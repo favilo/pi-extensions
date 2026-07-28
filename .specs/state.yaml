@@ -1,31 +1,22 @@
-active_flow: null
-active_epic_id: null
-active_story_id: null
+active_flow: extension_unit_coverage
+active_epic_id: e02
+active_story_id: e02s01
 active_bug_id: null
 git:
-  bookmark: favilo/bigpowers-closeout
+  bookmark: null
   parent_bookmark: main
-  change_id: tlmsuyql
+  change_id: mltkposz
 handoff:
-  last_step_completed: "Release 0.2.0 completed through merged PR #1; Bigpowers release metadata closed and epic archived"
+  last_step_completed: "verify-work and audit passed; seven unit tests discovered, 43 package tests green, F.I.R.S.T 5/5, security clear"
   open_decisions: []
   required_reading:
+    - .specs/product/SCOPE_LATEST.yaml
     - .specs/release-plan.yaml
-    - .specs/epics/archive/e01-mcp-provider-registry/epic.yaml
-  next_skill: null
+    - .specs/epics/e02-extension-unit-coverage/epic.yaml
+    - .specs/epics/e02-extension-unit-coverage/e02s01-extension-unit-contracts.md
+    - .specs/epics/e02-extension-unit-coverage/e02s01-tasks.yaml
+  next_skill: release-branch
   blocker: null
   deferred_work:
-    - Install and verify the private GitHub package on a second authenticated computer
-  verified_at: "2026-07-28T19:26:50Z"
-release:
-  pr: "https://github.com/favilo/pi-extensions/pull/1"
-  merged_commit: "782eb86eaaaeadb5a9f622b10f5b3423adfdcdbb"
-  merged_at: "2026-07-28T19:46:10Z"
-  ci_verified: false
-  ci_note: "No GitHub Actions workflows are configured"
-gate_trace:
-  verdict: WAIVED
-  generated_at: "2026-07-28T19:26:50Z"
-  rationale: "trace-stories, blind-spot, and completeness-critic scripts are unavailable; all four stories have explicit passing verify evidence"
-  heuristic_ratio: 0.0
-  downgrade_applied: false
+    - Add real Pi process integration tests after unit contracts are established
+  verified_at: "2026-07-28T20:39:58Z"

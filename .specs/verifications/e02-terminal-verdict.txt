@@ -1,0 +1,63 @@
+
+> pi-extensions@0.1.0 check
+> npm run typecheck && npm test
+
+
+> pi-extensions@0.1.0 typecheck
+> tsc --noEmit
+
+
+> pi-extensions@0.1.0 test
+> node --test extensions/*/*.test.ts examples/*/*.test.ts
+
+✔ the machine-local authoring example is decoupled from the registry implementation (5.24886ms)
+✔ the authoring example demonstrates the public contract without external services (3.282965ms)
+✔ denied writes use the denial text instead of a success message (0.939085ms)
+✔ successful writes do not produce error text (0.223708ms)
+✔ clear waits for idle, replaces the session, and reloads the replacement context (5.70394ms)
+✔ clear warns through the current context when replacement is cancelled (0.431606ms)
+✔ session start enables grep, find, and ls once while preserving active tools (1.581084ms)
+✔ tools-debug reports active and configured tool names (0.385701ms)
+✔ exit is a graceful alias that delegates to context shutdown (1.058639ms)
+✔ terminal focus reporting sequences update focus state (0.90429ms)
+✔ hardware cursor is hidden while the terminal is unfocused (0.218017ms)
+✔ focus does not enable a cursor hidden by another extension (0.300402ms)
+✔ jj status uses the bookmark reported for the working-copy commit (1.053409ms)
+✔ jj status falls back to the shortest stable change ID (0.211796ms)
+✔ jj status is absent outside a jj repository (0.150481ms)
+✔ jj status lookup does not snapshot the working copy (0.214151ms)
+✔ jj status requests the stable change ID instead of the commit ID (0.410457ms)
+✔ local context loads broad guidance before nearest overrides and stops at the Git boundary (2.415635ms)
+✔ local context leaves the system prompt unchanged when files are absent or empty (0.730586ms)
+✔ a failing provider status does not hide healthy providers (1.324446ms)
+✔ a conflicting provider tool does not replace the healthy owner (0.281085ms)
+✔ a provider registration failure does not block later providers (0.274213ms)
+✔ the package explicitly loads the shared MCP extension (4.327728ms)
+✔ a provider contributes a callable tool and named /mcp status section (1.409884ms)
+✔ a duplicate provider identity is visible without replacing the healthy provider (0.301904ms)
+✔ disposing a rejected duplicate preserves the accepted provider (0.384268ms)
+✔ provider registration is independent of extension load order (1.579432ms)
+✔ repeated registry availability does not duplicate provider tools (0.160299ms)
+✔ provider removal deactivates its tools (0.132277ms)
+✔ reload, new, resume, fork, and quit clean up runtime-owned provider state (1.30518ms)
+✔ 100 runtime replacement cycles leave no stale or duplicate tools (0.704276ms)
+✔ a provider can contribute tools after registration (1.145511ms)
+✔ multiple MCP providers contribute tools and named status sections (0.325068ms)
+✔ status collection for 100 synchronous providers completes within 50 ms (1.603126ms)
+✔ permissions parse from smol-toml tool-specific tables (2.158434ms)
+✔ file tools share read and write permission keys (0.145081ms)
+✔ deny rules take precedence over allow rules (0.282558ms)
+✔ fields within a rule are ANDed and rules are ORed (0.182872ms)
+✔ empty rules match every invocation while missing fields do not (0.105087ms)
+✔ arrays and objects are matched as compact JSON (0.106138ms)
+✔ allowing an entire tool persists an empty match-all rule (5.903323ms)
+✔ saving a rule preserves comments, formatting, and unrelated configuration (4.764024ms)
+✔ malformed permission rules are rejected (0.65829ms)
+ℹ tests 43
+ℹ suites 0
+ℹ pass 43
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 194.756472

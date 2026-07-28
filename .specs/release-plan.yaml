@@ -1,21 +1,18 @@
 release:
-  version: "0.2.0"
-  codename: Shareable MCP Provider Registry
-  status: completed
-  completed_at: "2026-07-28T19:46:10Z"
+  version: "0.2.1"
+  codename: Extension Unit Coverage
+  status: in_progress
   distribution: private_git
   semantic_release: false
   bump_hint: none
-  merged_pr: "https://github.com/favilo/pi-extensions/pull/1"
-  merged_commit: "782eb86eaaaeadb5a9f622b10f5b3423adfdcdbb"
 epics:
-  - id: e01
-    title: Shareable MCP Provider Registry
-    capsule_dir: epics/archive/e01-mcp-provider-registry
-    wsjf: 1.22
-    bcps: 18
+  - id: e02
+    title: Extension Unit Coverage
+    capsule_dir: epics/e02-extension-unit-coverage
+    wsjf: 2.0
+    bcps: 4
     note: >-
-      One cohesive epic establishes the provider-neutral registry, migrates the first real provider, proves lifecycle resilience, and enables other Pi agents to author providers from a self-contained example.
+      One focused characterization story adds deterministic unit contracts for the four currently untested extensions before process-level integration testing begins.
 bugs:
   total: 0
   fixed: 0

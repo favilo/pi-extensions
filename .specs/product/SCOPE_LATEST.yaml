@@ -1,205 +1,60 @@
-feature_name: shareable_mcp_provider_registry
+feature_name: extension_unit_coverage
 
 core_value: >-
-  Let independently installed MCP providers contribute tools and status to Pi
-  through one portable extension without coupling that extension to any provider.
+  Protect currently untested Pi extensions with fast, deterministic tests of their public behavior.
 
 summary: |-
-  This initiative makes the MCP extension shareable as part of this repository.
-  The shared extension owns the user-facing MCP command and a provider registry,
-  while independently loaded extensions contribute MCP tool providers and named
-  status sections. The shared extension must contain no Codex-specific imports,
-  names, configuration paths, data types, or presentation rules.
+  Add unit-level contract coverage for clear-reload, enable-extra-tools, exit, and local-agent-context. Tests exercise each extension through a minimal fake Pi API or isolated temporary filesystem rather than launching Pi.
 
-  The first integration migrates the machine-local Codex MCP extension to the
-  provider contract without moving its work-specific implementation or private
-  configuration into this repository. The registry supports multiple providers,
-  remains correct regardless of extension load order, and isolates provider and
-  individual MCP server failures so one failure does not prevent Pi or healthy
-  providers from operating.
-
-  A dedicated MCP README and a self-contained mock provider make the extension
-  usable as a foundation for other Pi agents. The example demonstrates the full
-  provider-facing behavior without requiring credentials, configuration, network
-  access, or a real MCP server.
+  This is characterization coverage: existing behavior should remain unchanged unless a test exposes a defect. The package-wide test command must discover the new files automatically.
 
 in_scope:
-  - future_story_id: e01s01
-    outcome: >-
-      A portable MCP extension in this repository exposes a provider registry and
-      the user-facing MCP status command without referring to Codex.
-  - future_story_id: e01s01
-    outcome: >-
-      Independently loaded MCP providers can contribute callable MCP tools through
-      the shared registry.
-  - future_story_id: e01s01
-    outcome: >-
-      Providers can contribute generic, provider-named status sections for display
-      by the shared MCP command.
-  - future_story_id: e01s01
-    outcome: >-
-      The registry supports zero, one, or multiple concurrently loaded providers.
-  - future_story_id: e01s02
-    outcome: >-
-      The machine-local Codex MCP extension registers itself as a provider without
-      requiring the shared extension to import or otherwise know about it.
-  - future_story_id: e01s02
-    outcome: >-
-      Existing Codex MCP tools, provider reporting, and useful server status
-      remain available through the decoupled provider integration.
-  - future_story_id: e01s03
-    outcome: >-
-      Provider registration and removal remain correct across arbitrary extension
-      load order, session reload, session replacement, and shutdown.
-  - future_story_id: e01s03
-    outcome: >-
-      A provider failure or individual MCP server failure is reported without
-      preventing Pi, the MCP command, or healthy providers and servers from working.
-  - future_story_id: e01s04
-    outcome: >-
-      A dedicated MCP README explains the extension's purpose, provider contract,
-      lifecycle expectations, failure isolation, and the path for creating another
-      provider.
-  - future_story_id: e01s04
-    outcome: >-
-      A self-contained mock extension demonstrates provider registration, a callable
-      tool, a named status section, failure reporting, and clean lifecycle behavior
-      without external dependencies.
-  - future_story_id: e01s04
-    outcome: >-
-      The README and example provide enough context for another Pi agent to build a
-      conforming MCP provider without reading the registry implementation first.
+  - future_story_id: e02s01
+    outcome: Cover /clear idle waiting, parent-session handoff, replacement reload, and cancellation notification.
+  - future_story_id: e02s01
+    outcome: Cover idempotent extra-tool activation and /tools-debug output.
+  - future_story_id: e02s01
+    outcome: Cover /exit graceful shutdown delegation.
+  - future_story_id: e02s01
+    outcome: Cover local context discovery order, Git boundary, trimming, empty-file omission, and no-op behavior.
 
 out_of_scope:
-  - item: Moving the Codex MCP implementation into this repository
-    reason: >-
-      Excluded because it is work-specific and may depend on private, local Codex
-      configuration; only the generic registry extension is intended to be shared.
-    disposition: retained_machine_locally
-  - item: Codex-specific behavior in the shared MCP extension
-    reason: >-
-      Prohibited because it would recreate the coupling this initiative exists to
-      remove and would prevent the registry from being provider-neutral.
-    disposition: prohibited
-  - item: Sharing MCP credentials, OAuth tokens, server configuration, or private application data
-    reason: >-
-      Excluded because these are provider-owned, sensitive, or machine-specific
-      concerns rather than package resources.
-    disposition: prohibited
-  - item: Replacing provider-owned MCP transports, authentication, or configuration parsing
-    reason: >-
-      Excluded because the registry coordinates providers; it does not standardize
-      how each provider connects to or authenticates with its MCP servers.
-    disposition: retained_by_providers
-  - item: New Codex MCP capabilities unrelated to registry adoption
-    reason: >-
-      Deferred to keep this initiative focused on decoupling and preserve a clear
-      regression boundary for existing Codex behavior.
-    disposition: deferred_to_future_story
-  - item: Public package-registry publication
-    reason: >-
-      Excluded because the repository's existing private git distribution already
-      satisfies the sharing requirement.
-    disposition: not_required
-  - item: Automatic installation or discovery of third-party provider extensions
-    reason: >-
-      Deferred because the current need is interoperability among extensions that
-      Pi has already loaded, not provider package management.
-    disposition: deferred_pending_demand
-  - item: Making the mock example a production MCP transport or provider
-    reason: >-
-      Excluded because the example exists to teach and verify the provider contract;
-      production transport, authentication, and configuration would obscure that
-      purpose and introduce external dependencies.
-    disposition: illustrative_only
+  - item: Real Pi process integration tests
+    reason: Deferred until unit contracts establish a stable, fast baseline.
+    disposition: future_integration_test_epic
+  - item: Production behavior changes
+    reason: This initiative characterizes existing contracts; defects discovered by tests require an explicit follow-up fix cycle.
+    disposition: prohibited_unless_test_exposes_defect
+  - item: Tests for already-covered extensions
+    reason: Existing tests already cover renderer, cursor, Jujutsu status, permissions, and MCP behavior.
+    disposition: retained_existing_coverage
 
 constraints:
-  compatibility:
-    - The shared extension must remain provider-neutral.
-    - Existing healthy Codex MCP tools and status information must remain available after migration.
-    - The registry must support independently packaged or machine-local provider extensions.
-  lifecycle:
-    - Correctness must not depend on extension load order.
-    - Reload and shutdown must not leave stale or duplicate providers or tools.
-  resilience:
-    - A failed provider must not prevent healthy providers from registering or operating.
-    - A failed MCP server must not prevent Pi or other servers from operating.
-    - Provider and server failures must remain visible to the user.
-  security:
-    - Provider credentials and machine-local configuration must remain outside this repository.
-    - The shared status surface must not expose secrets supplied by providers.
-  documentation:
-    - The MCP documentation must be understandable without prior knowledge of the Codex provider.
-    - The example must be self-contained and require no credentials, network access, configuration, or external MCP server.
-    - The example must favor clarity and contract coverage over production realism.
-  scope:
-    - This initiative changes integration boundaries, not the intended behavior of existing MCP tools.
+  technical:
+    - Use Node's built-in test runner and strict assertions.
+    - Add no dependency.
+    - Use temporary directories for filesystem scenarios and always clean them up.
+    - Test public extension behavior rather than private implementation details.
+  quality:
+    - Tests must be fast, independent, repeatable, self-validating, and timely.
+    - npm run check must remain green.
 
 success_criteria:
-  - future_story_id: e01s01
-    criterion: >-
-      The repository package loads a provider-neutral MCP extension that offers the
-      MCP command when no provider is installed.
-  - future_story_id: e01s01
-    criterion: >-
-      Two or more independent test providers can register concurrently, contribute
-      callable tools, and display distinct named status sections.
-  - future_story_id: e01s01
-    criterion: >-
-      The shared extension contains no import, type, event name, configuration path,
-      label, or conditional behavior specific to Codex.
-  - future_story_id: e01s02
-    criterion: >-
-      The machine-local Codex MCP extension contributes its tools and named status
-      sections solely through the shared provider contract.
-  - future_story_id: e01s02
-    criterion: >-
-      The shared MCP extension loads and operates when the Codex extension is absent.
-  - future_story_id: e01s03
-    criterion: >-
-      Reversing provider and registry load order produces the same available tools
-      and status output without duplicate registration.
-  - future_story_id: e01s03
-    criterion: >-
-      Reload, session replacement, and shutdown remove stale registrations and do
-      not duplicate providers or tools when a session starts again.
-  - future_story_id: e01s03
-    criterion: >-
-      A deliberately failing provider and a deliberately failing MCP server are
-      reported while Pi, the MCP command, healthy providers, and healthy servers
-      continue to operate.
-  - future_story_id: e01s03
-    criterion: >-
-      Existing package checks pass together with focused registry, lifecycle,
-      multi-provider, and failure-isolation verification.
-  - future_story_id: e01s04
-    criterion: >-
-      A dedicated MCP README documents provider registration, tool contribution,
-      named status sections, failure behavior, lifecycle cleanup, and testing.
-  - future_story_id: e01s04
-    criterion: >-
-      The mock provider runs without external setup and visibly demonstrates a
-      callable tool, healthy status, reported failure, and registration cleanup.
-  - future_story_id: e01s04
-    criterion: >-
-      A fresh Pi agent can use only the MCP README and mock provider as its primary
-      references to create a second conforming provider that passes contract checks.
+  - future_story_id: e02s01
+    criterion: Each of the four previously untested extension directories contains a focused index.test.ts file.
+  - future_story_id: e02s01
+    criterion: Focused tests and npm run check pass without network, credentials, or a real Pi process.
+  - future_story_id: e02s01
+    criterion: Tests cover positive behavior and important no-op or cancellation boundaries.
 
 references:
-  - path: .specs/PI_EXTENSIONS_MIGRATION.md
-    purpose: Existing package boundary and historical decision to keep Codex MCP local
-  - path: .specs/state.yaml
-    purpose: Current project state showing that no epic or story is active
   - path: package.json
-    purpose: Current explicit shared-extension package surface
-  - path: README.md
-    purpose: Current private package distribution and extension documentation
-  - path: ~/.pi/agent/extensions/mcp.ts
-    purpose: Existing coupled MCP status command to be made shareable
-  - path: ~/.pi/agent/extensions/codex-mcp.ts
-    purpose: Existing machine-local provider that must adopt the registry contract
-
-story_mapping_note: >-
-  No project epics or stories existed when this scope was written. The e01s01,
-  e01s02, e01s03, and e01s04 identifiers are provisional traceability reservations
-  for slice-tasks, not evidence of existing epic capsules or implementation plans.
+    purpose: Existing test discovery command
+  - path: extensions/clear-reload/index.ts
+    purpose: Clear-session command contract
+  - path: extensions/enable-extra-tools/index.ts
+    purpose: Tool activation and debug command contract
+  - path: extensions/exit/index.ts
+    purpose: Graceful shutdown alias contract
+  - path: extensions/local-agent-context/index.ts
+    purpose: Local context discovery and prompt augmentation contract

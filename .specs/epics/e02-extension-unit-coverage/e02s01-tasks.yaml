@@ -1,0 +1,59 @@
+story_id: e02s01
+title: Protect previously untested extensions with unit contracts
+status: passing
+bcps: 4
+tasks:
+  - id: 1
+    description: Characterize /clear idle waiting, parent-session handoff, replacement reload, UI notification, and cancellation behavior.
+    verify: node --test extensions/clear-reload/index.test.ts
+    status: passing
+    risk: P1
+    allure:
+      severity: high
+      categories:
+        - Extension Unit Coverage
+        - commands
+        - session lifecycle
+  - id: 2
+    description: Characterize idempotent activation of grep/find/ls and deterministic /tools-debug output.
+    verify: node --test extensions/enable-extra-tools/index.test.ts
+    status: passing
+    risk: P1
+    allure:
+      severity: high
+      categories:
+        - Extension Unit Coverage
+        - tools
+        - commands
+  - id: 3
+    description: Characterize /exit as a graceful shutdown alias without direct process termination.
+    verify: node --test extensions/exit/index.test.ts
+    status: passing
+    risk: P1
+    allure:
+      severity: high
+      categories:
+        - Extension Unit Coverage
+        - commands
+        - shutdown
+  - id: 4
+    description: Characterize local context discovery order, nearest Git boundary, trimming, empty-file omission, and no-op behavior using isolated temporary directories.
+    verify: node --test extensions/local-agent-context/index.test.ts
+    status: passing
+    risk: P1
+    allure:
+      severity: high
+      categories:
+        - Extension Unit Coverage
+        - context
+        - filesystem
+  - id: 5
+    description: Confirm package-wide discovery runs all new tests without regressing existing extensions.
+    verify: npm run check
+    status: passing
+    risk: P1
+    allure:
+      severity: high
+      categories:
+        - Extension Unit Coverage
+        - regression

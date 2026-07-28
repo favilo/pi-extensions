@@ -1,0 +1,36 @@
+story_id: e02s01
+verified_at: "2026-07-28T20:39:58Z"
+verifier: verify-work
+risk: P1
+status: passed
+phases:
+  typecheck:
+    passed: true
+    command: "npm run typecheck"
+  tests:
+    passed: true
+    command: "npm test"
+    result: "43 passed, 0 failed; seven new tests discovered"
+  terminal_verdict:
+    command: "npm run check"
+    exit_code: 0
+    captured_at: "2026-07-28T20:34:16Z"
+    stdout_stderr_file: ".specs/verifications/e02-terminal-verdict.txt"
+    sha256: "12b21646e3d2dfa8fbcf5bad6fb4d5f0d552aff252038c90f962e226ec212603"
+    note: "Single contiguous run"
+  first:
+    passed: true
+    report: ".specs/verifications/FIRST-e02s01.md"
+  security:
+    passed: true
+    note: "Test/spec-only change; no production source or runtime dependency changed"
+  manual:
+    passed: true
+    steps:
+      - step: "Confirm package test discovery includes the four previously untested extensions"
+        expected: "Seven focused tests appear and pass"
+        actual: "clear-reload (2), enable-extra-tools (2), exit (1), and local-agent-context (2) appeared and passed"
+        passed: true
+        confirmed_by_user: true
+  gaps:
+    closed: true
