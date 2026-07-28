@@ -4,13 +4,12 @@ active_story_id: null
 active_bug_id: null
 git:
   bookmark: main
-  change_id: mktqxmnw
+  change_id: lkwtzyot
 handoff:
-  last_step_completed: "Initial package pushed to the private GitHub repository"
-  open_decisions:
-    - "Original machine-local copies require explicit approval before removal"
+  last_step_completed: "Local package installed and fresh-process loading verified"
+  open_decisions: []
   required_reading:
     - .specs/PI_EXTENSIONS_MIGRATION.md
     - README.md
     - package.json
-  next_skill: survey-context
+  next_skill: verify-work

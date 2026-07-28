@@ -22,6 +22,7 @@ pi install git:github.com/favilo/pi-extensions
 - Work-specific `codex-mcp.ts`, `codex-mcp/`, and `mcp.ts` remain in `~/.pi/agent/extensions`.
 - `mcp.ts` remains local because it imports `codex-mcp.ts` and reports Codex-specific state.
 - Portable extensions are copied before originals are removed. Never remove the originals without explicit user approval.
+- This computer installs the local checkout for immediate `/reload` development; other computers install the private GitHub repository.
 
 ## Shared extensions
 
@@ -68,13 +69,15 @@ Completed:
 - Created the private GitHub repository `favilo/pi-extensions`.
 - Added the SSH remote with Jujutsu.
 - Created the `main` bookmark and pushed the initial package to GitHub.
+- Removed the eight original portable extension copies after explicit user approval.
+- Installed the local package path globally through Pi.
+- Verified a fresh Pi process loads the package without duplicate or startup diagnostics.
+- Verified the 24 retained Codex MCP tests still pass.
 
 Pending:
 
-1. Ask for explicit approval to remove the eight original portable extension copies from `~/.pi/agent/extensions`.
-2. Install the git package globally with Pi.
-3. Reload Pi and verify there are no duplicate commands or extensions.
-4. Confirm `codex-mcp` and `/mcp` still work locally.
+1. Reload the active Pi session.
+2. Manually confirm `/mcp`, `/permissions`, and `/clear` are available.
 
 ## Known issue
 

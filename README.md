@@ -4,13 +4,19 @@ Personal extensions for the [Pi coding agent](https://pi.dev).
 
 ## Install
 
-This is a private GitHub repository. Authenticate GitHub access on the target computer, then run:
+For active development, install the local checkout. Pi references it directly, so changes become available after `/reload`:
+
+```bash
+pi install ~/git/agent-skills/pi-extensions
+```
+
+On other computers, authenticate GitHub access and install the private repository:
 
 ```bash
 pi install git:github.com/favilo/pi-extensions
 ```
 
-Update the package with:
+Update a GitHub installation with:
 
 ```bash
 pi update git:github.com/favilo/pi-extensions
