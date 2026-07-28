@@ -1,0 +1,667 @@
+import { generateDiffString, isToolCallEventType, renderDiff, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { CURSOR_MARKER, matchesKey, visibleWidth, wrapTextWithAnsi, type Component, type Focusable } from "@earendil-works/pi-tui";
+import ignore from "ignore";
+import { spawn } from "node:child_process";
+import { appendFileSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
+import { homedir, tmpdir } from "node:os";
+import { dirname, join, relative, resolve } from "node:path";
+import {
+  loadPermissions,
+  parsePermissionRuleJson,
+  permissionDecision,
+  permissionKeyForTool,
+  saveAllowedRule,
+  type PermissionRule,
+} from "./config.ts";
+
+type ToolCallEventResult = { block: true; reason: string } | undefined;
+
+type PermissionContext = {
+  cwd: string;
+  hasUI: boolean;
+  mode: string;
+  ui: {
+    confirm(title: string, body: string): Promise<boolean>;
+    custom?<T>(
+      factory: (tui: { requestRender(force?: boolean): void; stop(): void; start(): void }, theme: unknown, keybindings: unknown, done: (value: T) => void) => unknown,
+    ): Promise<T>;
+    getEditorText?(): string;
+    setEditorText?(text: string): void;
+    notify?(message: string, level: "info" | "warning" | "error"): void;
+  };
+};
+
+type ReadInput = { path?: unknown };
+type PathToolInput = { path?: unknown };
+type FileEditInput = { path?: unknown };
+type BashInput = { command?: unknown };
+type SubagentInput = {
+  agent?: unknown;
+  task?: unknown;
+  tasks?: unknown;
+  chain?: unknown;
+  agentScope?: unknown;
+  cwd?: unknown;
+  timeout?: unknown;
+  instructions?: unknown;
+  abortOnFailure?: unknown;
+};
+type EditInput = { path?: unknown; edits?: Array<{ oldText?: unknown; newText?: unknown }> };
+type WriteInput = { path?: unknown; content?: unknown };
+
+type AuditEntry = {
+  time: string;
+  tool: string;
+  decision: string;
+  cwd: string;
+  path?: string;
+  command?: string;
+  pattern?: string;
+  reason?: string;
+  steering?: string;
+};
+
+type AllowPatternOption = {
+  toolName: string;
+  suggestedRule: PermissionRule;
+  subject: string;
+};
+
+type PermissionResult =
+  | { allowed: true; decision: "allow_once"; steering?: string }
+  | { allowed: true; decision: "allow_pattern"; pattern: string; steering?: string }
+  | { allowed: false; decision: "deny"; steering?: string };
+
+const CONFIG_PATH = join(homedir(), ".config", "pi", "config.toml");
+const AUDIT_LOG_PATH = join(homedir(), ".config", "pi", "audit.log");
+
+function ruleFromEditedBuffer(buffer: string): PermissionRule | undefined {
+  const line = buffer
+    .split("\n")
+    .map((candidate) => candidate.trim())
+    .find((candidate) => candidate && !candidate.startsWith("#"));
+  return line ? parsePermissionRuleJson(line) : undefined;
+}
+
+function isInsideDirectory(path: string, directory: string): boolean {
+  const rel = relative(resolve(directory), resolve(path));
+  return rel === "" || (!rel.startsWith("..") && !rel.startsWith("/") && !rel.match(/^[A-Za-z]:/));
+}
+
+function isAiIgnoredPath(path: string, cwd: string): boolean {
+  if (!isInsideDirectory(path, cwd)) return false;
+
+  let aiignore = "";
+  try {
+    aiignore = readFileSync(resolve(cwd, ".aiignore"), "utf8");
+  } catch {
+    return false;
+  }
+
+  const relativePath = relative(resolve(cwd), resolve(path)).replace(/\\/g, "/");
+  return ignore().add(aiignore).ignores(relativePath);
+}
+
+function escapeRegExpLiteral(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function exactPattern(value: string): string {
+  return `^${escapeRegExpLiteral(value)}$`;
+}
+
+function audit(entry: Omit<AuditEntry, "time">): void {
+  try {
+    mkdirSync(dirname(AUDIT_LOG_PATH), { recursive: true });
+    appendFileSync(AUDIT_LOG_PATH, `${JSON.stringify({ time: new Date().toISOString(), ...entry })}\n`, "utf8");
+  } catch {
+    // Never fail or allow a tool call because audit logging failed.
+  }
+}
+
+function compact(value: unknown, max = 2000): string {
+  const text = typeof value === "string" ? value : JSON.stringify(value, null, 2);
+  if (!text) return "(no arguments)";
+  return text.length > max ? `${text.slice(0, max)}\n…` : text;
+}
+
+function wrapWithContinuation(text: string, width: number, continuationPrefix: string): string[] {
+  const availableWidth = Math.max(1, width);
+  const prefixWidth = visibleWidth(continuationPrefix);
+  if (availableWidth <= prefixWidth) return wrapTextWithAnsi(text, availableWidth);
+
+  return wrapTextWithAnsi(text, availableWidth - prefixWidth).map((line, index) =>
+    index === 0 ? line : `${continuationPrefix}${line}`,
+  );
+}
+
+function isPrintableInput(data: string): boolean {
+  return data.length > 0 && !data.startsWith("\x1b") && !data.startsWith("\x00") && !data.startsWith("\x1f") && !/[\x00-\x08\x0b-\x1f\x7f]/.test(data);
+}
+
+function readTextIfPresent(path: string): string {
+  try {
+    return readFileSync(path, "utf8");
+  } catch {
+    return "";
+  }
+}
+
+function applyEditPreview(oldContent: string, edits: Array<{ oldText: string; newText: string }>): string {
+  const replacements = edits.map((edit, index) => {
+    const first = oldContent.indexOf(edit.oldText);
+    if (first === -1) throw new Error(`edit ${index + 1}: oldText was not found`);
+
+    const second = oldContent.indexOf(edit.oldText, first + edit.oldText.length);
+    if (second !== -1) throw new Error(`edit ${index + 1}: oldText matches more than once`);
+
+    return { index: first, length: edit.oldText.length, newText: edit.newText, editIndex: index };
+  });
+
+  replacements.sort((a, b) => a.index - b.index);
+  for (let i = 1; i < replacements.length; i++) {
+    const previous = replacements[i - 1];
+    const current = replacements[i];
+    if (previous.index + previous.length > current.index) {
+      throw new Error(`edit ${current.editIndex + 1}: replacement overlaps another edit`);
+    }
+  }
+
+  let next = oldContent;
+  for (const replacement of [...replacements].reverse()) {
+    next = next.slice(0, replacement.index) + replacement.newText + next.slice(replacement.index + replacement.length);
+  }
+  return next;
+}
+
+function truncateDiff(diff: string, maxLines = 240): string {
+  const lines = diff.split("\n");
+  if (lines.length <= maxLines) return diff;
+  return [...lines.slice(0, maxLines), `… diff truncated, ${lines.length - maxLines} more lines`].join("\n");
+}
+
+function diffPromptBody(path: string, oldContent: string, newContent: string, previewError?: string): string {
+  if (previewError) {
+    return `Path: ${path}\n\nDiff preview unavailable: ${previewError}\n\nReview the tool request carefully before allowing it.`;
+  }
+
+  if (oldContent === newContent) {
+    return `Path: ${path}\n\nNo content changes detected.`;
+  }
+
+  const { diff } = generateDiffString(oldContent, newContent, 3);
+  return `Path: ${path}\n\n${renderDiff(truncateDiff(diff), { filePath: path })}`;
+}
+
+function buildFileEditPrompt(toolName: string, input: unknown, cwd: string): { title: string; body: string } {
+  if (toolName === "write") {
+    const { path, content } = input as WriteInput;
+    if (typeof path !== "string" || typeof content !== "string") {
+      return { title: "Allow write?", body: `Invalid write arguments.\n\n${compact(input)}` };
+    }
+
+    const absolutePath = resolve(cwd, path);
+    const oldContent = readTextIfPresent(absolutePath);
+    return { title: `Allow write to ${path}?`, body: diffPromptBody(path, oldContent, content) };
+  }
+
+  const { path, edits } = input as EditInput;
+  if (typeof path !== "string" || !Array.isArray(edits)) {
+    return { title: "Allow edit?", body: `Invalid edit arguments.\n\n${compact(input)}` };
+  }
+
+  const absolutePath = resolve(cwd, path);
+  const oldContent = readTextIfPresent(absolutePath);
+  const normalizedEdits = edits.map((edit) => ({ oldText: String(edit.oldText ?? ""), newText: String(edit.newText ?? "") }));
+
+  try {
+    const newContent = applyEditPreview(oldContent, normalizedEdits);
+    return { title: `Allow edit to ${path}?`, body: diffPromptBody(path, oldContent, newContent) };
+  } catch (error) {
+    return { title: `Allow edit to ${path}?`, body: diffPromptBody(path, oldContent, oldContent, error instanceof Error ? error.message : String(error)) };
+  }
+}
+
+function getExternalEditorCommand(): string {
+  return process.env.VISUAL || process.env.EDITOR || (process.platform === "win32" ? "notepad" : "nano");
+}
+
+type TuiController = {
+  requestRender(force?: boolean): void;
+  stop(): void;
+  start(): void;
+};
+
+async function launchExternalEditor(tui: TuiController, path: string): Promise<boolean> {
+  const editorCmd = getExternalEditorCommand();
+
+  try {
+    tui.stop();
+    process.stdout.write(`Launching external editor: ${editorCmd}\nPi will resume when the editor exits.\n`);
+    const [editor, ...editorArgs] = editorCmd.split(" ");
+    const status = await new Promise<number | null>((resolveStatus) => {
+      const child = spawn(editor, [...editorArgs, path], { stdio: "inherit", shell: process.platform === "win32" });
+      child.on("error", () => resolveStatus(null));
+      child.on("close", (code) => resolveStatus(code));
+    });
+    return status === 0;
+  } finally {
+    tui.start();
+    tui.requestRender(true);
+  }
+}
+
+async function editPatternInExternalEditor(tui: TuiController, option: AllowPatternOption): Promise<PermissionRule | undefined> {
+  const tmpFile = join(tmpdir(), `pi-allow-pattern-${Date.now()}.txt`);
+  const buffer = [
+    "# Edit the JSON rule below, save, and exit.",
+    "# Fields use dot paths; values are JavaScript RegExp pattern strings.",
+    "# An empty object allows every invocation of the tool.",
+    `# Tool: ${option.toolName}`,
+    `# Subject: ${option.subject}`,
+    "",
+    JSON.stringify(option.suggestedRule),
+    "",
+  ].join("\n");
+
+  try {
+    writeFileSync(tmpFile, buffer, "utf8");
+    if (!await launchExternalEditor(tui, tmpFile)) return undefined;
+    return ruleFromEditedBuffer(readFileSync(tmpFile, "utf8"));
+  } finally {
+    try {
+      unlinkSync(tmpFile);
+    } catch {
+      // Ignore cleanup errors.
+    }
+  }
+}
+
+async function editPermissionsInExternalEditor(ctx: PermissionContext): Promise<void> {
+  if (ctx.mode !== "tui" || !ctx.ui.custom) {
+    throw new Error("The permissions editor is only available in interactive TUI mode.");
+  }
+
+  mkdirSync(dirname(CONFIG_PATH), { recursive: true });
+  appendFileSync(CONFIG_PATH, "", "utf8");
+
+  await ctx.ui.custom<void>((tui, theme: any, _keybindings, done) => {
+    void launchExternalEditor(tui, CONFIG_PATH)
+      .then((succeeded) => {
+        if (!succeeded) ctx.ui.notify?.(`Editor exited without saving ${CONFIG_PATH}.`, "error");
+        done(undefined);
+      })
+      .catch((error) => {
+        ctx.ui.notify?.(error instanceof Error ? error.message : String(error), "error");
+        done(undefined);
+      });
+
+    return {
+      render(width: number): string[] {
+        return wrapTextWithAnsi(theme.fg("muted", `Editing ${CONFIG_PATH}…`), width);
+      },
+      invalidate(): void { },
+    };
+  });
+}
+
+async function askScrollablePermission(
+  pi: ExtensionAPI,
+  ctx: PermissionContext,
+  title: string,
+  body: string,
+  allowPattern?: AllowPatternOption,
+  stickyHeader?: string,
+): Promise<PermissionResult> {
+  if (ctx.mode !== "tui" || !ctx.ui.custom) {
+    const bodyWithHeader = stickyHeader ? `${stickyHeader}\n\n${body}` : body;
+    const allowed = await ctx.ui.confirm(title, bodyWithHeader);
+    return allowed ? { allowed: true, decision: "allow_once" } : { allowed: false, decision: "deny" };
+  }
+
+  const rawLines = body.split("\n");
+  const pageSize = 28;
+  let offset = 0;
+  let scrollableLineCount = rawLines.length;
+  let steeringMode = false;
+  let steeringText = "";
+
+  return ctx.ui.custom<PermissionResult>((tui, theme: any, _keybindings, done) => {
+    const finishWithSteering = (result: PermissionResult, steering: string): void => {
+      pi.sendUserMessage(steering, { deliverAs: "steer" });
+      done({ ...result, steering });
+    };
+
+    const component: Component & Focusable = {
+      focused: false,
+      render(width: number): string[] {
+      const continuationPrefix = theme.fg("muted", "… ");
+      const contentWidth = Math.max(1, width - 2);
+      const wrappedBody = rawLines.flatMap((line) => wrapWithContinuation(line, contentWidth, continuationPrefix));
+      scrollableLineCount = wrappedBody.length;
+
+      const maxOffset = Math.max(0, scrollableLineCount - pageSize);
+      offset = Math.max(0, Math.min(offset, maxOffset));
+      const visible = wrappedBody.slice(offset, offset + pageSize);
+      const position = scrollableLineCount > pageSize ? ` lines ${offset + 1}-${Math.min(offset + pageSize, scrollableLineCount)} of ${scrollableLineCount}` : "";
+      const allowHint = allowPattern ? " • Ctrl+A allow+save pattern • Ctrl+E edit pattern" : "";
+      const steeringAllowHint = allowPattern ? " • Ctrl+A allow+save+steer" : "";
+      const steeringHint = steeringMode
+        ? `Ctrl+Y allow once+steer${steeringAllowHint} • Ctrl+D deny+steer`
+        : "Tab add steering message • Ctrl+D deny";
+      const shortcuts = `↑/↓ or j/k scroll • PgUp/PgDn page • Home/End jump • Ctrl+Y allow once${allowHint} • ${steeringHint}${position}`;
+      const wrap = (text: string): string[] => wrapWithContinuation(text, width, continuationPrefix);
+
+      return [
+        ...wrap(theme.fg("accent", theme.bold(title))),
+        ...(stickyHeader ? wrap(theme.fg("muted", stickyHeader)) : []),
+        ...(allowPattern ? wrap(theme.fg("muted", `Rule: ${JSON.stringify(allowPattern.suggestedRule)}`)) : []),
+        "",
+        ...visible,
+        "",
+        ...(steeringMode
+          ? [
+              ...wrap(theme.fg("warning", `Steering: ${steeringText}${component.focused ? CURSOR_MARKER : ""}\x1b[7m \x1b[27m`)),
+              ...wrap(theme.fg("dim", steeringText.trim() ? "choose allow or deny" : "type a message; Esc returns")),
+            ]
+          : []),
+        ...wrap(theme.fg("dim", shortcuts)),
+      ];
+    },
+    handleInput(data: string): void {
+      const maxOffset = Math.max(0, scrollableLineCount - pageSize);
+      const steeringMessage = steeringText.trim();
+
+      if (steeringMode) {
+        if (matchesKey(data, "ctrl+y")) {
+          if (!steeringMessage) return;
+          finishWithSteering({ allowed: true, decision: "allow_once" }, steeringMessage);
+          return;
+        }
+        if (allowPattern && matchesKey(data, "ctrl+a")) {
+          if (!steeringMessage) return;
+          saveAllowedRule(CONFIG_PATH, permissionKeyForTool(allowPattern.toolName), allowPattern.suggestedRule);
+          finishWithSteering(
+            { allowed: true, decision: "allow_pattern", pattern: JSON.stringify(allowPattern.suggestedRule) },
+            steeringMessage,
+          );
+          return;
+        }
+        if (matchesKey(data, "ctrl+d")) {
+          if (steeringMessage) finishWithSteering({ allowed: false, decision: "deny" }, steeringMessage);
+          else done({ allowed: false, decision: "deny" });
+          return;
+        }
+        if (matchesKey(data, "escape")) {
+          steeringMode = false;
+          tui.requestRender();
+          return;
+        }
+        if (matchesKey(data, "backspace")) {
+          steeringText = steeringText.slice(0, -1);
+          tui.requestRender();
+          return;
+        }
+        if (isPrintableInput(data)) {
+          steeringText += data;
+          tui.requestRender();
+        }
+        return;
+      }
+
+      if (matchesKey(data, "tab")) {
+        steeringMode = true;
+        tui.requestRender();
+        return;
+      }
+      if (matchesKey(data, "ctrl+y")) {
+        done({ allowed: true, decision: "allow_once" });
+        return;
+      }
+      if (allowPattern && matchesKey(data, "ctrl+a")) {
+        saveAllowedRule(CONFIG_PATH, permissionKeyForTool(allowPattern.toolName), allowPattern.suggestedRule);
+        done({ allowed: true, decision: "allow_pattern", pattern: JSON.stringify(allowPattern.suggestedRule) });
+        return;
+      }
+      if (allowPattern && matchesKey(data, "ctrl+e")) {
+        void editPatternInExternalEditor(tui, allowPattern).then((rule) => {
+          if (rule) {
+            saveAllowedRule(CONFIG_PATH, permissionKeyForTool(allowPattern.toolName), rule);
+            done({ allowed: true, decision: "allow_pattern", pattern: JSON.stringify(rule) });
+          }
+        });
+        return;
+      }
+      if (matchesKey(data, "ctrl+d")) {
+        done({ allowed: false, decision: "deny" });
+        return;
+      }
+      if (matchesKey(data, "up") || data === "k") offset = Math.max(0, offset - 1);
+      else if (matchesKey(data, "down") || data === "j") offset = Math.min(maxOffset, offset + 1);
+      else if (matchesKey(data, "pageUp") || data === "b") offset = Math.max(0, offset - pageSize);
+      else if (matchesKey(data, "pageDown") || data === "f" || data === " ") offset = Math.min(maxOffset, offset + pageSize);
+      else if (matchesKey(data, "home") || data === "g") offset = 0;
+      else if (matchesKey(data, "end") || data === "G") offset = maxOffset;
+      tui.requestRender();
+    },
+      invalidate(): void { },
+    };
+
+    return component;
+  });
+}
+
+function configuredDecision(toolName: string, input: unknown): "allow" | "deny" | "prompt" {
+  return permissionDecision(loadPermissions(CONFIG_PATH)[permissionKeyForTool(toolName)], input);
+}
+
+function configuredDeny(toolName: string, ctx: PermissionContext, details: Pick<AuditEntry, "path" | "command"> = {}): ToolCallEventResult {
+  const reason = `Blocked ${toolName}: arguments match a configured deny rule.`;
+  audit({ tool: toolName, decision: "deny_pattern", cwd: ctx.cwd, ...details, reason });
+  return { block: true, reason };
+}
+
+async function handlePathPermission(toolName: string, input: PathToolInput, ctx: PermissionContext, pi: ExtensionAPI): Promise<ToolCallEventResult> {
+  const requestedPath = typeof input.path === "string" ? input.path : "";
+  const absolutePath = resolve(ctx.cwd, requestedPath || ".");
+  const normalizedInput = { ...input, path: absolutePath };
+  const decision = configuredDecision(toolName, normalizedInput);
+
+  if (decision === "deny") return configuredDeny(toolName, ctx, { path: absolutePath });
+  if (isAiIgnoredPath(absolutePath, ctx.cwd)) {
+    const reason = `Blocked ${toolName}: ${requestedPath || "."} is matched by ${resolve(ctx.cwd, ".aiignore")}.`;
+    audit({ tool: toolName, decision: "deny_aiignore", cwd: ctx.cwd, path: absolutePath, reason });
+    return { block: true, reason };
+  }
+  if (decision === "allow" || isInsideDirectory(absolutePath, ctx.cwd)) {
+    if (decision === "allow") audit({ tool: toolName, decision: "allow_pattern", cwd: ctx.cwd, path: absolutePath });
+    return;
+  }
+  if (!ctx.hasUI) {
+    const reason = `Blocked ${toolName}: accessing paths outside the project requires explicit interactive permission or an allow rule.`;
+    audit({ tool: toolName, decision: "deny_no_ui", cwd: ctx.cwd, path: absolutePath, reason });
+    return { block: true, reason };
+  }
+
+  const result = await askScrollablePermission(
+    pi,
+    ctx,
+    `Allow external ${toolName} path?`,
+    `pi wants to use ${toolName} on a path outside the project directory.\n\nProject: ${ctx.cwd}\nPath: ${absolutePath}\n\nRules are stored under permissions.read in ${CONFIG_PATH}.`,
+    { toolName, suggestedRule: { path: exactPattern(absolutePath) }, subject: absolutePath },
+  );
+
+  audit({ tool: toolName, decision: result.decision, cwd: ctx.cwd, path: absolutePath, pattern: "pattern" in result ? result.pattern : undefined, steering: result.steering });
+  if (!result.allowed) return { block: true, reason: `User denied external ${toolName} path.` };
+}
+
+async function handleReadPermission(input: ReadInput, ctx: PermissionContext, pi: ExtensionAPI): Promise<ToolCallEventResult> {
+  return handlePathPermission("read", input, ctx, pi);
+}
+
+async function handleFileEditPermission(toolName: string, input: FileEditInput, ctx: PermissionContext, pi: ExtensionAPI): Promise<ToolCallEventResult> {
+  const requestedPath = typeof input.path === "string" ? input.path : "";
+  const absolutePath = resolve(ctx.cwd, requestedPath);
+  const decision = configuredDecision(toolName, { ...input, path: absolutePath });
+
+  if (decision === "deny") return configuredDeny(toolName, ctx, { path: absolutePath });
+  if (decision === "allow") {
+    audit({ tool: toolName, decision: "allow_pattern", cwd: ctx.cwd, path: absolutePath });
+    return;
+  }
+  if (!ctx.hasUI) {
+    const reason = `Blocked ${toolName}: file edits require explicit interactive permission or an allow rule.`;
+    audit({ tool: toolName, decision: "deny_no_ui", cwd: ctx.cwd, path: absolutePath, reason });
+    return { block: true, reason };
+  }
+
+  const prompt = buildFileEditPrompt(toolName, input, ctx.cwd);
+  const result = await askScrollablePermission(
+    pi,
+    ctx,
+    prompt.title,
+    prompt.body,
+    { toolName, suggestedRule: { path: exactPattern(absolutePath) }, subject: absolutePath },
+    `Path: ${requestedPath || absolutePath}`,
+  );
+
+  audit({ tool: toolName, decision: result.decision, cwd: ctx.cwd, path: absolutePath, pattern: "pattern" in result ? result.pattern : undefined, steering: result.steering });
+  if (!result.allowed) return { block: true, reason: `User denied ${toolName}.` };
+}
+
+async function handleBashPermission(input: BashInput, ctx: PermissionContext, pi: ExtensionAPI): Promise<ToolCallEventResult> {
+  const command = typeof input.command === "string" ? input.command : "";
+  const decision = configuredDecision("bash", input);
+
+  if (decision === "deny") return configuredDeny("bash", ctx, { command });
+  if (decision === "allow") {
+    audit({ tool: "bash", decision: "allow_pattern", cwd: ctx.cwd, command });
+    return;
+  }
+  if (!ctx.hasUI) {
+    const reason = "Blocked bash command: command requires explicit interactive permission or an allow rule.";
+    audit({ tool: "bash", decision: "deny_no_ui", cwd: ctx.cwd, command, reason });
+    return { block: true, reason };
+  }
+
+  const result = await askScrollablePermission(
+    pi,
+    ctx,
+    "Allow bash command?",
+    `pi wants to run this shell command.\n\n${compact(command)}\n\nRules are stored under permissions.bash in ${CONFIG_PATH}.`,
+    { toolName: "bash", suggestedRule: { command: exactPattern(command) }, subject: command },
+  );
+
+  audit({ tool: "bash", decision: result.decision, cwd: ctx.cwd, command, pattern: "pattern" in result ? result.pattern : undefined, steering: result.steering });
+  if (!result.allowed) return { block: true, reason: "User denied bash command." };
+}
+
+async function handleSubagentPermission(input: SubagentInput, ctx: PermissionContext, pi: ExtensionAPI): Promise<ToolCallEventResult> {
+  const decision = configuredDecision("subagent", input);
+  if (decision === "deny") return configuredDeny("subagent", ctx);
+  if (decision === "allow") {
+    audit({ tool: "subagent", decision: "allow_pattern", cwd: ctx.cwd });
+    return;
+  }
+  if (!ctx.hasUI) {
+    const reason = "Blocked subagent: delegation requires explicit interactive permission or an allow rule.";
+    audit({ tool: "subagent", decision: "deny_no_ui", cwd: ctx.cwd, reason });
+    return { block: true, reason };
+  }
+
+  const result = await askScrollablePermission(
+    pi,
+    ctx,
+    "Allow subagent delegation?",
+    [
+      "pi wants to delegate work to one or more child agents.",
+      "",
+      "Child agents run in isolated Pi sessions. Depending on the selected agent, they may execute shell commands and modify files. Their nested tool calls do not pass through this parent permission prompt.",
+      "",
+      "Requested delegation:",
+      compact(input, 8000),
+    ].join("\n"),
+    { toolName: "subagent", suggestedRule: {}, subject: "all subagent calls" },
+  );
+
+  audit({ tool: "subagent", decision: result.decision, cwd: ctx.cwd, pattern: "pattern" in result ? result.pattern : undefined, steering: result.steering });
+  if (!result.allowed) return { block: true, reason: "User denied subagent delegation." };
+}
+
+function isKnownMcpTool(toolName: string, pi: ExtensionAPI): boolean {
+  return toolName.startsWith("mcp__") && pi.getAllTools().some((tool) => tool.name === toolName);
+}
+
+async function handleUnknownToolPermission(toolName: string, input: unknown, ctx: PermissionContext, pi: ExtensionAPI): Promise<ToolCallEventResult> {
+  const knownMcpTool = isKnownMcpTool(toolName, pi);
+  if (knownMcpTool) {
+    const decision = configuredDecision(toolName, input);
+    if (decision === "deny") return configuredDeny(toolName, ctx);
+    if (decision === "allow") {
+      audit({ tool: toolName, decision: "allow_pattern", cwd: ctx.cwd });
+      return;
+    }
+  }
+
+  if (!ctx.hasUI) {
+    const reason = `Blocked ${toolName}: tool use requires explicit interactive permission or an allow rule.`;
+    audit({ tool: toolName, decision: "deny_no_ui", cwd: ctx.cwd, reason });
+    return { block: true, reason };
+  }
+
+  const result = await askScrollablePermission(
+    pi,
+    ctx,
+    `Allow ${toolName}?`,
+    [
+      knownMcpTool ? "pi wants to call a known MCP tool without a matching permission rule." : "pi wants to call a tool without a specific permission rule.",
+      "",
+      `Tool: ${toolName}`,
+      "",
+      "Arguments:",
+      compact(input, 8000),
+    ].join("\n"),
+    knownMcpTool ? { toolName, suggestedRule: {}, subject: "all calls to this MCP tool" } : undefined,
+  );
+
+  audit({ tool: toolName, decision: result.decision, cwd: ctx.cwd, pattern: "pattern" in result ? result.pattern : undefined, steering: result.steering });
+  if (!result.allowed) return { block: true, reason: `User denied ${toolName}.` };
+}
+
+export default function toolPermissionPolicy(pi: ExtensionAPI) {
+  pi.registerCommand("permissions", {
+    description: `Edit tool permissions in ${CONFIG_PATH}`,
+    handler: async (_args, ctx) => {
+      await ctx.waitForIdle();
+      try {
+        await editPermissionsInExternalEditor(ctx);
+      } catch (error) {
+        ctx.ui.notify(error instanceof Error ? error.message : String(error), "error");
+      }
+    },
+  });
+
+  pi.on("tool_call", async (event, ctx) => {
+    if (isToolCallEventType("read", event)) {
+      return handleReadPermission(event.input, ctx, pi);
+    }
+
+    if (isToolCallEventType("grep", event) || isToolCallEventType("find", event) || isToolCallEventType("ls", event)) {
+      return handlePathPermission(event.toolName, event.input, ctx, pi);
+    }
+
+    if (isToolCallEventType("write", event) || isToolCallEventType("edit", event)) {
+      return handleFileEditPermission(event.toolName, event.input, ctx, pi);
+    }
+
+    if (isToolCallEventType("bash", event)) {
+      return handleBashPermission(event.input, ctx, pi);
+    }
+
+    if (isToolCallEventType<"subagent", SubagentInput>("subagent", event)) {
+      return handleSubagentPermission(event.input, ctx, pi);
+    }
+
+    return handleUnknownToolPermission(event.toolName, event.input, ctx, pi);
+  });
+}

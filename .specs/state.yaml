@@ -1,0 +1,16 @@
+active_flow: package_migration
+active_epic_id: null
+active_story_id: null
+active_bug_id: null
+git:
+  bookmark: main
+  change_id: sltwypzp
+handoff:
+  last_step_completed: "Private GitHub repository created and SSH remote configured"
+  open_decisions:
+    - "Original machine-local copies require explicit approval before removal"
+  required_reading:
+    - .specs/PI_EXTENSIONS_MIGRATION.md
+    - README.md
+    - package.json
+  next_skill: survey-context
