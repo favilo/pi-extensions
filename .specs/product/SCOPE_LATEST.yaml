@@ -1,60 +1,142 @@
-feature_name: extension_unit_coverage
+feature_name: directory_local_tool_permissions
 
 core_value: >-
-  Protect currently untested Pi extensions with fast, deterministic tests of their public behavior.
+  Let users grant narrowly scoped tool permissions for trusted project directories without weakening permissions elsewhere.
 
 summary: |-
-  Add unit-level contract coverage for clear-reload, enable-extra-tools, exit, and local-agent-context. Tests exercise each extension through a minimal fake Pi API or isolated temporary filesystem rather than launching Pi.
+  Extend the existing tool-permissions extension with hierarchical project policy files. A directory may contain `.pi/permissions.toml`; when Pi starts inside a Git or Jujutsu repository, the extension searches from the working directory upward through the nearest repository root. Broad parent policy is considered first, but the nearest matching rule wins. If no project rule matches, evaluation falls back to the existing user policy.
 
-  This is characterization coverage: existing behavior should remain unchanged unless a test exposes a defect. The package-wide test command must discover the new files automatically.
+  Project policy is honored only when backed by an explicit persisted Pi trust decision. A trusted parent covers its descendants; a child denial overrides a trusted parent. Configuration above the path covered by the matched trust decision is ignored. For e03, trust provenance is resolved from Pi's user trust store behind an internal abstraction so a future public Pi API can replace that mechanism.
+
+  Permission prompts gain explicit save scopes: Ctrl+A allows and saves the suggested rule to the current directory's `.pi/permissions.toml`, while Ctrl+Shift+A allows and saves it to the existing user configuration. Permission rules remain TOML and separate from Pi's JSON settings.
 
 in_scope:
-  - future_story_id: e02s01
-    outcome: Cover /clear idle waiting, parent-session handoff, replacement reload, and cancellation notification.
-  - future_story_id: e02s01
-    outcome: Cover idempotent extra-tool activation and /tools-debug output.
-  - future_story_id: e02s01
-    outcome: Cover /exit graceful shutdown delegation.
-  - future_story_id: e02s01
-    outcome: Cover local context discovery order, Git boundary, trimming, empty-file omission, and no-op behavior.
+  - future_epic_id: e03
+    outcome: Extend `extensions/tool-permissions/` rather than introduce a replacement extension.
+  - future_epic_id: e03
+    outcome: Discover `.pi/permissions.toml` from the working directory upward through the nearest `.git` or `.jj` repository root.
+  - future_epic_id: e03
+    outcome: Resolve matching project rules from broadest to nearest so the nearest matching decision wins, then fall back to user policy when no project rule matches.
+  - future_epic_id: e03
+    outcome: Honor project policy only under the path covered by the nearest explicit persisted Pi trust decision.
+  - future_epic_id: e03
+    outcome: Save an allowed rule to the current directory's project policy with Ctrl+A.
+  - future_epic_id: e03
+    outcome: Save an allowed rule to user policy with Ctrl+Shift+A.
+  - future_epic_id: e03
+    outcome: Make the active save scope and destination clear in prompt hints and completion feedback.
+  - future_story_id: e03s03
+    outcome: Support `/permissions user` and trust-gated `/permissions local`, while preserving bare `/permissions` as the user-policy editor.
+  - future_epic_id: e03
+    outcome: Isolate trust resolution behind a replaceable interface so a future supported Pi API can supersede direct trust-store reading.
 
 out_of_scope:
-  - item: Real Pi process integration tests
-    reason: Deferred until unit contracts establish a stable, fast baseline.
-    disposition: future_integration_test_epic
-  - item: Production behavior changes
-    reason: This initiative characterizes existing contracts; defects discovered by tests require an explicit follow-up fix cycle.
-    disposition: prohibited_unless_test_exposes_defect
-  - item: Tests for already-covered extensions
-    reason: Existing tests already cover renderer, cursor, Jujutsu status, permissions, and MCP behavior.
-    disposition: retained_existing_coverage
+  - item: Changing Pi core or the native `pi config` command
+    reason: The capability extends the repository's existing tool-permissions extension and should not require a Pi fork.
+    disposition: excluded
+  - item: Integrating permission rules into Pi's JSON settings
+    reason: Pi exposes no extension settings namespace, its generic array merge does not provide rule-level precedence, and TOML is preferred for manually edited permission rules.
+    disposition: rejected_for_e03
+  - item: Searching for project policy above the nearest `.git` or `.jj` repository root toward `$HOME`
+    reason: Broader hierarchical overrides may be useful, but their boundaries and interaction with user-global policy require separate design.
+    disposition: deferred
+  - item: Loading project policy without an explicit persisted Pi trust decision
+    reason: Repository-controlled allow rules could otherwise silently authorize commands on the user's machine.
+    disposition: prohibited
+  - item: Treating session-only trust or one-run CLI approval as persisted trust
+    reason: Pi's public extension context exposes only a boolean and does not expose the matched trust path or provenance needed for safe ancestor policy loading.
+    disposition: deferred_until_supported
+  - item: Changing Ctrl+E pattern-editing behavior
+    reason: The requested interaction changes direct allow-and-save shortcuts; scoped pattern editing can follow after the storage model is proven.
+    disposition: deferred
+  - item: Migrating existing user permission rules automatically
+    reason: Existing user policy remains readable without destructive format migration.
+    disposition: excluded
+  - item: Changing audit-log scope or retention
+    reason: Permission resolution changes do not require separate project audit logs.
+    disposition: retained_existing_behavior
 
 constraints:
-  technical:
-    - Use Node's built-in test runner and strict assertions.
-    - Add no dependency.
-    - Use temporary directories for filesystem scenarios and always clean them up.
-    - Test public extension behavior rather than private implementation details.
-  quality:
-    - Tests must be fast, independent, repeatable, self-validating, and timely.
-    - npm run check must remain green.
+  behavioral:
+    - Within one policy file, deny rules retain precedence over allow rules.
+    - Across project policy files, the nearest matching decision wins.
+    - Any matching project decision wins over a conflicting user-level decision.
+    - If no project policy matches, evaluation falls back to user-level policy.
+    - Search includes the working directory and stops after the nearest directory containing `.git` or `.jj`.
+    - Outside a Git or Jujutsu repository, only the working directory is eligible for project policy in e03.
+  trust:
+    - Resolve the nearest persisted Pi trust decision for the working directory.
+    - A persisted trusted parent covers descendant directories unless a nearer persisted denial applies.
+    - Ignore candidate policy files above the path named by the matched trusted entry.
+    - Missing, denied, malformed, or unreadable trust data disables project policy without weakening user policy.
+    - Direct trust-store access must be encapsulated so its implementation can be replaced without changing permission evaluation.
+  security:
+    - Missing project policy is ignored, but an eligible malformed or unreadable project policy forces an interactive warning prompt and blocks in non-interactive modes.
+    - A failed save must not report success or allow a call as though persistence succeeded.
+    - Canonicalize paths before trust-boundary, repository-boundary, and precedence comparisons.
+  compatibility:
+    - Existing `~/.config/pi/config.toml` permission rules continue to work without manual migration.
+    - Interactive and non-interactive permission behavior remains unchanged when no eligible project policy exists.
+    - Use Pi's exported `CONFIG_DIR_NAME` rather than hardcoding `.pi` in implementation, while documenting `.pi` as the default user-facing path.
+  product:
+    - Keep permission configuration in dedicated TOML files.
+    - Keep configuration understandable and manually editable.
 
 success_criteria:
-  - future_story_id: e02s01
-    criterion: Each of the four previously untested extension directories contains a focused index.test.ts file.
-  - future_story_id: e02s01
-    criterion: Focused tests and npm run check pass without network, credentials, or a real Pi process.
-  - future_story_id: e02s01
-    criterion: Tests cover positive behavior and important no-op or cancellation boundaries.
+  - future_epic_id: e03
+    criterion: A rule in the current directory overrides a conflicting rule in a parent project policy file.
+  - future_epic_id: e03
+    criterion: A matching trusted parent rule applies to descendant working directories through the repository root.
+  - future_epic_id: e03
+    criterion: A project allow overrides a conflicting user deny, and a project deny overrides a conflicting user allow.
+  - future_epic_id: e03
+    criterion: A call without a matching project rule receives the existing user-level decision.
+  - future_epic_id: e03
+    criterion: Policy above the repository root or above the matched trusted path is ignored.
+  - future_epic_id: e03
+    criterion: A nearer explicit trust denial prevents inherited parent project policy from loading.
+  - future_epic_id: e03
+    criterion: Missing, malformed, denied, or unreadable trust information disables project policy while preserving user-policy behavior.
+  - future_story_id: e03s01
+    criterion: An eligible malformed or unreadable project policy produces a warning prompt interactively and blocks the tool call non-interactively.
+  - future_epic_id: e03
+    criterion: Ctrl+A persists the suggested allow rule to the current directory's project policy, while Ctrl+Shift+A persists it to user scope, and the prompt communicates both choices.
+  - future_story_id: e03s03
+    criterion: "/permissions user edits user policy, /permissions local edits the eligible current-directory policy, and bare /permissions remains user-scoped."
+  - future_epic_id: e03
+    criterion: Existing package checks remain green and existing user-only configurations preserve their behavior.
 
 references:
-  - path: package.json
-    purpose: Existing test discovery command
-  - path: extensions/clear-reload/index.ts
-    purpose: Clear-session command contract
-  - path: extensions/enable-extra-tools/index.ts
-    purpose: Tool activation and debug command contract
-  - path: extensions/exit/index.ts
-    purpose: Graceful shutdown alias contract
+  - path: extensions/tool-permissions/config.ts
+    purpose: Existing TOML permission parsing, matching, and persistence behavior
+  - path: extensions/tool-permissions/index.ts
+    purpose: Existing permission prompts, shortcuts, policy evaluation, and audit behavior
   - path: extensions/local-agent-context/index.ts
-    purpose: Local context discovery and prompt augmentation contract
+    purpose: Existing ancestor traversal and repository-boundary precedent
+  - path: README.md
+    purpose: Current user-facing permission configuration documentation
+  - path: ${HOME}/.nvm/versions/node/v24.6.0/lib/node_modules/@earendil-works/pi-coding-agent/docs/settings.md
+    purpose: Native global/project settings and project trust behavior
+  - path: ${HOME}/.nvm/versions/node/v24.6.0/lib/node_modules/@earendil-works/pi-coding-agent/docs/keybindings.md
+    purpose: Supported Ctrl+Shift shortcut syntax
+  - path: ${HOME}/.nvm/versions/node/v24.6.0/lib/node_modules/@earendil-works/pi-coding-agent/docs/extensions.md
+    purpose: "CONFIG_DIR_NAME, extension context, and project trust API"
+  - path: node_modules/@earendil-works/pi-coding-agent/dist/core/trust-manager.js
+    purpose: Current persisted trust lookup semantics and trust-requiring resource list
+  - path: node_modules/@earendil-works/pi-coding-agent/examples/extensions/subagent/agents.ts
+    purpose: Upstream nearest-ancestor `.pi` resource discovery precedent
+
+research_notes: |-
+  ## Prior Art
+
+  **Verdict: extend the existing tool-permissions extension.** No replacement plugin or new package is warranted. The repository already owns rule parsing, deny-before-allow evaluation, atomic TOML patching, prompt rendering, shortcut handling, and focused tests under `extensions/tool-permissions/`.
+
+  Eligible project-policy parse/read failures are distinct from absent policy: they produce a warning prompt in interactive mode and block in non-interactive mode. Trust-store failures instead make project policy ineligible and preserve existing user-policy behavior.
+
+  Pi calls `settings.json`, `extensions`, `skills`, `prompts`, `themes`, `SYSTEM.md`, and `APPEND_SYSTEM.md` under the current `.pi` directory “trust-requiring resources.” Their presence causes Pi to consult saved trust or prompt before loading them. A custom `permissions.toml` is not currently on that list, and Pi does not search ancestor `.pi` directories for these resources.
+
+  Pi's persisted trust store does support nearest-ancestor semantics: the closest explicit true or false decision wins, so a trusted parent covers descendants and a nearer child denial blocks inheritance. The public `ctx.isProjectTrusted()` API exposes only the resulting boolean, not whether it was explicit, which path matched, or whether trust was temporary. E03 therefore starts with a small trust-resolver adapter over the persisted store and fails closed on uncertainty. This dependency is intentionally replaceable.
+
+  Native Pi settings are not adopted for rules. They are JSON, expose no extension namespace through `ExtensionContext`, and use generic object/array merge semantics that do not implement nearest matching rule precedence. Dedicated TOML preserves the existing format and editing behavior.
+
+  Upstream subagent discovery walks ancestors to find the nearest `.pi/agents` directory, while this repository's local-agent-context extension stops traversal at a repository boundary. These are the discovery precedents for e03.

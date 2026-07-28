@@ -1,22 +1,29 @@
-active_flow: null
-active_epic_id: null
-active_story_id: null
+active_flow: planning
+active_epic_id: e03
+active_story_id: e03s01
 active_bug_id: null
 git:
-  bookmark: favilo/bigpowers-e02-closeout
+  bookmark: null
   parent_bookmark: main
-  change_id: umpypzvp
+  change_id: punnvyvq
 handoff:
-  last_step_completed: "Release 0.2.1 completed through merged PR #3; Bigpowers metadata closed and e02 archived"
+  last_step_completed: "Completed e03s01 impact assessment and detailed plan; capsule consistency gate passes"
   open_decisions: []
   required_reading:
+    - .specs/product/SCOPE_LATEST.yaml
+    - .specs/IMPACT_LATEST.md
+    - .specs/planning-status.yaml
     - .specs/release-plan.yaml
-    - .specs/epics/archive/e02-extension-unit-coverage/epic.yaml
-  next_skill: null
+    - .specs/epics/e03-directory-local-tool-permissions/epic.yaml
+    - .specs/epics/e03-directory-local-tool-permissions/e03s01-hierarchical-project-policy.md
+    - .specs/epics/e03-directory-local-tool-permissions/e03s03-scoped-permissions-editor.md
+    - extensions/tool-permissions/config.ts
+    - extensions/tool-permissions/index.ts
+  next_skill: kickoff-branch
   blocker: null
   deferred_work:
     - Add real Pi process integration tests after unit contracts are established
-  verified_at: "2026-07-28T20:39:58Z"
+  verified_at: "2026-07-29T19:05:03Z"
 release:
   pr: "https://github.com/favilo/pi-extensions/pull/3"
   merged_commit: "70d47f101b7e74b847c50265bbfe8097d409da68"

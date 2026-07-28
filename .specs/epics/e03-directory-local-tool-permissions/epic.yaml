@@ -1,0 +1,27 @@
+id: e03
+title: Directory-local tool permissions
+wsjf: 1.7
+total_bcps: 10
+status: planned
+stories:
+  - id: e03s01
+    title: Apply trusted hierarchical project permission policy
+    bcps: 5
+    status: todo
+    delta: ADDED
+    spec: e03s01-hierarchical-project-policy.md
+    tasks: e03s01-tasks.yaml
+  - id: e03s02
+    title: Save permission rules to project or user scope
+    bcps: 3
+    status: todo
+    delta: MODIFIED
+    spec: e03s02-scoped-permission-saving.md
+    tasks: e03s02-tasks.yaml
+  - id: e03s03
+    title: Edit project or user permission policy explicitly
+    bcps: 2
+    status: todo
+    delta: MODIFIED
+    spec: e03s03-scoped-permissions-editor.md
+    tasks: e03s03-tasks.yaml

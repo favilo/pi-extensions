@@ -1,0 +1,59 @@
+story_id: e03s01
+title: Apply trusted hierarchical project permission policy
+status: failing
+bcps: 5
+tasks:
+  - id: 1
+    description: Characterize existing user-only decisions and add a fake Pi tool-call harness proving every protected tool family reaches one decision boundary.
+    verify: node --test extensions/tool-permissions/index.test.ts
+    status: failing
+    risk: P0
+    allure:
+      severity: critical
+      categories:
+        - Directory-local Tool Permissions
+        - regression
+        - tool routing
+  - id: 2
+    description: Add and satisfy isolated filesystem contracts for Git/Jujutsu boundary discovery, canonical containment, persisted nearest-ancestor trust, nearer denial, and trusted-path exclusion.
+    verify: node --test extensions/tool-permissions/scope.test.ts
+    status: failing
+    risk: P0
+    allure:
+      severity: critical
+      categories:
+        - Directory-local Tool Permissions
+        - trust boundary
+        - filesystem
+  - id: 3
+    description: Add and satisfy effective-decision contracts for nearest project match, project-over-user precedence, user fallback, trust-store failure fallback, and eligible project-policy read/parse errors.
+    verify: node --test extensions/tool-permissions/scope.test.ts
+    status: failing
+    risk: P0
+    allure:
+      severity: critical
+      categories:
+        - Directory-local Tool Permissions
+        - policy precedence
+        - failure modes
+  - id: 4
+    description: Route all tool handlers through the scoped resolver, audit the decision source, warn and prompt on eligible project-policy errors with UI, and block those errors without UI.
+    verify: node --test extensions/tool-permissions/index.test.ts
+    status: failing
+    risk: P0
+    allure:
+      severity: critical
+      categories:
+        - Directory-local Tool Permissions
+        - integration
+        - audit
+  - id: 5
+    description: Run package-wide type and regression verification after removing the superseded single-path configuredDecision implementation.
+    verify: npm run check
+    status: failing
+    risk: P1
+    allure:
+      severity: high
+      categories:
+        - Directory-local Tool Permissions
+        - regression

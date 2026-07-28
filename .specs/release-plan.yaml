@@ -1,21 +1,21 @@
 release:
-  version: "0.2.1"
-  codename: Extension Unit Coverage
-  status: completed
-  completed_at: "2026-07-28T20:47:58Z"
+  version: "0.3.0"
+  codename: Directory-local Tool Permissions
+  status: planning
   distribution: private_git
   semantic_release: false
-  bump_hint: none
-  merged_pr: "https://github.com/favilo/pi-extensions/pull/3"
-  merged_commit: "70d47f101b7e74b847c50265bbfe8097d409da68"
+  bump_hint: minor
+  completed_at: null
+  merged_pr: null
+  merged_commit: null
 epics:
-  - id: e02
-    title: Extension Unit Coverage
-    capsule_dir: epics/archive/e02-extension-unit-coverage
-    wsjf: 2.0
-    bcps: 4
+  - id: e03
+    title: Directory-local tool permissions
+    capsule_dir: epics/e03-directory-local-tool-permissions
+    wsjf: 1.7
+    bcps: 10
     note: >-
-      One focused characterization story adds deterministic unit contracts for the four currently untested extensions before process-level integration testing begins.
+      WSJF = (business value 6 + time criticality 4 + risk reduction 7) / job size 10 = 1.7. The epic extends the existing permission boundary with trusted project hierarchy, explicit save scope, and scoped policy editor commands.
 bugs:
   total: 0
   fixed: 0
