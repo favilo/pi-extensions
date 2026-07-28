@@ -2,7 +2,7 @@ id: e01
 title: Shareable MCP Provider Registry
 wsjf: 1.22
 total_bcps: 18
-status: passing
+status: completed
 stories:
   - id: e01s01
     title: Use a provider-neutral MCP registry end to end

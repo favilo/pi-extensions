@@ -1,28 +1,28 @@
-active_flow: mcp_provider_registry
-active_epic_id: e01
-active_story_id: e01s01
+active_flow: null
+active_epic_id: null
+active_story_id: null
 active_bug_id: null
 git:
-  bookmark: null
+  bookmark: favilo/bigpowers-closeout
   parent_bookmark: main
-  change_id: pvqywrpw
+  change_id: tlmsuyql
 handoff:
-  last_step_completed: "verify-work passed with manual /mcp evidence, 36 package tests, 27 Codex tests, startup smoke, security, and P0 NFR gates"
+  last_step_completed: "Release 0.2.0 completed through merged PR #1; Bigpowers release metadata closed and epic archived"
   open_decisions: []
   required_reading:
-    - .specs/PI_EXTENSIONS_MIGRATION.md
-    - README.md
-    - package.json
-    - .specs/product/SCOPE_LATEST.yaml
-    - .specs/IMPACT_LATEST.md
     - .specs/release-plan.yaml
-    - .specs/epics/e01-mcp-provider-registry/epic.yaml
-    - .specs/epics/e01-mcp-provider-registry/e01s01-provider-neutral-registry.md
-  next_skill: release-branch
+    - .specs/epics/archive/e01-mcp-provider-registry/epic.yaml
+  next_skill: null
   blocker: null
   deferred_work:
     - Install and verify the private GitHub package on a second authenticated computer
   verified_at: "2026-07-28T19:26:50Z"
+release:
+  pr: "https://github.com/favilo/pi-extensions/pull/1"
+  merged_commit: "782eb86eaaaeadb5a9f622b10f5b3423adfdcdbb"
+  merged_at: "2026-07-28T19:46:10Z"
+  ci_verified: false
+  ci_note: "No GitHub Actions workflows are configured"
 gate_trace:
   verdict: WAIVED
   generated_at: "2026-07-28T19:26:50Z"

@@ -1,13 +1,17 @@
 release:
   version: "0.2.0"
   codename: Shareable MCP Provider Registry
-  status: in_progress
-  semantic_release: true
-  bump_hint: minor
+  status: completed
+  completed_at: "2026-07-28T19:46:10Z"
+  distribution: private_git
+  semantic_release: false
+  bump_hint: none
+  merged_pr: "https://github.com/favilo/pi-extensions/pull/1"
+  merged_commit: "782eb86eaaaeadb5a9f622b10f5b3423adfdcdbb"
 epics:
   - id: e01
     title: Shareable MCP Provider Registry
-    capsule_dir: epics/e01-mcp-provider-registry
+    capsule_dir: epics/archive/e01-mcp-provider-registry
     wsjf: 1.22
     bcps: 18
     note: >-
