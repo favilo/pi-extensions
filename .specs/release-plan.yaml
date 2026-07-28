@@ -1,14 +1,17 @@
 release:
   version: "0.2.1"
   codename: Extension Unit Coverage
-  status: in_progress
+  status: completed
+  completed_at: "2026-07-28T20:47:58Z"
   distribution: private_git
   semantic_release: false
   bump_hint: none
+  merged_pr: "https://github.com/favilo/pi-extensions/pull/3"
+  merged_commit: "70d47f101b7e74b847c50265bbfe8097d409da68"
 epics:
   - id: e02
     title: Extension Unit Coverage
-    capsule_dir: epics/e02-extension-unit-coverage
+    capsule_dir: epics/archive/e02-extension-unit-coverage
     wsjf: 2.0
     bcps: 4
     note: >-

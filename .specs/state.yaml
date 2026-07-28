@@ -1,22 +1,25 @@
-active_flow: extension_unit_coverage
-active_epic_id: e02
-active_story_id: e02s01
+active_flow: null
+active_epic_id: null
+active_story_id: null
 active_bug_id: null
 git:
-  bookmark: null
+  bookmark: favilo/bigpowers-e02-closeout
   parent_bookmark: main
-  change_id: mltkposz
+  change_id: umpypzvp
 handoff:
-  last_step_completed: "verify-work and audit passed; seven unit tests discovered, 43 package tests green, F.I.R.S.T 5/5, security clear"
+  last_step_completed: "Release 0.2.1 completed through merged PR #3; Bigpowers metadata closed and e02 archived"
   open_decisions: []
   required_reading:
-    - .specs/product/SCOPE_LATEST.yaml
     - .specs/release-plan.yaml
-    - .specs/epics/e02-extension-unit-coverage/epic.yaml
-    - .specs/epics/e02-extension-unit-coverage/e02s01-extension-unit-contracts.md
-    - .specs/epics/e02-extension-unit-coverage/e02s01-tasks.yaml
-  next_skill: release-branch
+    - .specs/epics/archive/e02-extension-unit-coverage/epic.yaml
+  next_skill: null
   blocker: null
   deferred_work:
     - Add real Pi process integration tests after unit contracts are established
   verified_at: "2026-07-28T20:39:58Z"
+release:
+  pr: "https://github.com/favilo/pi-extensions/pull/3"
+  merged_commit: "70d47f101b7e74b847c50265bbfe8097d409da68"
+  merged_at: "2026-07-28T20:47:58Z"
+  ci_verified: false
+  ci_note: "No GitHub Actions workflows are configured"

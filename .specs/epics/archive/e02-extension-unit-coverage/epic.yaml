@@ -2,7 +2,7 @@ id: e02
 title: Extension Unit Coverage
 wsjf: 2.0
 total_bcps: 4
-status: passing
+status: completed
 stories:
   - id: e02s01
     title: Protect previously untested extensions with unit contracts
