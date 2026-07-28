@@ -1,0 +1,22 @@
+{
+  "story_id": "e01s01",
+  "verified_at": "2026-07-28T19:14:37Z",
+  "status": "PASS",
+  "dimensions": {
+    "performance": {
+      "status": "PASS",
+      "threshold": "100 synchronous providers in <50 ms",
+      "command": "node --test --test-name-pattern='100 synchronous providers' extensions/mcp/registry.test.ts"
+    },
+    "reliability": {
+      "status": "PASS",
+      "threshold": "100 runtime replacement cycles with zero stale or duplicate tools",
+      "command": "node --test --test-name-pattern='100 runtime replacement cycles' extensions/mcp/lifecycle.test.ts"
+    },
+    "operability": {
+      "status": "PASS",
+      "threshold": "registration/status failures visible without secret text",
+      "command": "node --test extensions/mcp/index.test.ts extensions/mcp/failure-isolation.test.ts"
+    }
+  }
+}

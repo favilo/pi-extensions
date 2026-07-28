@@ -1,0 +1,40 @@
+story_id: e01s04
+title: Build another provider from the MCP guide and mock example
+status: passing
+bcps: 3
+tasks:
+  - id: 1
+    description: Update the MCP guide to require exact provider-object unregistration and explain why ID-only disposal can remove another provider instance.
+    verify: grep -qi 'provider object' extensions/mcp/README.md && grep -qi 'exact' extensions/mcp/README.md && grep -qi 'lifecycle' extensions/mcp/README.md
+    status: passing
+    risk: P1
+    allure:
+      severity: high
+      categories: &id001
+        - MCP Registry
+        - documentation
+        - example
+  - id: 2
+    description: Update the self-contained mock provider to emit its exact provider object during cleanup while retaining callable tool, status, failure, and offline behavior.
+    verify: node --test examples/mcp-provider/index.test.ts
+    status: passing
+    risk: P1
+    allure:
+      severity: high
+      categories: *id001
+  - id: 3
+    description: Verify the guide and example expose enough public contract information for a second provider to be created without reading registry internals.
+    verify: node --test --test-name-pattern='machine-local|authoring example' examples/mcp-provider/index.test.ts
+    status: passing
+    risk: P1
+    allure:
+      severity: high
+      categories: *id001
+  - id: 4
+    description: Keep the example illustrative rather than package-autoloaded and confirm all package checks remain green.
+    verify: npm run check && ! grep -q 'examples/.*/index.ts' package.json
+    status: passing
+    risk: P1
+    allure:
+      severity: high
+      categories: *id001

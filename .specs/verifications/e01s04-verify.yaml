@@ -1,0 +1,28 @@
+story_id: e01s04
+verified_at: "2026-07-28T19:26:50Z"
+verifier: verify-work
+risk: P1
+status: passed
+phases:
+  documentation:
+    passed: true
+    command: "grep -qi 'provider object' extensions/mcp/README.md && grep -qi 'exact' extensions/mcp/README.md && grep -qi 'lifecycle' extensions/mcp/README.md"
+  example:
+    passed: true
+    command: "node --test examples/mcp-provider/index.test.ts"
+    result: "2 passed, 0 failed"
+  terminal_verdict:
+    command: "npm run check"
+    exit_code: 0
+    captured_at: "2026-07-28T19:26:50Z"
+    stdout_stderr_file: ".specs/verifications/e01-final-verdict.txt"
+    sha256: "576b55f8c5c1448ecf9d4343cf6a1c798ec70f37d417d52137ea4df4c347c6a5"
+  manual:
+    passed: true
+    steps:
+      - step: "Review the provider guide and executable example"
+        expected: "Exact provider-object cleanup and offline authoring flow are documented"
+        actual: "Guide explains exact-object ownership; example registers, reports status, executes a tool, and cleans up offline"
+        passed: true
+  gaps:
+    closed: true

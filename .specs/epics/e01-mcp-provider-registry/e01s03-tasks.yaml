@@ -1,0 +1,56 @@
+story_id: e01s03
+title: Keep MCP providers isolated across failures and lifecycle changes
+status: passing
+bcps: 5
+tasks:
+  - id: 1
+    description: Cover reversed extension load order and repeated registration so providers expose the same tools and sections without duplication.
+    verify: node --test --test-name-pattern='load order|duplicate' extensions/mcp/lifecycle.test.ts
+    status: passing
+    risk: P0
+    allure:
+      severity: critical
+      categories: &id001
+        - MCP Registry
+        - lifecycle
+        - failure isolation
+  - id: 2
+    description: Cover reload, new, resume, fork, quit, provider removal, and runtime recreation explicitly so stale providers and tools do not survive lifecycle boundaries.
+    verify: node --test extensions/mcp/lifecycle.test.ts
+    status: passing
+    risk: P0
+    scenarios:
+      - SC-e01s03-P0-01
+    allure:
+      severity: critical
+      categories: *id001
+  - id: 3
+    description: Isolate a failing provider and a failing MCP server while healthy providers, healthy servers, callable tools, and status reporting remain available.
+    verify: node --test extensions/mcp/failure-isolation.test.ts
+    status: passing
+    risk: P0
+    allure:
+      severity: critical
+      categories: *id001
+  - id: 4
+    description: Run the package and machine-local provider regression suites after lifecycle and failure isolation are complete.
+    verify: npm run check && node --test "$HOME/.pi/agent/extensions/codex-mcp/tests/"*.test.ts
+    status: passing
+    risk: P0
+    allure:
+      severity: critical
+      categories: *id001
+  - id: 5
+    description: Run 100 registry/provider runtime replacement cycles and prove every cycle has exactly one active tool with no stale listeners or duplicate registrations.
+    verify: node --test --test-name-pattern='100 runtime replacement cycles' extensions/mcp/lifecycle.test.ts
+    status: passing
+    risk: P0
+    scenarios:
+      - SC-e01s03-P0-02
+    allure:
+      severity: critical
+      categories:
+        - MCP Registry
+        - lifecycle
+        - reliability
+        - NFR

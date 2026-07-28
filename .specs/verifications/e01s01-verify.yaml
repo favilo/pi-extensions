@@ -1,0 +1,43 @@
+story_id: e01s01
+verified_at: "2026-07-28T19:26:50Z"
+verifier: verify-work
+risk: P0
+status: passed
+phases:
+  branch:
+    passed: true
+    note: "Jujutsu feature chain is a descendant of main"
+  smoke:
+    passed: true
+    command: 'pi --no-extensions -e . -e "$HOME/.pi/agent/extensions/codex-mcp.ts" --list-models >/dev/null'
+  typecheck:
+    passed: true
+    command: "npm run typecheck"
+  tests:
+    passed: true
+    command: "npm test"
+    result: "36 passed, 0 failed"
+  terminal_verdict:
+    command: 'npm run check && node --test "$HOME/.pi/agent/extensions/codex-mcp/tests/"*.test.ts && pi --no-extensions -e . -e "$HOME/.pi/agent/extensions/codex-mcp.ts" --list-models >/dev/null'
+    exit_code: 0
+    captured_at: "2026-07-28T19:26:50Z"
+    note: "Single contiguous run"
+  security:
+    passed: true
+    report: ".specs/security/REVIEW.md"
+    high_findings: 0
+  nfr:
+    passed: true
+    report: ".specs/verifications/NFR-e01s01.json"
+  manual:
+    passed: true
+    steps:
+      - step: "Reload Pi and invoke /mcp"
+        expected: "Codex sections render, healthy provider tools remain available, and no registry-level failure appears"
+        actual: "Provider sections rendered; healthy providers and their tools remained ready"
+        passed: true
+  gaps:
+    closed: true
+    items:
+      - "Duplicate provider identity failures are visible"
+      - "Rejected duplicate disposal preserves the accepted provider"

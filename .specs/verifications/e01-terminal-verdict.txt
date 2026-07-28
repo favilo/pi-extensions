@@ -1,0 +1,53 @@
+
+> pi-extensions@0.1.0 check
+> npm run typecheck && npm test
+
+
+> pi-extensions@0.1.0 typecheck
+> tsc --noEmit
+
+
+> pi-extensions@0.1.0 test
+> node --test extensions/*/*.test.ts examples/*/*.test.ts
+
+✔ the machine-local authoring example is decoupled from the registry implementation (4.272104ms)
+✔ the authoring example demonstrates the public contract without external services (1.35721ms)
+✔ denied writes use the denial text instead of a success message (0.864037ms)
+✔ successful writes do not produce error text (0.198251ms)
+✔ terminal focus reporting sequences update focus state (0.857745ms)
+✔ hardware cursor is hidden while the terminal is unfocused (0.192029ms)
+✔ focus does not enable a cursor hidden by another extension (0.179276ms)
+✔ jj status uses the bookmark reported for the working-copy commit (0.768669ms)
+✔ jj status falls back to the shortest stable change ID (0.19796ms)
+✔ jj status is absent outside a jj repository (0.172222ms)
+✔ jj status lookup does not snapshot the working copy (0.215322ms)
+✔ jj status requests the stable change ID instead of the commit ID (0.287789ms)
+✔ a failing provider status does not hide healthy providers (1.325119ms)
+✔ a conflicting provider tool does not replace the healthy owner (0.273673ms)
+✔ a provider registration failure does not block later providers (0.329256ms)
+✔ the package explicitly loads the shared MCP extension (3.664968ms)
+✔ a provider contributes a callable tool and named /mcp status section (1.080051ms)
+✔ provider registration is independent of extension load order (1.339246ms)
+✔ repeated registry availability does not duplicate provider tools (0.291105ms)
+✔ provider removal deactivates its tools (0.311122ms)
+✔ a provider can contribute tools after registration (1.142598ms)
+✔ multiple MCP providers contribute tools and named status sections (0.330568ms)
+✔ permissions parse from smol-toml tool-specific tables (2.438473ms)
+✔ file tools share read and write permission keys (0.210493ms)
+✔ deny rules take precedence over allow rules (0.303618ms)
+✔ fields within a rule are ANDed and rules are ORed (0.212728ms)
+✔ empty rules match every invocation while missing fields do not (0.125996ms)
+✔ arrays and objects are matched as compact JSON (0.093114ms)
+✔ allowing an entire tool persists an empty match-all rule (6.311169ms)
+✔ saving a rule preserves comments, formatting, and unrelated configuration (4.828946ms)
+✔ malformed permission rules are rejected (0.622495ms)
+ℹ tests 31
+ℹ suites 0
+ℹ pass 31
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 147.865036
+
+TERMINAL_VERDICT_EXIT=0

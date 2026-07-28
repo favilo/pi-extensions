@@ -1,0 +1,28 @@
+story_id: e01s02
+verified_at: "2026-07-28T19:26:50Z"
+verifier: verify-work
+risk: P0
+status: passed
+phases:
+  smoke:
+    passed: true
+    command: 'pi --no-extensions -e . -e "$HOME/.pi/agent/extensions/codex-mcp.ts" --list-models >/dev/null'
+  tests:
+    passed: true
+    command: 'node --test "$HOME/.pi/agent/extensions/codex-mcp/tests/"*.test.ts'
+    result: "27 passed, 0 failed"
+  terminal_verdict:
+    command: 'npm run check && node --test "$HOME/.pi/agent/extensions/codex-mcp/tests/"*.test.ts && pi --no-extensions -e . -e "$HOME/.pi/agent/extensions/codex-mcp.ts" --list-models >/dev/null'
+    exit_code: 0
+    captured_at: "2026-07-28T19:26:50Z"
+    stdout_stderr_file: ".specs/verifications/e01-final-verdict.txt"
+    sha256: "576b55f8c5c1448ecf9d4343cf6a1c798ec70f37d417d52137ea4df4c347c6a5"
+  manual:
+    passed: true
+    steps:
+      - step: "Invoke /mcp after reload"
+        expected: "Provider-owned sections appear through the shared registry"
+        actual: "Provider-owned sections appeared with provider-owned status"
+        passed: true
+  gaps:
+    closed: true

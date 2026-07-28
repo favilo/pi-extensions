@@ -1,0 +1,21 @@
+release:
+  version: "0.2.0"
+  codename: Shareable MCP Provider Registry
+  status: in_progress
+  semantic_release: true
+  bump_hint: minor
+epics:
+  - id: e01
+    title: Shareable MCP Provider Registry
+    capsule_dir: epics/e01-mcp-provider-registry
+    wsjf: 1.22
+    bcps: 18
+    note: >-
+      One cohesive epic establishes the provider-neutral registry, migrates the first real provider, proves lifecycle resilience, and enables other Pi agents to author providers from a self-contained example.
+bugs:
+  total: 0
+  fixed: 0
+  deferred: 0
+  wontfix: 0
+  open: 0
+  registry: null

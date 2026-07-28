@@ -19,8 +19,9 @@ pi install git:github.com/favilo/pi-extensions
 - Structure: one Pi package with one folder per extension.
 - Tests are colocated with the extension they verify.
 - `package.json` explicitly lists each `index.ts`; helper and test files must never be auto-loaded.
-- Work-specific `codex-mcp.ts`, `codex-mcp/`, and `mcp.ts` remain in `~/.pi/agent/extensions`.
-- `mcp.ts` remains local because it imports `codex-mcp.ts` and reports Codex-specific state.
+- Work-specific `codex-mcp.ts` and `codex-mcp/` remain in `~/.pi/agent/extensions`.
+- The provider-neutral `mcp` extension is shared; machine-local providers register tools and named status sections through its event-bus contract.
+- `codex-mcp.ts` registers as a machine-local provider without being imported by the shared extension.
 - Portable extensions are copied before originals are removed. Never remove the originals without explicit user approval.
 - This computer installs the local checkout for immediate `/reload` development; other computers install the private GitHub repository.
 
@@ -34,6 +35,7 @@ pi install git:github.com/favilo/pi-extensions
 6. `jj-status`
 7. `local-agent-context`
 8. `tool-permissions`
+9. `mcp`
 
 ## Out of scope
 
@@ -52,7 +54,7 @@ pi install git:github.com/favilo/pi-extensions
 - `github.com/favilo/pi-extensions` exists as a private repository.
 - A second authenticated computer can install the repository through `pi install`.
 - Local source copies are removed only after package installation is verified, preventing duplicate extension loading.
-- `codex-mcp` and its `mcp` status command continue loading locally.
+- Machine-local `codex-mcp` contributes tools and status through the shared `mcp` extension without duplicate commands or tools.
 
 ## Current state
 
@@ -73,11 +75,16 @@ Completed:
 - Installed the local package path globally through Pi.
 - Verified a fresh Pi process loads the package without duplicate or startup diagnostics.
 - Verified the 24 retained Codex MCP tests still pass.
+- Reloaded the active Pi session and received user confirmation that `/mcp`, `/permissions`, and `/clear` are available.
+- Re-ran package verification: type checking and all 19 package tests pass, the production audit reports zero vulnerabilities, and a fresh RPC process registers `/mcp`, `/permissions`, and `/clear`.
+- Moved the provider-neutral `/mcp` command into this package and removed its direct dependency on `codex-mcp.ts`.
+- Adapted machine-local Codex MCP tools to register through the shared provider contract.
+- Added lifecycle cleanup, load-order independence, provider failure isolation, dedicated MCP documentation, and a self-contained machine-local provider example.
+- Removed the old machine-local `mcp.ts` after combined package and Codex loading passed.
 
 Pending:
 
-1. Reload the active Pi session.
-2. Manually confirm `/mcp`, `/permissions`, and `/clear` are available.
+1. Install `git:github.com/favilo/pi-extensions` on a second authenticated computer and confirm Pi loads it successfully.
 
 ## Known issue
 

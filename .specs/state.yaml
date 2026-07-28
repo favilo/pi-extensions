@@ -1,15 +1,31 @@
-active_flow: package_migration
-active_epic_id: null
-active_story_id: null
+active_flow: mcp_provider_registry
+active_epic_id: e01
+active_story_id: e01s01
 active_bug_id: null
 git:
-  bookmark: main
-  change_id: lkwtzyot
+  bookmark: null
+  parent_bookmark: main
+  change_id: pvqywrpw
 handoff:
-  last_step_completed: "Local package installed and fresh-process loading verified"
+  last_step_completed: "verify-work passed with manual /mcp evidence, 36 package tests, 27 Codex tests, startup smoke, security, and P0 NFR gates"
   open_decisions: []
   required_reading:
     - .specs/PI_EXTENSIONS_MIGRATION.md
     - README.md
     - package.json
-  next_skill: verify-work
+    - .specs/product/SCOPE_LATEST.yaml
+    - .specs/IMPACT_LATEST.md
+    - .specs/release-plan.yaml
+    - .specs/epics/e01-mcp-provider-registry/epic.yaml
+    - .specs/epics/e01-mcp-provider-registry/e01s01-provider-neutral-registry.md
+  next_skill: release-branch
+  blocker: null
+  deferred_work:
+    - Install and verify the private GitHub package on a second authenticated computer
+  verified_at: "2026-07-28T19:26:50Z"
+gate_trace:
+  verdict: WAIVED
+  generated_at: "2026-07-28T19:26:50Z"
+  rationale: "trace-stories, blind-spot, and completeness-critic scripts are unavailable; all four stories have explicit passing verify evidence"
+  heuristic_ratio: 0.0
+  downgrade_applied: false

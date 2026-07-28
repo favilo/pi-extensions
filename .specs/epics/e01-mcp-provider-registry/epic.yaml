@@ -1,0 +1,34 @@
+id: e01
+title: Shareable MCP Provider Registry
+wsjf: 1.22
+total_bcps: 18
+status: passing
+stories:
+  - id: e01s01
+    title: Use a provider-neutral MCP registry end to end
+    bcps: 5
+    status: passing
+    delta: ADDED
+    spec: e01s01-provider-neutral-registry.md
+    tasks: e01s01-tasks.yaml
+  - id: e01s02
+    title: Use Codex MCP through the shared registry
+    bcps: 5
+    status: passing
+    delta: MODIFIED
+    spec: e01s02-codex-provider-adoption.md
+    tasks: e01s02-tasks.yaml
+  - id: e01s03
+    title: Keep MCP providers isolated across failures and lifecycle changes
+    bcps: 5
+    status: passing
+    delta: MODIFIED
+    spec: e01s03-provider-resilience.md
+    tasks: e01s03-tasks.yaml
+  - id: e01s04
+    title: Build another provider from the MCP guide and mock example
+    bcps: 3
+    status: passing
+    delta: MODIFIED
+    spec: e01s04-provider-authoring-guide.md
+    tasks: e01s04-tasks.yaml

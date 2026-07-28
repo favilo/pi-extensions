@@ -1,0 +1,28 @@
+story_id: e01s03
+verified_at: "2026-07-28T19:26:50Z"
+verifier: verify-work
+risk: P0
+status: passed
+phases:
+  tests:
+    passed: true
+    commands:
+      - "node --test extensions/mcp/lifecycle.test.ts"
+      - "node --test extensions/mcp/failure-isolation.test.ts"
+    result: "Explicit reload/new/resume/fork/quit coverage and 100-cycle reliability passed"
+  terminal_verdict:
+    command: 'npm run check && node --test "$HOME/.pi/agent/extensions/codex-mcp/tests/"*.test.ts && pi --no-extensions -e . -e "$HOME/.pi/agent/extensions/codex-mcp.ts" --list-models >/dev/null'
+    exit_code: 0
+    captured_at: "2026-07-28T19:26:50Z"
+  nfr:
+    passed: true
+    reliability: "100 replacement cycles, zero stale or duplicate tools"
+  manual:
+    passed: true
+    steps:
+      - step: "Observe /mcp with one failed server"
+        expected: "Failed server remains visible while healthy servers and tools remain usable"
+        actual: "One provider timeout was visible; other healthy providers remained ready with tools"
+        passed: true
+  gaps:
+    closed: true

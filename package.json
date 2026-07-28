@@ -9,7 +9,7 @@
   ],
   "scripts": {
     "check": "npm run typecheck && npm test",
-    "test": "node --test extensions/*/*.test.ts",
+    "test": "node --test extensions/*/*.test.ts examples/*/*.test.ts",
     "typecheck": "tsc --noEmit"
   },
   "pi": {
@@ -21,6 +21,7 @@
       "./extensions/focus-aware-cursor/index.ts",
       "./extensions/jj-status/index.ts",
       "./extensions/local-agent-context/index.ts",
+      "./extensions/mcp/index.ts",
       "./extensions/tool-permissions/index.ts"
     ]
   },

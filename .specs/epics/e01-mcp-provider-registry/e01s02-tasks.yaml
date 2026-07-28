@@ -1,0 +1,40 @@
+story_id: e01s02
+title: Use Codex MCP through the shared registry
+status: passing
+bcps: 5
+tasks:
+  - id: 1
+    description: Add contract-focused coverage proving the machine-local Codex integration contributes its tools and provider-named status through the shared registry.
+    verify: node --test "$HOME/.pi/agent/extensions/codex-mcp/tests/"*.test.ts
+    status: passing
+    risk: P0
+    allure:
+      severity: critical
+      categories: &id001
+        - MCP Registry
+        - Codex
+        - integration
+  - id: 2
+    description: Adapt the machine-local Codex MCP extension to unregister with the exact provider object while preserving healthy server tools and provider status.
+    verify: npm run check && node --test "$HOME/.pi/agent/extensions/codex-mcp/tests/"*.test.ts
+    status: passing
+    risk: P0
+    allure:
+      severity: critical
+      categories: *id001
+  - id: 3
+    description: Remove the old coupled MCP command only after the package extension and Codex provider work together without duplicate commands or tools.
+    verify: test ! -f "$HOME/.pi/agent/extensions/mcp.ts" && ! grep -Rini --include='*.ts' 'codex' extensions/mcp
+    status: passing
+    risk: P0
+    allure:
+      severity: critical
+      categories: *id001
+  - id: 4
+    description: Verify Pi starts with the shared package and machine-local Codex provider, while retaining the expected MCP-related commands.
+    verify: pi --no-extensions -e . -e "$HOME/.pi/agent/extensions/codex-mcp.ts" --list-models >/dev/null
+    status: passing
+    risk: P0
+    allure:
+      severity: critical
+      categories: *id001

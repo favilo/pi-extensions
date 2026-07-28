@@ -35,6 +35,7 @@ Use `pi config` to enable or disable individual extensions.
 | `focus-aware-cursor` | Keeps terminal cursor visibility synchronized with terminal focus. |
 | `jj-status` | Shows the active Jujutsu bookmark or change ID instead of `detached`. |
 | `local-agent-context` | Loads `AGENTS.local.md` and `AGENTS.override.md` into the system prompt. |
+| `mcp` | Registers independent MCP tool providers and reports their status through `/mcp`. |
 | `tool-permissions` | Applies configurable allow and deny rules to tool calls. |
 
 `jj-status` requires `jj` on `PATH` when used in a Jujutsu repository.
@@ -56,6 +57,8 @@ npm run check
 ```
 
 Each extension owns its implementation and tests under `extensions/<name>/`. Only the explicit `index.ts` files in `package.json` are loaded by Pi.
+
+To create a machine-local MCP provider, see [`extensions/mcp/README.md`](extensions/mcp/README.md) and the self-contained [`examples/mcp-provider/`](examples/mcp-provider/) extension.
 
 ## Private extensions
 

@@ -1,0 +1,71 @@
+story_id: e01s01
+title: Use a provider-neutral MCP registry end to end
+status: passing
+bcps: 5
+tasks:
+  - id: 1
+    description: Specify the public provider contract with executable tests covering no providers, one provider, multiple providers, contributed tools, and named status sections.
+    verify: node --test extensions/mcp/registry.test.ts
+    status: passing
+    risk: P0
+    allure:
+      severity: critical
+      categories: &id001
+        - MCP Registry
+        - contract
+        - integration
+  - id: 2
+    description: Make duplicate provider identities visible through /mcp and authorize removal by exact provider instance so a rejected duplicate cannot remove the healthy owner.
+    verify: node --test extensions/mcp/index.test.ts extensions/mcp/failure-isolation.test.ts
+    status: passing
+    risk: P0
+    scenarios:
+      - SC-e01s01-P0-01
+      - SC-e01s01-P0-02
+      - SC-e01s03-P0-03
+    allure:
+      severity: critical
+      categories: *id001
+  - id: 3
+    description: Add the provider-neutral MCP extension to the explicitly loaded package surface without introducing provider-specific references.
+    verify: npm run typecheck && ! grep -RinE --include='*.ts' 'codex|CODEX_CONFIG_PATH|codex-mcp' extensions/mcp
+    status: passing
+    risk: P0
+    allure:
+      severity: critical
+      categories: *id001
+  - id: 4
+    description: Confirm the complete package remains healthy with the new extension loaded.
+    verify: npm run check
+    status: passing
+    risk: P0
+    allure:
+      severity: critical
+      categories: *id001
+  - id: 5
+    description: Migrate the public guide, authoring example, and machine-local Codex adapter to emit the exact provider object when unregistering.
+    verify: npm run check && node --test "$HOME/.pi/agent/extensions/codex-mcp/tests/provider-registry.test.ts"
+    status: passing
+    risk: P0
+    scenarios:
+      - SC-e01s01-P0-02
+    allure:
+      severity: critical
+      categories:
+        - MCP Registry
+        - wire contract
+        - Codex
+        - documentation
+  - id: 6
+    description: Prove status collection for 100 synchronous providers stays below the approved 50 ms performance threshold.
+    verify: node --test --test-name-pattern='100 synchronous providers' extensions/mcp/registry.test.ts
+    status: passing
+    risk: P0
+    scenarios:
+      - SC-e01s01-P0-03
+    allure:
+      severity: critical
+      categories:
+        - MCP Registry
+        - performance
+        - NFR
