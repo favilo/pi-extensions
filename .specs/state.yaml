@@ -4,9 +4,9 @@ active_story_id: null
 active_bug_id: null
 git:
   bookmark: main
-  change_id: sltwypzp
+  change_id: mktqxmnw
 handoff:
-  last_step_completed: "Private GitHub repository created and SSH remote configured"
+  last_step_completed: "Initial package pushed to the private GitHub repository"
   open_decisions:
     - "Original machine-local copies require explicit approval before removal"
   required_reading:

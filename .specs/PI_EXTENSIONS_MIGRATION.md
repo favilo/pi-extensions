@@ -67,14 +67,14 @@ Completed:
 - Initialized a colocated Jujutsu repository.
 - Created the private GitHub repository `favilo/pi-extensions`.
 - Added the SSH remote with Jujutsu.
+- Created the `main` bookmark and pushed the initial package to GitHub.
 
 Pending:
 
-1. Create the `main` bookmark and push the initial change.
-2. Ask for explicit approval to remove the eight original portable extension copies from `~/.pi/agent/extensions`.
-3. Install the git package globally with Pi.
-4. Reload Pi and verify there are no duplicate commands or extensions.
-5. Confirm `codex-mcp` and `/mcp` still work locally.
+1. Ask for explicit approval to remove the eight original portable extension copies from `~/.pi/agent/extensions`.
+2. Install the git package globally with Pi.
+3. Reload Pi and verify there are no duplicate commands or extensions.
+4. Confirm `codex-mcp` and `/mcp` still work locally.
 
 ## Known issue
 
