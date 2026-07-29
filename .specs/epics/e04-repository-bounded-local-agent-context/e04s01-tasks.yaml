@@ -1,0 +1,50 @@
+story_id: e04s01
+title: Bound local context discovery by repository and home
+status: failing
+bcps: 4
+spec: e04s01-repository-and-home-boundaries.md
+tasks:
+  - id: 1
+    description: Add failing public-behavior contracts for pure Jujutsu, colocated, Git-only, and differently nested Git/Jujutsu roots, proving the nearest reported repository root wins and no context above it is loaded.
+    verify: node --test extensions/local-agent-context/index.test.ts
+    status: failing
+    risk: P0
+    allure:
+      severity: critical
+      categories:
+        - Repository-bounded Local Context
+        - repository discovery
+        - context isolation
+  - id: 2
+    description: Add failing boundary contracts for traversal stopping before HOME, cwd-only behavior outside HOME, cwd-only behavior after root-probe failure or timeout, ordering preservation, and empty-file omission.
+    verify: node --test extensions/local-agent-context/index.test.ts
+    status: failing
+    risk: P0
+    allure:
+      severity: critical
+      categories:
+        - Repository-bounded Local Context
+        - home boundary
+        - failure modes
+  - id: 3
+    description: Resolve Jujutsu and Git roots with bounded injected command runners, choose the nearest valid ancestor, and apply fail-closed HOME-aware traversal without duplicating Pi's global AGENTS.md loading.
+    verify: node --test extensions/local-agent-context/index.test.ts
+    status: failing
+    risk: P0
+    allure:
+      severity: critical
+      categories:
+        - Repository-bounded Local Context
+        - integration
+        - deterministic discovery
+  - id: 4
+    description: Update user-facing extension documentation and run package-wide type and regression checks.
+    verify: npm run check
+    status: failing
+    risk: P1
+    allure:
+      severity: high
+      categories:
+        - Repository-bounded Local Context
+        - documentation
+        - regression

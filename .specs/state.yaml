@@ -1,32 +1,38 @@
 active_flow: planning
-active_epic_id: e03
-active_story_id: e03s01
+active_epic_id: e04
+active_story_id: e04s01
 active_bug_id: null
 git:
-  bookmark: null
+  bookmark: favilo/repository-bounded-local-agent-context
   parent_bookmark: main
-  change_id: punnvyvq
+  change_id: utquwzqy
 handoff:
-  last_step_completed: "Completed e03s01 impact assessment and detailed plan; capsule consistency gate passes"
+  last_step_completed: Created and prioritized the e04 repository-bounded local-agent-context
+    capsule; impact and consistency gates pass
   open_decisions: []
   required_reading:
-    - .specs/product/SCOPE_LATEST.yaml
-    - .specs/IMPACT_LATEST.md
-    - .specs/planning-status.yaml
-    - .specs/release-plan.yaml
-    - .specs/epics/e03-directory-local-tool-permissions/epic.yaml
-    - .specs/epics/e03-directory-local-tool-permissions/e03s01-hierarchical-project-policy.md
-    - .specs/epics/e03-directory-local-tool-permissions/e03s03-scoped-permissions-editor.md
-    - extensions/tool-permissions/config.ts
-    - extensions/tool-permissions/index.ts
+  - .plans/fix-local-agent-context-jj-boundary.md
+  - .specs/IMPACT_LATEST.md
+  - .specs/release-plan.yaml
+  - .specs/epics/e04-repository-bounded-local-agent-context/epic.yaml
+  - .specs/epics/e04-repository-bounded-local-agent-context/e04s01-repository-and-home-boundaries.md
+  - extensions/local-agent-context/index.ts
+  - extensions/local-agent-context/index.test.ts
   next_skill: kickoff-branch
   blocker: null
   deferred_work:
-    - Add real Pi process integration tests after unit contracts are established
-  verified_at: "2026-07-29T19:05:03Z"
+  - Build e03 directory-local tool permissions after the higher-WSJF e04 fix
+  - Add real Pi process integration tests after unit contracts are established
+  verified_at: '2026-07-29T19:35:34Z'
 release:
-  pr: "https://github.com/favilo/pi-extensions/pull/3"
-  merged_commit: "70d47f101b7e74b847c50265bbfe8097d409da68"
-  merged_at: "2026-07-28T20:47:58Z"
+  pr: https://github.com/favilo/pi-extensions/pull/3
+  merged_commit: 70d47f101b7e74b847c50265bbfe8097d409da68
+  merged_at: '2026-07-28T20:47:58Z'
   ci_verified: false
-  ci_note: "No GitHub Actions workflows are configured"
+  ci_note: No GitHub Actions workflows are configured
+metrics:
+  skill_timings:
+    release-branch:
+      calls: 1
+      total_seconds: 1434.0
+      avg_seconds: 1434.0

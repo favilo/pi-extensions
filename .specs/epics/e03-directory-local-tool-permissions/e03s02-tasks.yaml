@@ -2,6 +2,7 @@ story_id: e03s02
 title: Save permission rules to project or user scope
 status: failing
 bcps: 3
+spec: e03s02-scoped-permission-saving.md
 tasks:
   - id: 1
     description: Add failing interaction contracts for Ctrl+A project saves, Ctrl+Shift+A user saves, steering variants, prompt hints, and failed persistence.

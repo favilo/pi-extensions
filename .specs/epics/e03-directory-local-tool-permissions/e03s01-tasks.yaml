@@ -2,6 +2,7 @@ story_id: e03s01
 title: Apply trusted hierarchical project permission policy
 status: failing
 bcps: 5
+spec: e03s01-hierarchical-project-policy.md
 tasks:
   - id: 1
     description: Characterize existing user-only decisions and add a fake Pi tool-call harness proving every protected tool family reaches one decision boundary.
