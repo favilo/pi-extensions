@@ -10,7 +10,7 @@ For active development, install the local checkout. Pi references it directly, s
 pi install ~/git/agent-skills/pi-extensions
 ```
 
-On other computers, authenticate GitHub access and install the private repository:
+Install directly from GitHub:
 
 ```bash
 pi install git:github.com/favilo/pi-extensions
@@ -60,6 +60,6 @@ Each extension owns its implementation and tests under `extensions/<name>/`. Onl
 
 To create a machine-local MCP provider, see [`extensions/mcp/README.md`](extensions/mcp/README.md) and the self-contained [`examples/mcp-provider/`](examples/mcp-provider/) extension.
 
-## Private extensions
+## Local-only integrations
 
-Work-specific Codex MCP integration remains machine-local and is intentionally excluded from this repository.
+Environment-specific MCP integrations remain machine-local and are intentionally excluded from this repository.

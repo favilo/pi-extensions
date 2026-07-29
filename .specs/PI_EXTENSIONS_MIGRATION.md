@@ -2,11 +2,11 @@
 
 ## Reason for existence
 
-This document is the durable specification and resume point for moving portable Pi extensions from machine-local discovery into a private, git-installable Pi package.
+This document is the durable specification and resume point for moving portable Pi extensions from machine-local discovery into a git-installable Pi package.
 
 ## Goal
 
-Publish `favilo/pi-extensions` as a private GitHub repository installable on authenticated computers with:
+Publish `favilo/pi-extensions` as a public GitHub repository installable with:
 
 ```bash
 pi install git:github.com/favilo/pi-extensions
@@ -15,7 +15,7 @@ pi install git:github.com/favilo/pi-extensions
 ## Decisions
 
 - Repository path: `~/git/agent-skills/pi-extensions`.
-- Distribution: private GitHub repository, git only; no npm publication.
+- Distribution: public GitHub repository, git only; no npm publication.
 - Structure: one Pi package with one folder per extension.
 - Tests are colocated with the extension they verify.
 - `package.json` explicitly lists each `index.ts`; helper and test files must never be auto-loaded.
@@ -23,7 +23,7 @@ pi install git:github.com/favilo/pi-extensions
 - The provider-neutral `mcp` extension is shared; machine-local providers register tools and named status sections through its event-bus contract.
 - `codex-mcp.ts` registers as a machine-local provider without being imported by the shared extension.
 - Portable extensions are copied before originals are removed. Never remove the originals without explicit user approval.
-- This computer installs the local checkout for immediate `/reload` development; other computers install the private GitHub repository.
+- This computer installs the local checkout for immediate `/reload` development; other computers install the GitHub repository.
 
 ## Shared extensions
 
@@ -51,8 +51,8 @@ pi install git:github.com/favilo/pi-extensions
 - `npm run check` passes.
 - `npm audit --omit=dev` reports no production vulnerabilities.
 - Pi loads the package with `pi --no-extensions -e . --list-models`.
-- `github.com/favilo/pi-extensions` exists as a private repository.
-- A second authenticated computer can install the repository through `pi install`.
+- `github.com/favilo/pi-extensions` exists as a public repository.
+- Another computer can install the repository through `pi install`.
 - Local source copies are removed only after package installation is verified, preventing duplicate extension loading.
 - Machine-local `codex-mcp` contributes tools and status through the shared `mcp` extension without duplicate commands or tools.
 
@@ -68,7 +68,7 @@ Completed:
 - Verified zero production dependency vulnerabilities.
 - Verified Pi can load the package through a temporary local package invocation.
 - Initialized a colocated Jujutsu repository.
-- Created the private GitHub repository `favilo/pi-extensions`.
+- Created the GitHub repository `favilo/pi-extensions`.
 - Added the SSH remote with Jujutsu.
 - Created the `main` bookmark and pushed the initial package to GitHub.
 - Removed the eight original portable extension copies after explicit user approval.
@@ -84,7 +84,7 @@ Completed:
 
 Pending:
 
-1. Install `git:github.com/favilo/pi-extensions` on a second authenticated computer and confirm Pi loads it successfully.
+1. Install `git:github.com/favilo/pi-extensions` on another computer and confirm Pi loads it successfully.
 
 ## Known issue
 
