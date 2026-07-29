@@ -10,6 +10,9 @@
   ],
   "scripts": {
     "check": "npm run typecheck && npm test",
+    "check:ci": "npm run check && npm run check:plans && npm run check:portability",
+    "check:plans": "bash .github/scripts/check-active-plans.sh",
+    "check:portability": "python3 .github/scripts/check-portable-paths.py",
     "test": "node --test extensions/*/*.test.ts examples/*/*.test.ts",
     "typecheck": "tsc --noEmit"
   },
