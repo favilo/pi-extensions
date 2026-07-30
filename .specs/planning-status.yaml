@@ -1,0 +1,22 @@
+context_capsule: null
+workflows:
+  survey-context:
+    required: true
+    status: done
+  scope-work:
+    required: true
+    status: done
+  research-first:
+    required: false
+    status: done
+    note: "Extend existing plugin; prefer user-owned directory-scoped TOML. Pi trust does not safely cover standalone ancestor .pi/permissions.toml files."
+  elaborate-spec:
+    required: false
+    status: done
+    note: "Resolved hierarchical .pi/permissions.toml discovery, nearest-match precedence, repository boundary, and persisted ancestor trust behavior."
+  plan-release:
+    required: true
+    status: done
+  slice-tasks:
+    required: true
+    status: done

@@ -1,81 +1,73 @@
-# MCP Registry Gap-Closure Impact Assessment
+# e04s01 Repository and Home Boundaries — Impact Assessment
 
 ## Target
 
-- `extensions/mcp/registry.ts`: registration ownership, failure retention, and exact-instance disposal.
-- `extensions/mcp/index.ts`: provider-unregister wire payload and `/mcp` failure rendering.
-- `extensions/mcp/lifecycle.test.ts`: runtime replacement coverage and reliability threshold.
-- Machine-local `~/.pi/agent/extensions/codex-mcp/provider-registry.ts`: provider-object unregister payload.
-- Public guide and example: wire-contract documentation and copyable provider lifecycle.
+- `extensions/local-agent-context/index.ts`: ancestor discovery, repository-root selection, and local context loading.
+- `extensions/local-agent-context/index.test.ts`: public extension behavior for context order and traversal boundaries.
+- `README.md`: user-facing description of local context discovery.
 
 ## Zoom-out
 
 ### Purpose
 
-The shared MCP module coordinates independently loaded providers, registers their tools, renders provider-owned status through `/mcp`, and removes only the state owned by a disposing provider instance.
+The local-agent-context extension appends non-empty `AGENTS.local.md` and `AGENTS.override.md` files to Pi's existing system prompt. It supplies directory-specific guidance while leaving Pi's native `AGENTS.md` and `CLAUDE.md` loading unchanged.
 
 ### Callers
 
-- Pi invokes `extensions/mcp/index.ts` from the package manifest.
-- Repository providers call `registerMcpProvider`.
-- Machine-local Codex uses the literal event-bus wire contract.
-- Third-party providers copy the wire contract from `extensions/mcp/README.md` and `examples/mcp-provider/index.ts`.
-- Registry, integration, lifecycle, failure-isolation, example, and Codex adapter tests exercise the contract.
+- Pi loads the extension through `package.json` and invokes its `before_agent_start` handler.
+- The handler resolves directories from `ctx.cwd`, reads local context files, and returns an augmented system prompt.
+- The focused test suite invokes the extension through a fake `ExtensionAPI` event registration boundary.
 
 ### Contracts
 
-- Registration is idempotent for the same provider object.
-- Distinct objects with the same provider ID conflict visibly and cannot replace or remove the healthy owner.
-- Unregistration is authorized by exact provider-object identity, not merely a shared string ID.
-- Registration/status failures expose generic text and never provider-thrown secret content.
-- Reload, new, resume, fork, and quit teardown leave no stale active tools.
-- Registry behavior remains provider-neutral and adds no runtime dependency.
+- Broader eligible guidance appears before nearer guidance.
+- Within one directory, `AGENTS.local.md` appears before `AGENTS.override.md`.
+- Missing, empty, and whitespace-only files do not alter the prompt.
+- Pi's native global `~/.pi/agent/AGENTS.md` remains outside this extension's responsibility.
+- Repository and HOME ceilings must prevent unrelated ancestor guidance from entering the prompt.
 
-## Dependents (10)
+## Dependents (4)
 
-- `extensions/mcp/index.ts`
-- `extensions/mcp/registry.ts`
-- `extensions/mcp/index.test.ts`
-- `extensions/mcp/registry.test.ts`
-- `extensions/mcp/failure-isolation.test.ts`
-- `extensions/mcp/lifecycle.test.ts`
-- `extensions/mcp/README.md`
-- `examples/mcp-provider/index.ts`
-- `~/.pi/agent/extensions/codex-mcp/provider-registry.ts`
-- `~/.pi/agent/extensions/codex-mcp/tests/provider-registry.test.ts`
+- `package.json`: loads the extension in every Pi session using this package.
+- `extensions/local-agent-context/index.test.ts`: characterizes the extension's public behavior.
+- `README.md`: advertises the extension and must describe its bounded behavior accurately.
+- `.specs/epics/archive/e02-extension-unit-coverage/e02s01-extension-unit-contracts.md`: historical Git-boundary characterization superseded, not rewritten, by e04s01.
 
 ## Affected Stories
 
-- `e01s01`: duplicate identity conflicts must be visible and disposal must preserve the healthy owner.
-- `e01s02`: Codex must emit the revised provider-object unregister payload.
-- `e01s03`: lifecycle replacement and 100-cycle reliability coverage must become explicit.
-- `e01s04`: the public guide/example must teach the safe payload.
+- `e04s01`: owns repository command discovery, HOME fallback, failure behavior, and regression coverage.
+- `e02s01`: remains archived; its Git-only contract becomes a compatibility baseline rather than the complete boundary contract.
+- `e03s01`: depends conceptually on repository-boundary precedent but owns separate tool-permission discovery and must not import e04 implementation implicitly.
 
 ## Test Coverage
 
 Existing coverage:
 
-- Load-order independence and repeated readiness.
-- Provider removal by ID.
-- Tool-name conflict isolation.
-- Generic status-failure redaction.
-- Example shutdown cleanup.
-- Codex adapter registration and ID-based disposal.
+- `extensions/local-agent-context/index.test.ts` covers a Git-directory boundary, broad-to-near ordering, local-before-override ordering, trimming, empty-file omission, and no-op behavior.
+- `npm run check` covers package TypeScript and all extension tests.
 
 Required coverage:
 
-- Duplicate provider identity appears as a generic `/mcp` failure.
-- Disposing a rejected duplicate does not remove the healthy provider or its tools.
-- Exact-instance disposal removes the accepted owner.
-- Reload/new/resume/fork/quit runtime teardown and recreation remain duplicate-free.
-- 100 replacement cycles leave zero stale or duplicate tools.
-- Status collection for 100 synchronous providers completes in under 50 ms.
-- Codex and authoring-example adapters emit provider objects on unregister.
+- Pure Jujutsu root discovery.
+- Git-only and colocated Git/Jujutsu compatibility.
+- Differently nested Git and Jujutsu repositories, selecting the nearest valid returned root.
+- Exclusion of files above every selected repository root.
+- No-repository traversal stopping before `$HOME` when cwd is inside HOME.
+- Cwd-only behavior when cwd is outside HOME.
+- Cwd-only fail-closed behavior when VCS root discovery times out or cannot execute.
+- Rejection of command output that is not an ancestor of cwd.
+- Existing ordering, trimming, empty-file, and unchanged-prompt contracts.
 
-## Risk: High
+Coverage gaps:
 
-This changes a public cross-extension wire contract and tool ownership semantics across repository and machine-local callers; an incomplete migration can leave stale tools or let one provider remove another.
+- Existing tests expose no injectable VCS command boundary.
+- No test currently distinguishes no repository from root-probe operational failure.
+- No current test covers HOME containment or cwd outside HOME.
+
+## Risk: Medium
+
+The extension has one runtime caller and focused tests, but current coverage is partial and an incorrect boundary can inject unrelated instructions into every agent turn. External root probes also introduce timeout, executable-availability, and invalid-output failure modes.
 
 ## Recommended action
 
-Reopen `e01s01` and `e01s03`; update the Codex adapter and public example in the same change; use contract-first tests and the approved P0 NFR thresholds. Do not add dependencies.
+Proceed with contract-first TDD. Inject root probes, cap each probe at 1,000 ms, choose the deepest valid ancestor returned by Git or Jujutsu, and fall back to cwd-only behavior on operational uncertainty. Preserve the archived e02 evidence and e03 capsule unchanged.

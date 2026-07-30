@@ -1,25 +1,38 @@
-active_flow: null
-active_epic_id: null
-active_story_id: null
+active_flow: planning
+active_epic_id: e04
+active_story_id: e04s01
 active_bug_id: null
 git:
-  bookmark: favilo/bigpowers-e02-closeout
+  bookmark: favilo/repository-bounded-local-agent-context
   parent_bookmark: main
-  change_id: umpypzvp
+  change_id: utquwzqy
 handoff:
-  last_step_completed: "Release 0.2.1 completed through merged PR #3; Bigpowers metadata closed and e02 archived"
+  last_step_completed: Created and prioritized the e04 repository-bounded local-agent-context
+    capsule; impact and consistency gates pass
   open_decisions: []
   required_reading:
-    - .specs/release-plan.yaml
-    - .specs/epics/archive/e02-extension-unit-coverage/epic.yaml
-  next_skill: null
+  - .plans/fix-local-agent-context-jj-boundary.md
+  - .specs/IMPACT_LATEST.md
+  - .specs/release-plan.yaml
+  - .specs/epics/e04-repository-bounded-local-agent-context/epic.yaml
+  - .specs/epics/e04-repository-bounded-local-agent-context/e04s01-repository-and-home-boundaries.md
+  - extensions/local-agent-context/index.ts
+  - extensions/local-agent-context/index.test.ts
+  next_skill: kickoff-branch
   blocker: null
   deferred_work:
-    - Add real Pi process integration tests after unit contracts are established
-  verified_at: "2026-07-28T20:39:58Z"
+  - Build e03 directory-local tool permissions after the higher-WSJF e04 fix
+  - Add real Pi process integration tests after unit contracts are established
+  verified_at: '2026-07-29T19:35:34Z'
 release:
-  pr: "https://github.com/favilo/pi-extensions/pull/3"
-  merged_commit: "70d47f101b7e74b847c50265bbfe8097d409da68"
-  merged_at: "2026-07-28T20:47:58Z"
+  pr: https://github.com/favilo/pi-extensions/pull/3
+  merged_commit: 70d47f101b7e74b847c50265bbfe8097d409da68
+  merged_at: '2026-07-28T20:47:58Z'
   ci_verified: false
-  ci_note: "No GitHub Actions workflows are configured"
+  ci_note: No GitHub Actions workflows are configured
+metrics:
+  skill_timings:
+    release-branch:
+      calls: 1
+      total_seconds: 1434.0
+      avg_seconds: 1434.0

@@ -1,0 +1,48 @@
+story_id: e03s02
+title: Save permission rules to project or user scope
+status: failing
+bcps: 3
+spec: e03s02-scoped-permission-saving.md
+tasks:
+  - id: 1
+    description: Add failing interaction contracts for Ctrl+A project saves, Ctrl+Shift+A user saves, steering variants, prompt hints, and failed persistence.
+    verify: node --test extensions/tool-permissions/index.test.ts
+    status: failing
+    risk: P0
+    allure:
+      severity: critical
+      categories:
+        - Directory-local Tool Permissions
+        - keyboard interaction
+        - trust boundary
+  - id: 2
+    description: Route permission-prompt persistence to the selected scope and report the exact destination without allowing on failed saves.
+    verify: node --test extensions/tool-permissions/index.test.ts
+    status: failing
+    risk: P0
+    allure:
+      severity: critical
+      categories:
+        - Directory-local Tool Permissions
+        - permission persistence
+        - failure modes
+  - id: 3
+    description: Document project policy discovery, trust requirements, precedence, shortcuts, and user-policy fallback.
+    verify: node --test extensions/tool-permissions/documentation.test.ts
+    status: failing
+    risk: P1
+    allure:
+      severity: high
+      categories:
+        - Directory-local Tool Permissions
+        - documentation
+  - id: 4
+    description: Run package-wide type and regression verification.
+    verify: npm run check
+    status: failing
+    risk: P1
+    allure:
+      severity: high
+      categories:
+        - Directory-local Tool Permissions
+        - regression

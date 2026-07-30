@@ -1,0 +1,13 @@
+id: e04
+title: Repository-bounded local agent context
+wsjf: 8.0
+total_bcps: 4
+status: planned
+stories:
+  - id: e04s01
+    title: Bound local context discovery by repository and home
+    bcps: 4
+    status: todo
+    delta: MODIFIED
+    spec: e04s01-repository-and-home-boundaries.md
+    tasks: e04s01-tasks.yaml
