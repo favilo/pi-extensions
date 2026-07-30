@@ -37,6 +37,11 @@ metrics:
       total_seconds: 1434.0
       avg_seconds: 1434.0
     survey-context:
+      calls: 2
+      total_seconds: 259.0
+      avg_seconds: 129.5
+    verify-work:
       calls: 1
-      total_seconds: 154.0
-      avg_seconds: 154.0
+      total_seconds: 27.0
+      avg_seconds: 27.0
+  story_start: '2026-07-30T01:40:04Z'

@@ -16,6 +16,13 @@ epics:
     bcps: 4
     note: >-
       WSJF = (business value 5 + time criticality 3 + risk reduction 8) / job size 2 = 8.0. A focused fix prevents unrelated ancestor instructions from entering Pi context in pure Jujutsu, nested-repository, and non-repository workspaces.
+  - id: e05
+    title: Provider usage visibility
+    capsule_dir: epics/e05-provider-usage
+    wsjf: 4.0
+    bcps: 5
+    note: >-
+      WSJF = (business value 5 + time criticality 4 + risk reduction 3) / job size 3 = 4.0. A focused usage command gives users current provider/account quota visibility without changing the existing accounts plugin.
   - id: e03
     title: Directory-local tool permissions
     capsule_dir: epics/e03-directory-local-tool-permissions

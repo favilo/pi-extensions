@@ -1,0 +1,13 @@
+id: e05
+title: Provider usage visibility
+wsjf: 4.0
+total_bcps: 5
+status: planned
+stories:
+  - id: e05s01
+    title: Show current provider usage
+    bcps: 5
+    status: todo
+    delta: ADDED
+    spec: e05s01-show-current-provider-usage.md
+    tasks: e05s01-tasks.yaml
