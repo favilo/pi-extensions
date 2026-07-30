@@ -1,0 +1,176 @@
+{
+  "generated_at": "2026-07-30T17:43:53.236229+00:00",
+  "matrix_version": "1.0",
+  "stories": [
+    {
+      "id": "e03s01",
+      "title": "Apply trusted hierarchical project permission policy",
+      "epic_id": "e03",
+      "epic_title": "Directory-local tool permissions",
+      "bcp": 0,
+      "wsjf": 1.7,
+      "spec_path": ".specs/epics/e03-directory-local-tool-permissions/epic.yaml",
+      "status": "todo",
+      "links": [
+        {
+          "file": "extensions/tool-permissions/index.ts",
+          "line": 1,
+          "confidence": "high",
+          "method": "explicit_tag"
+        },
+        {
+          "file": ".specs/state.yaml",
+          "line": 4,
+          "confidence": "high",
+          "method": "explicit_tag"
+        },
+        {
+          "file": ".specs/epics/e03-directory-local-tool-permissions/e03s01-hierarchical-project-policy.md",
+          "line": 0,
+          "confidence": "medium",
+          "method": "file_heuristic"
+        },
+        {
+          "file": ".specs/epics/e03-directory-local-tool-permissions/e03s01-tasks.yaml",
+          "line": 0,
+          "confidence": "low",
+          "method": "task_reference"
+        }
+      ],
+      "link_count": 4
+    },
+    {
+      "id": "e03s02",
+      "title": "Save permission rules to project or user scope",
+      "epic_id": "e03",
+      "epic_title": "Directory-local tool permissions",
+      "bcp": 0,
+      "wsjf": 1.7,
+      "spec_path": ".specs/epics/e03-directory-local-tool-permissions/epic.yaml",
+      "status": "todo",
+      "links": [
+        {
+          "file": ".specs/epics/e03-directory-local-tool-permissions/e03s03-scoped-permissions-editor.md",
+          "line": 0,
+          "confidence": "medium",
+          "method": "file_heuristic"
+        },
+        {
+          "file": ".specs/epics/e03-directory-local-tool-permissions/e03s02-scoped-permission-saving.md",
+          "line": 0,
+          "confidence": "medium",
+          "method": "file_heuristic"
+        },
+        {
+          "file": ".specs/epics/e03-directory-local-tool-permissions/e03s02-tasks.yaml",
+          "line": 0,
+          "confidence": "low",
+          "method": "task_reference"
+        }
+      ],
+      "link_count": 3
+    },
+    {
+      "id": "e03s03",
+      "title": "Edit project or user permission policy explicitly",
+      "epic_id": "e03",
+      "epic_title": "Directory-local tool permissions",
+      "bcp": 0,
+      "wsjf": 1.7,
+      "spec_path": ".specs/epics/e03-directory-local-tool-permissions/epic.yaml",
+      "status": "todo",
+      "links": [
+        {
+          "file": ".specs/epics/e03-directory-local-tool-permissions/e03s03-scoped-permissions-editor.md",
+          "line": 0,
+          "confidence": "medium",
+          "method": "file_heuristic"
+        },
+        {
+          "file": ".specs/epics/e03-directory-local-tool-permissions/e03s01-hierarchical-project-policy.md",
+          "line": 0,
+          "confidence": "medium",
+          "method": "file_heuristic"
+        },
+        {
+          "file": ".specs/epics/e03-directory-local-tool-permissions/e03s03-tasks.yaml",
+          "line": 0,
+          "confidence": "low",
+          "method": "task_reference"
+        }
+      ],
+      "link_count": 3
+    },
+    {
+      "id": "e04s01",
+      "title": "Bound local context discovery by repository and home",
+      "epic_id": "e04",
+      "epic_title": "Repository-bounded local agent context",
+      "bcp": 0,
+      "wsjf": 8.0,
+      "spec_path": ".specs/epics/e04-repository-bounded-local-agent-context/epic.yaml",
+      "status": "todo",
+      "links": [
+        {
+          "file": ".plans/fix-local-agent-context-jj-boundary.md",
+          "line": 0,
+          "confidence": "medium",
+          "method": "file_heuristic"
+        },
+        {
+          "file": ".specs/epics/e04-repository-bounded-local-agent-context/e04s01-repository-and-home-boundaries.md",
+          "line": 0,
+          "confidence": "medium",
+          "method": "file_heuristic"
+        },
+        {
+          "file": ".specs/epics/e04-repository-bounded-local-agent-context/e04s01-tasks.yaml",
+          "line": 0,
+          "confidence": "low",
+          "method": "task_reference"
+        }
+      ],
+      "link_count": 3
+    },
+    {
+      "id": "e05s01",
+      "title": "Show current provider usage",
+      "epic_id": "e05",
+      "epic_title": "Provider usage visibility",
+      "bcp": 0,
+      "wsjf": 4.0,
+      "spec_path": ".specs/epics/e05-provider-usage/epic.yaml",
+      "status": "todo",
+      "links": [
+        {
+          "file": ".specs/epics/e05-provider-usage/e05s01-show-current-provider-usage.md",
+          "line": 0,
+          "confidence": "medium",
+          "method": "file_heuristic"
+        },
+        {
+          "file": ".specs/epics/e05-provider-usage/e05s01-tasks.yaml",
+          "line": 0,
+          "confidence": "low",
+          "method": "task_reference"
+        }
+      ],
+      "link_count": 2
+    }
+  ],
+  "summary": {
+    "total_stories": 5,
+    "tagged_stories": 1,
+    "dark_stories": [],
+    "dark_count": 0,
+    "orphan_tags": [],
+    "orphan_count": 0,
+    "stale_tags": [],
+    "stale_count": 0,
+    "oracle_stats": {
+      "high": 2,
+      "medium": 8,
+      "low": 5
+    }
+  }
+}

@@ -28,7 +28,7 @@ The tool-permissions module converts tool names, normalized arguments, user poli
 - Within one policy, matching deny rules take precedence over matching allow rules.
 - Rule fields are ANDed, rule lists are ORed, and values are JavaScript regular expressions.
 - Missing policy yields `prompt`; malformed policy never silently grants access.
-- Existing user policy remains at `~/.config/pi/config.toml` and retains current behavior when no eligible project policy matches.
+- Existing user policy remains at `~/.pi/agent/permissions.toml` and retains current behavior when no eligible project policy matches.
 - Every tool family must use the same scoped resolver; bypassing one handler would create a security hole.
 - Audit failure never allows or blocks a call by itself.
 

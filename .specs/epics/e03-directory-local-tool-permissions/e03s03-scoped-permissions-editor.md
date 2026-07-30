@@ -38,9 +38,9 @@ The selected TOML file is opened or created for editing, or a clear error is sho
 
 ## 10. Requirements
 ### MODIFIED: Bare permissions command
-**Before:** `/permissions` opens `~/.config/pi/config.toml`.
+**Before:** `/permissions` opens `~/.pi/agent/permissions.toml`.
 
-**After:** Bare `/permissions` continues to open `~/.config/pi/config.toml` as a backward-compatible alias for `/permissions user`.
+**After:** Bare `/permissions` continues to open `~/.pi/agent/permissions.toml` as a backward-compatible alias for `/permissions user`.
 
 ### ADDED: User policy editor
 `/permissions user` shall open the existing user permission TOML.
@@ -91,7 +91,7 @@ The command description, working message, and error notification identify the se
 ### Scenario: User scope is explicit
 **Given** interactive Pi
 **When** the user runs `/permissions user`
-**Then** `~/.config/pi/config.toml` opens.
+**Then** `~/.pi/agent/permissions.toml` opens.
 
 ### Scenario: Eligible local scope opens
 **Given** cwd is covered by eligible persisted trust

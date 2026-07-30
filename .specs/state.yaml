@@ -1,14 +1,15 @@
-active_flow: planning
-active_epic_id: e04
-active_story_id: e04s01
+active_flow: build_epic
+active_epic_id: e03
+active_story_id: e03s01
+active_story: e03s01
 active_bug_id: null
 git:
   bookmark: favilo/repository-bounded-local-agent-context
   parent_bookmark: main
   change_id: utquwzqy
 handoff:
-  last_step_completed: Created and prioritized the e04 repository-bounded local-agent-context
-    capsule; impact and consistency gates pass
+  last_step_completed: Verified e03s01 trusted hierarchical project permission policy;
+    mechanical gates and manual UAT pass
   open_decisions: []
   required_reading:
   - .plans/fix-local-agent-context-jj-boundary.md
@@ -18,7 +19,7 @@ handoff:
   - .specs/epics/e04-repository-bounded-local-agent-context/e04s01-repository-and-home-boundaries.md
   - extensions/local-agent-context/index.ts
   - extensions/local-agent-context/index.test.ts
-  next_skill: kickoff-branch
+  next_skill: audit-code
   blocker: null
   deferred_work:
   - Build e03 directory-local tool permissions after the higher-WSJF e04 fix
@@ -41,7 +42,7 @@ metrics:
       total_seconds: 259.0
       avg_seconds: 129.5
     verify-work:
-      calls: 1
-      total_seconds: 27.0
-      avg_seconds: 27.0
-  story_start: '2026-07-30T01:40:04Z'
+      calls: 2
+      total_seconds: 2129.0
+      avg_seconds: 1064.5
+  story_start: '2026-07-30T17:00:16Z'

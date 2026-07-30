@@ -71,7 +71,7 @@ test("arrays and objects are matched as compact JSON", () => {
 });
 
 test("allowing an entire tool persists an empty match-all rule", () => {
-  const path = join(mkdtempSync(join(tmpdir(), "pi-permissions-")), "config.toml");
+  const path = join(mkdtempSync(join(tmpdir(), "pi-permissions-")), "permissions.toml");
   saveAllowedRule(path, "mcp__example__search", {});
   assert.deepEqual(parsePermissions(readFileSync(path, "utf8")), {
     "mcp__example__search": { allow: [{}], deny: [] },
@@ -79,7 +79,7 @@ test("allowing an entire tool persists an empty match-all rule", () => {
 });
 
 test("saving a rule preserves comments, formatting, and unrelated configuration", () => {
-  const path = join(mkdtempSync(join(tmpdir(), "pi-permissions-")), "config.toml");
+  const path = join(mkdtempSync(join(tmpdir(), "pi-permissions-")), "permissions.toml");
   const source = [
     "# document comment",
     "[other]",

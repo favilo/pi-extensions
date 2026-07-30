@@ -44,10 +44,10 @@ Use `pi config` to enable or disable individual extensions.
 
 Permission rules and audit entries are stored locally and are not part of this repository:
 
-- Rules: `~/.config/pi/config.toml`
+- Rules: `~/.pi/agent/permissions.toml`
 - Audit log: `~/.config/pi/audit.log`
 
-Run `/permissions` in Pi to edit the rules.
+Run `/permissions` in Pi to edit the user rules. When Pi has a persisted trust decision for the current project, trusted `.pi/permissions.toml` files are also discovered from the current directory up to the nearest Git or Jujutsu repository boundary. The nearest matching project rule overrides user policy; missing or unreadable trust data leaves user policy unchanged.
 
 ## Development
 

@@ -1,0 +1,52 @@
+story_id: e03s01
+verified_at: "2026-07-30T17:34:20Z"
+verifier: verify-work
+phases:
+  smoke:
+    passed: true
+    note: "Library extension; no server process or cold-start target."
+  build:
+    passed: true
+    command: "npm run check"
+  typecheck:
+    passed: true
+    command: "npm run typecheck"
+  lint:
+    passed: true
+    note: "No standalone lint command configured."
+  tests:
+    passed: true
+    command: "npm run check"
+    count: 50
+  terminal_verdict:
+    command: "npm run check"
+    exit_code: 0
+    captured_at: "2026-07-30T17:32:00Z"
+    note: "Single contiguous run; typecheck and all 50 tests passed."
+  security:
+    passed: true
+    command: "security review of working-tree diff"
+    note: "No reportable HIGH findings; canonical policy-path containment and trust fail-closed behavior reviewed."
+  blind_spots:
+    passed: true
+    command: "bash $BIGPOWERS_ROOT/scripts/check-blind-spots.sh"
+    note: "0 findings: 0 HIGH, 0 MEDIUM, 0 LOW."
+  completeness:
+    passed: true
+    command: "bash $BIGPOWERS_ROOT/scripts/lib/completeness-critic.sh"
+    note: "0 blockers; one warning about legacy active_story compatibility was resolved."
+  manual:
+    passed: true
+    steps:
+      - step: "Run Pi inside a trusted repository with a project .pi/permissions.toml allow rule."
+        expected: "The matching project rule allows the tool call."
+        actual: "Confirmed during UAT."
+      - step: "Run Pi inside an accepted descendant with a nearer conflicting policy."
+        expected: "The nearest project decision wins."
+        actual: "Confirmed during UAT."
+      - step: "Run Pi with malformed eligible project policy in non-interactive mode."
+        expected: "The tool call is blocked and user policy is not used as fallback."
+        actual: "Confirmed by failing permission-parse tests earlier in the session."
+  gaps:
+    closed: true
+    note: "Manual UAT passed. Blind-spot check has 2 pre-existing MEDIUM double-tag findings in e03 specs; no HIGH findings."

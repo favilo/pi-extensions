@@ -1,4 +1,5 @@
-import { generateDiffString, isToolCallEventType, renderDiff, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
+// story: e03s01
+import { CONFIG_DIR_NAME, generateDiffString, getAgentDir, isToolCallEventType, renderDiff, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { CURSOR_MARKER, matchesKey, visibleWidth, wrapTextWithAnsi, type Component, type Focusable } from "@earendil-works/pi-tui";
 import ignore from "ignore";
 import { spawn } from "node:child_process";
@@ -6,13 +7,12 @@ import { appendFileSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } fr
 import { homedir, tmpdir } from "node:os";
 import { dirname, join, relative, resolve } from "node:path";
 import {
-  loadPermissions,
   parsePermissionRuleJson,
-  permissionDecision,
   permissionKeyForTool,
   saveAllowedRule,
   type PermissionRule,
 } from "./config.ts";
+import { createPersistedTrustResolver, resolveScopedPermissionDecision, type ScopedPermissionDecision } from "./scope.ts";
 
 type ToolCallEventResult = { block: true; reason: string } | undefined;
 
@@ -72,7 +72,7 @@ type PermissionResult =
   | { allowed: true; decision: "allow_pattern"; pattern: string; steering?: string }
   | { allowed: false; decision: "deny"; steering?: string };
 
-const CONFIG_PATH = join(homedir(), ".config", "pi", "config.toml");
+const CONFIG_PATH = join(getAgentDir(), "permissions.toml");
 const AUDIT_LOG_PATH = join(homedir(), ".config", "pi", "audit.log");
 
 function ruleFromEditedBuffer(buffer: string): PermissionRule | undefined {
@@ -451,8 +451,46 @@ async function askScrollablePermission(
   });
 }
 
-function configuredDecision(toolName: string, input: unknown): "allow" | "deny" | "prompt" {
-  return permissionDecision(loadPermissions(CONFIG_PATH)[permissionKeyForTool(toolName)], input);
+async function handleConfigurationDiagnostic(
+  result: ScopedPermissionDecision,
+  ctx: PermissionContext,
+  pi: ExtensionAPI,
+): Promise<ToolCallEventResult | "allow_once" | undefined> {
+  if (!result.diagnostic) return undefined;
+  const reason = `${result.diagnostic}${result.path ? `\n\nPath: ${result.path}` : ""}`;
+  if (!ctx.hasUI) {
+    const blocked = `Blocked tool call: ${reason}`;
+    audit({ tool: "permissions", decision: "deny_policy_error", cwd: ctx.cwd, reason: blocked });
+    return { block: true, reason: blocked };
+  }
+  const warning = await askScrollablePermission(pi, ctx, "Permission policy warning", reason);
+  if (warning.allowed) {
+    audit({ tool: "permissions", decision: "allow_once_policy_warning", cwd: ctx.cwd, path: result.path });
+    return "allow_once";
+  }
+  const blocked = "Tool call blocked because the permission policy could not be read.";
+  audit({ tool: "permissions", decision: "deny_policy_error", cwd: ctx.cwd, path: result.path, reason: blocked });
+  return { block: true, reason: blocked };
+}
+
+export function resolveToolPermissionDecision(
+  toolName: string,
+  input: unknown,
+  cwd: string,
+  options: { userPermissionsPath?: string; trustResolver?: Parameters<typeof resolveScopedPermissionDecision>[0]["trustResolver"] } = {},
+): ScopedPermissionDecision {
+  return resolveScopedPermissionDecision({
+    cwd,
+    toolName,
+    input,
+    userPermissionsPath: options.userPermissionsPath ?? CONFIG_PATH,
+    configDirName: CONFIG_DIR_NAME,
+    trustResolver: options.trustResolver ?? createPersistedTrustResolver(getAgentDir()),
+  });
+}
+
+function configuredDecision(toolName: string, input: unknown, cwd: string): ScopedPermissionDecision {
+  return resolveToolPermissionDecision(toolName, input, cwd);
 }
 
 function configuredDeny(toolName: string, ctx: PermissionContext, details: Pick<AuditEntry, "path" | "command"> = {}): ToolCallEventResult {
@@ -465,16 +503,19 @@ async function handlePathPermission(toolName: string, input: PathToolInput, ctx:
   const requestedPath = typeof input.path === "string" ? input.path : "";
   const absolutePath = resolve(ctx.cwd, requestedPath || ".");
   const normalizedInput = { ...input, path: absolutePath };
-  const decision = configuredDecision(toolName, normalizedInput);
+  const decision = configuredDecision(toolName, normalizedInput, ctx.cwd);
+  const configurationResult = await handleConfigurationDiagnostic(decision, ctx, pi);
+  if (configurationResult === "allow_once") return;
+  if (configurationResult) return configurationResult;
 
-  if (decision === "deny") return configuredDeny(toolName, ctx, { path: absolutePath });
+  if (decision.decision === "deny") return configuredDeny(toolName, ctx, { path: absolutePath });
   if (isAiIgnoredPath(absolutePath, ctx.cwd)) {
     const reason = `Blocked ${toolName}: ${requestedPath || "."} is matched by ${resolve(ctx.cwd, ".aiignore")}.`;
     audit({ tool: toolName, decision: "deny_aiignore", cwd: ctx.cwd, path: absolutePath, reason });
     return { block: true, reason };
   }
-  if (decision === "allow" || isInsideDirectory(absolutePath, ctx.cwd)) {
-    if (decision === "allow") audit({ tool: toolName, decision: "allow_pattern", cwd: ctx.cwd, path: absolutePath });
+  if (decision.decision === "allow" || isInsideDirectory(absolutePath, ctx.cwd)) {
+    if (decision.decision === "allow") audit({ tool: toolName, decision: "allow_pattern", cwd: ctx.cwd, path: absolutePath, reason: decision.source });
     return;
   }
   if (!ctx.hasUI) {
@@ -502,10 +543,13 @@ async function handleReadPermission(input: ReadInput, ctx: PermissionContext, pi
 async function handleFileEditPermission(toolName: string, input: FileEditInput, ctx: PermissionContext, pi: ExtensionAPI): Promise<ToolCallEventResult> {
   const requestedPath = typeof input.path === "string" ? input.path : "";
   const absolutePath = resolve(ctx.cwd, requestedPath);
-  const decision = configuredDecision(toolName, { ...input, path: absolutePath });
+  const decision = configuredDecision(toolName, { ...input, path: absolutePath }, ctx.cwd);
+  const configurationResult = await handleConfigurationDiagnostic(decision, ctx, pi);
+  if (configurationResult === "allow_once") return;
+  if (configurationResult) return configurationResult;
 
-  if (decision === "deny") return configuredDeny(toolName, ctx, { path: absolutePath });
-  if (decision === "allow") {
+  if (decision.decision === "deny") return configuredDeny(toolName, ctx, { path: absolutePath });
+  if (decision.decision === "allow") {
     audit({ tool: toolName, decision: "allow_pattern", cwd: ctx.cwd, path: absolutePath });
     return;
   }
@@ -531,10 +575,13 @@ async function handleFileEditPermission(toolName: string, input: FileEditInput, 
 
 async function handleBashPermission(input: BashInput, ctx: PermissionContext, pi: ExtensionAPI): Promise<ToolCallEventResult> {
   const command = typeof input.command === "string" ? input.command : "";
-  const decision = configuredDecision("bash", input);
+  const decision = configuredDecision("bash", input, ctx.cwd);
+  const configurationResult = await handleConfigurationDiagnostic(decision, ctx, pi);
+  if (configurationResult === "allow_once") return;
+  if (configurationResult) return configurationResult;
 
-  if (decision === "deny") return configuredDeny("bash", ctx, { command });
-  if (decision === "allow") {
+  if (decision.decision === "deny") return configuredDeny("bash", ctx, { command });
+  if (decision.decision === "allow") {
     audit({ tool: "bash", decision: "allow_pattern", cwd: ctx.cwd, command });
     return;
   }
@@ -557,9 +604,12 @@ async function handleBashPermission(input: BashInput, ctx: PermissionContext, pi
 }
 
 async function handleSubagentPermission(input: SubagentInput, ctx: PermissionContext, pi: ExtensionAPI): Promise<ToolCallEventResult> {
-  const decision = configuredDecision("subagent", input);
-  if (decision === "deny") return configuredDeny("subagent", ctx);
-  if (decision === "allow") {
+  const decision = configuredDecision("subagent", input, ctx.cwd);
+  const configurationResult = await handleConfigurationDiagnostic(decision, ctx, pi);
+  if (configurationResult === "allow_once") return;
+  if (configurationResult) return configurationResult;
+  if (decision.decision === "deny") return configuredDeny("subagent", ctx);
+  if (decision.decision === "allow") {
     audit({ tool: "subagent", decision: "allow_pattern", cwd: ctx.cwd });
     return;
   }
@@ -595,9 +645,12 @@ function isKnownMcpTool(toolName: string, pi: ExtensionAPI): boolean {
 async function handleUnknownToolPermission(toolName: string, input: unknown, ctx: PermissionContext, pi: ExtensionAPI): Promise<ToolCallEventResult> {
   const knownMcpTool = isKnownMcpTool(toolName, pi);
   if (knownMcpTool) {
-    const decision = configuredDecision(toolName, input);
-    if (decision === "deny") return configuredDeny(toolName, ctx);
-    if (decision === "allow") {
+    const decision = configuredDecision(toolName, input, ctx.cwd);
+    const configurationResult = await handleConfigurationDiagnostic(decision, ctx, pi);
+    if (configurationResult === "allow_once") return;
+    if (configurationResult) return configurationResult;
+    if (decision.decision === "deny") return configuredDeny(toolName, ctx);
+    if (decision.decision === "allow") {
       audit({ tool: toolName, decision: "allow_pattern", cwd: ctx.cwd });
       return;
     }

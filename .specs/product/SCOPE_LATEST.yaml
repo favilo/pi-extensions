@@ -75,7 +75,7 @@ constraints:
     - A failed save must not report success or allow a call as though persistence succeeded.
     - Canonicalize paths before trust-boundary, repository-boundary, and precedence comparisons.
   compatibility:
-    - Existing `~/.config/pi/config.toml` permission rules continue to work without manual migration.
+    - Existing user permission rules live at `~/.pi/agent/permissions.toml`; no automatic migration from legacy locations is provided.
     - Interactive and non-interactive permission behavior remains unchanged when no eligible project policy exists.
     - Use Pi's exported `CONFIG_DIR_NAME` rather than hardcoding `.pi` in implementation, while documenting `.pi` as the default user-facing path.
   product:
