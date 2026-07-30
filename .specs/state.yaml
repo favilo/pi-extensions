@@ -36,3 +36,7 @@ metrics:
       calls: 1
       total_seconds: 1434.0
       avg_seconds: 1434.0
+    survey-context:
+      calls: 1
+      total_seconds: 154.0
+      avg_seconds: 154.0
