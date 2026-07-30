@@ -76,6 +76,21 @@ export function createPersistedTrustResolver(agentDir = getAgentDir()): TrustRes
   };
 }
 
+export function resolveCurrentProjectPolicyPath(options: {
+  cwd: string;
+  trustResolver?: TrustResolver;
+  configDirName?: string;
+  fileSystem?: ScopeFileSystem;
+}): string | undefined {
+  const fs = options.fileSystem ?? defaultFileSystem;
+  const current = canonical(options.cwd, fs);
+  const trust = resolveTrustEligibility(current, options.trustResolver ?? createPersistedTrustResolver());
+  if (!trust) return undefined;
+  const trustedPath = canonical(trust.path, fs);
+  const projectPath = discoverProjectPolicyPaths(current, options.configDirName, fs)[0];
+  return isInside(canonical(projectPath, fs), trustedPath) ? projectPath : undefined;
+}
+
 export function resolveScopedPermissionDecision(options: {
   cwd: string;
   toolName: string;

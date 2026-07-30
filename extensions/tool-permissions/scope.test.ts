@@ -5,7 +5,7 @@ import { join } from "node:path";
 import test from "node:test";
 import { stringify as stringifyToml } from "smol-toml";
 import { type Permissions } from "./config.ts";
-import { discoverProjectPolicyPaths, resolveScopedPermissionDecision, type ScopeFileSystem, type TrustResolver } from "./scope.ts";
+import { discoverProjectPolicyPaths, resolveCurrentProjectPolicyPath, resolveScopedPermissionDecision, type ScopeFileSystem, type TrustResolver } from "./scope.ts";
 
 function policy(permissions: Permissions): string {
   return stringifyToml({ permissions });
@@ -34,6 +34,23 @@ test("stops at the nearest Git or Jujutsu boundary", () => {
     loadPermissions: () => ({}),
   });
   assert.deepEqual(paths, [join(cwd, ".pi", "permissions.toml"), join(repo, ".pi", "permissions.toml")]);
+});
+
+test("resolves the current directory policy path only under persisted trust", () => {
+  const root = mkdtempSync(join(tmpdir(), "pi-permission-scope-"));
+  const cwd = join(root, "repo", "child");
+  mkdirSync(cwd, { recursive: true });
+  const fs: ScopeFileSystem = {
+    existsSync: (path) => path === join(root, "repo", ".git"),
+    realpathSync: (path) => path,
+    loadPermissions: () => ({}),
+  };
+  assert.equal(resolveCurrentProjectPolicyPath({ cwd, trustResolver: () => null, fileSystem: fs }), undefined);
+  assert.equal(resolveCurrentProjectPolicyPath({
+    cwd,
+    trustResolver: () => ({ path: join(root, "repo"), decision: true }),
+    fileSystem: fs,
+  }), join(cwd, ".pi", "permissions.toml"));
 });
 
 test("nearest matching trusted project policy overrides parent and user policy", () => {

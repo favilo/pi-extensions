@@ -12,7 +12,7 @@ import {
   saveAllowedRule,
   type PermissionRule,
 } from "./config.ts";
-import { createPersistedTrustResolver, resolveScopedPermissionDecision, type ScopedPermissionDecision } from "./scope.ts";
+import { createPersistedTrustResolver, resolveCurrentProjectPolicyPath, resolveScopedPermissionDecision, type ScopedPermissionDecision } from "./scope.ts";
 
 type ToolCallEventResult = { block: true; reason: string } | undefined;
 
@@ -57,6 +57,7 @@ type AuditEntry = {
   path?: string;
   command?: string;
   pattern?: string;
+  scope?: "project" | "user";
   reason?: string;
   steering?: string;
 };
@@ -69,7 +70,7 @@ type AllowPatternOption = {
 
 type PermissionResult =
   | { allowed: true; decision: "allow_once"; steering?: string }
-  | { allowed: true; decision: "allow_pattern"; pattern: string; steering?: string }
+  | { allowed: true; decision: "allow_pattern"; pattern: string; scope: "project" | "user"; steering?: string }
   | { allowed: false; decision: "deny"; steering?: string };
 
 const CONFIG_PATH = join(getAgentDir(), "permissions.toml");
@@ -108,6 +109,14 @@ function escapeRegExpLiteral(value: string): string {
 
 function exactPattern(value: string): string {
   return `^${escapeRegExpLiteral(value)}$`;
+}
+
+function permissionResultAudit(result: PermissionResult): Pick<AuditEntry, "pattern" | "scope" | "steering"> {
+  return {
+    pattern: "pattern" in result ? result.pattern : undefined,
+    scope: "scope" in result ? result.scope : undefined,
+    steering: result.steering,
+  };
 }
 
 function audit(entry: Omit<AuditEntry, "time">): void {
@@ -325,6 +334,29 @@ async function askScrollablePermission(
   let scrollableLineCount = rawLines.length;
   let steeringMode = false;
   let steeringText = "";
+  const projectPath = allowPattern
+    ? resolveCurrentProjectPolicyPath({
+      cwd: ctx.cwd,
+      configDirName: CONFIG_DIR_NAME,
+      trustResolver: createPersistedTrustResolver(getAgentDir()),
+    })
+    : undefined;
+  const savePattern = (scope: "project" | "user"): boolean => {
+    if (!allowPattern) return false;
+    const target = scope === "project" ? projectPath : CONFIG_PATH;
+    if (!target) {
+      ctx.ui.notify?.("Project permissions cannot be saved because this directory is not trusted.", "warning");
+      return false;
+    }
+    try {
+      saveAllowedRule(target, permissionKeyForTool(allowPattern.toolName), allowPattern.suggestedRule);
+      ctx.ui.notify?.(`Saved ${scope} permission pattern to ${target}.`, "info");
+      return true;
+    } catch (error) {
+      ctx.ui.notify?.(`Could not save ${scope} permission pattern to ${target}: ${error instanceof Error ? error.message : String(error)}`, "error");
+      return false;
+    }
+  };
 
   return ctx.ui.custom<PermissionResult>((tui, theme: any, _keybindings, done) => {
     const finishWithSteering = (result: PermissionResult, steering: string): void => {
@@ -344,12 +376,14 @@ async function askScrollablePermission(
       offset = Math.max(0, Math.min(offset, maxOffset));
       const visible = wrappedBody.slice(offset, offset + pageSize);
       const position = scrollableLineCount > pageSize ? ` lines ${offset + 1}-${Math.min(offset + pageSize, scrollableLineCount)} of ${scrollableLineCount}` : "";
-      const allowHint = allowPattern ? " • Ctrl+A allow+save pattern • Ctrl+E edit pattern" : "";
-      const steeringAllowHint = allowPattern ? " • Ctrl+A allow+save+steer" : "";
-      const steeringHint = steeringMode
-        ? `Ctrl+Y allow once+steer${steeringAllowHint} • Ctrl+D deny+steer`
-        : "Tab add steering message • Ctrl+D deny";
-      const shortcuts = `↑/↓ or j/k scroll • PgUp/PgDn page • Home/End jump • Ctrl+Y allow once${allowHint} • ${steeringHint}${position}`;
+      const allowHint = allowPattern ? " • Ctrl+A allow+save project • Ctrl+Shift+A allow+save user • Ctrl+E edit pattern" : "";
+      const steeringAllowHint = allowPattern ? " • Ctrl+A project-save+steer • Ctrl+Shift+A user-save+steer" : "";
+      const navigationHint = steeringMode
+        ? `↑/↓ or j/k scroll • PgUp/PgDn page • Home/End jump • Ctrl+D deny+steer${position}`
+        : `↑/↓ or j/k scroll • PgUp/PgDn page • Home/End jump • Tab steering • Ctrl+D deny${position}`;
+      const approvalHint = steeringMode
+        ? `Ctrl+Y allow once+steer${steeringAllowHint}`
+        : `Ctrl+Y allow once${allowHint}`;
       const wrap = (text: string): string[] => wrapWithContinuation(text, width, continuationPrefix);
 
       return [
@@ -365,7 +399,8 @@ async function askScrollablePermission(
               ...wrap(theme.fg("dim", steeringText.trim() ? "choose allow or deny" : "type a message; Esc returns")),
             ]
           : []),
-        ...wrap(theme.fg("dim", shortcuts)),
+        ...wrap(theme.fg("dim", navigationHint)),
+        ...wrap(theme.fg("dim", approvalHint)),
       ];
     },
     handleInput(data: string): void {
@@ -378,11 +413,18 @@ async function askScrollablePermission(
           finishWithSteering({ allowed: true, decision: "allow_once" }, steeringMessage);
           return;
         }
-        if (allowPattern && matchesKey(data, "ctrl+a")) {
-          if (!steeringMessage) return;
-          saveAllowedRule(CONFIG_PATH, permissionKeyForTool(allowPattern.toolName), allowPattern.suggestedRule);
+        if (allowPattern && matchesKey(data, "ctrl+shift+a")) {
+          if (!steeringMessage || !savePattern("user")) return;
           finishWithSteering(
-            { allowed: true, decision: "allow_pattern", pattern: JSON.stringify(allowPattern.suggestedRule) },
+            { allowed: true, decision: "allow_pattern", pattern: JSON.stringify(allowPattern.suggestedRule), scope: "user" },
+            steeringMessage,
+          );
+          return;
+        }
+        if (allowPattern && matchesKey(data, "ctrl+a")) {
+          if (!steeringMessage || !savePattern("project")) return;
+          finishWithSteering(
+            { allowed: true, decision: "allow_pattern", pattern: JSON.stringify(allowPattern.suggestedRule), scope: "project" },
             steeringMessage,
           );
           return;
@@ -418,16 +460,21 @@ async function askScrollablePermission(
         done({ allowed: true, decision: "allow_once" });
         return;
       }
+      if (allowPattern && matchesKey(data, "ctrl+shift+a")) {
+        if (!savePattern("user")) return;
+        done({ allowed: true, decision: "allow_pattern", pattern: JSON.stringify(allowPattern.suggestedRule), scope: "user" });
+        return;
+      }
       if (allowPattern && matchesKey(data, "ctrl+a")) {
-        saveAllowedRule(CONFIG_PATH, permissionKeyForTool(allowPattern.toolName), allowPattern.suggestedRule);
-        done({ allowed: true, decision: "allow_pattern", pattern: JSON.stringify(allowPattern.suggestedRule) });
+        if (!savePattern("project")) return;
+        done({ allowed: true, decision: "allow_pattern", pattern: JSON.stringify(allowPattern.suggestedRule), scope: "project" });
         return;
       }
       if (allowPattern && matchesKey(data, "ctrl+e")) {
         void editPatternInExternalEditor(tui, allowPattern).then((rule) => {
           if (rule) {
             saveAllowedRule(CONFIG_PATH, permissionKeyForTool(allowPattern.toolName), rule);
-            done({ allowed: true, decision: "allow_pattern", pattern: JSON.stringify(rule) });
+            done({ allowed: true, decision: "allow_pattern", pattern: JSON.stringify(rule), scope: "user" });
           }
         });
         return;
@@ -532,7 +579,7 @@ async function handlePathPermission(toolName: string, input: PathToolInput, ctx:
     { toolName, suggestedRule: { path: exactPattern(absolutePath) }, subject: absolutePath },
   );
 
-  audit({ tool: toolName, decision: result.decision, cwd: ctx.cwd, path: absolutePath, pattern: "pattern" in result ? result.pattern : undefined, steering: result.steering });
+  audit({ tool: toolName, decision: result.decision, cwd: ctx.cwd, path: absolutePath, ...permissionResultAudit(result) });
   if (!result.allowed) return { block: true, reason: `User denied external ${toolName} path.` };
 }
 
@@ -569,7 +616,7 @@ async function handleFileEditPermission(toolName: string, input: FileEditInput, 
     `Path: ${requestedPath || absolutePath}`,
   );
 
-  audit({ tool: toolName, decision: result.decision, cwd: ctx.cwd, path: absolutePath, pattern: "pattern" in result ? result.pattern : undefined, steering: result.steering });
+  audit({ tool: toolName, decision: result.decision, cwd: ctx.cwd, path: absolutePath, ...permissionResultAudit(result) });
   if (!result.allowed) return { block: true, reason: `User denied ${toolName}.` };
 }
 
@@ -599,7 +646,7 @@ async function handleBashPermission(input: BashInput, ctx: PermissionContext, pi
     { toolName: "bash", suggestedRule: { command: exactPattern(command) }, subject: command },
   );
 
-  audit({ tool: "bash", decision: result.decision, cwd: ctx.cwd, command, pattern: "pattern" in result ? result.pattern : undefined, steering: result.steering });
+  audit({ tool: "bash", decision: result.decision, cwd: ctx.cwd, command, ...permissionResultAudit(result) });
   if (!result.allowed) return { block: true, reason: "User denied bash command." };
 }
 
@@ -634,7 +681,7 @@ async function handleSubagentPermission(input: SubagentInput, ctx: PermissionCon
     { toolName: "subagent", suggestedRule: {}, subject: "all subagent calls" },
   );
 
-  audit({ tool: "subagent", decision: result.decision, cwd: ctx.cwd, pattern: "pattern" in result ? result.pattern : undefined, steering: result.steering });
+  audit({ tool: "subagent", decision: result.decision, cwd: ctx.cwd, ...permissionResultAudit(result) });
   if (!result.allowed) return { block: true, reason: "User denied subagent delegation." };
 }
 
@@ -677,7 +724,7 @@ async function handleUnknownToolPermission(toolName: string, input: unknown, ctx
     knownMcpTool ? { toolName, suggestedRule: {}, subject: "all calls to this MCP tool" } : undefined,
   );
 
-  audit({ tool: toolName, decision: result.decision, cwd: ctx.cwd, pattern: "pattern" in result ? result.pattern : undefined, steering: result.steering });
+  audit({ tool: toolName, decision: result.decision, cwd: ctx.cwd, ...permissionResultAudit(result) });
   if (!result.allowed) return { block: true, reason: `User denied ${toolName}.` };
 }
 

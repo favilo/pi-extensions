@@ -1,3 +1,4 @@
+<!-- story: e03s02 -->
 # e03s02 — Save permission rules to project or user scope
 
 ## 1. Identity
