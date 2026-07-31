@@ -10,6 +10,8 @@ export type {
   McpProviderTool,
   McpToolProvider,
 } from "./registry.ts";
+export { StdioMcpClient } from "./stdio-client.ts";
+export type { SpawnMcpProcess, StdioMcpTool } from "./stdio-client.ts";
 
 const PROVIDER_REGISTER_CHANNEL = "pi-mcp:provider-register";
 const PROVIDER_UNREGISTER_CHANNEL = "pi-mcp:provider-unregister";

@@ -98,7 +98,11 @@ A failed MCP server should not throw from the provider factory or crash Pi. Catc
 
 Keep the disposer returned by your registration handshake and invoke it from `session_shutdown`. The disposer must emit the exact provider object used during registration, not only its string ID. Exact object identity prevents a rejected duplicate from removing the accepted provider that owns the same ID. Pi rebuilds extension runtimes during reload, new-session, resume, and fork flows. Cleanup prevents stale provider state and duplicate tools.
 
-The complete load-order and cleanup pattern is in [`examples/mcp-provider/index.ts`](../../examples/mcp-provider/index.ts).
+The complete load-order and cleanup pattern is in [`examples/mcp-provider/index.ts`](../../examples/mcp-provider/index.ts). For a concrete stdio MCP implementation, see [`examples/bevy-debugger-mcp/index.ts`](../../examples/bevy-debugger-mcp/index.ts). It demonstrates PATH-gated loading, MCP initialization, tool discovery, tool calls, status reporting, and shutdown cleanup.
+
+## Reusable stdio client
+
+`./stdio-client.ts` exports `StdioMcpClient`, a small newline-delimited JSON-RPC client for MCP servers using stdio transport. Providers can reuse it while retaining ownership of their command name, tool-name prefix, status text, and lifecycle policy. It is also re-exported from this extension's public module.
 
 ## Testing a provider
 

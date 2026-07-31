@@ -1,9 +1,0 @@
-# Tool permissions: deny rules take precedence over allow rules.
-# read covers read, ls, grep, and find. write covers write and edit.
-# Rule keys are dot paths into tool arguments; values are JavaScript RegExp patterns.
-# Fields in one rule are ANDed. Rules in a list are ORed. An empty rule matches every call.
-[permissions]
-
-[permissions.bash]
-allow = [{command = "^ls -lad \\.$"}, {command = "^ls -l \\.$"}, {command = "^ls -la \\.$"}]
-deny = []
