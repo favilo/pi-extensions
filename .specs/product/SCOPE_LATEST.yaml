@@ -53,8 +53,8 @@ out_of_scope:
     reason: Existing user policy remains readable without destructive format migration.
     disposition: excluded
   - item: Changing audit-log scope or retention
-    reason: Permission resolution changes do not require separate project audit logs.
-    disposition: retained_existing_behavior
+    reason: Added as e03s04 to move audit logs to a bounded user-local location with migration and seven-day retention.
+    disposition: in_scope
 
 constraints:
   behavioral:
