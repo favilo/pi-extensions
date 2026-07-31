@@ -4,8 +4,9 @@ import { CURSOR_MARKER, matchesKey, visibleWidth, wrapTextWithAnsi, type Compone
 import ignore from "ignore";
 import { spawn } from "node:child_process";
 import { appendFileSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
-import { homedir, tmpdir } from "node:os";
+import { tmpdir } from "node:os";
 import { dirname, join, relative, resolve } from "node:path";
+import { createAuditLogger } from "./audit.ts";
 import {
   parsePermissionRuleJson,
   permissionKeyForTool,
@@ -74,7 +75,7 @@ type PermissionResult =
   | { allowed: false; decision: "deny"; steering?: string };
 
 const CONFIG_PATH = join(getAgentDir(), "permissions.toml");
-const AUDIT_LOG_PATH = join(homedir(), ".config", "pi", "audit.log");
+const auditLogger = createAuditLogger();
 
 function ruleFromEditedBuffer(buffer: string): PermissionRule | undefined {
   const line = buffer
@@ -120,12 +121,7 @@ function permissionResultAudit(result: PermissionResult): Pick<AuditEntry, "patt
 }
 
 function audit(entry: Omit<AuditEntry, "time">): void {
-  try {
-    mkdirSync(dirname(AUDIT_LOG_PATH), { recursive: true });
-    appendFileSync(AUDIT_LOG_PATH, `${JSON.stringify({ time: new Date().toISOString(), ...entry })}\n`, "utf8");
-  } catch {
-    // Never fail or allow a tool call because audit logging failed.
-  }
+  auditLogger.write(entry);
 }
 
 function compact(value: unknown, max = 2000): string {

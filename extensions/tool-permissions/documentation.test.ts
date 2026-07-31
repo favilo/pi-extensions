@@ -7,6 +7,8 @@ test("documents user and project permission policy locations and trust behavior"
   assert.match(readme, /~\/\.pi\/agent\/permissions\.toml/);
   assert.match(readme, /\.pi\/permissions\.toml/);
   assert.match(readme, /persisted trust decision/);
+  assert.match(readme, /~\/\.pi\/tool-permissions\/audit\.log/);
+  assert.match(readme, /seven days/);
 });
 
 test("documents both scoped save shortcuts in the prompt implementation", () => {
