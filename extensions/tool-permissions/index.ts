@@ -77,6 +77,32 @@ type PermissionResult =
 const CONFIG_PATH = join(getAgentDir(), "permissions.toml");
 const auditLogger = createAuditLogger();
 
+type PermissionEditorTarget = { scope: "user" | "local"; path: string } | { error: string };
+
+export function resolvePermissionEditorTarget(
+  args: string | undefined,
+  cwd: string,
+  options: { userPermissionsPath?: string; trustResolver?: Parameters<typeof resolveScopedPermissionDecision>[0]["trustResolver"] } = {},
+): PermissionEditorTarget {
+  const tokens = args?.trim() ? args.trim().split(/\s+/) : [];
+  if (tokens.length > 1 || (tokens[0] && tokens[0] !== "user" && tokens[0] !== "local")) {
+    return { error: "Usage: /permissions [user|local]" };
+  }
+
+  if (!tokens[0] || tokens[0] === "user") {
+    return { scope: "user", path: options.userPermissionsPath ?? CONFIG_PATH };
+  }
+
+  const path = resolveCurrentProjectPolicyPath({
+    cwd,
+    configDirName: CONFIG_DIR_NAME,
+    trustResolver: options.trustResolver ?? createPersistedTrustResolver(getAgentDir()),
+  });
+  return path
+    ? { scope: "local", path }
+    : { error: "Local permissions cannot be edited because this directory is not trusted." };
+}
+
 function ruleFromEditedBuffer(buffer: string): PermissionRule | undefined {
   const line = buffer
     .split("\n")
@@ -282,18 +308,22 @@ async function editPatternInExternalEditor(tui: TuiController, option: AllowPatt
   }
 }
 
-async function editPermissionsInExternalEditor(ctx: PermissionContext): Promise<void> {
+async function editPermissionsInExternalEditor(ctx: PermissionContext, target: { scope: "user" | "local"; path: string }): Promise<void> {
   if (ctx.mode !== "tui" || !ctx.ui.custom) {
     throw new Error("The permissions editor is only available in interactive TUI mode.");
   }
 
-  mkdirSync(dirname(CONFIG_PATH), { recursive: true });
-  appendFileSync(CONFIG_PATH, "", "utf8");
+  try {
+    mkdirSync(dirname(target.path), { recursive: true });
+    appendFileSync(target.path, "", "utf8");
+  } catch (error) {
+    throw new Error(`Could not prepare ${target.scope} permission policy at ${target.path}: ${error instanceof Error ? error.message : String(error)}`);
+  }
 
   await ctx.ui.custom<void>((tui, theme: any, _keybindings, done) => {
-    void launchExternalEditor(tui, CONFIG_PATH)
+    void launchExternalEditor(tui, target.path)
       .then((succeeded) => {
-        if (!succeeded) ctx.ui.notify?.(`Editor exited without saving ${CONFIG_PATH}.`, "error");
+        if (!succeeded) ctx.ui.notify?.(`Editor exited without saving ${target.path}.`, "error");
         done(undefined);
       })
       .catch((error) => {
@@ -303,7 +333,7 @@ async function editPermissionsInExternalEditor(ctx: PermissionContext): Promise<
 
     return {
       render(width: number): string[] {
-        return wrapTextWithAnsi(theme.fg("muted", `Editing ${CONFIG_PATH}…`), width);
+        return wrapTextWithAnsi(theme.fg("muted", `Editing ${target.scope} permissions at ${target.path}…`), width);
       },
       invalidate(): void { },
     };
@@ -726,11 +756,16 @@ async function handleUnknownToolPermission(toolName: string, input: unknown, ctx
 
 export default function toolPermissionPolicy(pi: ExtensionAPI) {
   pi.registerCommand("permissions", {
-    description: `Edit tool permissions in ${CONFIG_PATH}`,
-    handler: async (_args, ctx) => {
+    description: `Edit user or local tool permissions`,
+    handler: async (args, ctx) => {
+      const target = resolvePermissionEditorTarget(args, ctx.cwd);
+      if ("error" in target) {
+        ctx.ui.notify(target.error, "error");
+        return;
+      }
       await ctx.waitForIdle();
       try {
-        await editPermissionsInExternalEditor(ctx);
+        await editPermissionsInExternalEditor(ctx, target);
       } catch (error) {
         ctx.ui.notify(error instanceof Error ? error.message : String(error), "error");
       }

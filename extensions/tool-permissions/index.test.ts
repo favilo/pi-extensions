@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import { stringify as stringifyToml } from "smol-toml";
-import { resolveToolPermissionDecision } from "./index.ts";
+import { resolvePermissionEditorTarget, resolveToolPermissionDecision } from "./index.ts";
 
 const userPolicy = stringifyToml({
   permissions: {
@@ -14,6 +14,44 @@ const userPolicy = stringifyToml({
     subagent: { allow: [{}], deny: [] },
     "mcp__example__search": { allow: [{}], deny: [] },
   },
+});
+
+test("resolves bare and explicit user permission editor targets", () => {
+  const userPath = join(mkdtempSync(join(tmpdir(), "pi-permissions-index-")), "permissions.toml");
+  assert.deepEqual(resolvePermissionEditorTarget(undefined, "/tmp/project", { userPermissionsPath: userPath }), {
+    scope: "user",
+    path: userPath,
+  });
+  assert.deepEqual(resolvePermissionEditorTarget("user", "/tmp/project", { userPermissionsPath: userPath }), {
+    scope: "user",
+    path: userPath,
+  });
+});
+
+test("resolves an eligible local permission editor target", () => {
+  const root = mkdtempSync(join(tmpdir(), "pi-permissions-index-"));
+  const cwd = join(root, "project");
+  const userPath = join(root, "user", "permissions.toml");
+  assert.deepEqual(resolvePermissionEditorTarget("local", cwd, {
+    userPermissionsPath: userPath,
+    trustResolver: () => ({ path: root, decision: true }),
+  }), {
+    scope: "local",
+    path: join(cwd, ".pi", "permissions.toml"),
+  });
+});
+
+test("refuses invalid and untrusted local permission editor targets", () => {
+  const userPath = join(mkdtempSync(join(tmpdir(), "pi-permissions-index-")), "permissions.toml");
+  assert.deepEqual(resolvePermissionEditorTarget("user extra", "/tmp/project", { userPermissionsPath: userPath }), {
+    error: "Usage: /permissions [user|local]",
+  });
+  assert.deepEqual(resolvePermissionEditorTarget("local", "/tmp/project", {
+    userPermissionsPath: userPath,
+    trustResolver: () => null,
+  }), {
+    error: "Local permissions cannot be edited because this directory is not trusted.",
+  });
 });
 
 test("all protected tool families use the scoped decision boundary", () => {

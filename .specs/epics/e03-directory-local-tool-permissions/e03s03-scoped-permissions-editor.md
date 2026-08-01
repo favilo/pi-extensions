@@ -1,3 +1,4 @@
+<!-- story: e03s03 -->
 # e03s03 — Edit project or user permission policy explicitly
 
 ## 1. Identity
