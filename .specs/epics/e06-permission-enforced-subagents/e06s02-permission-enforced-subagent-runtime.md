@@ -30,6 +30,37 @@ Implement a runnable subagent tool using the e06s01 AgentSession contract. Every
 ## 6. Failure modes
 Unknown child tools, denied actions, prompt cancellation, unavailable UI, child crash, parent cancellation, policy read failure, and attempted bypass.
 
+## 7. Preconditions
+- The e06s01 runtime contract is accepted and the existing permission evaluator is available.
+
+## 8. Inputs
+- Child tool request, effective cwd, parent context, policy decision, and UI availability.
+
+## 9. Outputs
+- Structured child result and an audited allow, deny, cancellation, or failure decision.
+
+## 10. Quality attributes
+- Fail-closed authorization, no duplicate policy implementation, bounded nesting, and deterministic cleanup.
+
+## 11. Interfaces and contracts
+- AgentSession-backed child execution delegates every capability request to the existing tool-permissions boundary.
+
+## 12. State
+- Child sessions and in-flight tool calls are owned by the parent invocation and are cleaned up on every terminal outcome.
+
+## 13. Dependencies
+- `[OK] @earendil-works/pi-coding-agent` — existing SDK dependency.
+- Existing `extensions/tool-permissions/` evaluator and audit logger; no new package.
+
+## 14. Failure modes
+- Unknown tool, denied request, policy read failure, bypass attempt, child crash, cancellation, and missing UI.
+
+## 15. Observability
+- Audit tool, decision, effective cwd, child identity, and safe reason; never persist secret-bearing input.
+
+## 16. Impact
+- Extends the permission boundary and introduces a new caller; the boundary must remain the single authorization point.
+
 ## 17. Acceptance criteria
 ### Scenario: Unlisted child action
 **Given** a child requests an action with no matching allow or deny rule
@@ -56,5 +87,11 @@ Unknown child tools, denied actions, prompt cancellation, unavailable UI, child 
 - `node --test extensions/tool-permissions/*.test.ts`
 - `npm run check`
 
-## 19. Definition of done
+## 19. Implementation steps
+1. Add contracts proving child calls reach the evaluator and audit logger → verify: node --test extensions/subagent/permission-boundary.test.ts
+2. Implement AgentSession-backed execution with default ask, deny, results, and cleanup → verify: node --test extensions/subagent/permission-boundary.test.ts
+3. Cover SDK and process bypass paths → verify: node --test extensions/subagent/permission-boundary.test.ts
+4. Run package regression checks → verify: npm run check
+
+## 20. Definition of done
 Runnable subagents use AgentSession, all child capabilities cross tool-permissions, default-ask and deny-list behavior are covered, and child agents receive actionable results.

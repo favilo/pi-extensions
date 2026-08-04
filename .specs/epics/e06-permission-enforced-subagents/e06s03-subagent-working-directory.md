@@ -30,6 +30,36 @@ Preserve the parent directory as the default subagent cwd and reuse the existing
 ## 6. Failure modes
 Symlink escape, missing cwd, parent/child policy mismatch, workspace policy lookup drift, and child cwd changing after startup.
 
+## 7. Preconditions
+- The subagent runtime accepts an explicit effective cwd and can pass it to policy evaluation.
+
+## 8. Inputs
+- Parent cwd, optional child cwd, filesystem canonicalization result, and trust/repository metadata.
+
+## 9. Outputs
+- A child session bound to a canonical cwd or a safe startup failure before tool execution.
+
+## 10. Quality attributes
+- Boundary preservation, symlink safety, deterministic resolution, and auditability.
+
+## 11. Interfaces and contracts
+- Default child cwd is the parent cwd; explicit child cwd uses the existing recursive permission resolver.
+
+## 12. State
+- Effective cwd is fixed for the child session and cannot drift after startup.
+
+## 13. Dependencies
+- Existing `tool-permissions/scope.ts` resolver; no new policy format or package.
+
+## 14. Failure modes
+- Missing directory, non-directory path, symlink escape, policy mismatch, and repository-boundary drift.
+
+## 15. Observability
+- Record effective canonical cwd and policy source in safe audit metadata.
+
+## 16. Impact
+- Adds cwd input to subagent execution while preserving existing trust and repository boundary contracts.
+
 ## 17. Acceptance criteria
 ### Scenario: Parent directory inheritance
 **Given** a subagent starts without an explicit cwd
@@ -56,5 +86,11 @@ Symlink escape, missing cwd, parent/child policy mismatch, workspace policy look
 - `node --test extensions/tool-permissions/scope.test.ts`
 - `npm run check`
 
-## 19. Definition of done
+## 19. Implementation steps
+1. Add contracts for inherited and explicit cwd resolution → verify: node --test extensions/subagent/working-directory.test.ts
+2. Route effective cwd through the existing recursive policy resolver → verify: node --test extensions/subagent/working-directory.test.ts
+3. Cover nested, alternate-workspace, canonical-containment, and symlink failures → verify: node --test extensions/subagent/working-directory.test.ts
+4. Run policy-scope regressions and package checks → verify: npm run check
+
+## 20. Definition of done
 Child cwd is canonical, policy-aware, auditable, and covered for nested, alternate-workspace, and boundary failures.

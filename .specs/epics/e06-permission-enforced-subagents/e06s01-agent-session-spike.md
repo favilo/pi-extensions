@@ -30,6 +30,38 @@ Explore Pi's `AgentSession` SDK and produce a runnable proof plus a durable spec
 ## 6. Failure modes
 SDK lifecycle leaks, child calls bypassing extensions, unavailable model/auth context, cancellation leaving a child running, missing UI, nested recursion, and cwd drift.
 
+## 7. Preconditions
+- The repository has the Pi SDK dependency installed.
+- The spike remains isolated from production extension registration.
+
+## 8. Inputs
+- Child working directory, parent context, task text, SDK session options, and deterministic test doubles.
+
+## 9. Outputs
+- A disposable proof harness, observed lifecycle results, and a recorded production contract.
+
+## 10. Quality attributes
+- Deterministic cleanup, fail-closed permission behavior, bounded resource use, and reproducible tests.
+
+## 11. Interfaces and contracts
+- `AgentSession` creation and disposal; session events; tool-call interception; explicit cwd; cancellation propagation.
+
+## 12. State
+- A child session exists only for the duration of the proof and is disposed on success, failure, or cancellation.
+
+## 13. Dependencies
+- `[OK] @earendil-works/pi-coding-agent` — existing project dependency and SDK under evaluation.
+- Existing `tool-permissions` hooks; no new package.
+
+## 14. Failure modes
+- Session construction failure, missing model/auth, child tool bypass, leaked session, cancellation race, and unavailable UI.
+
+## 15. Observability
+- Tests record lifecycle events, child result, interception outcome, cancellation, cwd, and cleanup state without secrets.
+
+## 16. Impact
+- Net-new isolated spike; no existing production caller or permission contract is changed.
+
 ## 17. Acceptance criteria
 ### Scenario: SDK proof
 **Given** the project can construct an `AgentSession`
@@ -50,5 +82,11 @@ SDK lifecycle leaks, child calls bypassing extensions, unavailable model/auth co
 - `node --test extensions/subagent/*.test.ts`
 - `npm run check`
 
-## 19. Definition of done
+## 19. Implementation steps
+1. Build a disposable AgentSession proof with deterministic lifecycle assertions → verify: node --test extensions/subagent/agent-session-spike.test.ts
+2. Characterize interception, nesting, cancellation, cwd, cleanup, and missing-UI behavior → verify: node --test extensions/subagent/agent-session-spike.test.ts
+3. Record the reviewed interaction direction and runtime contract in the spike specification → verify: test -f .specs/epics/e06-permission-enforced-subagents/e06s01-agent-session-spike.md
+4. Run package type and regression checks → verify: npm run check
+
+## 20. Definition of done
 A runnable AgentSession proof, interaction review artifact, captured user decision, and implementation-ready runtime/permission contract exist; no production bypass is introduced.

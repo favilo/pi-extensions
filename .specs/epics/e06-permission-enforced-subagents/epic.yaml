@@ -1,7 +1,7 @@
 id: e06
 title: Permission-enforced runnable subagents
 wsjf: 6.0
-total_bcps: 10
+total_bcps: 11
 status: planned
 stories:
   - id: e06s01
