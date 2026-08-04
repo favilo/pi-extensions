@@ -35,7 +35,7 @@ Delete dated audit files older than seven calendar days. Never delete the curren
 ### ADDED: Failure handling
 If migration, rotation, symlink maintenance, or cleanup fails, surface a warning and continue logging to the best available target. Audit failures must never block a tool call.
 
-## 6. Acceptance criteria
+## 17. Acceptance criteria
 ### Scenario: Write to the current dated log
 **Given** the tool-permissions audit logger is used
 **When** an audit event is recorded
@@ -61,14 +61,14 @@ If migration, rotation, symlink maintenance, or cleanup fails, surface a warning
 **And** logging continues to the best available target
 **And** the tool call is not blocked by the audit failure.
 
-## 7. Automated verification
+## 18. Automated verification
 - `node --test extensions/tool-permissions/audit.test.ts`
 - `npm run check`
 
-## 8. Implementation tasks
+## 19. Implementation tasks
 1. Extract an injectable audit-log manager for UTC paths, migration, symlink maintenance, retention, and fallback behavior → verify: `node --test extensions/tool-permissions/audit.test.ts`
 2. Integrate the manager into permission auditing and update the documented path → verify: `node --test extensions/tool-permissions/documentation.test.ts`
 3. Confirm package-wide behavior and types → verify: `npm run check`
 
-## 9. Definition of done
+## 20. Definition of done
 The new dated audit path, symlink, migration, seven-day retention, warning behavior, fallback logging, tests, and documentation are complete.

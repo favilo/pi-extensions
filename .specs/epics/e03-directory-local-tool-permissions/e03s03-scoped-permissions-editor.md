@@ -78,7 +78,7 @@ The command creates an empty target file when eligible and absent, then leaves a
 - No new package.
 
 ## 15. Failure modes
-Opening user policy for a local request, opening local policy without trust, editing an ancestor accidentally, accepting ambiguous arguments, or reporting success after editor failure.
+Opening user policy for a local request, opening local policy without trust, editing an ancestor accidentally, accepting unclear arguments, or reporting success after editor failure.
 
 ## 16. Observability
 The command description, working message, and error notification identify the selected scope and exact target path.
