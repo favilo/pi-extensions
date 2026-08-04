@@ -8,7 +8,7 @@ tasks:
   - id: 1
     description: Build a disposable AgentSession proof that starts and completes a child turn with inherited parent context.
     verify: node --test extensions/subagent/agent-session-spike.test.ts
-    status: failing
+    status: passing
     risk: P0
     security: high
     allure:
