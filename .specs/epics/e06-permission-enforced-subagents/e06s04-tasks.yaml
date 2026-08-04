@@ -1,0 +1,27 @@
+story_id: e06s04
+title: Handle subagent permission asks when the main UI is unavailable
+status: todo
+bcps: 2
+delta: ADDED
+spec: e06s04-subagent-missing-ui.md
+tasks:
+  - id: 1
+    description: Add contracts for default asks, available main UI, unavailable UI, cancellation, explicit allow, and explicit deny.
+    verify: node --test extensions/subagent/missing-ui.test.ts
+    status: todo
+    risk: P0
+  - id: 2
+    description: Return structured unavailable-UI and cancellation results without executing or persisting unapproved child actions.
+    verify: node --test extensions/subagent/missing-ui.test.ts
+    status: todo
+    risk: P0
+  - id: 3
+    description: Verify compatibility with existing tool-permissions prompt, allow, deny, and audit behavior.
+    verify: node --test extensions/tool-permissions/index.test.ts
+    status: todo
+    risk: P1
+  - id: 4
+    description: Run package type and regression checks.
+    verify: npm run check
+    status: todo
+    risk: P1

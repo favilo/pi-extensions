@@ -1,0 +1,27 @@
+story_id: e06s01
+title: Spike AgentSession runtime and subagent interaction model
+status: todo
+bcps: 3
+delta: ADDED
+spec: e06s01-agent-session-spike.md
+tasks:
+  - id: 1
+    description: Build a disposable AgentSession proof that starts and completes a child turn with inherited parent context.
+    verify: node --test extensions/subagent/agent-session-spike.test.ts
+    status: todo
+    risk: P0
+  - id: 2
+    description: Characterize child tool interception, nesting, cancellation, cwd, cleanup, and missing-UI behavior without adding a bypass.
+    verify: node --test extensions/subagent/agent-session-spike.test.ts
+    status: todo
+    risk: P0
+  - id: 3
+    description: Create the reviewed subagent interaction artifact and record the selected runtime contract and open constraints.
+    verify: test -f .specs/epics/e06-permission-enforced-subagents/e06s01-agent-session-spike.md
+    status: todo
+    risk: P1
+  - id: 4
+    description: Run package type and regression checks after the spike harness is isolated.
+    verify: npm run check
+    status: todo
+    risk: P1

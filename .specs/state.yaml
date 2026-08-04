@@ -1,7 +1,7 @@
 active_flow: build_epic
-active_epic_id: e03
-active_story_id: e03s03
-active_story: e03s03
+active_epic_id: e06
+active_story_id: e06s01
+active_story: e06s01
 active_bug_id: null
 git:
   bookmark: favilo/repository-bounded-local-agent-context
@@ -18,7 +18,8 @@ handoff:
   - .specs/epics/e04-repository-bounded-local-agent-context/e04s01-repository-and-home-boundaries.md
   - extensions/local-agent-context/index.ts
   - extensions/local-agent-context/index.test.ts
-  next_skill: request-review
+  next_skill: plan-work
+  context: Security review and e06s01 survey passed; next is task-plan confirmation.
   blocker: null
   deferred_work:
   - Build e03 directory-local tool permissions after the higher-WSJF e04 fix
@@ -30,6 +31,12 @@ release:
   merged_at: '2026-07-28T20:47:58Z'
   ci_verified: false
   ci_note: No GitHub Actions workflows are configured
+epic_cycle:
+  step: 2
+  current_step: 2
+  story_bcps: 3
+  security_review: pass
+
 metrics:
   skill_timings:
     release-branch:
@@ -37,11 +44,11 @@ metrics:
       total_seconds: 1434.0
       avg_seconds: 1434.0
     survey-context:
-      calls: 3
-      total_seconds: 259.0
-      avg_seconds: 86.33333333333333
+      calls: 4
+      total_seconds: 260.0
+      avg_seconds: 65.0
     verify-work:
       calls: 3
       total_seconds: 2129.0
       avg_seconds: 709.6666666666666
-  story_start: '2026-07-30T18:26:27Z'
+  story_start: '2026-08-04T14:15:00Z'

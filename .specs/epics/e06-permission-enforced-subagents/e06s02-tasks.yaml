@@ -1,0 +1,27 @@
+story_id: e06s02
+title: Run subagents through the tool-permissions boundary
+status: todo
+bcps: 4
+delta: ADDED
+spec: e06s02-permission-enforced-subagent-runtime.md
+tasks:
+  - id: 1
+    description: Add contracts proving child tool calls reach the existing permission evaluator and audit logger.
+    verify: node --test extensions/subagent/permission-boundary.test.ts
+    status: todo
+    risk: P0
+  - id: 2
+    description: Implement the AgentSession-backed subagent tool with default-ask behavior, deny-list enforcement, structured results, and cleanup.
+    verify: node --test extensions/subagent/permission-boundary.test.ts
+    status: todo
+    risk: P0
+  - id: 3
+    description: Add regression coverage for SDK and process paths that could otherwise bypass tool-permissions.
+    verify: node --test extensions/subagent/permission-boundary.test.ts
+    status: todo
+    risk: P0
+  - id: 4
+    description: Run existing tool-permissions tests and package checks.
+    verify: npm run check
+    status: todo
+    risk: P1

@@ -1,0 +1,27 @@
+story_id: e06s03
+title: Resolve permissions from each subagent working directory
+status: todo
+bcps: 2
+delta: ADDED
+spec: e06s03-subagent-working-directory.md
+tasks:
+  - id: 1
+    description: Add contracts for inherited parent cwd, explicit child cwd, recursive policy lookup, and effective-cwd audit fields.
+    verify: node --test extensions/subagent/working-directory.test.ts
+    status: todo
+    risk: P0
+  - id: 2
+    description: Pass the inherited or explicit cwd through existing tool-permissions recursive resolution without adding a subagent-specific resolver.
+    verify: node --test extensions/subagent/working-directory.test.ts
+    status: todo
+    risk: P0
+  - id: 3
+    description: Verify nested directories, alternate workspace directories, canonical containment, and symlink boundary failures.
+    verify: node --test extensions/subagent/working-directory.test.ts
+    status: todo
+    risk: P1
+  - id: 4
+    description: Run policy-scope regressions and package checks.
+    verify: npm run check
+    status: todo
+    risk: P1

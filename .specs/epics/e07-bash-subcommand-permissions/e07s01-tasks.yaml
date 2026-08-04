@@ -1,0 +1,22 @@
+story_id: e07s01
+title: Spike Bash parsing and subcommand permission contracts
+status: todo
+bcps: 3
+delta: ADDED
+spec: e07s01-bash-parser-spike.md
+tasks:
+  - id: 1
+    description: Build a representative Bash syntax corpus and compare parser candidates, including explicit bash -c payloads.
+    verify: node --test extensions/tool-permissions/bash-parser-spike.test.ts
+    status: todo
+    risk: P0
+  - id: 2
+    description: Record source-span, normalization, unsupported-syntax, dependency, and fail-closed contracts for the selected parser direction.
+    verify: node --test extensions/tool-permissions/bash-parser-spike.test.ts
+    status: todo
+    risk: P0
+  - id: 3
+    description: Run package type and regression checks without integrating a production parser yet.
+    verify: npm run check
+    status: todo
+    risk: P1

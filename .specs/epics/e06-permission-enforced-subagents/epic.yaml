@@ -1,0 +1,34 @@
+id: e06
+title: Permission-enforced runnable subagents
+wsjf: 6.0
+total_bcps: 10
+status: planned
+stories:
+  - id: e06s01
+    title: Spike AgentSession runtime and subagent interaction model
+    bcps: 3
+    status: todo
+    delta: ADDED
+    spec: e06s01-agent-session-spike.md
+    tasks: e06s01-tasks.yaml
+  - id: e06s02
+    title: Run subagents through the tool-permissions boundary
+    bcps: 4
+    status: todo
+    delta: ADDED
+    spec: e06s02-permission-enforced-subagent-runtime.md
+    tasks: e06s02-tasks.yaml
+  - id: e06s03
+    title: Resolve permissions from each subagent working directory
+    bcps: 2
+    status: todo
+    delta: ADDED
+    spec: e06s03-subagent-working-directory.md
+    tasks: e06s03-tasks.yaml
+  - id: e06s04
+    title: Handle subagent permission asks when the main UI is unavailable
+    bcps: 2
+    status: todo
+    delta: ADDED
+    spec: e06s04-subagent-missing-ui.md
+    tasks: e06s04-tasks.yaml
