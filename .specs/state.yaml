@@ -4,9 +4,9 @@ active_story_id: e06s01
 active_story: e06s01
 active_bug_id: null
 git:
-  bookmark: favilo/repository-bounded-local-agent-context
+  bookmark: favilo/e06s01-agent-session-spike
   parent_bookmark: main
-  change_id: vppmnoqy
+  change_id: rxsquoqo
 handoff:
   last_step_completed: Verified e03s03 scoped permission editor UAT and failure handling
   open_decisions: []
@@ -18,8 +18,8 @@ handoff:
   - .specs/epics/e04-repository-bounded-local-agent-context/e04s01-repository-and-home-boundaries.md
   - extensions/local-agent-context/index.ts
   - extensions/local-agent-context/index.test.ts
-  next_skill: kickoff-branch
-  context: e06 capsule plan artifacts are consistent; next is feature-branch kickoff before implementation.
+  next_skill: develop-tdd
+  context: Feature workspace favilo/e06s01-agent-session-spike is ready; preflight is green and implementation may begin.
   blocker: null
   deferred_work:
   - Build e03 directory-local tool permissions after the higher-WSJF e04 fix
@@ -32,8 +32,8 @@ release:
   ci_verified: false
   ci_note: No GitHub Actions workflows are configured
 epic_cycle:
-  step: 3
-  current_step: 3
+  step: 4
+  current_step: 4
   story_bcps: 3
   security_review: pass
   plan_consistency: pass
