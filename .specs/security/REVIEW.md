@@ -24,3 +24,11 @@ No credential-shaped values or reportable injection, traversal, authorization-by
 - Result: **PASS — no reportable HIGH findings**
 
 The new project-save destination is gated by persisted trust and canonical path containment. User and project targets are selected explicitly, persistence errors return before the permission result is completed, and no new shell, network, credential, or deserialization boundary was introduced. The shortcut ordering handles `ctrl+shift+a` before `ctrl+a`.
+
+## e06s01 AgentSession spike
+
+- Reviewed: 2026-08-04T23:02:00Z
+- Scope: `main..@` changes for the isolated subagent spike
+- Result: **PASS — no reportable HIGH findings**
+
+The spike passes explicit child `cwd` and parent context to the SDK session, disposes sessions in a `finally` block, propagates cancellation to the child abort hook, bounds nesting, and routes authorization through the existing tool-permissions resolver. The proof harness uses no shell execution, network boundary, credential handling, or new deserialization format. No reportable command-injection, path-traversal, authorization-bypass, secret-exposure, or unsafe-deserialization finding was identified.

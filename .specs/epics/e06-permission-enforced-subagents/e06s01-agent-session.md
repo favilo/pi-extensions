@@ -48,6 +48,19 @@ SDK lifecycle leaks, child calls bypassing extensions, unavailable model/auth co
 
 ## 12. State
 - A child session exists only for the duration of the proof and is disposed on success, failure, or cancellation.
+- **Reviewed control surface:** Hybrid command + sidebar.
+- `/subagents list` is the canonical keyboard-first view; a toggleable sidebar mirrors active children for monitoring and steering.
+- The first UI slice shows name/status, cwd/elapsed time, progress/last event, and abort/resume.
+- Steering uses `/subagents steer`; the sidebar supplies the target name, with tab completion and stable short IDs for duplicate names.
+- The launch tool accepts an optional name; omitted names use short generated color-animal names.
+- The parent owns the child lifecycle; permission decisions are delegated to the existing `tool-permissions` extension and passed through it to the user.
+- Review artifact: `.lavish/e06s01-subagent-interaction.html`.
+- **Reviewed interaction contract:** Parent-controlled bridge.
+- The parent owns the child lifecycle, can abort it at any time, receives normalized lifecycle events, and receives a structured child result.
+- Permission decisions remain delegated to the existing `tool-permissions` extension; the subagent layer must not recreate policy evaluation.
+- Review artifact: `.lavish/e06s01-subagent-interaction.html`.
+- User rationale: the parent must be able to abort the child at any time.
+- No unresolved review feedback was submitted.
 
 ## 13. Dependencies
 - `[OK] @earendil-works/pi-coding-agent` — existing project dependency and SDK under evaluation.
@@ -83,9 +96,9 @@ SDK lifecycle leaks, child calls bypassing extensions, unavailable model/auth co
 - `npm run check`
 
 ## 19. Implementation steps
-1. Build a disposable AgentSession proof with deterministic lifecycle assertions → verify: node --test extensions/subagent/agent-session-spike.test.ts
-2. Characterize interception, nesting, cancellation, cwd, cleanup, and missing-UI behavior → verify: node --test extensions/subagent/agent-session-spike.test.ts
-3. Record the reviewed interaction direction and runtime contract in the spike specification → verify: test -f .specs/epics/e06-permission-enforced-subagents/e06s01-agent-session-spike.md
+1. Build a disposable AgentSession proof with deterministic lifecycle assertions → verify: node --test extensions/subagent/agent-session.test.ts
+2. Characterize interception, nesting, cancellation, cwd, cleanup, and missing-UI behavior → verify: node --test extensions/subagent/agent-session.test.ts
+3. Record the reviewed interaction direction and runtime contract in the spike specification → verify: test -f .specs/epics/e06-permission-enforced-subagents/e06s01-agent-session.md
 4. Run package type and regression checks → verify: npm run check
 
 ## 20. Definition of done

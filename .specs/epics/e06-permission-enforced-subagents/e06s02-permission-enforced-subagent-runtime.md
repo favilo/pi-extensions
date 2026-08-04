@@ -12,7 +12,7 @@
 A subagent must not gain capabilities that the main agent could not use under the repository's permission policy.
 
 ## 3. Goal
-Implement a runnable subagent tool using the e06s01 AgentSession contract. Every child action must be evaluated by the existing tool-permissions extension before execution. The default decision is ask; only matching deny rules deny without asking.
+Implement a runnable subagent tool using the e06s01 AgentSession contract. Every child action must be evaluated by the existing tool-permissions extension before execution. Matching deny rules deny without asking, matching allow rules execute without asking, and the default decision is ask when neither rule matches.
 
 ## 4. Non-goals
 - A second permission policy format.
@@ -44,9 +44,13 @@ Unknown child tools, denied actions, prompt cancellation, unavailable UI, child 
 
 ## 11. Interfaces and contracts
 - AgentSession-backed child execution delegates every capability request to the existing tool-permissions boundary.
+- `ToolRequest` is shared by main and child callers and carries a typed actor (`main` or `child`), tool name, input, cwd, and optional steering context.
+- The permission boundary is owned by `extensions/tool-permissions/`; child runtime code consumes it and does not define a second policy evaluator or audit sink.
+- Policy resolution always uses the existing tool-permissions defaults with the request cwd as scope; child runtime callers cannot override policy paths.
 
 ## 12. State
 - Child sessions and in-flight tool calls are owned by the parent invocation and are cleaned up on every terminal outcome.
+- The shared boundary maps existing resolver decisions as allow, deny, or ask; matching allow and deny rules bypass prompting, while unmatched requests ask.
 
 ## 13. Dependencies
 - `[OK] @earendil-works/pi-coding-agent` — existing SDK dependency.
@@ -88,9 +92,9 @@ Unknown child tools, denied actions, prompt cancellation, unavailable UI, child 
 - `npm run check`
 
 ## 19. Implementation steps
-1. Add contracts proving child calls reach the evaluator and audit logger → verify: node --test extensions/subagent/permission-boundary.test.ts
-2. Implement AgentSession-backed execution with default ask, deny, results, and cleanup → verify: node --test extensions/subagent/permission-boundary.test.ts
-3. Cover SDK and process bypass paths → verify: node --test extensions/subagent/permission-boundary.test.ts
+1. Add contracts proving child calls reach the evaluator and audit logger → verify: node --test extensions/tool-permissions/permission-boundary.test.ts
+2. Implement AgentSession-backed execution with default ask, deny, results, and cleanup → verify: node --test extensions/tool-permissions/permission-boundary.test.ts
+3. Cover SDK and process bypass paths → verify: node --test extensions/tool-permissions/permission-boundary.test.ts
 4. Run package regression checks → verify: npm run check
 
 ## 20. Definition of done
