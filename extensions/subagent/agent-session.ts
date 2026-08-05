@@ -64,6 +64,7 @@ export async function createSubagentSession(cwd: string, options: SubagentSessio
   const { session } = await createAgentSession({
     cwd,
     noTools: "all",
+    tools: options.customTools?.map((tool) => tool.name) ?? [],
     customTools: options.customTools ?? [],
     sessionManager: options.sessionManager ?? SessionManager.inMemory(cwd),
   });
