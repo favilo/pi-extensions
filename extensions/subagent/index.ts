@@ -6,6 +6,7 @@ import {
   createLsToolDefinition,
   createReadToolDefinition,
   createWriteToolDefinition,
+  SessionManager,
   type ExtensionAPI,
   type ExtensionContext,
   type ToolDefinition,
@@ -26,15 +27,7 @@ const subagentParameters = {
 } as never;
 type SubagentParameters = { task: string; agent?: string; cwd?: string };
 
-/**
- * Wraps each normal coding-agent tool for a child AgentSession.
- *
- * The child session starts with `noTools: "all"`, then receives these
- * definitions as its complete tool surface. Each wrapper preserves the
- * normal tool name and schema, but sends execution through the parent's
- * shared permission boundary before invoking the underlying implementation.
- * Skills therefore see ordinary tools without gaining an authorization bypass.
- */
+/** Normal tools available to the parent-side permission executor. */
 function normalToolDefinitions(cwd: string): ToolDefinition[] {
   const builtins = [
     createReadToolDefinition(cwd),
@@ -50,19 +43,33 @@ function normalToolDefinitions(cwd: string): ToolDefinition[] {
   return [...definitions.values()];
 }
 
+const childToolRequestParameters = {
+  type: "object",
+  properties: {
+    toolName: { type: "string", description: "The exact parent tool name to request." },
+    input: { description: "The arguments for the requested tool." },
+  },
+  required: ["toolName", "input"],
+  additionalProperties: false,
+} as never;
+type ChildToolRequestParameters = { toolName: string; input: unknown };
+
+/** Exposes only the permission bridge to the child model. */
 export function createChildToolDefinitions(
   childId: string,
   cwd: string,
   boundary: ReturnType<typeof createToolPermissionBoundary>,
 ): ToolDefinition[] {
-  const tools = normalToolDefinitions(cwd);
-  return tools.map((tool): ToolDefinition => ({
-    ...tool,
-    async execute(toolCallId, input, signal, onUpdate) {
+  return [{
+    name: "subagent-tool-request",
+    label: "subagent-tool-request",
+    description: "Request that the parent agent authorize and execute a tool call on your behalf.",
+    parameters: childToolRequestParameters,
+    async execute(_toolCallId, input: ChildToolRequestParameters, signal) {
       const result = await executeChildToolRequest({
         childId,
-        toolName: tool.name,
-        input,
+        toolName: input.toolName,
+        input: input.input,
         cwd,
       }, boundary, signal);
       return {
@@ -70,7 +77,7 @@ export function createChildToolDefinitions(
         details: result,
       };
     },
-  }));
+  }];
 }
 
 function executeParentTool(
@@ -99,14 +106,21 @@ function executeParentTool(
     },
   });
 
+  const parentSessionDir = parentContext.sessionManager.getSessionFile()
+    ? parentContext.sessionManager.getSessionDir()
+    : undefined;
+
   return runSubagentSession({
     cwd,
-    parentContext: parentContext.getSystemPrompt(),
+    parentContext: `${parentContext.getSystemPrompt()}\n\nChild tool policy: you have only the subagent-tool-request tool. For every file, shell, search, MCP, or other tool action, call it with the exact toolName and JSON input. Do not attempt to call tools directly.`,
     task: params.task,
     signal,
     createSession: async ({ cwd: childCwd }) => createSubagentSession(
       childCwd,
-      { customTools: createChildToolDefinitions(childId, childCwd, boundary) },
+      {
+        customTools: createChildToolDefinitions(childId, childCwd, boundary),
+        sessionManager: parentSessionDir ? SessionManager.create(childCwd, parentSessionDir) : undefined,
+      },
     ),
   });
 }

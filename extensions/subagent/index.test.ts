@@ -1,8 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { mkdtempSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
+
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import subagentExtension, { createChildToolDefinitions } from "./index.ts";
 
@@ -19,7 +17,7 @@ test("registers the subagent launch tool", () => {
   assert.deepEqual(tools.map(({ name }) => name), ["subagent"]);
 });
 
-test("gives a child the normal tool names and schemas", () => {
+test("gives a child only the permission bridge tool", () => {
   const boundary = {
     evaluate: async () => "deny" as const,
     prompt: async () => "deny" as const,
@@ -29,7 +27,7 @@ test("gives a child the normal tool names and schemas", () => {
 
   const tools = createChildToolDefinitions("worker-1", "/workspace", boundary);
 
-  assert.deepEqual(tools.map((tool) => tool.name), ["read", "write", "edit", "bash", "grep", "find", "ls"]);
+  assert.deepEqual(tools.map((tool) => tool.name), ["subagent-tool-request"]);
   for (const tool of tools) {
     assert.equal((tool.parameters as { type?: string }).type, "object");
     assert.equal(typeof tool.execute, "function");
@@ -48,17 +46,14 @@ test("does not invoke the underlying tool when the boundary denies", async () =>
     audit: () => {},
   } as never;
 
-  const read = createChildToolDefinitions("worker-denied", "/workspace", boundary).find((tool) => tool.name === "read");
-  assert.ok(read);
-  const result = await read.execute("call-1", { path: "secret.txt" }, new AbortController().signal, undefined, {} as never);
+  const bridge = createChildToolDefinitions("worker-denied", "/workspace", boundary)[0];
+  const result = await bridge.execute("call-1", { toolName: "read", input: { path: "secret.txt" } }, new AbortController().signal, undefined, {} as never);
 
   assert.equal(executed, false);
   assert.match(JSON.stringify(result.details), /deny|denied/i);
 });
 
 test("executes the ordinary tool only after the boundary allows it", async () => {
-  const cwd = mkdtempSync(join(tmpdir(), "pi-subagent-tools-"));
-  writeFileSync(join(cwd, "notes.md"), "child-visible\n", "utf8");
   const auditEntries: unknown[] = [];
   const boundary = {
     evaluate: async () => "allow" as const,
@@ -70,9 +65,8 @@ test("executes the ordinary tool only after the boundary allows it", async () =>
     audit: () => {},
   } as never;
 
-  const read = createChildToolDefinitions("worker-allowed", cwd, boundary).find((tool) => tool.name === "read");
-  assert.ok(read);
-  await read.execute("call-2", { path: "notes.md" }, new AbortController().signal, undefined, {} as never);
+  const bridge = createChildToolDefinitions("worker-allowed", "/workspace", boundary)[0];
+  await bridge.execute("call-2", { toolName: "read", input: { path: "notes.md" } }, new AbortController().signal, undefined, {} as never);
 
   assert.equal(auditEntries.length, 1);
   assert.deepEqual((auditEntries[0] as { toolName: string }).toolName, "read");
