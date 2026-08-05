@@ -575,7 +575,7 @@ export function createToolPermissionBoundary(
     evaluate: async (request) => {
       const decision = resolveToolPermissionDecision(request.toolName, request.input, request.cwd);
       if (decision.diagnostic) throw new Error(decision.diagnostic);
-      return decision.decision === "prompt" ? "ask" : decision.decision;
+      return decision.decision;
     },
     prompt: options.prompt,
     execute: options.execute,

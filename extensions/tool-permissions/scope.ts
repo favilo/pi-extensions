@@ -12,7 +12,7 @@ export type ScopeFileSystem = {
 };
 
 export type ScopedPermissionDecision = {
-  decision: "allow" | "deny" | "prompt";
+  decision: "allow" | "deny" | "ask";
   source: "project" | "user" | "none";
   path?: string;
   diagnostic?: string;
@@ -114,10 +114,10 @@ export function resolveScopedPermissionDecision(options: {
           fs.loadPermissions(canonicalPolicyPath)[permissionKeyForTool(options.toolName)],
           options.input,
         );
-        if (decision !== "prompt") return { decision, source: "project", path: canonicalPolicyPath };
+        if (decision !== "ask") return { decision, source: "project", path: canonicalPolicyPath };
       } catch (error) {
         return {
-          decision: "prompt",
+          decision: "ask",
           source: "project",
           path: canonicalPolicyPath,
           diagnostic: `Project permission policy could not be read: ${error instanceof Error ? error.message : String(error)}`,
@@ -131,10 +131,10 @@ export function resolveScopedPermissionDecision(options: {
       loadPermissions(options.userPermissionsPath)[permissionKeyForTool(options.toolName)],
       options.input,
     );
-    return { decision, source: decision === "prompt" ? "none" : "user", path: options.userPermissionsPath };
+    return { decision, source: decision === "ask" ? "none" : "user", path: options.userPermissionsPath };
   } catch (error) {
     return {
-      decision: "prompt",
+      decision: "ask",
       source: "user",
       path: options.userPermissionsPath,
       diagnostic: `User permission policy could not be read: ${error instanceof Error ? error.message : String(error)}`,

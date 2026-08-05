@@ -93,11 +93,11 @@ export function matchesPermissionRule(rule: PermissionRule, input: unknown): boo
   });
 }
 
-export function permissionDecision(permission: ToolPermission | undefined, input: unknown): "allow" | "deny" | "prompt" {
-  if (!permission) return "prompt";
+export function permissionDecision(permission: ToolPermission | undefined, input: unknown): "allow" | "deny" | "ask" {
+  if (!permission) return "ask";
   if (permission.deny.some((rule) => matchesPermissionRule(rule, input))) return "deny";
   if (permission.allow.some((rule) => matchesPermissionRule(rule, input))) return "allow";
-  return "prompt";
+  return "ask";
 }
 
 export function saveAllowedRule(path: string, toolName: string, rule: PermissionRule): void {
