@@ -1,6 +1,6 @@
 story_id: e06s02
 title: Run subagents through the tool-permissions boundary
-status: failing
+status: passing
 bcps: 4
 delta: ADDED
 spec: e06s02-permission-enforced-subagent-runtime.md
@@ -35,7 +35,7 @@ tasks:
   - id: 4
     description: Run existing tool-permissions tests and package checks.
     verify: npm run check
-    status: failing
+    status: passing
     risk: P1
     security: medium
     allure:
