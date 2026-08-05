@@ -1,4 +1,4 @@
-import { createAgentSession, SessionManager, type ToolDefinition } from "@earendil-works/pi-coding-agent";
+import { createAgentSession, DefaultResourceLoader, getAgentDir, SessionManager, type ToolDefinition } from "@earendil-works/pi-coding-agent";
 import { executeToolRequest, type ToolExecutionResult, type ToolPermissionBoundary, type ToolRequest } from "../tool-permissions/permission-boundary.ts";
 
 export type SubagentSession = {
@@ -6,6 +6,7 @@ export type SubagentSession = {
   cwd?: string;
   prompt(text: string): Promise<void>;
   getLastAssistantText?(): string | undefined;
+  getActiveToolNames?(): string[];
   abort?(): Promise<void> | void;
   dispose(): void;
 };
@@ -66,6 +67,7 @@ export async function createSubagentSession(cwd: string, options: SubagentSessio
     noTools: "all",
     tools: options.customTools?.map((tool) => tool.name) ?? [],
     customTools: options.customTools ?? [],
+    resourceLoader: new DefaultResourceLoader({ cwd, agentDir: getAgentDir(), noExtensions: true }),
     sessionManager: options.sessionManager ?? SessionManager.inMemory(cwd),
   });
   return {
@@ -73,6 +75,7 @@ export async function createSubagentSession(cwd: string, options: SubagentSessio
     cwd,
     prompt: (text) => session.prompt(text),
     getLastAssistantText: () => session.getLastAssistantText(),
+    getActiveToolNames: () => session.getActiveToolNames(),
     dispose: () => session.dispose(),
   };
 }

@@ -13,7 +13,7 @@ import {
   type ToolDefinition,
 } from "@earendil-works/pi-coding-agent";
 import { getPublishedToolDefinitions } from "../tool-registry/index.ts";
-import { createToolPermissionBoundary, promptToolPermissionRequest } from "../tool-permissions/index.ts";
+import { createToolPermissionBoundary, logSubagentDebug, promptToolPermissionRequest } from "../tool-permissions/index.ts";
 import { createSubagentSession, executeChildToolRequest, runSubagentSession } from "./agent-session.ts";
 
 const subagentParameters = {
@@ -92,6 +92,7 @@ function executeParentTool(
   const tools = Object.fromEntries(normalToolDefinitions(cwd).map((tool) => [tool.name, tool]));
   const boundary = createToolPermissionBoundary({
     validate: (request) => {
+      logSubagentDebug("boundary-validate", { request, availableTools: Object.keys(tools) });
       const tool = tools[request.toolName as keyof typeof tools];
       if (!tool) return `Unknown tool: ${request.toolName}`;
       try {
@@ -104,6 +105,7 @@ function executeParentTool(
       }
     },
     prompt: async (request) => {
+      logSubagentDebug("boundary-prompt", { request, parentMode: parentContext.mode, parentHasUI: parentContext.hasUI });
       pi.sendMessage({
         customType: "subagent-tool-request",
         content: `Subagent "${childId}" requests ${request.toolName}`,
@@ -113,6 +115,7 @@ function executeParentTool(
       return promptToolPermissionRequest(pi, parentContext, request);
     },
     execute: async (request) => {
+      logSubagentDebug("boundary-execute", { request });
       const tool = tools[request.toolName as keyof typeof tools];
       if (!tool) throw new Error(`Unknown child tool: ${request.toolName}`);
       return tool.execute(childId, request.input as never, signal, undefined, parentContext);
@@ -133,13 +136,18 @@ function executeParentTool(
     parentContext: `${parentContext.getSystemPrompt()}\n\nChild tool policy: you have only the subagent-tool-request tool. For every file, shell, search, MCP, or other tool action, call it with the exact toolName and JSON input. Do not attempt to call tools directly.\n\nAvailable parent tools and input schemas:\n${JSON.stringify(toolCatalog)}`, 
     task: params.task,
     signal,
-    createSession: async ({ cwd: childCwd }) => createSubagentSession(
-      childCwd,
-      {
+    createSession: async ({ cwd: childCwd }) => {
+      const session = await createSubagentSession(childCwd, {
         customTools: createChildToolDefinitions(childId, childCwd, boundary),
         sessionManager: parentSessionDir ? SessionManager.create(childCwd, parentSessionDir) : undefined,
-      },
-    ),
+      });
+      logSubagentDebug("child-session-created", {
+        childId,
+        cwd: childCwd,
+        activeTools: session.getActiveToolNames?.(),
+      });
+      return session;
+    },
   });
 }
 

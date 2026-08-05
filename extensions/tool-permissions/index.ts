@@ -158,6 +158,19 @@ function compact(value: unknown, max = 2000): string {
   return text.length > max ? `${text.slice(0, max)}\n…` : text;
 }
 
+export function logSubagentDebug(event: string, details: unknown): void {
+  if (process.env.PI_SUBAGENT_DEBUG !== "1") return;
+  try {
+    appendFileSync(
+      join(tmpdir(), "pi-subagent-debug.jsonl"),
+      `${JSON.stringify({ time: new Date().toISOString(), event, details })}\n`,
+      "utf8",
+    );
+  } catch {
+    // Debug logging must never affect permission behavior.
+  }
+}
+
 function wrapWithContinuation(text: string, width: number, continuationPrefix: string): string[] {
   const availableWidth = Math.max(1, width);
   const prefixWidth = visibleWidth(continuationPrefix);
@@ -531,6 +544,12 @@ export async function promptToolPermissionRequest(
   ctx: ExtensionContext,
   request: ToolRequest,
 ): Promise<"allow" | "deny"> {
+  logSubagentDebug("permission-prompt-enter", {
+    request,
+    mode: ctx.mode,
+    hasUI: ctx.hasUI,
+    hasCustomUI: typeof ctx.ui.custom === "function",
+  });
   const actor = request.actor.kind === "child" ? `subagent \"${request.actor.childId}\"` : "the main agent";
   const result = await askScrollablePermission(
     pi,
@@ -547,7 +566,9 @@ export async function promptToolPermissionRequest(
       compact(request.input, 8000),
     ].join("\\n"),
   );
-  return result.allowed ? "allow" : "deny";
+  const decision = result.allowed ? "allow" : "deny";
+  logSubagentDebug("permission-prompt-result", { request, decision, result });
+  return decision;
 }
 
 async function handleConfigurationDiagnostic(
@@ -820,6 +841,22 @@ export default function toolPermissionPolicy(pi: ExtensionAPI) {
   });
 
   pi.on("tool_call", async (event, ctx) => {
+    // Child sessions expose this bridge as their only tool. Its payload is
+    // authorized by the parent boundary, so the child-side policy must not
+    // intercept it as an unknown standalone tool.
+    if (event.toolName === "subagent-tool-request") {
+      logSubagentDebug("bridge-hook-bypass", {
+        toolName: event.toolName,
+        input: event.input,
+        mode: ctx.mode,
+        hasUI: ctx.hasUI,
+        hasCustomUI: typeof ctx.ui.custom === "function",
+        result: undefined,
+      });
+      // Undefined is the extension hook's allow/no-op result, not a denial.
+      return undefined;
+    }
+
     if (isToolCallEventType("read", event)) {
       return handleReadPermission(event.input, ctx, pi);
     }
