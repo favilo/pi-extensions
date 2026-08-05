@@ -33,7 +33,8 @@
   "dependencies": {
     "@decimalturn/toml-patch": "^2.1.0",
     "ignore": "^7.0.6",
-    "smol-toml": "^1.7.0"
+    "smol-toml": "^1.7.0",
+    "typebox": "^1.3.10"
   },
   "peerDependencies": {
     "@earendil-works/pi-coding-agent": "*",

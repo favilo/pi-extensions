@@ -1,3 +1,4 @@
+import { Compile } from "typebox/compile";
 import {
   createBashToolDefinition,
   createEditToolDefinition,
@@ -90,6 +91,18 @@ function executeParentTool(
 ) {
   const tools = Object.fromEntries(normalToolDefinitions(cwd).map((tool) => [tool.name, tool]));
   const boundary = createToolPermissionBoundary({
+    validate: (request) => {
+      const tool = tools[request.toolName as keyof typeof tools];
+      if (!tool) return `Unknown tool: ${request.toolName}`;
+      try {
+        const validator = Compile(tool.parameters as never);
+        return validator.Check(request.input)
+          ? undefined
+          : `Invalid input for ${request.toolName}; arguments do not match the published tool schema.`;
+      } catch (error) {
+        return `Could not validate input for ${request.toolName}: ${error instanceof Error ? error.message : String(error)}`;
+      }
+    },
     prompt: async (request) => {
       pi.sendMessage({
         customType: "subagent-tool-request",
@@ -109,10 +122,15 @@ function executeParentTool(
   const parentSessionDir = parentContext.sessionManager.getSessionFile()
     ? parentContext.sessionManager.getSessionDir()
     : undefined;
+  const toolCatalog = normalToolDefinitions(cwd).map((tool) => ({
+    name: tool.name,
+    description: tool.description,
+    parameters: tool.parameters,
+  }));
 
   return runSubagentSession({
     cwd,
-    parentContext: `${parentContext.getSystemPrompt()}\n\nChild tool policy: you have only the subagent-tool-request tool. For every file, shell, search, MCP, or other tool action, call it with the exact toolName and JSON input. Do not attempt to call tools directly.`,
+    parentContext: `${parentContext.getSystemPrompt()}\n\nChild tool policy: you have only the subagent-tool-request tool. For every file, shell, search, MCP, or other tool action, call it with the exact toolName and JSON input. Do not attempt to call tools directly.\n\nAvailable parent tools and input schemas:\n${JSON.stringify(toolCatalog)}`, 
     task: params.task,
     signal,
     createSession: async ({ cwd: childCwd }) => createSubagentSession(

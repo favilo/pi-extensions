@@ -49,6 +49,29 @@ test("routes process-shaped child requests through the boundary instead of execu
   assert.equal(executed, false);
 });
 
+test("rejects invalid child input before permission evaluation or execution", async () => {
+  let evaluated = false;
+  let executed = false;
+  const boundary: ToolPermissionBoundary = {
+    validate: () => "input does not match the tool schema",
+    evaluate: async () => {
+      evaluated = true;
+      return "allow";
+    },
+    execute: async () => {
+      executed = true;
+      return undefined;
+    },
+  };
+
+  const result = await executeChildToolRequest(childRequest(), boundary);
+
+  assert.equal(result.status, "denied");
+  assert.match(result.reason ?? "", /schema/);
+  assert.equal(evaluated, false);
+  assert.equal(executed, false);
+});
+
 test("adapts a child tool call to the shared boundary actor and preserves context", async () => {
   let received: ToolRequest | undefined;
   const boundary: ToolPermissionBoundary = {

@@ -592,6 +592,7 @@ export function createToolPermissionBoundary(
   options: {
     prompt?: ToolPermissionBoundary["prompt"];
     execute: ToolPermissionBoundary["execute"];
+    validate?: ToolPermissionBoundary["validate"];
     audit?: ToolPermissionBoundary["audit"];
   },
 ): ToolPermissionBoundary {
@@ -603,7 +604,8 @@ export function createToolPermissionBoundary(
     },
     prompt: options.prompt,
     execute: options.execute,
-    audit: options.audit ?? ((entry) => audit({ tool: entry.toolName, actor: entry.actor, decision: entry.decision, cwd: entry.cwd, reason: entry.reason })),
+    validate: options.validate,
+    audit: options.audit ?? ((entry) => audit({ tool: entry.toolName, actor: entry.actor, decision: entry.decision, cwd: entry.cwd, reason: entry.reason })), 
   };
 }
 

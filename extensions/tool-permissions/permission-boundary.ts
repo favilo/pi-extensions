@@ -22,6 +22,7 @@ export type ToolPermissionBoundary = {
   evaluate(request: ToolRequest): Promise<PermissionDecision>;
   prompt?(request: ToolRequest): Promise<PermissionPromptResult>;
   execute(request: ToolRequest): Promise<unknown>;
+  validate?(request: ToolRequest): string | undefined;
   audit?(entry: { actor: ToolActor; toolName: string; cwd: string; decision: string; reason?: string }): void;
 };
 
@@ -39,6 +40,12 @@ export async function executeToolRequest(
   signal?: AbortSignal,
 ): Promise<ToolExecutionResult> {
   if (signal?.aborted) return result(request, "cancelled", "Tool action was cancelled before authorization.");
+
+  const validationError = boundary.validate?.(request);
+  if (validationError) {
+    audit(boundary, request, "invalid_input", validationError);
+    return result(request, "denied", validationError);
+  }
 
   let decision: PermissionDecision;
   try {
