@@ -1,0 +1,48 @@
+story_id: e03s04
+title: Rotate permission audit logs
+status: passing
+bcps: 2
+spec: e03s04-rotating-audit-log.md
+tasks:
+  - id: 1
+    description: Add deterministic tests for UTC dated paths, current-log symlink, legacy migration, retry idempotency, seven-day retention, and fallback behavior.
+    verify: node --test extensions/tool-permissions/audit.test.ts
+    status: passing
+    risk: P1
+    allure:
+      severity: high
+      categories:
+        - Directory-local Tool Permissions
+        - audit logging
+        - retention
+  - id: 2
+    description: Integrate rotating audit persistence, surface warnings on maintenance failures, and preserve non-blocking audit behavior.
+    verify: node --test extensions/tool-permissions/audit.test.ts
+    status: passing
+    risk: P1
+    allure:
+      severity: high
+      categories:
+        - Directory-local Tool Permissions
+        - failure handling
+        - operability
+  - id: 3
+    description: Document the new audit location, dated files, symlink, migration, and retention policy.
+    verify: node --test extensions/tool-permissions/documentation.test.ts
+    status: passing
+    risk: P2
+    allure:
+      severity: medium
+      categories:
+        - Directory-local Tool Permissions
+        - documentation
+  - id: 4
+    description: Run package-wide type and regression verification.
+    verify: npm run check
+    status: passing
+    risk: P1
+    allure:
+      severity: high
+      categories:
+        - Directory-local Tool Permissions
+        - regression

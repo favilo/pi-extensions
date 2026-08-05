@@ -1,0 +1,85 @@
+story_id: e03s02
+verified_at: "2026-07-30T21:34:01Z"
+verifier: verify-work
+status: blocked
+branch:
+  vcs: jj
+  change_id: vppmnoqy
+  bookmark: favilo/repository-bounded-local-agent-context
+  passed: true
+phases:
+  preflight:
+    passed: true
+    command: "bash $BIGPOWERS_ROOT/scripts/bp-read-agents.sh"
+    note: "Preflight completed successfully using BIGPOWERS_ROOT."
+  task_verification:
+    passed: true
+    commands:
+      - command: "node --test extensions/tool-permissions/index.test.ts"
+        exit_code: 0
+        note: "1 test passed."
+      - command: "node --test extensions/tool-permissions/documentation.test.ts"
+        exit_code: 0
+        note: "2 tests passed."
+  smoke:
+    passed: true
+    note: "No server process or standalone CLI is provided; extension package smoke is covered by the package test command."
+  build:
+    passed: true
+    command: "npm run check"
+    note: "TypeScript compilation completed successfully."
+  typecheck:
+    passed: true
+    command: "npm run typecheck"
+  lint:
+    passed: true
+    note: "No lint script is defined; npm run check:ci completed its configured checks."
+  tests:
+    passed: true
+    command: "npm run check"
+    note: "53 tests passed, 0 failed."
+  terminal_verdict:
+    command: "npm run check"
+    exit_code: 0
+    captured_at: "2026-07-30T21:40:00Z"
+    note: "Single contiguous terminal run; typecheck and the full 53-test suite passed."
+  security:
+    passed: true
+    report: ".specs/security/REVIEW.md"
+    note: "Manual diff review found no reportable HIGH findings."
+  blind_spots:
+    passed: true
+    command: "bash $BIGPOWERS_ROOT/scripts/check-blind-spots.sh"
+    note: "0 HIGH findings; 2 MEDIUM double-tag findings."
+  completeness_critic:
+    passed: false
+    command: "bash $BIGPOWERS_ROOT/scripts/lib/completeness-critic.sh"
+    note: "BLOCKER: active story e03s02 has zero explicit story-tag links."
+  nfr:
+    passed: false
+    note: "P0 NFR evidence was not produced: the only available test plan covers e01 provider-registry NFRs, not e03 permission persistence."
+  manual:
+    passed: false
+    steps:
+      - step: "Open a permission prompt and press Ctrl+A"
+        expected: "A project-scoped rule is persisted and the call proceeds only after success."
+        actual: "Not manually exercised; no interactive Pi UAT harness is present."
+        passed: false
+      - step: "Open a permission prompt and press Ctrl+Shift+A"
+        expected: "A user-scoped rule is persisted and the call proceeds only after success."
+        actual: "Not manually exercised; automated coverage checks source text and scoped decision resolution only."
+        passed: false
+      - step: "Use steering mode with each save shortcut"
+        expected: "The selected scope is persisted, steering text is delivered, and the call proceeds."
+        actual: "Not manually exercised."
+        passed: false
+      - step: "Attempt an ineligible or failed project save"
+        expected: "The UI reports failure and the call is not allowed as a saved pattern."
+        actual: "Not manually exercised."
+        passed: false
+gaps:
+  closed: false
+  blockers:
+    - "Manual UAT for the P0 interaction contracts is still required."
+    - "P0 NFR evidence plan for e03s02 is missing."
+next_skill: verify-work

@@ -1,0 +1,70 @@
+story_id: e03s03
+verified_at: "2026-08-01T01:38:35Z"
+verifier: verify-work
+status: passed
+vcs:
+  kind: jj
+  change_id: nnqvqovx
+phases:
+  preflight:
+    passed: true
+    command: "bash $BIGPOWERS_ROOT/scripts/bp-read-agents.sh"
+  task_verification:
+    passed: true
+    commands:
+      - command: "node --test extensions/tool-permissions/index.test.ts"
+        exit_code: 0
+        note: "4 tests passed."
+      - command: "node --test extensions/tool-permissions/documentation.test.ts"
+        exit_code: 0
+        note: "2 tests passed."
+  build:
+    passed: true
+    command: "npm run check"
+    note: "Typecheck and all 63 package tests passed."
+  terminal_verdict:
+    command: "npm run check"
+    exit_code: 0
+    captured_at: "2026-08-01T01:38:35Z"
+    note: "Single contiguous terminal run."
+  security:
+    passed: true
+    note: "Scoped local target is resolved only through persisted trust and current-directory containment; no HIGH findings identified."
+  blind_spots:
+    passed: true
+    command: "bash $BIGPOWERS_ROOT/scripts/check-blind-spots.sh"
+    note: "0 HIGH findings; 2 MEDIUM double-tag findings."
+  completeness_critic:
+    passed: true
+    command: "bash $BIGPOWERS_ROOT/scripts/lib/completeness-critic.sh"
+    note: "No blockers."
+  manual:
+    passed: true
+    steps:
+      - step: "Run /permissions"
+        expected: "User policy opens."
+        actual: "User policy opened."
+        passed: true
+      - step: "Run /permissions user"
+        expected: "User policy opens."
+        actual: "User policy opened."
+        passed: true
+      - step: "Run /permissions local in a trusted project"
+        expected: "Current project's .pi/permissions.toml opens or is created."
+        actual: "Local policy opened successfully."
+        passed: true
+      - step: "Run /permissions local in an untrusted directory"
+        expected: "No file opens; trust refusal is shown."
+        actual: "Correct trust refusal was shown."
+        passed: true
+      - step: "Run /permissions unexpected"
+        expected: "No file opens; usage is shown."
+        actual: "Error: Usage: /permissions [user|local]."
+        passed: true
+      - step: "Force target creation or editor launch failure"
+        expected: "An error is shown without claiming the policy changed."
+        actual: "Error: Editor exited without saving ${HOME}/.pi/agent/permissions.toml."
+        passed: true
+gaps:
+  closed: true
+next_skill: audit-code

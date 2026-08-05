@@ -53,8 +53,8 @@ out_of_scope:
     reason: Existing user policy remains readable without destructive format migration.
     disposition: excluded
   - item: Changing audit-log scope or retention
-    reason: Permission resolution changes do not require separate project audit logs.
-    disposition: retained_existing_behavior
+    reason: Added as e03s04 to move audit logs to a bounded user-local location with migration and seven-day retention.
+    disposition: in_scope
 
 constraints:
   behavioral:
@@ -75,7 +75,7 @@ constraints:
     - A failed save must not report success or allow a call as though persistence succeeded.
     - Canonicalize paths before trust-boundary, repository-boundary, and precedence comparisons.
   compatibility:
-    - Existing `~/.config/pi/config.toml` permission rules continue to work without manual migration.
+    - Existing user permission rules live at `~/.pi/agent/permissions.toml`; no automatic migration from legacy locations is provided.
     - Interactive and non-interactive permission behavior remains unchanged when no eligible project policy exists.
     - Use Pi's exported `CONFIG_DIR_NAME` rather than hardcoding `.pi` in implementation, while documenting `.pi` as the default user-facing path.
   product:

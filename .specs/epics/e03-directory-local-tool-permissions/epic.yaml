@@ -1,7 +1,7 @@
 id: e03
 title: Directory-local tool permissions
-wsjf: 1.7
-total_bcps: 10
+wsjf: 1.4
+total_bcps: 12
 status: planned
 stories:
   - id: e03s01
@@ -25,3 +25,10 @@ stories:
     delta: MODIFIED
     spec: e03s03-scoped-permissions-editor.md
     tasks: e03s03-tasks.yaml
+  - id: e03s04
+    title: Rotate permission audit logs
+    bcps: 2
+    status: todo
+    delta: ADDED
+    spec: e03s04-rotating-audit-log.md
+    tasks: e03s04-tasks.yaml

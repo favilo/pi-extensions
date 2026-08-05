@@ -1,3 +1,4 @@
+<!-- story: e03s03 -->
 # e03s03 — Edit project or user permission policy explicitly
 
 ## 1. Identity
@@ -38,9 +39,9 @@ The selected TOML file is opened or created for editing, or a clear error is sho
 
 ## 10. Requirements
 ### MODIFIED: Bare permissions command
-**Before:** `/permissions` opens `~/.config/pi/config.toml`.
+**Before:** `/permissions` opens `~/.pi/agent/permissions.toml`.
 
-**After:** Bare `/permissions` continues to open `~/.config/pi/config.toml` as a backward-compatible alias for `/permissions user`.
+**After:** Bare `/permissions` continues to open `~/.pi/agent/permissions.toml` as a backward-compatible alias for `/permissions user`.
 
 ### ADDED: User policy editor
 `/permissions user` shall open the existing user permission TOML.
@@ -77,7 +78,7 @@ The command creates an empty target file when eligible and absent, then leaves a
 - No new package.
 
 ## 15. Failure modes
-Opening user policy for a local request, opening local policy without trust, editing an ancestor accidentally, accepting ambiguous arguments, or reporting success after editor failure.
+Opening user policy for a local request, opening local policy without trust, editing an ancestor accidentally, accepting unclear arguments, or reporting success after editor failure.
 
 ## 16. Observability
 The command description, working message, and error notification identify the selected scope and exact target path.
@@ -91,7 +92,7 @@ The command description, working message, and error notification identify the se
 ### Scenario: User scope is explicit
 **Given** interactive Pi
 **When** the user runs `/permissions user`
-**Then** `~/.config/pi/config.toml` opens.
+**Then** `~/.pi/agent/permissions.toml` opens.
 
 ### Scenario: Eligible local scope opens
 **Given** cwd is covered by eligible persisted trust

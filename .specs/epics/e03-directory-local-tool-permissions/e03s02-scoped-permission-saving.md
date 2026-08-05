@@ -1,3 +1,4 @@
+<!-- story: e03s02 -->
 # e03s02 — Save permission rules to project or user scope
 
 ## 1. Identity
@@ -8,7 +9,7 @@
 - **Risk:** P0
 
 ## 2. User need
-A Pi user responding to a permission prompt needs a fast, unambiguous choice between saving a rule for the current project directory and saving it for every project.
+A Pi user responding to a permission prompt needs a fast, clear choice between saving a rule for the current project directory and saving it for every project.
 
 ## 3. Goal
 Make Ctrl+A allow and save to the current directory's project policy, and Ctrl+Shift+A allow and save to user policy, with accurate hints, feedback, steering behavior, and failure handling.
