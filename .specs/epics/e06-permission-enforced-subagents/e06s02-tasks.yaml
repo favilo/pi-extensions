@@ -26,7 +26,7 @@ tasks:
   - id: 3
     description: Add regression coverage for SDK and process paths that could otherwise bypass tool-permissions.
     verify: node --test extensions/subagent/permission-boundary.test.ts
-    status: failing
+    status: passing
     risk: P0
     security: high
     allure:
