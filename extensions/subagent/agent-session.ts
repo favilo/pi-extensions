@@ -5,6 +5,7 @@ export type SubagentSession = {
   sessionId: string;
   cwd?: string;
   prompt(text: string): Promise<void>;
+  getLastAssistantText?(): string | undefined;
   abort?(): Promise<void> | void;
   dispose(): void;
 };
@@ -28,6 +29,7 @@ export type SubagentSessionRunResult = {
   cwd: string;
   completed: boolean;
   disposed: boolean;
+  output?: string;
 };
 
 export type ChildToolCall = { toolName: string; input: unknown };
@@ -69,6 +71,7 @@ export async function createSubagentSession(cwd: string, options: SubagentSessio
     sessionId: session.sessionId,
     cwd,
     prompt: (text) => session.prompt(text),
+    getLastAssistantText: () => session.getLastAssistantText(),
     dispose: () => session.dispose(),
   };
 }
@@ -89,7 +92,13 @@ export async function runSubagentSession(options: SubagentSessionRunOptions): Pr
     session.dispose();
     disposed = true;
   }
-  return { sessionId: session.sessionId, cwd: options.cwd, completed, disposed };
+  return {
+    sessionId: session.sessionId,
+    cwd: options.cwd,
+    completed,
+    disposed,
+    ...(session.getLastAssistantText?.() === undefined ? {} : { output: session.getLastAssistantText?.() }),
+  };
 }
 
 export async function runToolInterceptionProbe(options: ToolInterceptionProbeOptions): Promise<ToolInterceptionResult> {

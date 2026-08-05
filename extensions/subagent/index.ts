@@ -83,11 +83,15 @@ function executeParentTool(
 ) {
   const tools = Object.fromEntries(normalToolDefinitions(cwd).map((tool) => [tool.name, tool]));
   const boundary = createToolPermissionBoundary({
-    prompt: async (request) => promptToolPermissionRequest(
-      pi,
-      parentContext,
-      request,
-    ),
+    prompt: async (request) => {
+      pi.sendMessage({
+        customType: "subagent-tool-request",
+        content: `Subagent "${childId}" requests ${request.toolName}`,
+        display: true,
+        details: request,
+      });
+      return promptToolPermissionRequest(pi, parentContext, request);
+    },
     execute: async (request) => {
       const tool = tools[request.toolName as keyof typeof tools];
       if (!tool) throw new Error(`Unknown child tool: ${request.toolName}`);
