@@ -14,6 +14,7 @@ import {
   type PermissionRule,
 } from "./config.ts";
 import { createPersistedTrustResolver, resolveCurrentProjectPolicyPath, resolveScopedPermissionDecision, type ScopedPermissionDecision } from "./scope.ts";
+import type { ToolPermissionBoundary, ToolRequest } from "./permission-boundary.ts";
 
 type ToolCallEventResult = { block: true; reason: string } | undefined;
 
@@ -53,6 +54,7 @@ type WriteInput = { path?: unknown; content?: unknown };
 type AuditEntry = {
   time: string;
   tool: string;
+  actor?: ToolRequest["actor"];
   decision: string;
   cwd: string;
   path?: string;
@@ -560,6 +562,25 @@ export function resolveToolPermissionDecision(
     configDirName: CONFIG_DIR_NAME,
     trustResolver: options.trustResolver ?? createPersistedTrustResolver(getAgentDir()),
   });
+}
+
+export function createToolPermissionBoundary(
+  options: {
+    prompt?: ToolPermissionBoundary["prompt"];
+    execute: ToolPermissionBoundary["execute"];
+    audit?: ToolPermissionBoundary["audit"];
+  },
+): ToolPermissionBoundary {
+  return {
+    evaluate: async (request) => {
+      const decision = resolveToolPermissionDecision(request.toolName, request.input, request.cwd);
+      if (decision.diagnostic) throw new Error(decision.diagnostic);
+      return decision.decision === "prompt" ? "ask" : decision.decision;
+    },
+    prompt: options.prompt,
+    execute: options.execute,
+    audit: options.audit ?? ((entry) => audit({ tool: entry.toolName, actor: entry.actor, decision: entry.decision, cwd: entry.cwd, reason: entry.reason })),
+  };
 }
 
 function configuredDecision(toolName: string, input: unknown, cwd: string): ScopedPermissionDecision {
