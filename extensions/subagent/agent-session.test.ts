@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { mkdtempSync, writeFileSync } from "node:fs";
+import { SessionManager } from "@earendil-works/pi-coding-agent";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { resolveToolPermissionDecision } from "../tool-permissions/index.ts";
@@ -12,12 +13,24 @@ import {
   type SubagentSession,
 } from "./agent-session.ts";
 
-test("creates an SDK session in the child cwd and disposes it", async () => {
+test("creates an in-memory SDK session by default", async () => {
   const cwd = mkdtempSync(join(tmpdir(), "pi-subagent-spike-"));
   const session = await createSubagentSession(cwd);
 
   assert.equal(session.cwd, cwd);
   assert.match(session.sessionId, /^[0-9a-f-]{36}$/);
+  session.dispose();
+});
+
+test("accepts an injected file-backed session manager", async () => {
+  const cwd = mkdtempSync(join(tmpdir(), "pi-subagent-cwd-"));
+  const sessionDir = mkdtempSync(join(tmpdir(), "pi-subagent-sessions-"));
+  const manager = SessionManager.create(cwd, sessionDir);
+  const session = await createSubagentSession(cwd, { sessionManager: manager });
+
+  assert.equal(manager.isPersisted(), true);
+  assert.equal(manager.getSessionDir(), sessionDir);
+  assert.equal(manager.getCwd(), cwd);
   session.dispose();
 });
 

@@ -1,4 +1,4 @@
-import { createAgentSession, SessionManager } from "@earendil-works/pi-coding-agent";
+import { createAgentSession, SessionManager, type ToolDefinition } from "@earendil-works/pi-coding-agent";
 import { executeToolRequest, type ToolExecutionResult, type ToolPermissionBoundary, type ToolRequest } from "../tool-permissions/permission-boundary.ts";
 
 export type SubagentSession = {
@@ -10,6 +10,10 @@ export type SubagentSession = {
 };
 
 export type CreateSubagentSession = (options: { cwd: string }) => Promise<SubagentSession>;
+export type SubagentSessionOptions = {
+  customTools?: ToolDefinition[];
+  sessionManager?: SessionManager;
+};
 
 export type SubagentSessionRunOptions = {
   cwd: string;
@@ -54,11 +58,12 @@ export function validateNestingDepth(depth: number, maximum: number): void {
   if (depth >= maximum) throw new Error(`Exceeded maximum nesting depth of ${maximum}.`);
 }
 
-export async function createSubagentSession(cwd: string): Promise<SubagentSession> {
+export async function createSubagentSession(cwd: string, options: SubagentSessionOptions = {}): Promise<SubagentSession> {
   const { session } = await createAgentSession({
     cwd,
     noTools: "all",
-    sessionManager: SessionManager.inMemory(cwd),
+    customTools: options.customTools ?? [],
+    sessionManager: options.sessionManager ?? SessionManager.inMemory(cwd),
   });
   return {
     sessionId: session.sessionId,

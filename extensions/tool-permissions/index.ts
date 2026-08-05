@@ -1,5 +1,5 @@
 // story: e03s01
-import { CONFIG_DIR_NAME, generateDiffString, getAgentDir, isToolCallEventType, renderDiff, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { CONFIG_DIR_NAME, generateDiffString, getAgentDir, isToolCallEventType, renderDiff, type ExtensionAPI, type ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { CURSOR_MARKER, matchesKey, visibleWidth, wrapTextWithAnsi, type Component, type Focusable } from "@earendil-works/pi-tui";
 import ignore from "ignore";
 import { spawn } from "node:child_process";
@@ -524,6 +524,30 @@ async function askScrollablePermission(
 
     return component;
   });
+}
+
+export async function promptToolPermissionRequest(
+  pi: ExtensionAPI,
+  ctx: ExtensionContext,
+  request: ToolRequest,
+): Promise<"allow" | "deny"> {
+  const actor = request.actor.kind === "child" ? `subagent \"${request.actor.childId}\"` : "the main agent";
+  const result = await askScrollablePermission(
+    pi,
+    ctx,
+    `Allow ${actor} to use ${request.toolName}?`,
+    [
+      `${actor} requested a tool through the shared permission boundary.`,
+      "",
+      `Tool: ${request.toolName}`,
+      `Working directory: ${request.cwd}`,
+      ...(request.steering ? [`Steering: ${request.steering}`] : []),
+      "",
+      "Arguments:",
+      compact(request.input, 8000),
+    ].join("\\n"),
+  );
+  return result.allowed ? "allow" : "deny";
 }
 
 async function handleConfigurationDiagnostic(

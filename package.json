@@ -26,7 +26,8 @@
       "./extensions/jj-status/index.ts",
       "./extensions/local-agent-context/index.ts",
       "./extensions/mcp/index.ts",
-      "./extensions/tool-permissions/index.ts"
+      "./extensions/tool-permissions/index.ts",
+      "./extensions/subagent/index.ts"
     ]
   },
   "dependencies": {

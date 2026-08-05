@@ -24,13 +24,14 @@ import {
   createWriteTool,
 } from "@earendil-works/pi-coding-agent";
 import { Text } from "@earendil-works/pi-tui";
+import { registerPublishedTool } from "../tool-registry/index.ts";
 import { toolErrorText } from "./result.ts";
 
 export default function (pi: ExtensionAPI) {
   const cwd = process.cwd();
 
   const originalRead = createReadTool(cwd);
-  pi.registerTool({
+  registerPublishedTool(pi, {
     name: "read",
     label: "read",
     description: originalRead.description,
@@ -79,7 +80,7 @@ export default function (pi: ExtensionAPI) {
   });
 
   const originalBash = createBashTool(cwd);
-  pi.registerTool({
+  registerPublishedTool(pi, {
     name: "bash",
     label: "bash",
     description: originalBash.description,
@@ -123,7 +124,7 @@ export default function (pi: ExtensionAPI) {
   });
 
   const originalGrep = createGrepTool(cwd);
-  pi.registerTool({
+  registerPublishedTool(pi, {
     name: "grep",
     label: "grep",
     description: originalGrep.description,
@@ -166,7 +167,7 @@ export default function (pi: ExtensionAPI) {
   });
 
   const originalFind = createFindTool(cwd);
-  pi.registerTool({
+  registerPublishedTool(pi, {
     name: "find",
     label: "find",
     description: originalFind.description,
@@ -206,7 +207,7 @@ export default function (pi: ExtensionAPI) {
   });
 
   const originalLs = createLsTool(cwd);
-  pi.registerTool({
+  registerPublishedTool(pi, {
     name: "ls",
     label: "ls",
     description: originalLs.description,
@@ -245,7 +246,7 @@ export default function (pi: ExtensionAPI) {
   });
 
   const originalEdit = createEditTool(cwd);
-  pi.registerTool({
+  registerPublishedTool(pi, {
     name: "edit",
     label: "edit",
     description: originalEdit.description,
@@ -299,7 +300,7 @@ export default function (pi: ExtensionAPI) {
   });
 
   const originalWrite = createWriteTool(cwd);
-  pi.registerTool({
+  registerPublishedTool(pi, {
     name: "write",
     label: "write",
     description: originalWrite.description,

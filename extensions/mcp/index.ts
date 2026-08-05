@@ -1,4 +1,5 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { publishToolDefinition, unpublishToolDefinition } from "../tool-registry/index.ts";
 import {
   McpProviderRegistry,
   type McpRegistryStatusSection,
@@ -50,13 +51,17 @@ export function registerMcpProvider(pi: ExtensionAPI, provider: McpToolProvider)
 }
 
 export default function mcpExtension(pi: ExtensionAPI) {
-  const registry = new McpProviderRegistry((tool) => pi.registerTool(tool));
+  const registry = new McpProviderRegistry((tool) => {
+    publishToolDefinition(tool);
+    pi.registerTool(tool);
+  });
   const stopRegistrationListener = pi.events.on(PROVIDER_REGISTER_CHANNEL, (data) => {
     registry.register(data as McpToolProvider);
   });
   const stopUnregistrationListener = pi.events.on(PROVIDER_UNREGISTER_CHANNEL, (data) => {
     if (!data || typeof data !== "object") return;
     const removedTools = new Set(registry.unregister(data as McpToolProvider));
+    for (const name of removedTools) unpublishToolDefinition(name);
     pi.setActiveTools(pi.getActiveTools().filter((name) => !removedTools.has(name)));
   });
 
@@ -74,6 +79,7 @@ export default function mcpExtension(pi: ExtensionAPI) {
 
   pi.on("session_shutdown", () => {
     const removedTools = new Set(registry.unregisterAll());
+    for (const name of removedTools) unpublishToolDefinition(name);
     pi.setActiveTools(pi.getActiveTools().filter((name) => !removedTools.has(name)));
     stopRegistrationListener();
     stopUnregistrationListener();
