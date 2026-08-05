@@ -8,7 +8,7 @@ tasks:
   - id: 1
     description: Add contracts proving child tool calls reach the existing permission evaluator and audit logger.
     verify: node --test extensions/subagent/permission-boundary.test.ts
-    status: failing
+    status: passing
     risk: P0
     security: high
     allure:
@@ -17,7 +17,7 @@ tasks:
   - id: 2
     description: Implement the AgentSession-backed subagent tool with default-ask behavior, deny-list enforcement, structured results, and cleanup.
     verify: node --test extensions/subagent/permission-boundary.test.ts
-    status: failing
+    status: passing
     risk: P0
     security: high
     allure:
