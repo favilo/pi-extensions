@@ -33,6 +33,10 @@ export type SubagentSessionRunResult = {
   output?: string;
 };
 
+export function resolveSubagentCwd(parentCwd: string, requestedCwd?: string): string {
+  return requestedCwd ?? parentCwd;
+}
+
 export type ChildToolCall = { toolName: string; input: unknown };
 export type ToolPermissionDecision = "allow" | "deny";
 export type ToolInterceptionResult = {
