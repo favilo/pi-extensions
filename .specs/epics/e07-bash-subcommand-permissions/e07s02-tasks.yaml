@@ -1,0 +1,22 @@
+story_id: e07s02
+title: Allowlist individual Bash subcommands and deny whole commands safely
+status: todo
+bcps: 4
+delta: ADDED
+spec: e07s02-subcommand-decision-boundary.md
+tasks:
+  - id: 1
+    description: Add failing contracts for simple commands, lists, pipelines, explicit bash -c payloads, allow rules, deny rules, asks, and parser failures.
+    verify: node --test extensions/tool-permissions/bash-subcommands.test.ts
+    status: todo
+    risk: P0
+  - id: 2
+    description: Evaluate parsed subcommands with existing Bash policy precedence and make the complete invocation atomic.
+    verify: node --test extensions/tool-permissions/bash-subcommands.test.ts
+    status: todo
+    risk: P0
+  - id: 3
+    description: Preserve existing Bash permission behavior and run package regression and type checks.
+    verify: npm run check
+    status: todo
+    risk: P1

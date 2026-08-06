@@ -57,7 +57,7 @@ test("fields within a rule are ANDed and rules are ORed", () => {
   assert.equal(permissionDecision(permission, {
     query: "public roadmap",
     filters: { created_date_range: { start_date: "2024-01-01" } },
-  }), "prompt");
+  }), "ask");
   assert.equal(permissionDecision(permission, { query: "secret roadmap" }), "deny");
 });
 

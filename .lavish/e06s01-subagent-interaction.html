@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>e06s01 · Subagent interaction contract</title>
+<style>
+:root{color-scheme:dark;font:16px/1.5 system-ui,sans-serif;background:#10131a;color:#eef2f7}body{max-width:1100px;margin:0 auto;padding:40px 24px}h1{font-size:32px;margin:0 0 8px}h2{font-size:18px;margin:0 0 8px}p{color:#aab5c5}.eyebrow{color:#73daca;text-transform:uppercase;letter-spacing:.12em;font-size:12px}.grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin:24px 0}.card{border:1px solid #344052;border-radius:12px;padding:20px;background:#171c25}.card:has(input:checked){border-color:#73daca;box-shadow:0 0 0 2px #24544e}.tag{display:inline-block;color:#73daca;background:#193732;border-radius:99px;padding:2px 8px;font-size:12px}.card ul{padding-left:20px;color:#c3ccd8}.decision{border-top:1px solid #344052;padding-top:24px}textarea{width:100%;min-height:80px;background:#0d1016;color:#eef2f7;border:1px solid #475366;border-radius:8px;padding:10px;box-sizing:border-box}button{background:#73daca;color:#10201e;border:0;border-radius:8px;padding:10px 16px;font-weight:700;cursor:pointer}button:hover{background:#a0f2e7}.status{margin-top:12px;color:#73daca;min-height:24px}@media(max-width:760px){.grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="eyebrow">e06s01 · interaction review</div>
+<h1>How should users control live subagents?</h1>
+<p>Choose the control surface for the AgentSession spike. The goal is a real Pi interaction: inspect child status, steer work, cancel safely, and see permission state. Authorization remains owned by the existing <code>tool-permissions</code> extension.</p>
+<form class="decision" data-lavish-question="subagent-interaction" onsubmit="event.preventDefault(); const data=new FormData(event.currentTarget); const choice=data.get('contract'); if(!choice)return; const rationale=data.get('rationale')||'(no additional rationale)'; window.lavish.queuePrompt('For e06s01 choose the '+choice+' subagent control surface. Rationale: '+rationale,{tag:'decision',text:'Subagent controls: '+choice,element:event.currentTarget,data:{controlSurface:choice,rationale}}); document.querySelector('.status').textContent='Choice queued for review: '+choice;">
+<div class="grid">
+<label class="card"><input type="radio" name="contract" value="Command-first controls" required><h2>Command-first controls</h2><p><code>/subagents list</code> opens a focused list with status, cwd, and actions for steer, inspect, abort, or resume.</p><ul><li>Fast for keyboard users</li><li>Minimal persistent UI cost</li><li>Harder to monitor while working</li></ul></label>
+<label class="card"><input type="radio" name="contract" value="Toggleable sidebar"><h2>Toggleable sidebar</h2><p>A collapsible panel keeps live children visible with per-agent status, progress, permission state, and steering input.</p><ul><li>Best at-a-glance visibility</li><li>Direct controls near status</li><li>Consumes scarce terminal width</li></ul></label>
+<label class="card"><input type="radio" name="contract" value="Hybrid command and sidebar"><span class="tag">Recommended</span><h2>Hybrid command + sidebar</h2><p><code>/subagents list</code> is the canonical view; a toggleable sidebar mirrors it for active monitoring.</p><ul><li>Keyboard and visual workflows</li><li>One shared state model</li><li>More UI integration work</li></ul></label>
+</div>
+<label for="rationale">Notes for this control surface</label>
+<textarea id="rationale" name="rationale" placeholder="What should the spike preserve or avoid?"></textarea>
+<p><button type="submit">Queue selected surface</button></p>
+<div class="status" aria-live="polite"></div>
+</form>
+
+<section class="decision" data-lavish-question="subagent-controls">
+<h2>Which controls and fields are essential?</h2>
+<p>Select the minimum viable controls for the first UI slice. We can defer anything not selected.</p>
+<form onsubmit="event.preventDefault(); const data=new FormData(event.currentTarget); const values=data.getAll('item'); if(!values.length)return; window.lavish.queuePrompt('For the hybrid subagent UI, include these fields and controls: '+values.join(', '),{tag:'ui-scope',text:'Essential subagent UI: '+values.join(', '),element:event.currentTarget,data:{items:values}}); document.querySelector('.controls-status').textContent='UI scope queued: '+values.join(', ');">
+<label><input type="checkbox" name="item" value="name and status"> Name and status</label><br>
+<label><input type="checkbox" name="item" value="cwd and elapsed time"> Cwd and elapsed time</label><br>
+<label><input type="checkbox" name="item" value="progress and last event"> Progress and last event</label><br>
+<label><input type="checkbox" name="item" value="permission state"> Permission state</label><br>
+<label><input type="checkbox" name="item" value="steer"> Steer</label><br>
+<label><input type="checkbox" name="item" value="inspect transcript"> Inspect transcript</label><br>
+<label><input type="checkbox" name="item" value="abort and resume"> Abort and resume</label><br>
+<label><input type="checkbox" name="item" value="open cwd"> Open cwd</label>
+<p><button type="submit">Queue essential controls</button></p>
+<div class="controls-status status" aria-live="polite"></div>
+</form>
+</section>
+
+<section class="decision" data-lavish-question="steering">
+<h2>How should steering work?</h2>
+<p>Choose the interaction for sending a new instruction to a running child.</p>
+<form onsubmit="event.preventDefault(); const data=new FormData(event.currentTarget); const choice=data.get('steering'); if(!choice)return; window.lavish.queuePrompt('For the hybrid subagent UI, use '+choice+' for steering running children.',{tag:'ui-steering',text:'Steering: '+choice,element:event.currentTarget,data:{steering:choice}}); document.querySelector('.steering-status').textContent='Steering choice queued: '+choice;">
+<label class="card"><input type="radio" name="steering" value="Inline sidebar input" required><h2>Inline sidebar input</h2><p>Focus a child row, type an instruction, and submit without leaving the main view.</p></label>
+<label class="card"><input type="radio" name="steering" value="/subagents steer command"><h2><code>/subagents steer</code></h2><p>Use a command with child identity and instruction, useful when the sidebar is hidden.</p></label>
+<label class="card"><input type="radio" name="steering" value="Both shared paths"><span class="tag">Recommended</span><h2>Both shared paths</h2><p>Sidebar input and <code>/subagents steer</code> dispatch the same parent-owned operation.</p></label>
+<p><button type="submit">Queue steering decision</button></p>
+<div class="steering-status status" aria-live="polite"></div>
+</form>
+</section>
+
+<section class="decision" data-lavish-question="steering-target">
+<h2>How should the sidebar target a subagent?</h2>
+<p>Pick the identity affordance for <code>/subagents steer</code>. The goal is to avoid typing opaque IDs.</p>
+<form onsubmit="event.preventDefault(); const data=new FormData(event.currentTarget); const values=data.getAll('targeting'); if(!values.length)return; window.lavish.queuePrompt('For subagent steering, support '+values.join(' and ')+'.', {tag:'ui-targeting',text:'Steering target: '+values.join(', '),element:event.currentTarget,data:{targeting:values}}); document.querySelector('.targeting-status').textContent='Targeting choice queued: '+values.join(', ');">
+<label><input type="checkbox" name="targeting" value="sidebar-generated subagent name argument"> Sidebar-generated subagent name argument</label><br>
+<label><input type="checkbox" name="targeting" value="tab completion for subagent names"> Tab completion for subagent names</label><br>
+<label><input type="checkbox" name="targeting" value="stable short IDs for duplicate names"> Stable short IDs for duplicate names</label>
+<p><button type="submit">Queue targeting decision</button></p>
+<div class="targeting-status status" aria-live="polite"></div>
+</form>
+</section>
+
+<section class="decision" data-lavish-question="naming">
+<h2>How should unnamed subagents be named?</h2>
+<p>Choose a human-friendly identity for list rows, tab completion, and generated <code>/subagents steer</code> commands.</p>
+<p><strong>Captured rule:</strong> the launch tool accepts an optional name; when omitted, generate a short color-animal name. Explicit names remain supported.</p>
+<form onsubmit="event.preventDefault(); const data=new FormData(event.currentTarget); const choice=data.get('naming'); if(!choice)return; window.lavish.queuePrompt('Use '+choice+' for unnamed subagent names.',{tag:'ui-naming',text:'Subagent naming: '+choice,element:event.currentTarget,data:{naming:choice}}); document.querySelector('.naming-status').textContent='Naming choice queued: '+choice;">
+<label class="card"><input type="radio" name="naming" value="Generated adjective-noun names" required><h2>Generated adjective-noun names</h2><p>Use short names such as <code>amber-otter</code> or <code>quiet-orbit</code>.</p></label>
+<label class="card"><input type="radio" name="naming" value="Generated color-animal names"><h2>Generated color-animal names</h2><p>Use a constrained vocabulary optimized for fast recognition and completion.</p></label>
+<label class="card"><input type="radio" name="naming" value="Explicit name with generated fallback"><span class="tag">Recommended</span><h2>Explicit name with generated fallback</h2><p>Accept an optional user name; generate a short name when omitted and prevent collisions.</p></label>
+<p><button type="submit">Queue naming decision</button></p>
+<div class="naming-status status" aria-live="polite"></div>
+</form>
+</section>
+</body>
+</html>

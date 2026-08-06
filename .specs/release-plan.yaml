@@ -16,6 +16,20 @@ epics:
     bcps: 4
     note: >-
       WSJF = (business value 5 + time criticality 3 + risk reduction 8) / job size 2 = 8.0. A focused fix prevents unrelated ancestor instructions from entering Pi context in pure Jujutsu, nested-repository, and non-repository workspaces.
+  - id: e06
+    title: Permission-enforced runnable subagents
+    capsule_dir: epics/e06-permission-enforced-subagents
+    wsjf: 6.0
+    bcps: 10
+    note: >-
+      Provisional WSJF = 6.0. Explore AgentSession runtime options, then run subagents through the existing permission boundary with cwd-aware policy resolution and safe missing-UI behavior.
+  - id: e07
+    title: Bash subcommand permission evaluation
+    capsule_dir: epics/e07-bash-subcommand-permissions
+    wsjf: 5.5
+    bcps: 9
+    note: >-
+      Provisional WSJF = 5.5. Parse compound Bash safely, allowlist individual commands, deny the complete invocation when one component is denied, and preserve complete audit evidence.
   - id: e05
     title: Provider usage visibility
     capsule_dir: epics/e05-provider-usage

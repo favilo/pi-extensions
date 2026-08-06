@@ -1,0 +1,22 @@
+story_id: e07s03
+title: Audit Bash components and report denied subcommands to agents
+status: todo
+bcps: 2
+delta: ADDED
+spec: e07s03-subcommand-audit-and-denials.md
+tasks:
+  - id: 1
+    description: Add contracts for per-subcommand audit records, aggregate command audit, denied-subcommand details, and steering context.
+    verify: node --test extensions/tool-permissions/bash-subcommands.test.ts
+    status: todo
+    risk: P1
+  - id: 2
+    description: Implement safe agent-facing denial details and preserve non-blocking existing audit failure behavior.
+    verify: node --test extensions/tool-permissions/audit.test.ts
+    status: todo
+    risk: P1
+  - id: 3
+    description: Run complete package checks and verify existing audit-log behavior remains green.
+    verify: npm run check
+    status: todo
+    risk: P1
