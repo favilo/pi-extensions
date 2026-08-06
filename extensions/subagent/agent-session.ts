@@ -1,3 +1,5 @@
+import { statSync, realpathSync } from "node:fs";
+import { isAbsolute, relative, resolve, sep } from "node:path";
 import { createAgentSession, DefaultResourceLoader, getAgentDir, SessionManager, type ToolDefinition } from "@earendil-works/pi-coding-agent";
 import { executeToolRequest, type ToolExecutionResult, type ToolPermissionBoundary, type ToolRequest } from "../tool-permissions/permission-boundary.ts";
 
@@ -34,7 +36,31 @@ export type SubagentSessionRunResult = {
 };
 
 export function resolveSubagentCwd(parentCwd: string, requestedCwd?: string): string {
-  return requestedCwd ?? parentCwd;
+  const parent = canonicalDirectory(parentCwd, "Parent working directory");
+  const candidate = requestedCwd === undefined
+    ? parent
+    : resolve(parent, requestedCwd);
+  const child = canonicalDirectory(candidate, "Child working directory");
+  const childRelativePath = relative(parent, child);
+  if (childRelativePath === ".." || childRelativePath.startsWith(`..${sep}`) || isAbsolute(childRelativePath)) {
+    throw new Error("Child working directory is outside the parent working directory.");
+  }
+  return child;
+}
+
+function canonicalDirectory(path: string, label: string): string {
+  let canonical: string;
+  try {
+    canonical = realpathSync(path);
+  } catch {
+    throw new Error(`${label} does not exist.`);
+  }
+  try {
+    if (!statSync(canonical).isDirectory()) throw new Error();
+  } catch {
+    throw new Error(`${label} is not a directory.`);
+  }
+  return canonical;
 }
 
 export type ChildToolCall = { toolName: string; input: unknown };

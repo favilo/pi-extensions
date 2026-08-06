@@ -14,7 +14,7 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import { getPublishedToolDefinitions } from "../tool-registry/index.ts";
 import { createToolPermissionBoundary, logSubagentDebug, promptToolPermissionRequest } from "../tool-permissions/index.ts";
-import { createSubagentSession, executeChildToolRequest, runSubagentSession } from "./agent-session.ts";
+import { createSubagentSession, executeChildToolRequest, resolveSubagentCwd, runSubagentSession } from "./agent-session.ts";
 
 const subagentParameters = {
   type: "object",
@@ -159,7 +159,7 @@ export default function subagentExtension(pi: ExtensionAPI): void {
     parameters: subagentParameters,
     async execute(_toolCallId, params: SubagentParameters, signal, _onUpdate, ctx) {
       const childId = params.agent?.trim() || "child-agent";
-      const cwd = params.cwd ? new URL(params.cwd, `file://${ctx.cwd}/`).pathname : ctx.cwd;
+      const cwd = resolveSubagentCwd(ctx.cwd, params.cwd);
       const result = await executeParentTool(pi, cwd, childId, ctx, params, signal);
       return {
         content: [{ type: "text", text: JSON.stringify(result) }],
