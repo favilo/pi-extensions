@@ -14,7 +14,7 @@ stories:
   - id: e06s02
     title: Run subagents through the tool-permissions boundary
     bcps: 4
-    status: todo
+    status: passing
     delta: ADDED
     spec: e06s02-permission-enforced-subagent-runtime.md
     tasks: e06s02-tasks.yaml

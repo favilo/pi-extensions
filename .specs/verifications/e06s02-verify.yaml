@@ -1,0 +1,51 @@
+story_id: e06s02
+verified_at: "2026-08-06T20:15:00Z"
+verifier: verify-work
+status: passed
+vcs:
+  kind: jj
+  bookmark: favilo/e06s01-agent-session-spike
+phases:
+  build:
+    passed: true
+    command: "npm run check"
+    note: "Typecheck and all 88 package tests passed."
+  task_verification:
+    passed: true
+    commands:
+      - command: "node --test extensions/subagent/permission-boundary.test.ts"
+        exit_code: 0
+        note: "Permission boundary, validation, denial, approval, cleanup, and bypass tests passed."
+      - command: "node --test extensions/tool-permissions/permission-boundary.test.ts"
+        exit_code: 0
+        note: "Shared resolver and audit boundary tests passed."
+  security:
+    passed: true
+    report: ".specs/security/REVIEW.md"
+    note: "Child capabilities remain behind the existing permission boundary; no reportable HIGH finding identified."
+  nfr:
+    passed: true
+    note: "Fail-closed defaults, bounded nesting, deterministic cleanup, structured results, and safe audit metadata are covered by focused tests."
+  manual:
+    passed: true
+    steps:
+      - step: "Run scripts/e06s02-uat.sh allowed"
+        expected: "An allow-listed child request executes without a duplicate prompt."
+        actual: "ls -l executed and returned output."
+        passed: true
+      - step: "Run scripts/e06s02-uat.sh denied"
+        expected: "A deny-listed child request is blocked with a structured denial."
+        actual: "Permission denied was returned and execution did not occur."
+        passed: true
+      - step: "Run scripts/e06s02-uat.sh unlisted"
+        expected: "An unlisted request follows the permission prompt and returns a structured result."
+        actual: "Permission denied by the user was returned."
+        passed: true
+      - step: "Inspect child session capabilities"
+        expected: "Only the permission bridge is exposed; direct SDK/process execution is unavailable."
+        actual: "Focused bypass tests passed and debug traces confirmed extension isolation."
+        passed: true
+gaps:
+  closed: true
+  note: "Verification evidence and P0 security/NFR gates are recorded."
+next_skill: audit-code

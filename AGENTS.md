@@ -1,24 +1,31 @@
 # Agent instructions
 
-## Bigpowers script execution
+## Bigpowers command guardrail — mandatory
 
-Keep the working directory at the project root. Do **not** `cd` into the Bigpowers checkout to run its scripts.
+This rule overrides convenience and applies to every agent, every task, and every
+Bigpowers script, including timing, validation, setup, and verification scripts.
 
-`BIGPOWERS_ROOT` is provided by the environment and identifies the Bigpowers installation. Invoke Bigpowers scripts by absolute path while remaining in this project directory:
+Before executing any Bigpowers script:
+
+1. Keep the working directory at the project root.
+2. Invoke it only through its absolute installation path:
+  `"$BIGPOWERS_ROOT/scripts/<script>.sh" ...`
+3. Never invoke a Bigpowers script with a relative path such as:
+  `bash scripts/<script>.sh`
+  `./scripts/<script>.sh`
+  `sh scripts/<script>.sh`
+4. Never `cd` into `$BIGPOWERS_ROOT`.
+5. If `BIGPOWERS_ROOT` is unset, stop and report the problem; do not guess the path.
+
+Required form:
 
 ```bash
 "$BIGPOWERS_ROOT/scripts/<script>.sh" ...
 ```
 
-For project-local scripts, invoke them from the project root and preserve the existing environment:
-
-```bash
-BIGPOWERS_ROOT="$BIGPOWERS_ROOT" bash .github/scripts/check-active-plans.sh
-```
-
-Never use `cd "$BIGPOWERS_ROOT"` merely to run a Bigpowers script. The project root is the execution context; `BIGPOWERS_ROOT` is only the script location/configuration.
-
-Do not add machine-local absolute paths to repository files. Use environment variables such as `${HOME}`, repository-relative paths, or descriptive fake paths in fixtures and verification evidence.
+Before running a command, verify that any scripts/*.sh path belongs to the
+project or to Bigpowers. If it belongs to Bigpowers, rewrite it using the
+required absolute-path form.
 
 ## TDD
 

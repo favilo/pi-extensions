@@ -6,27 +6,27 @@ active_bug_id: null
 git:
   bookmark: favilo/e06s01-agent-session-spike
   parent_bookmark: main
-  change_id: lnntukxv
 handoff:
-  last_step_completed: Completed e06s02 AgentSession bridge, published tool registry, child extension isolation, schema validation, and executable UAT harness
-  open_decisions:
-    - Persist e06s02 verification evidence from allowed, denied, and unlisted UAT scenarios
-    - Run/record P0 security and NFR/completeness gates before marking e06s02 passing
+  last_step_completed: Completed e06s02 AgentSession bridge, published tool registry,
+    child extension isolation, schema validation, and executable UAT harness
+  open_decisions: []
   required_reading:
-  - .plans/fix-local-agent-context-jj-boundary.md
   - .specs/IMPACT_LATEST.md
   - .specs/release-plan.yaml
   - .specs/epics/e04-repository-bounded-local-agent-context/epic.yaml
   - .specs/epics/e04-repository-bounded-local-agent-context/e04s01-repository-and-home-boundaries.md
   - extensions/local-agent-context/index.ts
   - extensions/local-agent-context/index.test.ts
-  next_skill: verify-work
-  context: e06s02 real parent-agent UAT passed allowed, deny-list, and unlisted bash scenarios. Child sessions expose only subagent-tool-request, persist with the parent session directory when applicable, and load no extensions. npm run check passes (88 tests). Continue by writing verification evidence, then run P0 security/NFR gates and audit-code.
-  blocker: Verification evidence and P0 gates remain to be recorded.
+  next_skill: audit-code
+  context: e06s02 verification evidence is recorded for allowed, deny-list, and
+    unlisted bash scenarios. Child sessions expose only subagent-tool-request,
+    persist with the parent session directory when applicable, and load no extensions.
+    npm run check passes (88 tests); security and NFR gates are recorded.
+  blocker: null
   deferred_work:
   - Build e03 directory-local tool permissions after the higher-WSJF e04 fix
   - Add real Pi process integration tests after unit contracts are established
-  verified_at: '2026-08-06T19:35:00Z'
+  verified_at: '2026-08-06T20:15:00Z'
 release:
   pr: https://github.com/favilo/pi-extensions/pull/3
   merged_commit: 70d47f101b7e74b847c50265bbfe8097d409da68
@@ -46,9 +46,9 @@ metrics:
       total_seconds: 1434.0
       avg_seconds: 1434.0
     survey-context:
-      calls: 5
-      total_seconds: 458.0
-      avg_seconds: 91.6
+      calls: 6
+      total_seconds: 790.0
+      avg_seconds: 131.66666666666666
     verify-work:
       calls: 4
       total_seconds: 2395.0
@@ -57,4 +57,4 @@ metrics:
       calls: 1
       total_seconds: 391.0
       avg_seconds: 391.0
-  story_start: '2026-08-05T18:04:35Z'
+  story_start: '2026-08-06T20:09:38Z'

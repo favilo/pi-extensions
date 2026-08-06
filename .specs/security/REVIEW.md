@@ -32,3 +32,11 @@ The new project-save destination is gated by persisted trust and canonical path 
 - Result: **PASS — no reportable HIGH findings**
 
 The spike passes explicit child `cwd` and parent context to the SDK session, disposes sessions in a `finally` block, propagates cancellation to the child abort hook, bounds nesting, and routes authorization through the existing tool-permissions resolver. The proof harness uses no shell execution, network boundary, credential handling, or new deserialization format. No reportable command-injection, path-traversal, authorization-bypass, secret-exposure, or unsafe-deserialization finding was identified.
+
+## e06s02 Permission-enforced subagent runtime
+
+- Reviewed: 2026-08-06T20:15:00Z
+- Scope: `extensions/subagent/` and `extensions/tool-permissions/` permission bridge
+- Result: **PASS — no reportable HIGH findings**
+
+Child tool requests are schema-validated and routed through the existing resolver and audit logger. Child sessions expose only the permission bridge, reject direct SDK/process execution paths, fail closed when UI is unavailable, bound nesting, and dispose on success, failure, and cancellation. No new shell, network, credential, or unsafe-deserialization boundary was introduced.
