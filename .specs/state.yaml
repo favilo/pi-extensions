@@ -34,8 +34,8 @@ release:
   ci_verified: false
   ci_note: No GitHub Actions workflows are configured
 epic_cycle:
-  step: 4
-  current_step: 4
+  step: 5
+  current_step: 5
   story_bcps: 4
   security_review: pass
   plan_consistency: pass
