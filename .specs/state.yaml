@@ -6,11 +6,12 @@ active_bug_id: null
 git:
   bookmark: favilo/e06s01-agent-session-spike
   parent_bookmark: main
-  change_id: rloowkwo
+  change_id: lnntukxv
 handoff:
-  last_step_completed: Completed e06s02 shared ToolRequest and tool-permissions boundary
-    contract; AgentSession tool exposure remains next
-  open_decisions: []
+  last_step_completed: Completed e06s02 AgentSession bridge, published tool registry, child extension isolation, schema validation, and executable UAT harness
+  open_decisions:
+    - Persist e06s02 verification evidence from allowed, denied, and unlisted UAT scenarios
+    - Run/record P0 security and NFR/completeness gates before marking e06s02 passing
   required_reading:
   - .plans/fix-local-agent-context-jj-boundary.md
   - .specs/IMPACT_LATEST.md
@@ -19,14 +20,13 @@ handoff:
   - .specs/epics/e04-repository-bounded-local-agent-context/e04s01-repository-and-home-boundaries.md
   - extensions/local-agent-context/index.ts
   - extensions/local-agent-context/index.test.ts
-  next_skill: develop-tdd
-  context: e06s02 boundary contract and default cwd-scoped adapter are green; next
-    context wires AgentSession-backed tools.
-  blocker: null
+  next_skill: verify-work
+  context: e06s02 real parent-agent UAT passed allowed, deny-list, and unlisted bash scenarios. Child sessions expose only subagent-tool-request, persist with the parent session directory when applicable, and load no extensions. npm run check passes (88 tests). Continue by writing verification evidence, then run P0 security/NFR gates and audit-code.
+  blocker: Verification evidence and P0 gates remain to be recorded.
   deferred_work:
   - Build e03 directory-local tool permissions after the higher-WSJF e04 fix
   - Add real Pi process integration tests after unit contracts are established
-  verified_at: '2026-08-01T01:45:00Z'
+  verified_at: '2026-08-06T19:35:00Z'
 release:
   pr: https://github.com/favilo/pi-extensions/pull/3
   merged_commit: 70d47f101b7e74b847c50265bbfe8097d409da68

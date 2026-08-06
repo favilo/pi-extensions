@@ -99,3 +99,13 @@ Unknown child tools, denied actions, prompt cancellation, unavailable UI, child 
 
 ## 20. Definition of done
 Runnable subagents use AgentSession, all child capabilities cross tool-permissions, default-ask and deny-list behavior are covered, and child agents receive actionable results.
+
+## 21. Implementation and UAT handoff
+- Child sessions expose only `subagent-tool-request`; parent-side tool definitions remain authoritative.
+- Parent validates bridged input against the published TypeBox schema before permission evaluation or execution.
+- Child sessions use an extension-free `DefaultResourceLoader` to prevent duplicate permission hooks.
+- Published built-in-renderer and MCP definitions are available through `extensions/tool-registry/`.
+- UAT harness: `scripts/e06s02-uat.sh {allowed|denied|unlisted}`.
+- Real UAT results on 2026-08-06: allowed `ls -l` executed and returned output; deny-list returned structured `Permission denied.`; unlisted returned structured `Permission denied by the user.`. Debug traces confirmed child identity, cwd, validation, prompt path, and extension isolation.
+- `npm run check` passes with 88 tests.
+- Remaining next-session work: write `.specs/verifications/e06s02-verify.yaml`, record P0 security/NFR/completeness evidence, and run audit-code before changing the story status.

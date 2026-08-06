@@ -1,0 +1,224 @@
+timestamp: "2026-08-06T19:34:07Z"
+git_commit: "de936e460c0b4777b4ce0a53e366820ec69e84c6"
+suite: "golden-combined"
+mode: "daily"
+deterministic:
+  total: 41
+  passed: 0
+  failed: 39
+  skipped: 2
+  pass_rate: 0
+gates:
+  - name: compliance
+    exit_code: 1
+    duration_seconds: .09
+    status: fail
+  - name: g04-selftest
+    exit_code: skipped
+    duration_seconds: 0
+    status: skipped
+    note: script not found: scripts/golden-g04-selftest.sh
+  - name: g06-migrate-version
+    exit_code: skipped
+    duration_seconds: 0
+    status: skipped
+    note: script not found: tests/run-golden-migrate-version.sh
+  - name: g07-negative-path
+    exit_code: 127
+    duration_seconds: 0
+    status: fail
+    error: script not found: scripts/golden-g07-negative-path.sh
+  - name: g08-anti-vacuity
+    exit_code: 127
+    duration_seconds: 0
+    status: fail
+    error: script not found: scripts/golden-g08-anti-vacuity.sh
+  - name: g09-yaml-roundtrip
+    exit_code: 127
+    duration_seconds: 0
+    status: fail
+    error: script not found: scripts/golden-g09-yaml-roundtrip.sh
+  - name: g10-trace-anti-vacuity
+    exit_code: 127
+    duration_seconds: 0
+    status: fail
+    error: script not found: scripts/golden-g10-trace-anti-vacuity.sh
+  - name: g11-gitignore-venv
+    exit_code: 127
+    duration_seconds: 0
+    status: fail
+    error: script not found: scripts/golden-g11-gitignore-venv.sh
+  - name: g12-status-selftest
+    exit_code: 127
+    duration_seconds: 0
+    status: fail
+    error: script not found: scripts/golden-g12-status-consistency.sh
+  - name: g12-status-consistency
+    exit_code: 127
+    duration_seconds: 0
+    status: fail
+    error: script not found: scripts/golden-g12-status-consistency.sh
+  - name: g15-compliance-runner-selftest
+    exit_code: 127
+    duration_seconds: 0
+    status: fail
+    error: script not found: scripts/golden-g15-compliance-runner-selftest.sh
+  - name: g15-compliance-runner
+    exit_code: 127
+    duration_seconds: 0
+    status: fail
+    error: script not found: scripts/golden-g15-compliance-runner-selftest.sh
+  - name: g13-script-orphans-selftest
+    exit_code: 127
+    duration_seconds: 0
+    status: fail
+    error: script not found: scripts/golden-g13-script-orphans.sh
+  - name: g13-script-orphans
+    exit_code: 127
+    duration_seconds: 0
+    status: fail
+    error: script not found: scripts/golden-g13-script-orphans.sh
+  - name: workflow-diagrams-fresh
+    exit_code: 127
+    duration_seconds: 0
+    status: fail
+    error: script not found: scripts/generate-workflow-diagrams.sh
+  - name: reference-nav-fresh
+    exit_code: 127
+    duration_seconds: 0
+    status: fail
+    error: script not found: scripts/generate-reference-nav.sh
+  - name: g14-adapter-dispatch-selftest
+    exit_code: 127
+    duration_seconds: 0
+    status: fail
+    error: script not found: scripts/golden-g14-adapter-dispatch.sh
+  - name: g14-adapter-dispatch
+    exit_code: 127
+    duration_seconds: 0
+    status: fail
+    error: script not found: scripts/golden-g14-adapter-dispatch.sh
+  - name: g16-spec-version-gap-selftest
+    exit_code: 127
+    duration_seconds: 0
+    status: fail
+    error: script not found: scripts/golden-g16-spec-version-gap.sh
+  - name: g16-spec-version-gap
+    exit_code: 127
+    duration_seconds: 0
+    status: fail
+    error: script not found: scripts/golden-g16-spec-version-gap.sh
+  - name: target-contracts
+    exit_code: 127
+    duration_seconds: 0
+    status: fail
+    error: script not found: scripts/test-target-contracts.sh
+  - name: install-hub
+    exit_code: 127
+    duration_seconds: 0
+    status: fail
+    error: script not found: scripts/test-install-hub.sh
+  - name: adapter-render
+    exit_code: 127
+    duration_seconds: 0
+    status: fail
+    error: script not found: scripts/test-adapter-render.sh
+  - name: adapters
+    exit_code: 127
+    duration_seconds: 0
+    status: fail
+    error: script not found: scripts/test-adapters.sh
+  - name: tombstone-mechanism
+    exit_code: 127
+    duration_seconds: 0
+    status: fail
+    error: script not found: scripts/test-tombstone-mechanism.sh
+  - name: trace-strict
+    exit_code: 127
+    duration_seconds: 0
+    status: fail
+    error: script not found: scripts/test-trace-strict.sh
+  - name: trace-matrix-size
+    exit_code: 127
+    duration_seconds: 0
+    status: fail
+    error: script not found: scripts/test-trace-matrix-size.sh
+  - name: setup-no-pyyaml
+    exit_code: 127
+    duration_seconds: 0
+    status: fail
+    error: script not found: scripts/test-setup-no-pyyaml.sh
+  - name: install-distribute-only
+    exit_code: 127
+    duration_seconds: 0
+    status: fail
+    error: script not found: scripts/test-install-distribute-only.sh
+  - name: completeness-critic-scope
+    exit_code: 127
+    duration_seconds: 0
+    status: fail
+    error: script not found: scripts/test-completeness-critic-scope.sh
+  - name: epics-wiki-zero-stories
+    exit_code: 127
+    duration_seconds: 0
+    status: fail
+    error: script not found: scripts/test-generate-epics-wiki-zero-stories.sh
+  - name: golden-g11-worktree-venv
+    exit_code: 127
+    duration_seconds: 0
+    status: fail
+    error: script not found: scripts/test-golden-g11-worktree-venv.sh
+  - name: install-helpers
+    exit_code: 127
+    duration_seconds: 0
+    status: fail
+    error: script not found: scripts/test-install-helpers.sh
+  - name: project-runtime
+    exit_code: 127
+    duration_seconds: 0
+    status: fail
+    error: script not found: scripts/test-project-runtime.sh
+  - name: project-vcs
+    exit_code: 127
+    duration_seconds: 0
+    status: fail
+    error: script not found: scripts/test-project-vcs.sh
+  - name: configurable-specs-root
+    exit_code: 127
+    duration_seconds: 0
+    status: fail
+    error: script not found: scripts/test-configurable-specs-root.sh
+  - name: import-boundaries
+    exit_code: 127
+    duration_seconds: 0
+    status: fail
+    error: script not found: scripts/check-import-boundaries.sh
+  - name: skill-catalog
+    exit_code: 127
+    duration_seconds: 0
+    status: fail
+    error: script not found: scripts/validate-skill-catalog.sh
+  - name: specs-parse
+    exit_code: 127
+    duration_seconds: 0
+    status: fail
+    error: script not found: scripts/validate-specs-yaml.sh
+  - name: story-verify-selftest
+    exit_code: 127
+    duration_seconds: 0
+    status: fail
+    error: script not found: scripts/run-story-verify.sh
+  - name: story-verify
+    exit_code: 127
+    duration_seconds: 0
+    status: fail
+    error: script not found: scripts/run-story-verify.sh
+agent_stories:
+  total: 0
+  passed: 0
+  failed: 0
+  skipped: 0
+  flake_count: 0
+  pass_rate: n/a
+summary:
+  combined_verdict: "fail"
