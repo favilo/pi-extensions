@@ -40,3 +40,11 @@ The spike passes explicit child `cwd` and parent context to the SDK session, dis
 - Result: **PASS — no reportable HIGH findings**
 
 Child tool requests are schema-validated and routed through the existing resolver and audit logger. Child sessions expose only the permission bridge, reject direct SDK/process execution paths, fail closed when UI is unavailable, bound nesting, and dispose on success, failure, and cancellation. No new shell, network, credential, or unsafe-deserialization boundary was introduced.
+
+## e06s03 Subagent working-directory enforcement
+
+- Reviewed: 2026-08-10T21:03:19Z
+- Scope: `resolveSubagentCwd` and effective-cwd propagation through the subagent permission bridge
+- Result: **PASS — no reportable HIGH findings**
+
+Parent and requested child directories are resolved with `realpathSync`, verified as directories, and checked for canonical containment before a child session starts. Missing paths, non-directories, absolute escapes, `..` traversal, and symlink escapes fail closed. The canonical child cwd is used to construct built-in tools, evaluate recursive project policy, and attribute audit entries. No new dependency, command parser, network boundary, credential handling, or unsafe deserialization was introduced.

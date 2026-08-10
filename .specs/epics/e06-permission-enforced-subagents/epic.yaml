@@ -21,7 +21,7 @@ stories:
   - id: e06s03
     title: Resolve permissions from each subagent working directory
     bcps: 2
-    status: todo
+    status: passing
     delta: ADDED
     spec: e06s03-subagent-working-directory.md
     tasks: e06s03-tasks.yaml
