@@ -1,5 +1,5 @@
 // story: e03s01
-import { CONFIG_DIR_NAME, generateDiffString, getAgentDir, isToolCallEventType, renderDiff, type ExtensionAPI, type ExtensionContext } from "@earendil-works/pi-coding-agent";
+import { CONFIG_DIR_NAME, generateDiffString, getAgentDir, isToolCallEventType, renderDiff, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { CURSOR_MARKER, matchesKey, visibleWidth, wrapTextWithAnsi, type Component, type Focusable } from "@earendil-works/pi-tui";
 import ignore from "ignore";
 import { spawn } from "node:child_process";
@@ -18,7 +18,7 @@ import type { ToolPermissionBoundary, ToolRequest } from "./permission-boundary.
 
 type ToolCallEventResult = { block: true; reason: string } | undefined;
 
-type PermissionContext = {
+export type PermissionContext = {
   cwd: string;
   hasUI: boolean;
   mode: string;
@@ -356,7 +356,7 @@ async function editPermissionsInExternalEditor(ctx: PermissionContext, target: {
 }
 
 async function askScrollablePermission(
-  pi: ExtensionAPI,
+  pi: Pick<ExtensionAPI, "sendUserMessage">,
   ctx: PermissionContext,
   title: string,
   body: string,
@@ -540,8 +540,8 @@ async function askScrollablePermission(
 }
 
 export async function promptToolPermissionRequest(
-  pi: ExtensionAPI,
-  ctx: ExtensionContext,
+  pi: Pick<ExtensionAPI, "sendUserMessage">,
+  ctx: PermissionContext,
   request: ToolRequest,
 ): Promise<"allow" | "deny"> {
   logSubagentDebug("permission-prompt-enter", {
