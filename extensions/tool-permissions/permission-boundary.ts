@@ -15,6 +15,9 @@ export type ToolExecutionResult = {
   actor: ToolActor;
   toolName: string;
   reason?: string;
+  cwd?: string;
+  summary?: string;
+  steering?: string;
   value?: unknown;
 };
 
@@ -32,6 +35,18 @@ function result(request: ToolRequest, status: ToolExecutionResult["status"], rea
 
 function audit(boundary: ToolPermissionBoundary, request: ToolRequest, decision: string, reason?: string): void {
   boundary.audit?.({ actor: request.actor, toolName: request.toolName, cwd: request.cwd, decision, ...(reason ? { reason } : {}) });
+}
+
+function unavailableUiResult(request: ToolRequest): ToolExecutionResult {
+  return {
+    status: "denied",
+    actor: request.actor,
+    toolName: request.toolName,
+    reason: "unavailable_ui",
+    cwd: request.cwd,
+    summary: `${request.toolName} requires interactive approval.`,
+    ...(request.steering ? { steering: request.steering } : {}),
+  };
 }
 
 export async function executeToolRequest(
@@ -64,9 +79,8 @@ export async function executeToolRequest(
 
   if (decision === "ask") {
     if (!boundary.prompt) {
-      const reason = "Permission denied: no permission UI is available.";
-      audit(boundary, request, "deny_no_ui", reason);
-      return result(request, "denied", reason);
+      audit(boundary, request, "deny_no_ui", "Interactive approval is unavailable.");
+      return unavailableUiResult(request);
     }
     try {
       const prompted = await boundary.prompt(request);
