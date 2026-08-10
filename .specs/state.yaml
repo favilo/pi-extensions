@@ -1,27 +1,24 @@
 active_flow: build_epic
 active_epic_id: e06
-active_story_id: e06s03
-active_story: e06s03
+active_story_id: e06s04
+active_story: e06s04
 active_bug_id: null
 git:
   bookmark: favilo/e06s01-agent-session-spike
   parent_bookmark: main
 handoff:
-  last_step_completed: Completed and audited e06s03 canonical subagent working-directory
-    enforcement
+  last_step_completed: Started e06s04 and reviewed the existing permission-boundary
+    behavior
   open_decisions: []
   required_reading:
-  - .specs/epics/e06-permission-enforced-subagents/e06s03-subagent-working-directory.md
-  - .specs/verifications/e06s03-verify.yaml
-  - .specs/verifications/AUDIT-e06s03.md
-  - extensions/subagent/agent-session.ts
-  - extensions/subagent/index.ts
-  - extensions/subagent/working-directory.test.ts
-  next_skill: commit-message
-  context: e06s03 inherits the parent cwd by default, canonicalizes explicit child
-    directories, rejects missing, non-directory, and symlink-escape paths before startup,
-    and carries the effective cwd through the existing permission boundary. npm run
-    check:ci passes with 93 tests.
+  - .specs/epics/e06-permission-enforced-subagents/e06s04-subagent-missing-ui.md
+  - .specs/epics/e06-permission-enforced-subagents/e06s04-tasks.yaml
+  - extensions/tool-permissions/permission-boundary.ts
+  - extensions/tool-permissions/permission-boundary.test.ts
+  next_skill: develop-tdd
+  context: The approved contract keeps status `denied`, uses reason `unavailable_ui`,
+    and returns safe tool, cwd, summary, and optional steering context. Cancellation remains
+    `cancelled`; explicit allow and deny behavior remains unchanged.
   blocker: null
   deferred_work:
   - Build e03 directory-local tool permissions after the higher-WSJF e04 fix
@@ -57,4 +54,9 @@ metrics:
       calls: 2
       total_seconds: 3056.0
       avg_seconds: 1528.0
-  story_start: '2026-08-06T20:09:38Z'
+    develop-tdd:
+      calls: 1
+      total_seconds: 793.0
+      avg_seconds: 793.0
+      _start: '2026-08-10T21:48:26Z'
+  story_start: '2026-08-10T21:34:19Z'
