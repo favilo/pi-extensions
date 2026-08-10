@@ -9,7 +9,7 @@ export type ToolRequest = {
 };
 
 export type PermissionDecision = "allow" | "deny" | "ask";
-export type PermissionPromptResult = "allow" | "deny";
+export type PermissionPromptResult = "allow" | "deny" | "cancel";
 export type ToolExecutionResult = {
   status: "allowed" | "denied" | "cancelled" | "failed";
   actor: ToolActor;
@@ -84,7 +84,11 @@ export async function executeToolRequest(
     }
     try {
       const prompted = await boundary.prompt(request);
-      if (prompted !== "allow") {
+      if (prompted === "cancel") {
+        audit(boundary, request, "cancel_prompt", "Permission prompt was cancelled.");
+        return result(request, "cancelled", "permission_prompt_cancelled");
+      }
+      if (prompted === "deny") {
         const reason = "Permission denied by the user.";
         audit(boundary, request, "deny_prompt", reason);
         return result(request, "denied", reason);
