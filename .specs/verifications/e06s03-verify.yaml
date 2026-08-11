@@ -1,0 +1,37 @@
+story_id: e06s03
+verified_at: "2026-08-08T01:32:54Z"
+verifier: verify-work
+status: passed
+vcs:
+  kind: jj
+  bookmark: e06s02-permission-enforced-subagents
+phases:
+  task_verification:
+    passed: true
+    commands:
+      - command: "node --test extensions/subagent/working-directory.test.ts"
+        exit_code: 0
+        note: "5 cwd inheritance, canonicalization, and boundary tests passed."
+      - command: "node --test extensions/tool-permissions/scope.test.ts"
+        exit_code: 0
+  build:
+    passed: true
+    command: "npm run check"
+    note: "Typecheck and 93 package tests passed."
+  security:
+    passed: true
+    note: "Missing, non-directory, and symlink-escape child paths fail before startup."
+  manual:
+    passed: true
+    steps:
+      - step: "Start a child in a nested directory"
+        expected: "The child uses the canonical nested cwd."
+        actual: "Covered by working-directory.test.ts."
+        passed: true
+      - step: "Start a child through a symlink escaping the parent"
+        expected: "Startup fails before tool execution."
+        actual: "Covered by working-directory.test.ts."
+        passed: true
+gaps:
+  closed: true
+  note: "All e06s03 acceptance scenarios are covered."

@@ -24,3 +24,35 @@ No credential-shaped values or reportable injection, traversal, authorization-by
 - Result: **PASS — no reportable HIGH findings**
 
 The new project-save destination is gated by persisted trust and canonical path containment. User and project targets are selected explicitly, persistence errors return before the permission result is completed, and no new shell, network, credential, or deserialization boundary was introduced. The shortcut ordering handles `ctrl+shift+a` before `ctrl+a`.
+
+## e06s01 AgentSession spike
+
+- Reviewed: 2026-08-04T23:02:00Z
+- Scope: `main..@` changes for the isolated subagent spike
+- Result: **PASS — no reportable HIGH findings**
+
+The spike passes explicit child `cwd` and parent context to the SDK session, disposes sessions in a `finally` block, propagates cancellation to the child abort hook, bounds nesting, and routes authorization through the existing tool-permissions resolver. The proof harness uses no shell execution, network boundary, credential handling, or new deserialization format. No reportable command-injection, path-traversal, authorization-bypass, secret-exposure, or unsafe-deserialization finding was identified.
+
+## e06s02 Permission-enforced subagent runtime
+
+- Reviewed: 2026-08-06T20:15:00Z
+- Scope: `extensions/subagent/` and `extensions/tool-permissions/` permission bridge
+- Result: **PASS — no reportable HIGH findings**
+
+Child tool requests are schema-validated and routed through the existing resolver and audit logger. Child sessions expose only the permission bridge, reject direct SDK/process execution paths, fail closed when UI is unavailable, bound nesting, and dispose on success, failure, and cancellation. No new shell, network, credential, or unsafe-deserialization boundary was introduced.
+
+## e06s03 Subagent working-directory enforcement
+
+- Reviewed: 2026-08-10T21:03:19Z
+- Scope: `resolveSubagentCwd` and effective-cwd propagation through the subagent permission bridge
+- Result: **PASS — no reportable HIGH findings**
+
+Parent and requested child directories are resolved with `realpathSync`, verified as directories, and checked for canonical containment before a child session starts. Missing paths, non-directories, absolute escapes, `..` traversal, and symlink escapes fail closed. The canonical child cwd is used to construct built-in tools, evaluate recursive project policy, and attribute audit entries. No new dependency, command parser, network boundary, credential handling, or unsafe deserialization was introduced.
+
+## e06s04 Missing permission UI and prompt cancellation
+
+- Reviewed: 2026-08-11T12:40:00Z
+- Scope: `szzuxrsr..qnqpxknk` subagent permission prompt and unavailable-UI handling
+- Result: **PASS — no reportable HIGH findings**
+
+Unlisted child actions fail closed when the parent has no dialog-capable UI: the real parent adapter now omits its prompt callback, causing the shared boundary to return a structured `denied` result with reason `unavailable_ui` without executing or persisting policy. The result exposes only actor, tool name, effective cwd, a fixed action summary, and optional steering; raw tool input is excluded. Explicit allow and deny rules remain authoritative before the prompt path. Escape resolves the existing TUI prompt as `cancel`, and the boundary maps that result to `cancelled` without execution. No dependency, shell, network, credential, path, or deserialization boundary changed, and no injection, authorization-bypass, secret-exposure, or unsafe-deserialization finding met the reporting threshold.

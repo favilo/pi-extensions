@@ -14,10 +14,12 @@ import {
   type PermissionRule,
 } from "./config.ts";
 import { createPersistedTrustResolver, resolveCurrentProjectPolicyPath, resolveScopedPermissionDecision, type ScopedPermissionDecision } from "./scope.ts";
+import type { ToolPermissionBoundary, ToolRequest } from "./permission-boundary.ts";
+import { isPermissionPromptCancellation } from "./prompt-input.ts";
 
 type ToolCallEventResult = { block: true; reason: string } | undefined;
 
-type PermissionContext = {
+export type PermissionContext = {
   cwd: string;
   hasUI: boolean;
   mode: string;
@@ -53,6 +55,7 @@ type WriteInput = { path?: unknown; content?: unknown };
 type AuditEntry = {
   time: string;
   tool: string;
+  actor?: ToolRequest["actor"];
   decision: string;
   cwd: string;
   path?: string;
@@ -72,7 +75,7 @@ type AllowPatternOption = {
 type PermissionResult =
   | { allowed: true; decision: "allow_once"; steering?: string }
   | { allowed: true; decision: "allow_pattern"; pattern: string; scope: "project" | "user"; steering?: string }
-  | { allowed: false; decision: "deny"; steering?: string };
+  | { allowed: false; decision: "deny" | "cancel"; steering?: string };
 
 const CONFIG_PATH = join(getAgentDir(), "permissions.toml");
 const auditLogger = createAuditLogger();
@@ -154,6 +157,19 @@ function compact(value: unknown, max = 2000): string {
   const text = typeof value === "string" ? value : JSON.stringify(value, null, 2);
   if (!text) return "(no arguments)";
   return text.length > max ? `${text.slice(0, max)}\n…` : text;
+}
+
+export function logSubagentDebug(event: string, details: unknown): void {
+  if (process.env.PI_SUBAGENT_DEBUG !== "1") return;
+  try {
+    appendFileSync(
+      join(tmpdir(), "pi-subagent-debug.jsonl"),
+      `${JSON.stringify({ time: new Date().toISOString(), event, details })}\n`,
+      "utf8",
+    );
+  } catch {
+    // Debug logging must never affect permission behavior.
+  }
 }
 
 function wrapWithContinuation(text: string, width: number, continuationPrefix: string): string[] {
@@ -341,7 +357,7 @@ async function editPermissionsInExternalEditor(ctx: PermissionContext, target: {
 }
 
 async function askScrollablePermission(
-  pi: ExtensionAPI,
+  pi: Pick<ExtensionAPI, "sendUserMessage">,
   ctx: PermissionContext,
   title: string,
   body: string,
@@ -406,7 +422,7 @@ async function askScrollablePermission(
       const steeringAllowHint = allowPattern ? " • Ctrl+A project-save+steer • Ctrl+Shift+A user-save+steer" : "";
       const navigationHint = steeringMode
         ? `↑/↓ or j/k scroll • PgUp/PgDn page • Home/End jump • Ctrl+D deny+steer${position}`
-        : `↑/↓ or j/k scroll • PgUp/PgDn page • Home/End jump • Tab steering • Ctrl+D deny${position}`;
+        : `↑/↓ or j/k scroll • PgUp/PgDn page • Home/End jump • Tab steering • Ctrl+D deny • Esc cancel${position}`;
       const approvalHint = steeringMode
         ? `Ctrl+Y allow once+steer${steeringAllowHint}`
         : `Ctrl+Y allow once${allowHint}`;
@@ -477,6 +493,10 @@ async function askScrollablePermission(
         return;
       }
 
+      if (isPermissionPromptCancellation(data)) {
+        done({ allowed: false, decision: "cancel" });
+        return;
+      }
       if (matchesKey(data, "tab")) {
         steeringMode = true;
         tui.requestRender();
@@ -524,6 +544,38 @@ async function askScrollablePermission(
   });
 }
 
+export async function promptToolPermissionRequest(
+  pi: Pick<ExtensionAPI, "sendUserMessage">,
+  ctx: PermissionContext,
+  request: ToolRequest,
+): Promise<"allow" | "deny" | "cancel"> {
+  logSubagentDebug("permission-prompt-enter", {
+    request,
+    mode: ctx.mode,
+    hasUI: ctx.hasUI,
+    hasCustomUI: typeof ctx.ui.custom === "function",
+  });
+  const actor = request.actor.kind === "child" ? `subagent \"${request.actor.childId}\"` : "the main agent";
+  const result = await askScrollablePermission(
+    pi,
+    ctx,
+    `Allow ${actor} to use ${request.toolName}?`,
+    [
+      `${actor} requested a tool through the shared permission boundary.`,
+      "",
+      `Tool: ${request.toolName}`,
+      `Working directory: ${request.cwd}`,
+      ...(request.steering ? [`Steering: ${request.steering}`] : []),
+      "",
+      "Arguments:",
+      compact(request.input, 8000),
+    ].join("\\n"),
+  );
+  const decision = result.allowed ? "allow" : result.decision;
+  logSubagentDebug("permission-prompt-result", { request, decision, result });
+  return decision;
+}
+
 async function handleConfigurationDiagnostic(
   result: ScopedPermissionDecision,
   ctx: PermissionContext,
@@ -560,6 +612,27 @@ export function resolveToolPermissionDecision(
     configDirName: CONFIG_DIR_NAME,
     trustResolver: options.trustResolver ?? createPersistedTrustResolver(getAgentDir()),
   });
+}
+
+export function createToolPermissionBoundary(
+  options: {
+    prompt?: ToolPermissionBoundary["prompt"];
+    execute: ToolPermissionBoundary["execute"];
+    validate?: ToolPermissionBoundary["validate"];
+    audit?: ToolPermissionBoundary["audit"];
+  },
+): ToolPermissionBoundary {
+  return {
+    evaluate: async (request) => {
+      const decision = resolveToolPermissionDecision(request.toolName, request.input, request.cwd);
+      if (decision.diagnostic) throw new Error(decision.diagnostic);
+      return decision.decision;
+    },
+    prompt: options.prompt,
+    execute: options.execute,
+    validate: options.validate,
+    audit: options.audit ?? ((entry) => audit({ tool: entry.toolName, actor: entry.actor, decision: entry.decision, cwd: entry.cwd, reason: entry.reason })), 
+  };
 }
 
 function configuredDecision(toolName: string, input: unknown, cwd: string): ScopedPermissionDecision {
@@ -773,6 +846,22 @@ export default function toolPermissionPolicy(pi: ExtensionAPI) {
   });
 
   pi.on("tool_call", async (event, ctx) => {
+    // Child sessions expose this bridge as their only tool. Its payload is
+    // authorized by the parent boundary, so the child-side policy must not
+    // intercept it as an unknown standalone tool.
+    if (event.toolName === "subagent-tool-request") {
+      logSubagentDebug("bridge-hook-bypass", {
+        toolName: event.toolName,
+        input: event.input,
+        mode: ctx.mode,
+        hasUI: ctx.hasUI,
+        hasCustomUI: typeof ctx.ui.custom === "function",
+        result: undefined,
+      });
+      // Undefined is the extension hook's allow/no-op result, not a denial.
+      return undefined;
+    }
+
     if (isToolCallEventType("read", event)) {
       return handleReadPermission(event.input, ctx, pi);
     }
