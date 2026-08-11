@@ -7,22 +7,20 @@ git:
   bookmark: favilo/e06s01-agent-session-spike
   parent_bookmark: main
 handoff:
-  last_step_completed: Completed e06s04 implementation, focused verification, full
-    CI checks, and security review
-  open_decisions:
-  - Confirm manual UAT for unavailable UI, Escape cancellation, and explicit rules
-  - Waive or repair the non-executable Bigpowers blind-spot script
+  last_step_completed: Completed e06s04 implementation and verify-work with user-confirmed
+    UAT and a waived blind-spot script gate
+  open_decisions: []
   required_reading:
   - .specs/epics/e06-permission-enforced-subagents/e06s04-subagent-missing-ui.md
   - .specs/epics/e06-permission-enforced-subagents/e06s04-tasks.yaml
   - .specs/verifications/e06s04-verify.yaml
   - .specs/security/REVIEW.md
-  next_skill: verify-work
+  next_skill: audit-code
   context: e06s04 fails closed through the real parent adapter when the main UI is
-    unavailable, maps Escape to distinct cancellation, and passes check:ci with
-    97 tests.
-  blocker: Manual UAT is pending, and the installed check-blind-spots.sh lacks its
-    executable bit.
+    unavailable, maps Escape to distinct cancellation, and passes check:ci with 97
+    tests. The user accepted deterministic harness UAT and waived the non-executable
+    blind-spot script gate.
+  blocker: null
   deferred_work:
   - Build e03 directory-local tool permissions after the higher-WSJF e04 fix
   - Add real Pi process integration tests after unit contracts are established
@@ -50,10 +48,9 @@ metrics:
       total_seconds: 5590.0
       avg_seconds: 798.5714285714286
     verify-work:
-      calls: 4
-      total_seconds: 2395.0
-      avg_seconds: 598.75
-      _start: '2026-08-11T19:25:50Z'
+      calls: 5
+      total_seconds: 5191.0
+      avg_seconds: 1038.2
     audit-code:
       calls: 2
       total_seconds: 3056.0

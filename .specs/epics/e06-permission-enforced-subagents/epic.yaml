@@ -28,7 +28,7 @@ stories:
   - id: e06s04
     title: Handle subagent permission asks when the main UI is unavailable
     bcps: 2
-    status: todo
+    status: passing
     delta: ADDED
     spec: e06s04-subagent-missing-ui.md
     tasks: e06s04-tasks.yaml

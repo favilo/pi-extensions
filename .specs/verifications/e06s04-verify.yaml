@@ -1,7 +1,7 @@
 story_id: e06s04
 verified_at: "2026-08-11T19:46:28Z"
 verifier: verify-work
-status: pending_manual
+status: passed
 vcs:
   kind: jj
   bookmark: favilo/e06s01-agent-session-spike
@@ -26,14 +26,15 @@ phases:
     report: ".specs/security/REVIEW.md"
     note: "No reportable HIGH findings; unavailable UI and cancellation fail closed without exposing raw tool input."
   blind_spots:
-    passed: false
-    note: "Bigpowers check-blind-spots.sh could not execute because the installed script lacks its executable bit; completeness critic reported no blockers and one traceability warning."
+    passed: true
+    waived: true
+    note: "User waived the gate because the installed check-blind-spots.sh lacks its executable bit; completeness critic reported zero blockers and one traceability warning."
   nfr:
     passed: true
     note: "No e06 test-plan thresholds exist; this local permission-control extension introduces no performance or service-operability boundary."
   manual:
-    passed: false
-    pending_confirmation: true
+    passed: true
+    confirmed_by_user: true
     steps:
       - step: "Request an unlisted child action without a parent UI"
         expected: "The result is denied with reason unavailable_ui, contains safe context, omits raw input, and does not execute."
@@ -42,5 +43,5 @@ phases:
       - step: "Exercise explicit allow and deny rules without a parent UI"
         expected: "Existing rules remain automatic and do not enter the unavailable-UI prompt path."
 gaps:
-  closed: false
-  note: "Awaiting manual UAT confirmation; blind-spot script installation permission must be corrected or explicitly waived."
+  closed: true
+  note: "User accepted the deterministic UI harness as UAT evidence and waived the non-executable blind-spot script gate."
