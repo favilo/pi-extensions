@@ -48,3 +48,11 @@ Child tool requests are schema-validated and routed through the existing resolve
 - Result: **PASS — no reportable HIGH findings**
 
 Parent and requested child directories are resolved with `realpathSync`, verified as directories, and checked for canonical containment before a child session starts. Missing paths, non-directories, absolute escapes, `..` traversal, and symlink escapes fail closed. The canonical child cwd is used to construct built-in tools, evaluate recursive project policy, and attribute audit entries. No new dependency, command parser, network boundary, credential handling, or unsafe deserialization was introduced.
+
+## e06s04 Missing permission UI and prompt cancellation
+
+- Reviewed: 2026-08-11T12:40:00Z
+- Scope: `szzuxrsr..qnqpxknk` subagent permission prompt and unavailable-UI handling
+- Result: **PASS — no reportable HIGH findings**
+
+Unlisted child actions fail closed when the parent has no dialog-capable UI: the real parent adapter now omits its prompt callback, causing the shared boundary to return a structured `denied` result with reason `unavailable_ui` without executing or persisting policy. The result exposes only actor, tool name, effective cwd, a fixed action summary, and optional steering; raw tool input is excluded. Explicit allow and deny rules remain authoritative before the prompt path. Escape resolves the existing TUI prompt as `cancel`, and the boundary maps that result to `cancelled` without execution. No dependency, shell, network, credential, path, or deserialization boundary changed, and no injection, authorization-bypass, secret-exposure, or unsafe-deserialization finding met the reporting threshold.

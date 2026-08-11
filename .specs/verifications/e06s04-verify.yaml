@@ -1,0 +1,46 @@
+story_id: e06s04
+verified_at: "2026-08-11T19:46:28Z"
+verifier: verify-work
+status: pending_manual
+vcs:
+  kind: jj
+  bookmark: favilo/e06s01-agent-session-spike
+phases:
+  task_verification:
+    passed: true
+    commands:
+      - command: "node --test extensions/subagent/missing-ui.test.ts"
+        exit_code: 0
+        note: "4 unavailable-UI, prompt cancellation, and no-execution tests passed."
+      - command: "node --test extensions/tool-permissions/index.test.ts"
+        exit_code: 0
+        note: "4 existing permission-policy compatibility tests passed."
+  terminal_verdict:
+    passed: true
+    command: "npm run check:ci"
+    exit_code: 0
+    captured_at: "2026-08-11T19:40:00Z"
+    note: "Single contiguous run: typecheck, 97 tests, plan consistency, and portability passed."
+  security:
+    passed: true
+    report: ".specs/security/REVIEW.md"
+    note: "No reportable HIGH findings; unavailable UI and cancellation fail closed without exposing raw tool input."
+  blind_spots:
+    passed: false
+    note: "Bigpowers check-blind-spots.sh could not execute because the installed script lacks its executable bit; completeness critic reported no blockers and one traceability warning."
+  nfr:
+    passed: true
+    note: "No e06 test-plan thresholds exist; this local permission-control extension introduces no performance or service-operability boundary."
+  manual:
+    passed: false
+    pending_confirmation: true
+    steps:
+      - step: "Request an unlisted child action without a parent UI"
+        expected: "The result is denied with reason unavailable_ui, contains safe context, omits raw input, and does not execute."
+      - step: "Press Escape in an available parent permission prompt"
+        expected: "The prompt resolves as cancel; the child receives cancelled and the action does not execute."
+      - step: "Exercise explicit allow and deny rules without a parent UI"
+        expected: "Existing rules remain automatic and do not enter the unavailable-UI prompt path."
+gaps:
+  closed: false
+  note: "Awaiting manual UAT confirmation; blind-spot script installation permission must be corrected or explicitly waived."

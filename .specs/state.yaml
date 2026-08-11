@@ -7,19 +7,22 @@ git:
   bookmark: favilo/e06s01-agent-session-spike
   parent_bookmark: main
 handoff:
-  last_step_completed: Started e06s04 and reviewed the existing permission-boundary
-    behavior
-  open_decisions: []
+  last_step_completed: Completed e06s04 implementation, focused verification, full
+    CI checks, and security review
+  open_decisions:
+  - Confirm manual UAT for unavailable UI, Escape cancellation, and explicit rules
+  - Waive or repair the non-executable Bigpowers blind-spot script
   required_reading:
   - .specs/epics/e06-permission-enforced-subagents/e06s04-subagent-missing-ui.md
   - .specs/epics/e06-permission-enforced-subagents/e06s04-tasks.yaml
-  - extensions/tool-permissions/permission-boundary.ts
-  - extensions/tool-permissions/permission-boundary.test.ts
-  next_skill: develop-tdd
-  context: The approved contract keeps status `denied`, uses reason `unavailable_ui`,
-    and returns safe tool, cwd, summary, and optional steering context. Cancellation remains
-    `cancelled`; explicit allow and deny behavior remains unchanged.
-  blocker: null
+  - .specs/verifications/e06s04-verify.yaml
+  - .specs/security/REVIEW.md
+  next_skill: verify-work
+  context: e06s04 fails closed through the real parent adapter when the main UI is
+    unavailable, maps Escape to distinct cancellation, and passes check:ci with
+    97 tests.
+  blocker: Manual UAT is pending, and the installed check-blind-spots.sh lacks its
+    executable bit.
   deferred_work:
   - Build e03 directory-local tool permissions after the higher-WSJF e04 fix
   - Add real Pi process integration tests after unit contracts are established
@@ -50,13 +53,14 @@ metrics:
       calls: 4
       total_seconds: 2395.0
       avg_seconds: 598.75
+      _start: '2026-08-11T19:25:50Z'
     audit-code:
       calls: 2
       total_seconds: 3056.0
       avg_seconds: 1528.0
     develop-tdd:
-      calls: 1
-      total_seconds: 793.0
-      avg_seconds: 793.0
-      _start: '2026-08-10T21:48:26Z'
+      calls: 2
+      total_seconds: 6554.0
+      avg_seconds: 3277.0
+      _start: '2026-08-10T23:36:43Z'
   story_start: '2026-08-10T21:34:19Z'
