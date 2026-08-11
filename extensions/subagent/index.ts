@@ -86,7 +86,9 @@ export function createParentPermissionPrompt(
   pi: Pick<ExtensionAPI, "sendMessage" | "sendUserMessage">,
   childId: string,
   parentContext: PermissionContext,
-): NonNullable<ToolPermissionBoundary["prompt"]> {
+): ToolPermissionBoundary["prompt"] {
+  if (!parentContext.hasUI) return undefined;
+
   return async (request) => {
     logSubagentDebug("boundary-prompt", { request, parentMode: parentContext.mode, parentHasUI: parentContext.hasUI });
     pi.sendMessage({
