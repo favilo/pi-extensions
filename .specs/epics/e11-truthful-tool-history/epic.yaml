@@ -1,0 +1,31 @@
+id: e11
+renamed_from:
+  epic_id: e08
+  reason: "Reserved for merged origin epic"
+  source_revision: "main@origin"
+title: Truthful built-in tool outcomes and history
+wsjf: 0.0
+total_bcps: 8
+status: planned
+stories:
+  - id: e11s01
+    title: Return deterministic edit failures to the agent before permission prompts
+    bcps: 3
+    status: todo
+    delta: MODIFIED
+    spec: e11s01-edit-preflight-failures.md
+    tasks: e11s01-tasks.yaml
+  - id: e11s02
+    title: Return denied edit outcomes and reasons to the agent
+    bcps: 2
+    status: todo
+    delta: MODIFIED
+    spec: e11s02-edit-denial-rendering.md
+    tasks: e11s02-tasks.yaml
+  - id: e11s03
+    title: Show complete Bash commands and output in expanded history
+    bcps: 3
+    status: todo
+    delta: MODIFIED
+    spec: e11s03-complete-bash-history.md
+    tasks: e11s03-tasks.yaml

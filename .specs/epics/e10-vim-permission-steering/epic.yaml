@@ -1,0 +1,20 @@
+id: e10
+title: Vim-capable permission steering editor
+wsjf: 0.0
+total_bcps: 6
+status: planned
+stories:
+  - id: e10s01
+    title: Spike reuse of Pi prompt editor input behavior
+    bcps: 2
+    status: todo
+    delta: ADDED
+    spec: e10s01-editor-integration-spike.md
+    tasks: e10s01-tasks.yaml
+  - id: e10s02
+    title: Support configured Vim editing in permission steering
+    bcps: 4
+    status: todo
+    delta: MODIFIED
+    spec: e10s02-vim-steering-editor.md
+    tasks: e10s02-tasks.yaml

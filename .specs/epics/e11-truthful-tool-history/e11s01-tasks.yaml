@@ -1,0 +1,22 @@
+story_id: e11s01
+title: Return deterministic edit failures to the agent before permission prompts
+status: todo
+bcps: 3
+delta: MODIFIED
+spec: e11s01-edit-preflight-failures.md
+tasks:
+  - id: 1
+    description: Add behavioral contracts for missing, non-unique, and overlapping edit replacements that fail before permission UI is invoked.
+    verify: node --test extensions/built-in-tool-renderer/edit-result.test.ts
+    status: todo
+    risk: P1
+  - id: 2
+    description: Implement deterministic edit preflight and propagate one canonical failed result to the agent and history renderer.
+    verify: node --test extensions/built-in-tool-renderer/edit-result.test.ts
+    status: todo
+    risk: P1
+  - id: 3
+    description: Verify the complete extension suite and plan consistency.
+    verify: npm run check:ci
+    status: todo
+    risk: P1
