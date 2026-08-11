@@ -7,15 +7,14 @@ git:
   bookmark: favilo/e06s01-agent-session-spike
   parent_bookmark: main
 handoff:
-  last_step_completed: Completed e06s04 implementation and verify-work with user-confirmed
-    UAT and a waived blind-spot script gate
+  last_step_completed: Completed e06s04 implementation, verify-work, and audit-code
   open_decisions: []
   required_reading:
   - .specs/epics/e06-permission-enforced-subagents/e06s04-subagent-missing-ui.md
   - .specs/epics/e06-permission-enforced-subagents/e06s04-tasks.yaml
   - .specs/verifications/e06s04-verify.yaml
   - .specs/security/REVIEW.md
-  next_skill: audit-code
+  next_skill: commit-message
   context: e06s04 fails closed through the real parent adapter when the main UI is
     unavailable, maps Escape to distinct cancellation, and passes check:ci with 97
     tests. The user accepted deterministic harness UAT and waived the non-executable
@@ -52,9 +51,9 @@ metrics:
       total_seconds: 5191.0
       avg_seconds: 1038.2
     audit-code:
-      calls: 2
-      total_seconds: 3056.0
-      avg_seconds: 1528.0
+      calls: 3
+      total_seconds: 3246.0
+      avg_seconds: 1082.0
     develop-tdd:
       calls: 2
       total_seconds: 6554.0
