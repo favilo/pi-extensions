@@ -13,7 +13,8 @@ import {
   type ToolDefinition,
 } from "@earendil-works/pi-coding-agent";
 import { getPublishedToolDefinitions } from "../tool-registry/index.ts";
-import { createToolPermissionBoundary, logSubagentDebug, promptToolPermissionRequest } from "../tool-permissions/index.ts";
+import { createToolPermissionBoundary, logSubagentDebug, promptToolPermissionRequest, type PermissionContext } from "../tool-permissions/index.ts";
+import type { ToolPermissionBoundary } from "../tool-permissions/permission-boundary.ts";
 import { createSubagentSession, executeChildToolRequest, resolveSubagentCwd, runSubagentSession } from "./agent-session.ts";
 
 const subagentParameters = {
@@ -81,6 +82,23 @@ export function createChildToolDefinitions(
   }];
 }
 
+export function createParentPermissionPrompt(
+  pi: Pick<ExtensionAPI, "sendMessage" | "sendUserMessage">,
+  childId: string,
+  parentContext: PermissionContext,
+): NonNullable<ToolPermissionBoundary["prompt"]> {
+  return async (request) => {
+    logSubagentDebug("boundary-prompt", { request, parentMode: parentContext.mode, parentHasUI: parentContext.hasUI });
+    pi.sendMessage({
+      customType: "subagent-tool-request",
+      content: `Subagent "${childId}" requests ${request.toolName}`,
+      display: true,
+      details: request,
+    });
+    return promptToolPermissionRequest(pi, parentContext, request);
+  };
+}
+
 function executeParentTool(
   pi: ExtensionAPI,
   cwd: string,
@@ -104,16 +122,7 @@ function executeParentTool(
         return `Could not validate input for ${request.toolName}: ${error instanceof Error ? error.message : String(error)}`;
       }
     },
-    prompt: async (request) => {
-      logSubagentDebug("boundary-prompt", { request, parentMode: parentContext.mode, parentHasUI: parentContext.hasUI });
-      pi.sendMessage({
-        customType: "subagent-tool-request",
-        content: `Subagent "${childId}" requests ${request.toolName}`,
-        display: true,
-        details: request,
-      });
-      return promptToolPermissionRequest(pi, parentContext, request);
-    },
+    prompt: createParentPermissionPrompt(pi, childId, parentContext),
     execute: async (request) => {
       logSubagentDebug("boundary-execute", { request });
       const tool = tools[request.toolName as keyof typeof tools];
