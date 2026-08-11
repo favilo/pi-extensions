@@ -1,7 +1,7 @@
 id: e06
 title: Permission-enforced runnable subagents
 wsjf: 6.0
-total_bcps: 11
+total_bcps: 19
 status: planned
 stories:
   - id: e06s01
@@ -32,3 +32,17 @@ stories:
     delta: ADDED
     spec: e06s04-subagent-missing-ui.md
     tasks: e06s04-tasks.yaml
+  - id: e06s05
+    title: Run observable subagents in the background
+    bcps: 5
+    status: todo
+    delta: ADDED
+    spec: e06s05-background-subagent-results.md
+    tasks: e06s05-tasks.yaml
+  - id: e06s06
+    title: Switch between live subagent transcript panels
+    bcps: 3
+    status: todo
+    delta: ADDED
+    spec: e06s06-switchable-live-transcripts.md
+    tasks: e06s06-tasks.yaml

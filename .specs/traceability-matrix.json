@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-01T01:41:24.509041+00:00",
+  "generated_at": "2026-08-12T18:12:52.384537+00:00",
   "matrix_version": "1.0",
   "stories": [
     {
@@ -72,17 +72,11 @@
       "bcp": 0,
       "wsjf": 1.7,
       "spec_path": ".specs/epics/e03-directory-local-tool-permissions/epic.yaml",
-      "status": "todo",
+      "status": "passing",
       "links": [
         {
           "file": ".specs/epics/e03-directory-local-tool-permissions/e03s03-scoped-permissions-editor.md",
           "line": 1,
-          "confidence": "high",
-          "method": "explicit_tag"
-        },
-        {
-          "file": ".specs/state.yaml",
-          "line": 4,
           "confidence": "high",
           "method": "explicit_tag"
         },
@@ -99,7 +93,7 @@
           "method": "task_reference"
         }
       ],
-      "link_count": 4
+      "link_count": 3
     },
     {
       "id": "e03s04",
@@ -149,13 +143,25 @@
           "method": "file_heuristic"
         },
         {
+          "file": ".specs/epics/e09-invocation-bound-steering/e09s01-command-bound-steering.md",
+          "line": 0,
+          "confidence": "medium",
+          "method": "file_heuristic"
+        },
+        {
+          "file": ".specs/epics/e07-bash-subcommand-permissions/e07s02-subcommand-decision-boundary.md",
+          "line": 0,
+          "confidence": "medium",
+          "method": "file_heuristic"
+        },
+        {
           "file": ".specs/epics/e04-repository-bounded-local-agent-context/e04s01-tasks.yaml",
           "line": 0,
           "confidence": "low",
           "method": "task_reference"
         }
       ],
-      "link_count": 3
+      "link_count": 5
     },
     {
       "id": "e05s01",
@@ -181,11 +187,416 @@
         }
       ],
       "link_count": 2
+    },
+    {
+      "id": "e06s01",
+      "title": "Spike AgentSession runtime and subagent interaction model",
+      "epic_id": "e06",
+      "epic_title": "Permission-enforced runnable subagents",
+      "bcp": 0,
+      "wsjf": 6.0,
+      "spec_path": ".specs/epics/e06-permission-enforced-subagents/epic.yaml",
+      "status": "passing",
+      "links": [
+        {
+          "file": ".specs/epics/e06-permission-enforced-subagents/e06s02-permission-enforced-subagent-runtime.md",
+          "line": 0,
+          "confidence": "medium",
+          "method": "file_heuristic"
+        },
+        {
+          "file": ".lavish/e06s01-subagent-interaction.html",
+          "line": 0,
+          "confidence": "medium",
+          "method": "file_heuristic"
+        },
+        {
+          "file": ".specs/epics/e06-permission-enforced-subagents/e06s01-tasks.yaml",
+          "line": 0,
+          "confidence": "low",
+          "method": "task_reference"
+        }
+      ],
+      "link_count": 3
+    },
+    {
+      "id": "e06s02",
+      "title": "Run subagents through the tool-permissions boundary",
+      "epic_id": "e06",
+      "epic_title": "Permission-enforced runnable subagents",
+      "bcp": 0,
+      "wsjf": 6.0,
+      "spec_path": ".specs/epics/e06-permission-enforced-subagents/epic.yaml",
+      "status": "passing",
+      "links": [
+        {
+          "file": ".specs/epics/e06-permission-enforced-subagents/e06s02-tasks.yaml",
+          "line": 0,
+          "confidence": "low",
+          "method": "task_reference"
+        }
+      ],
+      "link_count": 1
+    },
+    {
+      "id": "e06s03",
+      "title": "Resolve permissions from each subagent working directory",
+      "epic_id": "e06",
+      "epic_title": "Permission-enforced runnable subagents",
+      "bcp": 0,
+      "wsjf": 6.0,
+      "spec_path": ".specs/epics/e06-permission-enforced-subagents/epic.yaml",
+      "status": "passing",
+      "links": [
+        {
+          "file": "extensions/subagent/working-directory.test.ts",
+          "line": 0,
+          "confidence": "medium",
+          "method": "file_heuristic"
+        },
+        {
+          "file": ".specs/epics/e06-permission-enforced-subagents/e06s03-subagent-working-directory.md",
+          "line": 0,
+          "confidence": "medium",
+          "method": "file_heuristic"
+        },
+        {
+          "file": ".specs/epics/e06-permission-enforced-subagents/e06s03-tasks.yaml",
+          "line": 0,
+          "confidence": "low",
+          "method": "task_reference"
+        }
+      ],
+      "link_count": 3
+    },
+    {
+      "id": "e06s04",
+      "title": "Handle subagent permission asks when the main UI is unavailable",
+      "epic_id": "e06",
+      "epic_title": "Permission-enforced runnable subagents",
+      "bcp": 0,
+      "wsjf": 6.0,
+      "spec_path": ".specs/epics/e06-permission-enforced-subagents/epic.yaml",
+      "status": "passing",
+      "links": [
+        {
+          "file": ".specs/epics/e06-permission-enforced-subagents/e06s02-permission-enforced-subagent-runtime.md",
+          "line": 0,
+          "confidence": "medium",
+          "method": "file_heuristic"
+        },
+        {
+          "file": ".specs/epics/e06-permission-enforced-subagents/e06s04-tasks.yaml",
+          "line": 0,
+          "confidence": "low",
+          "method": "task_reference"
+        }
+      ],
+      "link_count": 2
+    },
+    {
+      "id": "e06s05",
+      "title": "Run observable subagents in the background",
+      "epic_id": "e06",
+      "epic_title": "Permission-enforced runnable subagents",
+      "bcp": 0,
+      "wsjf": 6.0,
+      "spec_path": ".specs/epics/e06-permission-enforced-subagents/epic.yaml",
+      "status": "todo",
+      "links": [
+        {
+          "file": ".specs/state.yaml",
+          "line": 4,
+          "confidence": "high",
+          "method": "explicit_tag"
+        },
+        {
+          "file": ".specs/epics/e06-permission-enforced-subagents/e06s05-tasks.yaml",
+          "line": 0,
+          "confidence": "low",
+          "method": "task_reference"
+        }
+      ],
+      "link_count": 2
+    },
+    {
+      "id": "e06s06",
+      "title": "Switch between live subagent transcript panels",
+      "epic_id": "e06",
+      "epic_title": "Permission-enforced runnable subagents",
+      "bcp": 0,
+      "wsjf": 6.0,
+      "spec_path": ".specs/epics/e06-permission-enforced-subagents/epic.yaml",
+      "status": "todo",
+      "links": [
+        {
+          "file": ".specs/epics/e06-permission-enforced-subagents/e06s06-switchable-live-transcripts.md",
+          "line": 0,
+          "confidence": "medium",
+          "method": "file_heuristic"
+        },
+        {
+          "file": ".specs/epics/e06-permission-enforced-subagents/e06s06-tasks.yaml",
+          "line": 0,
+          "confidence": "low",
+          "method": "task_reference"
+        },
+        {
+          "file": ".specs/epics/e06-permission-enforced-subagents/e06s05-tasks.yaml",
+          "line": 0,
+          "confidence": "low",
+          "method": "task_reference"
+        }
+      ],
+      "link_count": 3
+    },
+    {
+      "id": "e07s01",
+      "title": "Spike Bash parsing and subcommand permission contracts",
+      "epic_id": "e07",
+      "epic_title": "Bash subcommand permission evaluation",
+      "bcp": 0,
+      "wsjf": 5.5,
+      "spec_path": ".specs/epics/e07-bash-subcommand-permissions/epic.yaml",
+      "status": "todo",
+      "links": [
+        {
+          "file": ".specs/epics/e07-bash-subcommand-permissions/e07s01-bash-parser-spike.md",
+          "line": 0,
+          "confidence": "medium",
+          "method": "file_heuristic"
+        },
+        {
+          "file": ".specs/epics/e07-bash-subcommand-permissions/e07s02-subcommand-decision-boundary.md",
+          "line": 0,
+          "confidence": "medium",
+          "method": "file_heuristic"
+        },
+        {
+          "file": ".specs/epics/e07-bash-subcommand-permissions/e07s03-subcommand-audit-and-denials.md",
+          "line": 0,
+          "confidence": "medium",
+          "method": "file_heuristic"
+        },
+        {
+          "file": ".specs/epics/e07-bash-subcommand-permissions/e07s01-tasks.yaml",
+          "line": 0,
+          "confidence": "low",
+          "method": "task_reference"
+        }
+      ],
+      "link_count": 4
+    },
+    {
+      "id": "e07s02",
+      "title": "Allowlist individual Bash subcommands and deny whole commands safely",
+      "epic_id": "e07",
+      "epic_title": "Bash subcommand permission evaluation",
+      "bcp": 0,
+      "wsjf": 5.5,
+      "spec_path": ".specs/epics/e07-bash-subcommand-permissions/epic.yaml",
+      "status": "todo",
+      "links": [
+        {
+          "file": ".specs/epics/e07-bash-subcommand-permissions/e07s02-tasks.yaml",
+          "line": 0,
+          "confidence": "low",
+          "method": "task_reference"
+        }
+      ],
+      "link_count": 1
+    },
+    {
+      "id": "e07s03",
+      "title": "Audit Bash components and report denied subcommands to agents",
+      "epic_id": "e07",
+      "epic_title": "Bash subcommand permission evaluation",
+      "bcp": 0,
+      "wsjf": 5.5,
+      "spec_path": ".specs/epics/e07-bash-subcommand-permissions/epic.yaml",
+      "status": "todo",
+      "links": [
+        {
+          "file": ".specs/epics/e07-bash-subcommand-permissions/e07s03-subcommand-audit-and-denials.md",
+          "line": 0,
+          "confidence": "medium",
+          "method": "file_heuristic"
+        },
+        {
+          "file": ".specs/epics/e07-bash-subcommand-permissions/e07s03-tasks.yaml",
+          "line": 0,
+          "confidence": "low",
+          "method": "task_reference"
+        }
+      ],
+      "link_count": 2
+    },
+    {
+      "id": "e08s01",
+      "title": "Return deterministic edit failures to the agent before permission prompts",
+      "epic_id": "e08",
+      "epic_title": "Truthful built-in tool outcomes and history",
+      "bcp": 0,
+      "wsjf": 0.0,
+      "spec_path": ".specs/epics/e08-truthful-tool-history/epic.yaml",
+      "status": "todo",
+      "links": [
+        {
+          "file": ".specs/epics/e03-directory-local-tool-permissions/e03s03-scoped-permissions-editor.md",
+          "line": 0,
+          "confidence": "medium",
+          "method": "file_heuristic"
+        },
+        {
+          "file": ".specs/epics/e06-permission-enforced-subagents/e06s02-permission-enforced-subagent-runtime.md",
+          "line": 0,
+          "confidence": "medium",
+          "method": "file_heuristic"
+        },
+        {
+          "file": ".specs/epics/e08-truthful-tool-history/e08s01-edit-preflight-failures.md",
+          "line": 0,
+          "confidence": "medium",
+          "method": "file_heuristic"
+        },
+        {
+          "file": ".specs/epics/e08-truthful-tool-history/e08s01-tasks.yaml",
+          "line": 0,
+          "confidence": "low",
+          "method": "task_reference"
+        }
+      ],
+      "link_count": 4
+    },
+    {
+      "id": "e08s02",
+      "title": "Return denied edit outcomes and reasons to the agent",
+      "epic_id": "e08",
+      "epic_title": "Truthful built-in tool outcomes and history",
+      "bcp": 0,
+      "wsjf": 0.0,
+      "spec_path": ".specs/epics/e08-truthful-tool-history/epic.yaml",
+      "status": "todo",
+      "links": [
+        {
+          "file": ".specs/epics/e08-truthful-tool-history/e08s02-tasks.yaml",
+          "line": 0,
+          "confidence": "low",
+          "method": "task_reference"
+        }
+      ],
+      "link_count": 1
+    },
+    {
+      "id": "e08s03",
+      "title": "Show complete Bash commands and output in expanded history",
+      "epic_id": "e08",
+      "epic_title": "Truthful built-in tool outcomes and history",
+      "bcp": 0,
+      "wsjf": 0.0,
+      "spec_path": ".specs/epics/e08-truthful-tool-history/epic.yaml",
+      "status": "todo",
+      "links": [
+        {
+          "file": ".specs/epics/e08-truthful-tool-history/e08s03-complete-bash-history.md",
+          "line": 0,
+          "confidence": "medium",
+          "method": "file_heuristic"
+        },
+        {
+          "file": ".specs/epics/e08-truthful-tool-history/e08s03-tasks.yaml",
+          "line": 0,
+          "confidence": "low",
+          "method": "task_reference"
+        }
+      ],
+      "link_count": 2
+    },
+    {
+      "id": "e09s01",
+      "title": "Identify the exact tool invocation receiving steering feedback",
+      "epic_id": "e09",
+      "epic_title": "Invocation-bound permission steering",
+      "bcp": 0,
+      "wsjf": 0.0,
+      "spec_path": ".specs/epics/e09-invocation-bound-steering/epic.yaml",
+      "status": "todo",
+      "links": [
+        {
+          "file": ".specs/epics/e09-invocation-bound-steering/e09s01-tasks.yaml",
+          "line": 0,
+          "confidence": "low",
+          "method": "task_reference"
+        }
+      ],
+      "link_count": 1
+    },
+    {
+      "id": "e10s01",
+      "title": "Spike reuse of Pi prompt editor input behavior",
+      "epic_id": "e10",
+      "epic_title": "Vim-capable permission steering editor",
+      "bcp": 0,
+      "wsjf": 0.0,
+      "spec_path": ".specs/epics/e10-vim-permission-steering/epic.yaml",
+      "status": "todo",
+      "links": [
+        {
+          "file": "extensions/tool-permissions/prompt-input.ts",
+          "line": 0,
+          "confidence": "medium",
+          "method": "file_heuristic"
+        },
+        {
+          "file": ".specs/epics/e10-vim-permission-steering/e10s01-editor-integration-spike.md",
+          "line": 0,
+          "confidence": "medium",
+          "method": "file_heuristic"
+        },
+        {
+          "file": ".specs/epics/e10-vim-permission-steering/e10s01-tasks.yaml",
+          "line": 0,
+          "confidence": "low",
+          "method": "task_reference"
+        },
+        {
+          "file": ".specs/epics/e10-vim-permission-steering/e10s02-tasks.yaml",
+          "line": 0,
+          "confidence": "low",
+          "method": "task_reference"
+        }
+      ],
+      "link_count": 4
+    },
+    {
+      "id": "e10s02",
+      "title": "Support configured Vim editing in permission steering",
+      "epic_id": "e10",
+      "epic_title": "Vim-capable permission steering editor",
+      "bcp": 0,
+      "wsjf": 0.0,
+      "spec_path": ".specs/epics/e10-vim-permission-steering/epic.yaml",
+      "status": "todo",
+      "links": [
+        {
+          "file": ".specs/epics/e10-vim-permission-steering/e10s02-vim-steering-editor.md",
+          "line": 0,
+          "confidence": "medium",
+          "method": "file_heuristic"
+        },
+        {
+          "file": ".specs/epics/e10-vim-permission-steering/e10s02-tasks.yaml",
+          "line": 0,
+          "confidence": "low",
+          "method": "task_reference"
+        }
+      ],
+      "link_count": 2
     }
   ],
   "summary": {
-    "total_stories": 6,
-    "tagged_stories": 4,
+    "total_stories": 21,
+    "tagged_stories": 5,
     "dark_stories": [],
     "dark_count": 0,
     "orphan_tags": [],
@@ -194,8 +605,8 @@
     "stale_count": 0,
     "oracle_stats": {
       "high": 5,
-      "medium": 6,
-      "low": 6
+      "medium": 25,
+      "low": 23
     }
   }
 }

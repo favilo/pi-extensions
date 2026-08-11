@@ -1,0 +1,43 @@
+story_id: e06s06
+title: Switch between live subagent transcript panels
+status: failing
+bcps: 3
+delta: ADDED
+spec: e06s06-switchable-live-transcripts.md
+tasks:
+  - id: 1
+    description: Build a bounded read-only child transcript component from normalized assistant, tool, status, and terminal events.
+    verify: node --test extensions/subagent/transcript-panel.test.ts
+    status: failing
+    risk: P0
+    security: medium
+    allure:
+      severity: critical
+      categories: ["Live transcript", "TUI"]
+  - id: 2
+    description: Register configurable Ctrl+Tab cycling across main and child panels with Escape returning focus to the existing editor.
+    verify: node --test extensions/subagent/transcript-panel.test.ts
+    status: failing
+    risk: P0
+    security: medium
+    allure:
+      severity: critical
+      categories: ["Panel navigation", "TUI focus"]
+  - id: 3
+    description: Route child permission asks to the main window and serialize concurrent prompts without crossing child decisions.
+    verify: node --test extensions/subagent/permission-prompt-queue.test.ts
+    status: failing
+    risk: P0
+    security: high
+    allure:
+      severity: critical
+      categories: ["Permission boundary", "Concurrency", "Security Review"]
+  - id: 4
+    description: Verify narrow-terminal rendering, completion during panel switching, custom-editor composition, and package regressions.
+    verify: npm run check
+    status: failing
+    risk: P1
+    security: medium
+    allure:
+      severity: high
+      categories: ["TUI", "Regression"]
