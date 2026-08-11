@@ -15,6 +15,7 @@ import {
 } from "./config.ts";
 import { createPersistedTrustResolver, resolveCurrentProjectPolicyPath, resolveScopedPermissionDecision, type ScopedPermissionDecision } from "./scope.ts";
 import type { ToolPermissionBoundary, ToolRequest } from "./permission-boundary.ts";
+import { isPermissionPromptCancellation } from "./prompt-input.ts";
 
 type ToolCallEventResult = { block: true; reason: string } | undefined;
 
@@ -74,7 +75,7 @@ type AllowPatternOption = {
 type PermissionResult =
   | { allowed: true; decision: "allow_once"; steering?: string }
   | { allowed: true; decision: "allow_pattern"; pattern: string; scope: "project" | "user"; steering?: string }
-  | { allowed: false; decision: "deny"; steering?: string };
+  | { allowed: false; decision: "deny" | "cancel"; steering?: string };
 
 const CONFIG_PATH = join(getAgentDir(), "permissions.toml");
 const auditLogger = createAuditLogger();
@@ -421,7 +422,7 @@ async function askScrollablePermission(
       const steeringAllowHint = allowPattern ? " • Ctrl+A project-save+steer • Ctrl+Shift+A user-save+steer" : "";
       const navigationHint = steeringMode
         ? `↑/↓ or j/k scroll • PgUp/PgDn page • Home/End jump • Ctrl+D deny+steer${position}`
-        : `↑/↓ or j/k scroll • PgUp/PgDn page • Home/End jump • Tab steering • Ctrl+D deny${position}`;
+        : `↑/↓ or j/k scroll • PgUp/PgDn page • Home/End jump • Tab steering • Ctrl+D deny • Esc cancel${position}`;
       const approvalHint = steeringMode
         ? `Ctrl+Y allow once+steer${steeringAllowHint}`
         : `Ctrl+Y allow once${allowHint}`;
@@ -492,6 +493,10 @@ async function askScrollablePermission(
         return;
       }
 
+      if (isPermissionPromptCancellation(data)) {
+        done({ allowed: false, decision: "cancel" });
+        return;
+      }
       if (matchesKey(data, "tab")) {
         steeringMode = true;
         tui.requestRender();
@@ -543,7 +548,7 @@ export async function promptToolPermissionRequest(
   pi: Pick<ExtensionAPI, "sendUserMessage">,
   ctx: PermissionContext,
   request: ToolRequest,
-): Promise<"allow" | "deny"> {
+): Promise<"allow" | "deny" | "cancel"> {
   logSubagentDebug("permission-prompt-enter", {
     request,
     mode: ctx.mode,
@@ -566,7 +571,7 @@ export async function promptToolPermissionRequest(
       compact(request.input, 8000),
     ].join("\\n"),
   );
-  const decision = result.allowed ? "allow" : "deny";
+  const decision = result.allowed ? "allow" : result.decision;
   logSubagentDebug("permission-prompt-result", { request, decision, result });
   return decision;
 }
