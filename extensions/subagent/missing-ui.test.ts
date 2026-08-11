@@ -1,11 +1,27 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { promptToolPermissionRequest, type PermissionContext } from "../tool-permissions/index.ts";
+import { createParentPermissionPrompt } from "./index.ts";
 import { executeToolRequest, type ToolPermissionBoundary } from "../tool-permissions/permission-boundary.ts";
 
 function isInputComponent(value: unknown): value is { handleInput(data: string): void } {
   return typeof value === "object" && value !== null && "handleInput" in value && typeof value.handleInput === "function";
 }
+
+test("omits the parent prompt adapter when the main UI is unavailable", () => {
+  const prompt = createParentPermissionPrompt(
+    { sendMessage() {}, sendUserMessage() {} },
+    "amber-otter",
+    {
+      cwd: "/workspace/project",
+      hasUI: false,
+      mode: "print",
+      ui: { confirm: async () => false },
+    },
+  );
+
+  assert.equal(prompt, undefined);
+});
 
 test("returns a structured unavailable-UI denial without executing", async () => {
   let executed = false;
