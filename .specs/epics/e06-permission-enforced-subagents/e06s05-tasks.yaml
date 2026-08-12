@@ -75,7 +75,7 @@ tasks:
     description: >-
       Queue a fixed subagent_finished custom message containing only generated child ID and enumerated terminal status with deliverAs nextTurn and triggerTurn false.
     verify: node --test extensions/subagent/background-lifecycle.test.ts
-    status: failing
+    status: passing
     risk: P0
     security: high
     security_verification: >-

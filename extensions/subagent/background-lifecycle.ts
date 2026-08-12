@@ -55,7 +55,7 @@ const DEFAULT_EVENT_LIMITS: BackgroundEventLimits = {
 /** Owns child launch authority beyond the foreground tool invocation. */
 export function createBackgroundSessionController(
   createSession: CreateManagedSubagentSession,
-  _options: BackgroundControllerOptions = {},
+  controllerOptions: BackgroundControllerOptions = {},
 ): BackgroundSessionController {
   const registry = createBackgroundTaskRegistry();
   const runtimes = new Map<string, {
@@ -93,13 +93,22 @@ export function createBackgroundSessionController(
       runtimes.set(task.id, runtime);
       const unsubscribe = session.subscribe((event) => events.append(event));
       registry.transition(task.id, "running");
+      const finish = (status: "completed" | "failed" | "cancelled") => {
+        registry.transition(task.id, status);
+        controllerOptions.notify?.({
+          customType: "subagent_finished",
+          content: `subagent_finished:${task.id}:${status}`,
+          display: false,
+          details: { id: task.id, status },
+        }, { deliverAs: "nextTurn", triggerTurn: false });
+      };
       void session.prompt(`${options.parentContext}\n\n${options.task}`)
         .then(
           () => {
             runtime.output = session.getLastAssistantText?.();
-            registry.transition(task.id, "completed");
+            finish("completed");
           },
-          () => { registry.transition(task.id, cancellation.signal.aborted ? "cancelled" : "failed"); },
+          () => { finish(cancellation.signal.aborted ? "cancelled" : "failed"); },
         )
         .finally(() => {
           events.seal();
