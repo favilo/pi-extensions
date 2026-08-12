@@ -44,7 +44,7 @@ test("bounds shutdown cleanup when child abort never settles", async () => {
   assert.deepEqual(calls, ["unsubscribe", "dispose"]);
 });
 
-test("closes idempotently and rejects stale work after shutdown", async () => {
+test("closes idempotently, rejects stale work, and does not wake the parent during shutdown", async () => {
   const calls: string[] = [];
   let settle: (() => void) | undefined;
   const pending = new Promise<void>((resolve) => { settle = resolve; });
@@ -76,7 +76,7 @@ test("closes idempotently and rejects stale work after shutdown", async () => {
   settle?.();
   await new Promise((resolve) => setImmediate(resolve));
   assert.deepEqual(calls, ["abort", "unsubscribe", "dispose"]);
-  assert.equal(notifications.length, 1);
+  assert.equal(notifications.length, 0);
 });
 
 test("steers an active parent or starts an idle parent turn with only generated identity and terminal status", async () => {
