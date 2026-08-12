@@ -79,7 +79,7 @@ test("closes idempotently and rejects stale work after shutdown", async () => {
   assert.equal(notifications.length, 1);
 });
 
-test("queues only generated identity and terminal status for the next natural turn", async () => {
+test("steers an active parent or starts an idle parent turn with only generated identity and terminal status", async () => {
   let settle: (() => void) | undefined;
   const pending = new Promise<void>((resolve) => { settle = resolve; });
   const notifications: unknown[] = [];
@@ -108,7 +108,7 @@ test("queues only generated identity and terminal status for the next natural tu
       display: false,
       details: { id: launched.id, status: "completed" },
     },
-    options: { deliverAs: "nextTurn", triggerTurn: false },
+    options: { deliverAs: "steer", triggerTurn: true },
   }]);
   assert.equal(JSON.stringify(notifications).includes("ignore previous"), false);
   assert.equal(JSON.stringify(notifications).includes("malicious"), false);
