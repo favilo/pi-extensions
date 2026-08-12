@@ -53,7 +53,12 @@ function promptHarness() {
       },
     },
   } satisfies PermissionContext;
-  return { components, context, pi: { sendUserMessage() {} } };
+  return {
+    components,
+    context,
+    mainPi: { sendUserMessage() {} },
+    childPi: { sendUserMessage() {} },
+  };
 }
 
 for (const actors of [
@@ -61,9 +66,10 @@ for (const actors of [
   [{ kind: "child", childId: "amber-otter" } as const, { kind: "main" } as const],
 ]) {
   test(`presents ${actors[0].kind} then ${actors[1].kind} prompts FIFO and requires independent decisions`, async () => {
-    const { components, context, pi } = promptHarness();
-    const first = promptToolPermissionRequest(pi, context, request(actors[0]));
-    const second = promptToolPermissionRequest(pi, context, request(actors[1], "write", { path: "report.md" }));
+    const { components, context, mainPi, childPi } = promptHarness();
+    const piFor = (actor: ToolRequest["actor"]) => actor.kind === "main" ? mainPi : childPi;
+    const first = promptToolPermissionRequest(piFor(actors[0]), context, request(actors[0]));
+    const second = promptToolPermissionRequest(piFor(actors[1]), context, request(actors[1], "write", { path: "report.md" }));
 
     assert.equal(components.length, 1, "a later prompt must not replace the visible prompt");
     assert.match(components[0].render(100).join("\n"), new RegExp(actors[0].kind === "main" ? "main agent" : "amber-otter"));
