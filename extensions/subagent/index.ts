@@ -96,7 +96,7 @@ export function createChildToolDefinitions(
 }
 
 export function createParentPermissionPrompt(
-  pi: Pick<ExtensionAPI, "sendMessage" | "sendUserMessage">,
+  pi: Pick<ExtensionAPI, "sendUserMessage">,
   childId: string,
   parentContext: PermissionContext,
   setStatus: (status: "running" | "waiting-for-permission") => void = () => {},
@@ -106,12 +106,7 @@ export function createParentPermissionPrompt(
   return async (request, signal) => {
     setStatus("waiting-for-permission");
     logSubagentDebug("boundary-prompt", { request, parentMode: parentContext.mode, parentHasUI: parentContext.hasUI });
-    pi.sendMessage({
-      customType: "subagent-tool-request",
-      content: `Subagent "${childId}" requests ${request.toolName}`,
-      display: true,
-      details: request,
-    });
+    parentContext.ui.notify?.(`Subagent ${childId} → ${request.toolName}: permission required`, "info");
     try {
       return await promptToolPermissionRequest(pi, { ...parentContext, signal }, request);
     } finally {
@@ -139,7 +134,7 @@ function executeParentTool(
 
   return controller.launch({
     cwd,
-    parentContext: `${parentContext.getSystemPrompt()}\n\nChild tool policy: you have only the subagent-tool-request tool. For every file, shell, search, MCP, or other tool action, call it with the exact toolName and JSON input. Do not attempt to call tools directly.\n\nAvailable parent tools and input schemas:\n${JSON.stringify(toolCatalog)}`,
+    parentContext: `${parentContext.getSystemPrompt()}\n\nYou are a background subagent. Child tool policy: you have only the subagent-tool-request tool. For every file, shell, search, MCP, or other tool action, call it with the exact toolName and JSON input. Do not attempt to call tools directly, and do not ask the main agent to repeat or duplicate your requested action. Tool permission UI and activity are attributed to your generated subagent ID.\n\nAvailable parent tools and input schemas:\n${JSON.stringify(toolCatalog)}`,
     task: params.task,
     createSession: async ({ childId, cwd: childCwd, signal }) => {
       const boundary = createToolPermissionBoundary({

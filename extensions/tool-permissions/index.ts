@@ -38,6 +38,8 @@ export type PermissionContext = {
     notify?(message: string, level: "info" | "warning" | "error"): void;
   };
   signal?: AbortSignal;
+  sessionId?: string;
+  sessionManager?: { getSessionId(): string };
 };
 
 type ReadInput = { path?: unknown };
@@ -564,6 +566,12 @@ async function presentScrollablePermission(
   });
 }
 
+function permissionParentSessionId(ctx: PermissionContext): string {
+  const sessionId = ctx.sessionId ?? ctx.sessionManager?.getSessionId();
+  if (!sessionId) throw new Error("Permission prompt session identity is unavailable.");
+  return sessionId;
+}
+
 async function askScrollablePermission(
   pi: Pick<ExtensionAPI, "sendUserMessage">,
   ctx: PermissionContext,
@@ -575,7 +583,7 @@ async function askScrollablePermission(
 ): Promise<PermissionResult> {
   const identity = createPermissionPromptIdentity(request);
   logSubagentDebug("permission-queue-enqueue", { identity });
-  return permissionPromptQueueFor(pi as object).enqueue({
+  return permissionPromptQueueFor(permissionParentSessionId(ctx)).enqueue({
     identity,
     cancel: { allowed: false, decision: "cancel" },
     signal: ctx.signal,
@@ -934,8 +942,8 @@ export default function toolPermissionPolicy(pi: ExtensionAPI) {
     },
   });
 
-  pi.on("session_shutdown", () => {
-    closePermissionPromptQueue(pi as object);
+  pi.on("session_shutdown", (_event, ctx) => {
+    closePermissionPromptQueue(permissionParentSessionId(ctx));
   });
 
   pi.on("tool_call", async (event, ctx) => {

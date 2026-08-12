@@ -121,13 +121,13 @@ tasks:
 
   - id: 8
     description: >-
-      Serialize main-agent and child permission presentation through one parent-session-owned FIFO queue whose immutable request identity binds actor, tool, cwd, and safe input identity; cancel, prompt-error, and shutdown paths settle only the exact request fail-closed; apply the same cwd-aware automatic and configured allow/deny model to child requests as main requests.
+      Serialize main-agent and child permission presentation through one parent-session-ID-keyed FIFO queue shared across extension module graphs whose immutable request identity binds actor, tool, cwd, and safe input identity; visibly attribute child prompts; cancel, prompt-error, and shutdown paths settle only the exact request fail-closed; apply the same cwd-aware automatic and configured allow/deny model to child requests as main requests.
     verify: node --test extensions/tool-permissions/prompt-queue.test.ts extensions/subagent/missing-ui.test.ts extensions/subagent/permission-boundary.test.ts
     status: passing
     risk: P0
     security: high
     security_verification: >-
-      Prove main-to-child and child-to-main FIFO ordering, independent decisions, immutable identity, exact queued/active cancellation, prompt-error and shutdown denial, no double settlement, in-cwd read/search automatic allow, allow-list allow, deny-list precedence, and .aiignore denial.
+      Prove main-to-child and child-to-main FIFO ordering, cross-module-graph sharing with cross-parent-session isolation, independent decisions, immutable identity, visible child attribution, exact queued/active cancellation, prompt-error and shutdown denial, no double settlement, in-cwd read/search automatic allow, allow-list allow, deny-list precedence, and .aiignore denial.
     tdd:
       red: A compilable public queue contract and current direct prompt presentation fail behavioral overlap and child policy-parity assertions.
       green: One session-owned shared prompt queue and one shared cwd-aware permission resolver pass focused and package verification without weakening fail-closed behavior.

@@ -121,19 +121,37 @@ export class PermissionPromptQueue {
   }
 }
 
-let sessionQueue: PermissionPromptQueue | undefined;
+const SESSION_QUEUES_KEY = Symbol.for("pi-extensions.tool-permissions.session-prompt-queues");
 
-/**
- * ExtensionAPI wrappers are extension-local, so object identity cannot own this
- * queue. The module instance is loaded once for the active parent runtime and
- * reset by session_shutdown before Pi binds replacement extension instances.
- */
-export function permissionPromptQueueFor(_extensionApi: object): PermissionPromptQueue {
-  sessionQueue ??= new PermissionPromptQueue();
-  return sessionQueue;
+type ProcessGlobal = { [key: symbol]: unknown };
+type SessionQueueRegistry = Map<string, PermissionPromptQueue>;
+
+function sessionQueueRegistry(): SessionQueueRegistry {
+  const processGlobal = globalThis as ProcessGlobal;
+  const current = processGlobal[SESSION_QUEUES_KEY] as SessionQueueRegistry | undefined;
+  if (current) return current;
+  const registry: SessionQueueRegistry = new Map();
+  processGlobal[SESSION_QUEUES_KEY] = registry;
+  return registry;
 }
 
-export function closePermissionPromptQueue(_extensionApi: object): void {
-  sessionQueue?.close();
-  sessionQueue = undefined;
+/**
+ * ExtensionAPI wrappers and Jiti module graphs are extension-local. The process
+ * global only hosts a registry; each active top-level parent session owns an
+ * independent queue selected by its stable Pi session ID.
+ */
+export function permissionPromptQueueFor(parentSessionId: string): PermissionPromptQueue {
+  const registry = sessionQueueRegistry();
+  const current = registry.get(parentSessionId);
+  if (current) return current;
+  const queue = new PermissionPromptQueue();
+  registry.set(parentSessionId, queue);
+  return queue;
+}
+
+export function closePermissionPromptQueue(parentSessionId: string): void {
+  const registry = sessionQueueRegistry();
+  registry.get(parentSessionId)?.close();
+  registry.delete(parentSessionId);
+  if (registry.size === 0) delete (globalThis as ProcessGlobal)[SESSION_QUEUES_KEY];
 }

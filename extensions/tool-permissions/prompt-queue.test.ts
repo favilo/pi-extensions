@@ -33,6 +33,7 @@ function promptHarness() {
     cwd: "/workspace/project",
     hasUI: true,
     mode: "tui",
+    sessionId: "parent-session",
     ui: {
       confirm: async () => false,
       custom<T>(factory: (
@@ -194,14 +195,16 @@ test("an active cancellation cannot be overwritten by a late prompt result", asy
 test("shares one queue across separately loaded extension module graphs", async () => {
   const firstModule = await import(new URL("./prompt-queue.ts?extension=main", import.meta.url).href);
   const secondModule = await import(new URL("./prompt-queue.ts?extension=child", import.meta.url).href);
-  const first = firstModule.permissionPromptQueueFor({});
-  const second = secondModule.permissionPromptQueueFor({});
+  const first = firstModule.permissionPromptQueueFor("parent-session");
+  const second = secondModule.permissionPromptQueueFor("parent-session");
+  const unrelated = secondModule.permissionPromptQueueFor("other-parent-session");
 
   try {
     assert.equal(first, second);
+    assert.notEqual(first, unrelated);
   } finally {
-    firstModule.closePermissionPromptQueue({});
-    secondModule.closePermissionPromptQueue({});
+    firstModule.closePermissionPromptQueue("parent-session");
+    secondModule.closePermissionPromptQueue("other-parent-session");
   }
 });
 

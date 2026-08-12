@@ -21,7 +21,7 @@ planning:
     constraints:
       - "Do not modify the e06 repair flow or child-private bridge catalog."
 handoff:
-  last_step_completed: Fixed the e06s05 shared permission prompt race test-first; 117 package tests and plan consistency pass, with live manual reverification pending
+  last_step_completed: Proved child-to-main FIFO overlap live, fixed cross-module queue ownership, added child prompt attribution, and passed 118 package tests
   open_decisions: []
   required_reading:
     - .specs/epics/e06-permission-enforced-subagents/e06s05-background-subagent-results.md
@@ -29,8 +29,8 @@ handoff:
     - .specs/epics/e06-permission-enforced-subagents/e06s06-switchable-live-transcripts.md
     - .specs/security/epics/e06/THREAT_MODEL.md
   next_skill: develop-tdd
-  context: Phase Execute. The e06s05 UAT blocker is mechanically fixed through one session-owned FIFO permission queue shared by main and child prompt callers. Immutable identity binds request ID, actor, tool, cwd, and hashed safe input; queued/active cancellation, prompt errors, shutdown, and late settlement fail closed. Child requests now use the same normalized cwd-aware resolver, including in-project read/search auto-allow, configured allow/deny precedence, and .aiignore denial. Focused tests and the full 117-test package check pass; plan consistency passes. Repeat the live main-to-child, child-to-main, cancellation, result retrieval, and completion checks before verify-work. E07s01 remains paused.
-  blocker: Live Pi manual reverification remains required before e06s05 can advance to verify-work.
+  context: Phase Execute. Live debug traces proved the original overwrite came from separate Jiti module graphs creating separate queues. The repair stores a process-global registry keyed by stable parent Pi session ID, so one parent and its child extension graphs share a FIFO while unrelated parent sessions remain isolated. Child-to-main overlap passed live: subagent_result enqueued behind the visible child Bash prompt and appeared only after the child decision. Main-to-child was not yet proven live because the child model delayed its pwd request until after the main prompt settled; the request eventually appeared. Child prompts now emit a fixed TUI notification `Subagent <id> → <tool>: permission required`, and the child system prompt forbids asking the main agent to duplicate delegated actions. Immutable identity, exact cancellation, shutdown, prompt errors, late settlement, child policy parity, cross-module sharing, and session isolation have automated coverage. Full package check passes with 118 tests. E07s01 remains paused.
+  blocker: Reload and manually verify the new child attribution, then run a deterministic main-to-child overlap by holding a main permission prompt open long enough for the child request to queue; cancellation/reload checks also remain open before verify-work.
   deferred_work:
     - "Resume e07s01 at build-epic Step 2 after e06 observable background subagents"
     - "Persist completed and active child sessions for later external analysis"
