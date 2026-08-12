@@ -43,7 +43,7 @@ tasks:
     description: >-
       Install child ID, registry ownership, independent cancellation, permission boundary, cwd, and event subscription before starting prompt work; then return the launch handle without awaiting child completion.
     verify: node --test extensions/subagent/background-lifecycle.test.ts
-    status: failing
+    status: passing
     risk: P0
     security: high
     security_verification: >-
