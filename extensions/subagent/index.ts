@@ -97,6 +97,7 @@ export function createParentPermissionPrompt(
   pi: Pick<ExtensionAPI, "sendMessage" | "sendUserMessage">,
   childId: string,
   parentContext: PermissionContext,
+  _setStatus: (status: "running" | "waiting-for-permission") => void = () => {},
 ): ToolPermissionBoundary["prompt"] {
   if (!parentContext.hasUI) return undefined;
 

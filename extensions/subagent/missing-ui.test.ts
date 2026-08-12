@@ -53,6 +53,35 @@ test("returns a structured unavailable-UI denial without executing", async () =>
   assert.doesNotMatch(JSON.stringify(result), /private-notes|must-not-leak/);
 });
 
+test("marks only the requesting child as waiting while its prompt is open", async () => {
+  const statuses: string[] = [];
+  let resolvePrompt: ((value: boolean) => void) | undefined;
+  const prompt = createParentPermissionPrompt(
+    { sendMessage() {}, sendUserMessage() {} },
+    "amber-otter",
+    {
+      cwd: "/workspace/project",
+      hasUI: true,
+      mode: "tui",
+      ui: {
+        confirm: () => new Promise<boolean>((resolve) => { resolvePrompt = resolve; }),
+      },
+    },
+    (status) => statuses.push(status),
+  );
+
+  const pending = prompt?.({
+    actor: { kind: "child", childId: "amber-otter" },
+    toolName: "read",
+    input: { path: "notes.md" },
+    cwd: "/workspace/project",
+  });
+  assert.deepEqual(statuses, ["waiting-for-permission"]);
+  resolvePrompt?.(false);
+  await pending;
+  assert.deepEqual(statuses, ["waiting-for-permission", "running"]);
+});
+
 test("Escape cancels an available main UI permission prompt", async () => {
   let promptComponent: unknown;
   const context = {
