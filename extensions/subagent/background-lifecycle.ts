@@ -50,6 +50,8 @@ export type CreateManagedSubagentSession = (options: {
   signal: AbortSignal;
 }) => Promise<ManagedSubagentSession>;
 
+const DEFAULT_CLEANUP_TIMEOUT_MS = 2_000;
+
 const DEFAULT_EVENT_LIMITS: BackgroundEventLimits = {
   maxEvents: 1_000,
   maxEventBytes: 64 * 1_024,
@@ -84,6 +86,16 @@ export function createBackgroundSessionController(
     }, { deliverAs: "nextTurn", triggerTurn: false });
   }
 
+  async function waitForAbort(session: ManagedSubagentSession): Promise<void> {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const abort = Promise.resolve(session.abort?.()).catch(() => undefined);
+    const timeout = new Promise<void>((resolve) => {
+      timer = setTimeout(resolve, controllerOptions.cleanupTimeoutMs ?? DEFAULT_CLEANUP_TIMEOUT_MS);
+    });
+    await Promise.race([abort, timeout]);
+    if (timer) clearTimeout(timer);
+  }
+
   function cleanup(id: string): void {
     const runtime = runtimes.get(id);
     if (!runtime || runtime.cleaned) return;
@@ -104,7 +116,7 @@ export function createBackgroundSessionController(
       for (const [id, runtime] of runtimes) {
         if (!registry.get(id)?.terminal) {
           runtime.cancellation.abort();
-          await runtime.session.abort?.();
+          await waitForAbort(runtime.session);
           finish(id, "cancelled");
         }
         cleanup(id);
