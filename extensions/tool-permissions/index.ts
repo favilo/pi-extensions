@@ -14,7 +14,7 @@ import {
   type PermissionRule,
 } from "./config.ts";
 import { createPersistedTrustResolver, resolveCurrentProjectPolicyPath, resolveScopedPermissionDecision, type ScopedPermissionDecision } from "./scope.ts";
-import type { ToolPermissionBoundary, ToolRequest } from "./permission-boundary.ts";
+import type { PermissionDecision, ToolPermissionBoundary, ToolRequest } from "./permission-boundary.ts";
 import { isPermissionPromptCancellation } from "./prompt-input.ts";
 
 type ToolCallEventResult = { block: true; reason: string } | undefined;
@@ -614,6 +614,16 @@ export function resolveToolPermissionDecision(
     configDirName: CONFIG_DIR_NAME,
     trustResolver: options.trustResolver ?? createPersistedTrustResolver(getAgentDir()),
   });
+}
+
+type PermissionResolverOptions = Parameters<typeof resolveToolPermissionDecision>[3];
+
+/** Shared policy contract for equivalent main-agent and child tool requests. */
+export function resolvePermissionDecisionForRequest(
+  request: ToolRequest,
+  options: PermissionResolverOptions = {},
+): PermissionDecision {
+  return resolveToolPermissionDecision(request.toolName, request.input, request.cwd, options).decision;
 }
 
 export function createToolPermissionBoundary(
