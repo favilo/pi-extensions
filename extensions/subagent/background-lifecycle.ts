@@ -29,6 +29,17 @@ export type BackgroundSessionController = {
   result(id: string): BackgroundResult;
 };
 
+export type BackgroundCompletionSignal = {
+  customType: "subagent_finished";
+  content: string;
+  display: false;
+  details: { id: string; status: "completed" | "failed" | "cancelled" };
+};
+
+export type BackgroundControllerOptions = {
+  notify?: (message: BackgroundCompletionSignal, options: { deliverAs: "nextTurn"; triggerTurn: false }) => void;
+};
+
 export type CreateManagedSubagentSession = (options: {
   childId: string;
   cwd: string;
@@ -44,6 +55,7 @@ const DEFAULT_EVENT_LIMITS: BackgroundEventLimits = {
 /** Owns child launch authority beyond the foreground tool invocation. */
 export function createBackgroundSessionController(
   createSession: CreateManagedSubagentSession,
+  _options: BackgroundControllerOptions = {},
 ): BackgroundSessionController {
   const registry = createBackgroundTaskRegistry();
   const runtimes = new Map<string, {
