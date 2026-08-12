@@ -27,7 +27,7 @@ tasks:
     description: >-
       Adapt published AgentSession assistant and tool events into child-tagged monotonic events with deterministic per-event, event-count, and total UTF-8 byte limits, explicit truncation, partial-update coalescing, and late-event rejection.
     verify: node --test extensions/subagent/background-events.test.ts
-    status: failing
+    status: passing
     risk: P0
     security: medium
     security_verification: >-
