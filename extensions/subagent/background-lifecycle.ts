@@ -41,7 +41,7 @@ export type BackgroundCompletionSignal = {
 };
 
 export type BackgroundControllerOptions = {
-  notify?: (message: BackgroundCompletionSignal, options: { deliverAs: "nextTurn"; triggerTurn: false }) => void;
+  notify?: (message: BackgroundCompletionSignal, options: { deliverAs: "steer"; triggerTurn: true }) => void;
   cleanupTimeoutMs?: number;
   maxRetainedResults?: number;
   maxOutputBytes?: number;
@@ -114,7 +114,7 @@ export function createBackgroundSessionController(
       content: `subagent_finished:${id}:${status}`,
       display: false,
       details: { id, status },
-    }, { deliverAs: "nextTurn", triggerTurn: false });
+    }, { deliverAs: "steer", triggerTurn: true });
   }
 
   async function waitForAbort(session: ManagedSubagentSession): Promise<void> {

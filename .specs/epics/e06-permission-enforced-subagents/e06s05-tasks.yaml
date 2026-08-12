@@ -73,7 +73,7 @@ tasks:
 
   - id: 5
     description: >-
-      Queue a fixed subagent_finished custom message containing only generated child ID and enumerated terminal status with deliverAs nextTurn and triggerTurn false.
+      Queue a fixed subagent_finished custom message containing only generated child ID and enumerated terminal status with deliverAs steer and triggerTurn true, so active work is steered and an idle parent starts a new turn.
     verify: node --test extensions/subagent/background-lifecycle.test.ts
     status: passing
     risk: P0

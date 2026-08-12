@@ -60,9 +60,9 @@ A launch tool can return while promises, model streams, tool calls, event listen
 
 ### Completion-signal prompt injection or unsolicited execution — HIGH — CWE-74
 
-A model-authored child name or output embedded in `subagent_finished` could inject instructions into parent context. Triggering a parent turn on completion could cause unexpected tools to run.
+A model-authored child name or output embedded in `subagent_finished` could inject instructions into parent context. Completion intentionally steers active work or starts an idle parent turn, so any child-authored content in the signal could cause unexpected tools to run.
 
-**Required mitigation:** Use generated or strictly validated child IDs and a fixed structured signal containing only ID plus enumerated terminal status. Never include child output, errors, tool text, or user-provided names in the context signal. Deliver it for the next natural turn with no automatic trigger. Full output remains behind explicit result retrieval.
+**Required mitigation:** Use generated or strictly validated child IDs and a fixed structured signal containing only ID plus enumerated terminal status. Never include child output, errors, tool text, or user-provided names in the context signal. Deliver the fixed signal through the steering queue and trigger an idle parent turn; suppress delivery during session shutdown. Full output remains behind explicit result retrieval.
 
 ### Cross-session or cross-child result disclosure — HIGH — CWE-639
 
@@ -116,7 +116,7 @@ The implemented e06s05 runtime keeps child execution behind `tool-permissions`, 
 - Prove missing/hidden UI, prompt cancellation, queue cancellation, and shutdown all deny rather than allow.
 - Prove reload, session replacement, abort, and exit unsubscribe and dispose every child with no late state mutation.
 - Prove generated child IDs cannot retrieve another parent registry's status, events, or result.
-- Prove `subagent_finished` contains only generated ID and enumerated status, enters only the next natural turn, and never triggers a turn.
+- Prove `subagent_finished` contains only generated ID and enumerated status, steers active work or triggers an idle parent turn, and is suppressed during session shutdown.
 - Prove ordered bounded buffers, truncation, terminal sealing, stable repeated retrieval, and late-event rejection.
 - Prove raw child events are absent from audit/debug logs, completion signals, and parent context before explicit retrieval.
 - Prove transcript content is sanitized, width-bounded, viewport-limited, and cannot imitate trusted panel headers.

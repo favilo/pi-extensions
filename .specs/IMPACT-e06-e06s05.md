@@ -75,7 +75,7 @@ Pi SDK detail verified from installed declarations:
 
 - `AgentSession.subscribe(listener)` returns an unsubscribe function; Pi persists session messages internally on `message_end`.
 - Published core events include `message_update`, `message_end`, `tool_execution_start`, `tool_execution_update`, `tool_execution_end`, `agent_end`, and `agent_settled`.
-- `pi.sendMessage(message, { deliverAs: "nextTurn", triggerTurn: false })` can queue a non-triggering completion signal.
+- `pi.sendMessage(message, { deliverAs: "steer", triggerTurn: true })` queues a completion signal during active work and starts a new parent turn when idle.
 - `session_shutdown` distinguishes `quit`, `reload`, `new`, `resume`, and `fork`.
 
 ## Affected stories
