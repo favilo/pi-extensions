@@ -20,7 +20,7 @@ test("registers background launch, explicit result lookup, and shutdown cleanup"
   subagentExtension(pi);
 
   assert.deepEqual(tools.map(({ name }) => name), ["subagent", "subagent_result"]);
-  assert.deepEqual(events, ["session_shutdown"]);
+  assert.deepEqual(events, ["message_start", "agent_settled", "session_shutdown"]);
 });
 
 test("gives a child only the permission bridge tool", () => {

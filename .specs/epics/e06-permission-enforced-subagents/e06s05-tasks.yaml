@@ -73,16 +73,16 @@ tasks:
 
   - id: 5
     description: >-
-      Queue a fixed subagent_finished custom message containing only generated child ID and enumerated terminal status with deliverAs steer and triggerTurn true, so active work is steered and an idle parent starts a new turn.
-    verify: node --test extensions/subagent/background-lifecycle.test.ts
+      Queue a fixed subagent_finished custom message containing only generated child ID and enumerated terminal status with deliverAs steer and triggerTurn true, so active work is steered and an idle parent starts a new turn; retain it until exact main-stream acknowledgement and retry unacknowledged late steering after parent settlement.
+    verify: node --test extensions/subagent/background-lifecycle.test.ts extensions/subagent/completion-delivery.test.ts
     status: passing
     risk: P0
     security: high
     security_verification: >-
-      No new security findings in affected paths; prove child names, output, errors, tool text, and provider content never enter the signal and completion never triggers a parent turn.
+      No new security findings in affected paths; prove child names, output, errors, tool text, and provider content never enter the signal, acknowledgement requires exact fixed identity and content, and shutdown clears pending delivery without waking the parent.
     tdd:
-      red: A compilable notification stub fails exact payload, next-natural-turn, and no-trigger assertions.
-      green: Completion produces one fixed non-triggering signal per terminal child.
+      red: A compilable dispatcher stub fails exact payload, initial steering, post-settlement retry, and acknowledgement assertions.
+      green: Completion produces one fixed signal per terminal child, retries only while unacknowledged, and suppresses shutdown wakeups.
     allure:
       severity: critical
       categories: ["Parent notification", "Prompt injection", "Security Review"]

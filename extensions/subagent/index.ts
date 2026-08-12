@@ -17,6 +17,7 @@ import { createToolPermissionBoundary, logSubagentDebug, promptToolPermissionReq
 import type { ToolPermissionBoundary } from "../tool-permissions/permission-boundary.ts";
 import { createSubagentSession, executeChildToolRequest, resolveSubagentCwd } from "./agent-session.ts";
 import { createBackgroundSessionController, type BackgroundSessionController } from "./background-lifecycle.ts";
+import { createCompletionSignalDispatcher } from "./completion-delivery.ts";
 
 const subagentParameters = {
   type: "object",
@@ -173,10 +174,14 @@ function executeParentTool(
 }
 
 export default function subagentExtension(pi: ExtensionAPI): void {
+  const completionSignals = createCompletionSignalDispatcher(
+    (message, options) => pi.sendMessage(message, options),
+    (event, details) => logSubagentDebug(event, details),
+  );
   const controller = createBackgroundSessionController(
     async () => { throw new Error("Background child session factory was not supplied by the launch request."); },
     {
-      notify: (message, options) => pi.sendMessage(message, options),
+      notify: (message, options) => completionSignals.notify(message, options),
       debug: (event, details) => logSubagentDebug(event, details),
     },
   );
@@ -210,7 +215,16 @@ export default function subagentExtension(pi: ExtensionAPI): void {
     },
   });
 
+  pi.on("message_start", (event) => {
+    completionSignals.observeMessage(event.message);
+  });
+
+  pi.on("agent_settled", () => {
+    completionSignals.parentSettled();
+  });
+
   pi.on("session_shutdown", async () => {
+    completionSignals.close();
     await controller.close();
   });
 }

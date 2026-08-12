@@ -27,7 +27,7 @@ test("retries an unacknowledged completion after the parent settles", () => {
   dispatcher.parentSettled();
   assert.equal(sent.length, 2);
 
-  dispatcher.observeMessage(completion);
+  dispatcher.observeMessage({ role: "custom", ...completion });
   dispatcher.parentSettled();
   assert.equal(sent.length, 2);
 });
