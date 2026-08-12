@@ -107,7 +107,7 @@ tasks:
     description: >-
       Preserve the single durable Pi SessionManager store and existing schema validation, cwd-aware policy evaluation, main-window prompt, fail-closed cancellation/missing-UI behavior, exactly-once execution, audit attribution, and package behavior.
     verify: node --test extensions/subagent/agent-session.test.ts extensions/subagent/index.test.ts extensions/subagent/missing-ui.test.ts extensions/subagent/permission-boundary.test.ts extensions/subagent/working-directory.test.ts extensions/tool-permissions/permission-boundary.test.ts && npm run check
-    status: failing
+    status: passing
     risk: P0
     security: high
     security_verification: >-

@@ -15,7 +15,8 @@ import {
 import { getPublishedToolDefinitions } from "../tool-registry/index.ts";
 import { createToolPermissionBoundary, logSubagentDebug, promptToolPermissionRequest, type PermissionContext } from "../tool-permissions/index.ts";
 import type { ToolPermissionBoundary } from "../tool-permissions/permission-boundary.ts";
-import { createSubagentSession, executeChildToolRequest, resolveSubagentCwd, runSubagentSession } from "./agent-session.ts";
+import { createSubagentSession, executeChildToolRequest, resolveSubagentCwd } from "./agent-session.ts";
+import { createBackgroundSessionController, type BackgroundSessionController } from "./background-lifecycle.ts";
 
 const subagentParameters = {
   type: "object",
@@ -28,6 +29,16 @@ const subagentParameters = {
   additionalProperties: false,
 } as never;
 type SubagentParameters = { task: string; agent?: string; cwd?: string };
+
+const subagentResultParameters = {
+  type: "object",
+  properties: {
+    id: { type: "string", description: "The generated background child task ID." },
+  },
+  required: ["id"],
+  additionalProperties: false,
+} as never;
+type SubagentResultParameters = { id: string };
 
 /** Normal tools available to the parent-side permission executor. */
 function normalToolDefinitions(cwd: string): ToolDefinition[] {
@@ -104,35 +115,11 @@ export function createParentPermissionPrompt(
 function executeParentTool(
   pi: ExtensionAPI,
   cwd: string,
-  childId: string,
   parentContext: ExtensionContext,
   params: SubagentParameters,
-  signal: AbortSignal | undefined,
+  controller: BackgroundSessionController,
 ) {
   const tools = Object.fromEntries(normalToolDefinitions(cwd).map((tool) => [tool.name, tool]));
-  const boundary = createToolPermissionBoundary({
-    validate: (request) => {
-      logSubagentDebug("boundary-validate", { request, availableTools: Object.keys(tools) });
-      const tool = tools[request.toolName as keyof typeof tools];
-      if (!tool) return `Unknown tool: ${request.toolName}`;
-      try {
-        const validator = Compile(tool.parameters as never);
-        return validator.Check(request.input)
-          ? undefined
-          : `Invalid input for ${request.toolName}; arguments do not match the published tool schema.`;
-      } catch (error) {
-        return `Could not validate input for ${request.toolName}: ${error instanceof Error ? error.message : String(error)}`;
-      }
-    },
-    prompt: createParentPermissionPrompt(pi, childId, parentContext),
-    execute: async (request) => {
-      logSubagentDebug("boundary-execute", { request });
-      const tool = tools[request.toolName as keyof typeof tools];
-      if (!tool) throw new Error(`Unknown child tool: ${request.toolName}`);
-      return tool.execute(childId, request.input as never, signal, undefined, parentContext);
-    },
-  });
-
   const parentSessionDir = parentContext.sessionManager.getSessionFile()
     ? parentContext.sessionManager.getSessionDir()
     : undefined;
@@ -142,40 +129,77 @@ function executeParentTool(
     parameters: tool.parameters,
   }));
 
-  return runSubagentSession({
+  return controller.launch({
     cwd,
-    parentContext: `${parentContext.getSystemPrompt()}\n\nChild tool policy: you have only the subagent-tool-request tool. For every file, shell, search, MCP, or other tool action, call it with the exact toolName and JSON input. Do not attempt to call tools directly.\n\nAvailable parent tools and input schemas:\n${JSON.stringify(toolCatalog)}`, 
+    parentContext: `${parentContext.getSystemPrompt()}\n\nChild tool policy: you have only the subagent-tool-request tool. For every file, shell, search, MCP, or other tool action, call it with the exact toolName and JSON input. Do not attempt to call tools directly.\n\nAvailable parent tools and input schemas:\n${JSON.stringify(toolCatalog)}`,
     task: params.task,
-    signal,
-    createSession: async ({ cwd: childCwd }) => {
+    createSession: async ({ childId, cwd: childCwd, signal }) => {
+      const boundary = createToolPermissionBoundary({
+        validate: (request) => {
+          const tool = tools[request.toolName as keyof typeof tools];
+          if (!tool) return `Unknown tool: ${request.toolName}`;
+          try {
+            const validator = Compile(tool.parameters as never);
+            return validator.Check(request.input)
+              ? undefined
+              : `Invalid input for ${request.toolName}; arguments do not match the published tool schema.`;
+          } catch (error) {
+            return `Could not validate input for ${request.toolName}: ${error instanceof Error ? error.message : String(error)}`;
+          }
+        },
+        prompt: createParentPermissionPrompt(pi, childId, parentContext),
+        execute: async (request) => {
+          const tool = tools[request.toolName as keyof typeof tools];
+          if (!tool) throw new Error(`Unknown child tool: ${request.toolName}`);
+          return tool.execute(childId, request.input as never, signal, undefined, parentContext);
+        },
+      });
       const session = await createSubagentSession(childCwd, {
         customTools: createChildToolDefinitions(childId, childCwd, boundary),
         sessionManager: parentSessionDir ? SessionManager.create(childCwd, parentSessionDir) : undefined,
       });
-      logSubagentDebug("child-session-created", {
-        childId,
-        cwd: childCwd,
-        activeTools: session.getActiveToolNames?.(),
-      });
+      logSubagentDebug("child-session-created", { childId, cwd: childCwd, activeTools: session.getActiveToolNames?.() });
       return session;
     },
   });
 }
 
 export default function subagentExtension(pi: ExtensionAPI): void {
+  const controller = createBackgroundSessionController(
+    async () => { throw new Error("Background child session factory was not supplied by the launch request."); },
+    { notify: (message, options) => pi.sendMessage(message, options) },
+  );
+
   pi.registerTool({
     name: "subagent",
     label: "subagent",
-    description: "Launch a child agent whose tool requests remain subject to the parent permission policy.",
+    description: "Launch a permission-enforced child in the background and return its generated task ID.",
     parameters: subagentParameters,
-    async execute(_toolCallId, params: SubagentParameters, signal, _onUpdate, ctx) {
-      const childId = params.agent?.trim() || "child-agent";
+    async execute(_toolCallId, params: SubagentParameters, _signal, _onUpdate, ctx) {
       const cwd = resolveSubagentCwd(ctx.cwd, params.cwd);
-      const result = await executeParentTool(pi, cwd, childId, ctx, params, signal);
+      const result = await executeParentTool(pi, cwd, ctx, params, controller);
       return {
         content: [{ type: "text", text: JSON.stringify(result) }],
         details: result,
       };
     },
+  });
+
+  pi.registerTool({
+    name: "subagent_result",
+    label: "subagent_result",
+    description: "Retrieve current status and bounded output for a background child owned by this parent session.",
+    parameters: subagentResultParameters,
+    async execute(_toolCallId, params: SubagentResultParameters) {
+      const result = controller.result(params.id);
+      return {
+        content: [{ type: "text", text: JSON.stringify(result) }],
+        details: result,
+      };
+    },
+  });
+
+  pi.on("session_shutdown", async () => {
+    await controller.close();
   });
 }

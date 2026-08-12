@@ -14,6 +14,7 @@ export type BackgroundLaunchOptions = {
   cwd: string;
   parentContext: string;
   task: string;
+  createSession?: CreateManagedSubagentSession;
 };
 
 export type BackgroundResult =
@@ -122,7 +123,7 @@ export function createBackgroundSessionController(
       const cancellation = new AbortController();
       let session: ManagedSubagentSession;
       try {
-        session = await createSession({ childId: task.id, cwd: options.cwd, signal: cancellation.signal });
+        session = await (options.createSession ?? createSession)({ childId: task.id, cwd: options.cwd, signal: cancellation.signal });
       } catch (error) {
         registry.transition(task.id, "failed");
         throw error;
