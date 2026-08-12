@@ -91,7 +91,7 @@ tasks:
     description: >-
       Close the registry idempotently on parent abort and session shutdown for quit, reload, new, resume, and fork by rejecting launches, denying pending work, aborting children, unsubscribing, bounding cleanup, disposing sessions, and invalidating stale callbacks.
     verify: node --test extensions/subagent/background-lifecycle.test.ts
-    status: failing
+    status: passing
     risk: P0
     security: high
     security_verification: >-

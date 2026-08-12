@@ -62,11 +62,47 @@ export function createBackgroundSessionController(
   const runtimes = new Map<string, {
     session: ManagedSubagentSession;
     events: ReturnType<typeof createBackgroundEventBuffer>;
+    cancellation: AbortController;
+    unsubscribe: () => void;
     output?: string;
+    cleaned: boolean;
   }>();
+  let closed = false;
+
+  function finish(id: string, status: "completed" | "failed" | "cancelled"): void {
+    const current = registry.get(id);
+    if (!current || current.terminal) return;
+    registry.transition(id, status);
+    controllerOptions.notify?.({
+      customType: "subagent_finished",
+      content: `subagent_finished:${id}:${status}`,
+      display: false,
+      details: { id, status },
+    }, { deliverAs: "nextTurn", triggerTurn: false });
+  }
+
+  function cleanup(id: string): void {
+    const runtime = runtimes.get(id);
+    if (!runtime || runtime.cleaned) return;
+    runtime.cleaned = true;
+    runtime.events.seal();
+    runtime.unsubscribe();
+    runtime.session.dispose();
+  }
 
   return {
-    async close() {},
+    async close() {
+      if (closed) return;
+      closed = true;
+      for (const [id, runtime] of runtimes) {
+        if (!registry.get(id)?.terminal) {
+          runtime.cancellation.abort();
+          await runtime.session.abort?.();
+          finish(id, "cancelled");
+        }
+        cleanup(id);
+      }
+    },
 
     result(id) {
       const task = registry.get(id);
@@ -81,6 +117,7 @@ export function createBackgroundSessionController(
     },
 
     async launch(options) {
+      if (closed) throw new Error("Background child registry is closed.");
       const task = registry.register(options.cwd);
       const cancellation = new AbortController();
       let session: ManagedSubagentSession;
@@ -92,32 +129,26 @@ export function createBackgroundSessionController(
       }
 
       const events = createBackgroundEventBuffer(task.id, DEFAULT_EVENT_LIMITS);
-      const runtime = { session, events, output: undefined as string | undefined };
-      runtimes.set(task.id, runtime);
-      const unsubscribe = session.subscribe((event) => events.append(event));
-      registry.transition(task.id, "running");
-      const finish = (status: "completed" | "failed" | "cancelled") => {
-        registry.transition(task.id, status);
-        controllerOptions.notify?.({
-          customType: "subagent_finished",
-          content: `subagent_finished:${task.id}:${status}`,
-          display: false,
-          details: { id: task.id, status },
-        }, { deliverAs: "nextTurn", triggerTurn: false });
+      const runtime = {
+        session,
+        events,
+        cancellation,
+        unsubscribe: () => {},
+        output: undefined as string | undefined,
+        cleaned: false,
       };
+      runtimes.set(task.id, runtime);
+      runtime.unsubscribe = session.subscribe((event) => events.append(event));
+      registry.transition(task.id, "running");
       void session.prompt(`${options.parentContext}\n\n${options.task}`)
         .then(
           () => {
             runtime.output = session.getLastAssistantText?.();
-            finish("completed");
+            finish(task.id, "completed");
           },
-          () => { finish(cancellation.signal.aborted ? "cancelled" : "failed"); },
+          () => { finish(task.id, cancellation.signal.aborted ? "cancelled" : "failed"); },
         )
-        .finally(() => {
-          events.seal();
-          unsubscribe();
-          session.dispose();
-        });
+        .finally(() => cleanup(task.id));
 
       return registry.get(task.id)!;
     },
