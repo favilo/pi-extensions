@@ -23,6 +23,7 @@ export type BackgroundResult =
     found: true;
     events: ReturnType<ReturnType<typeof createBackgroundEventBuffer>["snapshot"]>;
     output?: string;
+    outputTruncated?: boolean;
   });
 
 export type BackgroundSessionController = {
@@ -42,6 +43,8 @@ export type BackgroundCompletionSignal = {
 export type BackgroundControllerOptions = {
   notify?: (message: BackgroundCompletionSignal, options: { deliverAs: "nextTurn"; triggerTurn: false }) => void;
   cleanupTimeoutMs?: number;
+  maxRetainedResults?: number;
+  maxOutputBytes?: number;
 };
 
 export type CreateManagedSubagentSession = (options: {

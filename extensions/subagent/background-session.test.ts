@@ -57,6 +57,30 @@ test("returns active status and stable terminal output only through explicit sco
   assert.deepEqual(controller.result(launched.id), completed);
 });
 
+test("bounds terminal output and evicts the oldest retained result", async () => {
+  const outputs = ["first child output", "second child output"];
+  let created = 0;
+  const controller = createBackgroundSessionController(async () => {
+    const output = outputs[created++];
+    return {
+      prompt: async () => {},
+      subscribe: () => () => {},
+      getLastAssistantText: () => output,
+      dispose() {},
+    };
+  }, { maxRetainedResults: 1, maxOutputBytes: 8 });
+
+  const first = await controller.launch({ cwd: "/workspace/first", parentContext: "policy", task: "one" });
+  await new Promise((resolve) => setImmediate(resolve));
+  const second = await controller.launch({ cwd: "/workspace/second", parentContext: "policy", task: "two" });
+  await new Promise((resolve) => setImmediate(resolve));
+
+  assert.deepEqual(controller.result(first.id), { found: false, status: "unknown" });
+  const retained = controller.result(second.id);
+  assert.equal(retained.found && Buffer.byteLength(retained.output ?? "", "utf8") <= 8, true);
+  assert.equal(retained.found && retained.outputTruncated, true);
+});
+
 test("tracks lifecycle states and seals the first terminal transition", () => {
   const registry = createBackgroundTaskRegistry();
   const task = registry.register("/workspace/child");
