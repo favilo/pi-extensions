@@ -6,6 +6,41 @@ import {
   type ManagedSubagentSession,
 } from "./background-lifecycle.ts";
 
+test("closes idempotently and rejects stale work after shutdown", async () => {
+  const calls: string[] = [];
+  let settle: (() => void) | undefined;
+  const pending = new Promise<void>((resolve) => { settle = resolve; });
+  let childSignal: AbortSignal | undefined;
+  const session: ManagedSubagentSession = {
+    prompt: () => pending,
+    subscribe: () => () => calls.push("unsubscribe"),
+    abort: () => { calls.push("abort"); },
+    dispose: () => calls.push("dispose"),
+  };
+  const notifications: unknown[] = [];
+  const controller = createBackgroundSessionController(async ({ signal }) => {
+    childSignal = signal;
+    return session;
+  }, { notify: (message) => notifications.push(message) });
+  const launched = await controller.launch({ cwd: "/workspace", parentContext: "policy", task: "wait" });
+
+  await controller.close();
+  await controller.close();
+
+  assert.equal(childSignal?.aborted, true);
+  assert.deepEqual(calls, ["abort", "unsubscribe", "dispose"]);
+  assert.equal(controller.result(launched.id).status, "cancelled");
+  await assert.rejects(
+    controller.launch({ cwd: "/workspace", parentContext: "policy", task: "late" }),
+    /closed/i,
+  );
+
+  settle?.();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.deepEqual(calls, ["abort", "unsubscribe", "dispose"]);
+  assert.equal(notifications.length, 1);
+});
+
 test("queues only generated identity and terminal status for the next natural turn", async () => {
   let settle: (() => void) | undefined;
   const pending = new Promise<void>((resolve) => { settle = resolve; });

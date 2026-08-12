@@ -27,6 +27,7 @@ export type BackgroundResult =
 export type BackgroundSessionController = {
   launch(options: BackgroundLaunchOptions): Promise<BackgroundTaskSnapshot>;
   result(id: string): BackgroundResult;
+  close(): Promise<void>;
 };
 
 export type BackgroundCompletionSignal = {
@@ -65,6 +66,8 @@ export function createBackgroundSessionController(
   }>();
 
   return {
+    async close() {},
+
     result(id) {
       const task = registry.get(id);
       const runtime = runtimes.get(id);
