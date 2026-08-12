@@ -7,6 +7,25 @@ function published(event: unknown): AgentSessionEvent {
   return event as AgentSessionEvent;
 }
 
+test("handles non-JSON tool payloads without escaping configured byte bounds", () => {
+  const buffer = createBackgroundEventBuffer("child-1", {
+    maxEvents: 2,
+    maxEventBytes: 24,
+    maxTotalBytes: 12,
+  });
+
+  assert.doesNotThrow(() => buffer.append(published({
+    type: "tool_execution_end",
+    toolCallId: "call-1",
+    toolName: "custom",
+    result: { value: 1n },
+    isError: false,
+  })));
+  const snapshot = buffer.snapshot();
+  assert.equal(snapshot.bytes <= 12, true);
+  assert.equal(snapshot.truncated, true);
+});
+
 test("normalizes exposed events in order while bounding and sealing retained data", () => {
   const buffer = createBackgroundEventBuffer("child-1", {
     maxEvents: 4,
