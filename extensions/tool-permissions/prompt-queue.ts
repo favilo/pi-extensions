@@ -121,18 +121,19 @@ export class PermissionPromptQueue {
   }
 }
 
-const sessionQueues = new WeakMap<object, PermissionPromptQueue>();
+let sessionQueue: PermissionPromptQueue | undefined;
 
-export function permissionPromptQueueFor(sessionOwner: object): PermissionPromptQueue {
-  let queue = sessionQueues.get(sessionOwner);
-  if (!queue) {
-    queue = new PermissionPromptQueue();
-    sessionQueues.set(sessionOwner, queue);
-  }
-  return queue;
+/**
+ * ExtensionAPI wrappers are extension-local, so object identity cannot own this
+ * queue. The module instance is loaded once for the active parent runtime and
+ * reset by session_shutdown before Pi binds replacement extension instances.
+ */
+export function permissionPromptQueueFor(_extensionApi: object): PermissionPromptQueue {
+  sessionQueue ??= new PermissionPromptQueue();
+  return sessionQueue;
 }
 
-export function closePermissionPromptQueue(sessionOwner: object): void {
-  sessionQueues.get(sessionOwner)?.close();
-  sessionQueues.delete(sessionOwner);
+export function closePermissionPromptQueue(_extensionApi: object): void {
+  sessionQueue?.close();
+  sessionQueue = undefined;
 }
