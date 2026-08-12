@@ -97,11 +97,12 @@ export function createParentPermissionPrompt(
   pi: Pick<ExtensionAPI, "sendMessage" | "sendUserMessage">,
   childId: string,
   parentContext: PermissionContext,
-  _setStatus: (status: "running" | "waiting-for-permission") => void = () => {},
+  setStatus: (status: "running" | "waiting-for-permission") => void = () => {},
 ): ToolPermissionBoundary["prompt"] {
   if (!parentContext.hasUI) return undefined;
 
   return async (request) => {
+    setStatus("waiting-for-permission");
     logSubagentDebug("boundary-prompt", { request, parentMode: parentContext.mode, parentHasUI: parentContext.hasUI });
     pi.sendMessage({
       customType: "subagent-tool-request",
@@ -109,7 +110,11 @@ export function createParentPermissionPrompt(
       display: true,
       details: request,
     });
-    return promptToolPermissionRequest(pi, parentContext, request);
+    try {
+      return await promptToolPermissionRequest(pi, parentContext, request);
+    } finally {
+      setStatus("running");
+    }
   };
 }
 
@@ -148,7 +153,12 @@ function executeParentTool(
             return `Could not validate input for ${request.toolName}: ${error instanceof Error ? error.message : String(error)}`;
           }
         },
-        prompt: createParentPermissionPrompt(pi, childId, parentContext),
+        prompt: createParentPermissionPrompt(
+          pi,
+          childId,
+          parentContext,
+          (status) => { controller.setStatus(childId, status); },
+        ),
         execute: async (request) => {
           const tool = tools[request.toolName as keyof typeof tools];
           if (!tool) throw new Error(`Unknown child tool: ${request.toolName}`);
