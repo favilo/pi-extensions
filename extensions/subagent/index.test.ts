@@ -4,17 +4,23 @@ import test from "node:test";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import subagentExtension, { createChildToolDefinitions } from "./index.ts";
 
-test("registers the subagent launch tool", () => {
+test("registers background launch, explicit result lookup, and shutdown cleanup", () => {
   const tools: Array<{ name: string }> = [];
+  const events: string[] = [];
   const pi = {
     registerTool(tool: { name: string }) {
       tools.push(tool);
     },
+    on(event: string) {
+      events.push(event);
+    },
+    sendMessage() {},
   } as unknown as ExtensionAPI;
 
   subagentExtension(pi);
 
-  assert.deepEqual(tools.map(({ name }) => name), ["subagent"]);
+  assert.deepEqual(tools.map(({ name }) => name), ["subagent", "subagent_result"]);
+  assert.deepEqual(events, ["session_shutdown"]);
 });
 
 test("gives a child only the permission bridge tool", () => {
