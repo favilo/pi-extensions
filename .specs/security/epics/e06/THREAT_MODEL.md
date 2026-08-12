@@ -102,9 +102,9 @@ A cancelled or failed child could expose partial output as a successful result, 
 
 ## Security review result
 
-The working tree changes only planning and threat-model artifacts; no new runtime path is implemented yet. Existing e06 code already enforces child tool requests through `tool-permissions`, validates published schemas, constrains cwd, and disposes invocation-scoped sessions. Moving ownership beyond the launch invocation materially increases concurrency and lifecycle risk.
+The implemented e06s05 runtime keeps child execution behind `tool-permissions`, validates published schemas, constrains cwd, and owns cleanup under the parent session. Manual UAT exposed a main-versus-child prompt displacement that orphaned the child's prompt promise. The repair routes every main and child prompt through one session-owned FIFO queue, hashes rather than retains raw input identity, makes settlement idempotent, propagates active cancellation, closes pending work on session shutdown, and applies the shared normalized cwd-aware resolver to child requests. Focused tests cover both arrival orders, independent decisions, queued and active cancellation, prompt errors, shutdown, late results, `.aiignore`, and configured allow/deny precedence. No raw input was added to queue identity, audit output, or completion messages.
 
-**Verdict:** PASS for planning and e06s05 test-first work only. E06s05 must enforce one prompt-capable active child until e06s06's keyed FIFO permission queue is present. Production background launch is blocked until tests prove session-scoped registry isolation, no stale-context use, bounded buffers, fixed completion signals, explicit result access, terminal-state sealing, and shutdown cleanup. E06s06 is blocked until prompt-to-child binding and deterministic focus restoration are proven.
+**Verdict:** PASS with no unresolved HIGH-confidence finding in the changed permission paths. Live TUI reverification remains mandatory because unit tests cannot prove Pi's concrete focus restoration behavior. The temporary one-active-child admission limit remains until e06s06 separately expands child concurrency.
 
 ## Verification obligations
 

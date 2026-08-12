@@ -16,6 +16,11 @@ import {
 import { createPersistedTrustResolver, resolveCurrentProjectPolicyPath, resolveScopedPermissionDecision, type ScopedPermissionDecision } from "./scope.ts";
 import type { PermissionDecision, ToolPermissionBoundary, ToolRequest } from "./permission-boundary.ts";
 import { isPermissionPromptCancellation } from "./prompt-input.ts";
+import {
+  closePermissionPromptQueue,
+  createPermissionPromptIdentity,
+  permissionPromptQueueFor,
+} from "./prompt-queue.ts";
 
 type ToolCallEventResult = { block: true; reason: string } | undefined;
 
@@ -24,7 +29,7 @@ export type PermissionContext = {
   hasUI: boolean;
   mode: string;
   ui: {
-    confirm(title: string, body: string): Promise<boolean>;
+    confirm(title: string, body: string, options?: { signal?: AbortSignal }): Promise<boolean>;
     custom?<T>(
       factory: (tui: { requestRender(force?: boolean): void; stop(): void; start(): void }, theme: unknown, keybindings: unknown, done: (value: T) => void) => unknown,
     ): Promise<T>;
@@ -32,6 +37,7 @@ export type PermissionContext = {
     setEditorText?(text: string): void;
     notify?(message: string, level: "info" | "warning" | "error"): void;
   };
+  signal?: AbortSignal;
 };
 
 type ReadInput = { path?: unknown };
@@ -358,17 +364,18 @@ async function editPermissionsInExternalEditor(ctx: PermissionContext, target: {
   });
 }
 
-async function askScrollablePermission(
+async function presentScrollablePermission(
   pi: Pick<ExtensionAPI, "sendUserMessage">,
   ctx: PermissionContext,
   title: string,
   body: string,
-  allowPattern?: AllowPatternOption,
-  stickyHeader?: string,
+  allowPattern: AllowPatternOption | undefined,
+  stickyHeader: string | undefined,
+  signal: AbortSignal,
 ): Promise<PermissionResult> {
   if (ctx.mode !== "tui" || !ctx.ui.custom) {
     const bodyWithHeader = stickyHeader ? `${stickyHeader}\n\n${body}` : body;
-    const allowed = await ctx.ui.confirm(title, bodyWithHeader);
+    const allowed = await ctx.ui.confirm(title, bodyWithHeader, { signal });
     return allowed ? { allowed: true, decision: "allow_once" } : { allowed: false, decision: "deny" };
   }
 
@@ -402,7 +409,18 @@ async function askScrollablePermission(
     }
   };
 
-  return ctx.ui.custom<PermissionResult>((tui, theme: any, _keybindings, done) => {
+  return ctx.ui.custom<PermissionResult>((tui, theme: any, _keybindings, finish) => {
+    let settled = false;
+    const onAbort = (): void => done({ allowed: false, decision: "cancel" });
+    const done = (value: PermissionResult): void => {
+      if (settled) return;
+      settled = true;
+      signal.removeEventListener("abort", onAbort);
+      finish(value);
+    };
+    signal.addEventListener("abort", onAbort, { once: true });
+    if (signal.aborted) queueMicrotask(onAbort);
+
     const finishWithSteering = (result: PermissionResult, steering: string): void => {
       pi.sendUserMessage(steering, { deliverAs: "steer" });
       done({ ...result, steering });
@@ -546,6 +564,35 @@ async function askScrollablePermission(
   });
 }
 
+async function askScrollablePermission(
+  pi: Pick<ExtensionAPI, "sendUserMessage">,
+  ctx: PermissionContext,
+  request: Pick<ToolRequest, "actor" | "toolName" | "cwd" | "input">,
+  title: string,
+  body: string,
+  allowPattern?: AllowPatternOption,
+  stickyHeader?: string,
+): Promise<PermissionResult> {
+  const identity = createPermissionPromptIdentity(request);
+  logSubagentDebug("permission-queue-enqueue", { identity });
+  return permissionPromptQueueFor(pi as object).enqueue({
+    identity,
+    cancel: { allowed: false, decision: "cancel" },
+    signal: ctx.signal,
+    present: async (signal) => {
+      logSubagentDebug("permission-queue-present", { identity });
+      try {
+        const result = await presentScrollablePermission(pi, ctx, title, body, allowPattern, stickyHeader, signal);
+        logSubagentDebug("permission-queue-settle", { identity, decision: result.decision });
+        return result;
+      } catch (error) {
+        logSubagentDebug("permission-queue-error", { identity, errorType: error instanceof Error ? error.name : typeof error });
+        throw error;
+      }
+    },
+  });
+}
+
 export async function promptToolPermissionRequest(
   pi: Pick<ExtensionAPI, "sendUserMessage">,
   ctx: PermissionContext,
@@ -561,6 +608,7 @@ export async function promptToolPermissionRequest(
   const result = await askScrollablePermission(
     pi,
     ctx,
+    request,
     `Allow ${actor} to use ${request.toolName}?`,
     [
       `${actor} requested a tool through the shared permission boundary.`,
@@ -590,7 +638,13 @@ async function handleConfigurationDiagnostic(
     audit({ tool: "permissions", decision: "deny_policy_error", cwd: ctx.cwd, reason: blocked });
     return { block: true, reason: blocked };
   }
-  const warning = await askScrollablePermission(pi, ctx, "Permission policy warning", reason);
+  const warning = await askScrollablePermission(
+    pi,
+    ctx,
+    { actor: { kind: "main" }, toolName: "permissions", input: { diagnostic: result.diagnostic, path: result.path }, cwd: ctx.cwd },
+    "Permission policy warning",
+    reason,
+  );
   if (warning.allowed) {
     audit({ tool: "permissions", decision: "allow_once_policy_warning", cwd: ctx.cwd, path: result.path });
     return "allow_once";
@@ -618,12 +672,33 @@ export function resolveToolPermissionDecision(
 
 type PermissionResolverOptions = Parameters<typeof resolveToolPermissionDecision>[3];
 
+const IMPLICIT_PROJECT_PATH_TOOLS = new Set(["read", "grep", "find", "ls"]);
+const CONFIGURED_PATH_TOOLS = new Set(["read", "grep", "find", "ls", "write", "edit"]);
+
+function normalizedPermissionInput(request: ToolRequest): unknown {
+  if (!CONFIGURED_PATH_TOOLS.has(request.toolName) || typeof request.input !== "object" || request.input === null) {
+    return request.input;
+  }
+  const input = request.input as Record<string, unknown>;
+  const requestedPath = typeof input.path === "string" ? input.path : "";
+  return { ...input, path: resolve(request.cwd, requestedPath || ".") };
+}
+
 /** Shared policy contract for equivalent main-agent and child tool requests. */
 export function resolvePermissionDecisionForRequest(
   request: ToolRequest,
   options: PermissionResolverOptions = {},
 ): PermissionDecision {
-  return resolveToolPermissionDecision(request.toolName, request.input, request.cwd, options).decision;
+  const input = normalizedPermissionInput(request);
+  const resolved = resolveToolPermissionDecision(request.toolName, input, request.cwd, options);
+  if (resolved.diagnostic) throw new Error(resolved.diagnostic);
+  if (resolved.decision === "deny") return "deny";
+  if (!IMPLICIT_PROJECT_PATH_TOOLS.has(request.toolName)) return resolved.decision;
+
+  const path = (input as { path: string }).path;
+  if (isAiIgnoredPath(path, request.cwd)) return "deny";
+  if (resolved.decision === "allow") return "allow";
+  return isInsideDirectory(path, request.cwd) ? "allow" : "ask";
 }
 
 export function createToolPermissionBoundary(
@@ -635,11 +710,7 @@ export function createToolPermissionBoundary(
   },
 ): ToolPermissionBoundary {
   return {
-    evaluate: async (request) => {
-      const decision = resolveToolPermissionDecision(request.toolName, request.input, request.cwd);
-      if (decision.diagnostic) throw new Error(decision.diagnostic);
-      return decision.decision;
-    },
+    evaluate: async (request) => resolvePermissionDecisionForRequest(request),
     prompt: options.prompt,
     execute: options.execute,
     validate: options.validate,
@@ -685,6 +756,7 @@ async function handlePathPermission(toolName: string, input: PathToolInput, ctx:
   const result = await askScrollablePermission(
     pi,
     ctx,
+    { actor: { kind: "main" }, toolName, input: normalizedInput, cwd: ctx.cwd },
     `Allow external ${toolName} path?`,
     `pi wants to use ${toolName} on a path outside the project directory.\n\nProject: ${ctx.cwd}\nPath: ${absolutePath}\n\nRules are stored under permissions.read in ${getUserPermissionsPath()}.`,
     { toolName, suggestedRule: { path: exactPattern(absolutePath) }, subject: absolutePath },
@@ -721,6 +793,7 @@ async function handleFileEditPermission(toolName: string, input: FileEditInput, 
   const result = await askScrollablePermission(
     pi,
     ctx,
+    { actor: { kind: "main" }, toolName, input: { ...input, path: absolutePath }, cwd: ctx.cwd },
     prompt.title,
     prompt.body,
     { toolName, suggestedRule: { path: exactPattern(absolutePath) }, subject: absolutePath },
@@ -752,6 +825,7 @@ async function handleBashPermission(input: BashInput, ctx: PermissionContext, pi
   const result = await askScrollablePermission(
     pi,
     ctx,
+    { actor: { kind: "main" }, toolName: "bash", input, cwd: ctx.cwd },
     "Allow bash command?",
     `pi wants to run this shell command.\n\n${compact(command)}\n\nRules are stored under permissions.bash in ${getUserPermissionsPath()}.`,
     { toolName: "bash", suggestedRule: { command: exactPattern(command) }, subject: command },
@@ -780,6 +854,7 @@ async function handleSubagentPermission(input: SubagentInput, ctx: PermissionCon
   const result = await askScrollablePermission(
     pi,
     ctx,
+    { actor: { kind: "main" }, toolName: "subagent", input, cwd: ctx.cwd },
     "Allow subagent delegation?",
     [
       "pi wants to delegate work to one or more child agents.",
@@ -824,6 +899,7 @@ async function handleUnknownToolPermission(toolName: string, input: unknown, ctx
   const result = await askScrollablePermission(
     pi,
     ctx,
+    { actor: { kind: "main" }, toolName, input, cwd: ctx.cwd },
     `Allow ${toolName}?`,
     [
       knownMcpTool ? "pi wants to call a known MCP tool without a matching permission rule." : "pi wants to call a tool without a specific permission rule.",
@@ -856,6 +932,10 @@ export default function toolPermissionPolicy(pi: ExtensionAPI) {
         ctx.ui.notify(error instanceof Error ? error.message : String(error), "error");
       }
     },
+  });
+
+  pi.on("session_shutdown", () => {
+    closePermissionPromptQueue(pi as object);
   });
 
   pi.on("tool_call", async (event, ctx) => {

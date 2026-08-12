@@ -123,7 +123,7 @@ tasks:
     description: >-
       Serialize main-agent and child permission presentation through one parent-session-owned FIFO queue whose immutable request identity binds actor, tool, cwd, and safe input identity; cancel, prompt-error, and shutdown paths settle only the exact request fail-closed; apply the same cwd-aware automatic and configured allow/deny model to child requests as main requests.
     verify: node --test extensions/tool-permissions/prompt-queue.test.ts extensions/subagent/missing-ui.test.ts extensions/subagent/permission-boundary.test.ts
-    status: failing
+    status: passing
     risk: P0
     security: high
     security_verification: >-

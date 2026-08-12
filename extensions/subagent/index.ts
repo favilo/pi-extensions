@@ -79,12 +79,14 @@ export function createChildToolDefinitions(
     description: "Request that the parent agent authorize and execute a tool call on your behalf.",
     parameters: childToolRequestParameters,
     async execute(_toolCallId, input: ChildToolRequestParameters, signal) {
+      logSubagentDebug("child-tool-request-start", { childId, toolName: input.toolName, cwd });
       const result = await executeChildToolRequest({
         childId,
         toolName: input.toolName,
         input: input.input,
         cwd,
       }, boundary, signal);
+      logSubagentDebug("child-tool-request-result", { childId, toolName: input.toolName, status: result.status });
       return {
         content: [{ type: "text", text: JSON.stringify(result) }],
         details: result,
@@ -101,7 +103,7 @@ export function createParentPermissionPrompt(
 ): ToolPermissionBoundary["prompt"] {
   if (!parentContext.hasUI) return undefined;
 
-  return async (request) => {
+  return async (request, signal) => {
     setStatus("waiting-for-permission");
     logSubagentDebug("boundary-prompt", { request, parentMode: parentContext.mode, parentHasUI: parentContext.hasUI });
     pi.sendMessage({
@@ -111,7 +113,7 @@ export function createParentPermissionPrompt(
       details: request,
     });
     try {
-      return await promptToolPermissionRequest(pi, parentContext, request);
+      return await promptToolPermissionRequest(pi, { ...parentContext, signal }, request);
     } finally {
       setStatus("running");
     }
@@ -178,7 +180,10 @@ function executeParentTool(
 export default function subagentExtension(pi: ExtensionAPI): void {
   const controller = createBackgroundSessionController(
     async () => { throw new Error("Background child session factory was not supplied by the launch request."); },
-    { notify: (message, options) => pi.sendMessage(message, options) },
+    {
+      notify: (message, options) => pi.sendMessage(message, options),
+      debug: (event, details) => logSubagentDebug(event, details),
+    },
   );
 
   pi.registerTool({

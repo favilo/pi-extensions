@@ -23,7 +23,7 @@ export type ToolExecutionResult = {
 
 export type ToolPermissionBoundary = {
   evaluate(request: ToolRequest): Promise<PermissionDecision>;
-  prompt?(request: ToolRequest): Promise<PermissionPromptResult>;
+  prompt?(request: ToolRequest, signal?: AbortSignal): Promise<PermissionPromptResult>;
   execute(request: ToolRequest): Promise<unknown>;
   validate?(request: ToolRequest): string | undefined;
   audit?(entry: { actor: ToolActor; toolName: string; cwd: string; decision: string; reason?: string }): void;
@@ -83,7 +83,7 @@ export async function executeToolRequest(
       return unavailableUiResult(request);
     }
     try {
-      const prompted = await boundary.prompt(request);
+      const prompted = await boundary.prompt(request, signal);
       if (prompted === "cancel") {
         audit(boundary, request, "cancel_prompt", "Permission prompt was cancelled.");
         return result(request, "cancelled", "permission_prompt_cancelled");

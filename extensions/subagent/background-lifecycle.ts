@@ -45,6 +45,7 @@ export type BackgroundControllerOptions = {
   cleanupTimeoutMs?: number;
   maxRetainedResults?: number;
   maxOutputBytes?: number;
+  debug?: (event: string, details: Record<string, unknown>) => void;
 };
 
 export type CreateManagedSubagentSession = (options: {
@@ -189,11 +190,16 @@ export function createBackgroundSessionController(
         cleaned: false,
       };
       runtimes.set(task.id, runtime);
-      runtime.unsubscribe = session.subscribe((event) => events.append(event));
+      runtime.unsubscribe = session.subscribe((event) => {
+        controllerOptions.debug?.("child-session-event", { childId: task.id, eventType: event.type });
+        events.append(event);
+      });
       registry.transition(task.id, "running");
+      controllerOptions.debug?.("child-prompt-start", { childId: task.id });
       void session.prompt(`${options.parentContext}\n\n${options.task}`)
         .then(
           () => {
+            controllerOptions.debug?.("child-prompt-resolved", { childId: task.id });
             const output = session.getLastAssistantText?.();
             if (output !== undefined) {
               const bounded = truncateUtf8(output, controllerOptions.maxOutputBytes ?? DEFAULT_MAX_OUTPUT_BYTES);
@@ -202,7 +208,11 @@ export function createBackgroundSessionController(
             }
             finish(task.id, "completed");
           },
-          () => { finish(task.id, cancellation.signal.aborted ? "cancelled" : "failed"); },
+          () => {
+            const status = cancellation.signal.aborted ? "cancelled" : "failed";
+            controllerOptions.debug?.("child-prompt-rejected", { childId: task.id, status });
+            finish(task.id, status);
+          },
         )
         .finally(() => cleanup(task.id));
 

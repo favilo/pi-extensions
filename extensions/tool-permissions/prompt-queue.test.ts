@@ -141,6 +141,50 @@ test("closing the queue cancels active and queued prompts exactly once", async (
   assert.deepEqual(settlements, ["main"]);
 });
 
+test("advances after prompt errors without settling another request", async () => {
+  const queue = new PermissionPromptQueue();
+  const presentations: string[] = [];
+  const first = queue.enqueue({
+    identity: createPermissionPromptIdentity(request({ kind: "main" })),
+    present: async () => { presentations.push("main"); throw new Error("prompt failed"); },
+    cancel: "cancel",
+  });
+  const second = queue.enqueue({
+    identity: createPermissionPromptIdentity(request({ kind: "child", childId: "amber-otter" })),
+    present: async () => { presentations.push("child"); return "deny"; },
+    cancel: "cancel",
+  });
+
+  await assert.rejects(first, /prompt failed/);
+  assert.equal(await second, "deny");
+  assert.deepEqual(presentations, ["main", "child"]);
+});
+
+test("an active cancellation cannot be overwritten by a late prompt result", async () => {
+  const queue = new PermissionPromptQueue();
+  const controller = new AbortController();
+  const presentation = deferred<string>();
+  const first = queue.enqueue({
+    identity: createPermissionPromptIdentity(request({ kind: "main" })),
+    present: async () => presentation.promise,
+    cancel: "cancel",
+    signal: controller.signal,
+  });
+  let secondPresented = false;
+  const second = queue.enqueue({
+    identity: createPermissionPromptIdentity(request({ kind: "child", childId: "amber-otter" })),
+    present: async () => { secondPresented = true; return "deny"; },
+    cancel: "cancel",
+  });
+
+  controller.abort();
+  assert.equal(await first, "cancel");
+  assert.equal(secondPresented, false, "the next prompt waits for active UI teardown");
+  presentation.resolve("allow");
+  assert.equal(await second, "deny");
+  assert.equal(await first, "cancel");
+});
+
 test("uses main-agent cwd and configured policy semantics for child requests", () => {
   const root = mkdtempSync(join(tmpdir(), "pi-permission-parity-"));
   const cwd = join(root, "project");
