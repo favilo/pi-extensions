@@ -19,6 +19,7 @@ export type BackgroundTaskRegistry = {
   register(cwd: string): BackgroundTaskSnapshot;
   get(id: string): BackgroundTaskSnapshot | undefined;
   transition(id: string, status: BackgroundChildStatus): BackgroundTaskSnapshot | undefined;
+  remove(id: string): void;
 };
 
 const TERMINAL_STATUSES = new Set<BackgroundChildStatus>(["completed", "failed", "cancelled"]);
@@ -32,6 +33,10 @@ export function createBackgroundTaskRegistry(): BackgroundTaskRegistry {
   const tasks = new Map<string, BackgroundTaskSnapshot>();
 
   return {
+    remove(id) {
+      tasks.delete(id);
+    },
+
     register(cwd) {
       if ([...tasks.values()].some((task) => !task.terminal)) {
         throw new Error("Only one active background child is allowed until permission prompts are serialized.");

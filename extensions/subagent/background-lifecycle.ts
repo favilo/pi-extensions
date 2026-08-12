@@ -54,6 +54,8 @@ export type CreateManagedSubagentSession = (options: {
 }) => Promise<ManagedSubagentSession>;
 
 const DEFAULT_CLEANUP_TIMEOUT_MS = 2_000;
+const DEFAULT_MAX_OUTPUT_BYTES = 256 * 1_024;
+const DEFAULT_MAX_RETAINED_RESULTS = 20;
 
 const DEFAULT_EVENT_LIMITS: BackgroundEventLimits = {
   maxEvents: 1_000,
@@ -73,14 +75,28 @@ export function createBackgroundSessionController(
     cancellation: AbortController;
     unsubscribe: () => void;
     output?: string;
+    outputTruncated?: boolean;
     cleaned: boolean;
   }>();
   let closed = false;
+  const terminalOrder: string[] = [];
+
+  function retainTerminal(id: string): void {
+    terminalOrder.push(id);
+    const maximum = controllerOptions.maxRetainedResults ?? DEFAULT_MAX_RETAINED_RESULTS;
+    while (terminalOrder.length > maximum) {
+      const evicted = terminalOrder.shift();
+      if (!evicted) return;
+      runtimes.delete(evicted);
+      registry.remove(evicted);
+    }
+  }
 
   function finish(id: string, status: "completed" | "failed" | "cancelled"): void {
     const current = registry.get(id);
     if (!current || current.terminal) return;
     registry.transition(id, status);
+    retainTerminal(id);
     controllerOptions.notify?.({
       customType: "subagent_finished",
       content: `subagent_finished:${id}:${status}`,
@@ -135,6 +151,7 @@ export function createBackgroundSessionController(
         ...task,
         events: runtime.events.snapshot(),
         ...(task.terminal && runtime.output !== undefined ? { output: runtime.output } : {}),
+        ...(task.terminal && runtime.outputTruncated ? { outputTruncated: true } : {}),
       };
     },
 
@@ -157,6 +174,7 @@ export function createBackgroundSessionController(
         cancellation,
         unsubscribe: () => {},
         output: undefined as string | undefined,
+        outputTruncated: undefined as boolean | undefined,
         cleaned: false,
       };
       runtimes.set(task.id, runtime);
@@ -165,7 +183,13 @@ export function createBackgroundSessionController(
       void session.prompt(`${options.parentContext}\n\n${options.task}`)
         .then(
           () => {
-            runtime.output = session.getLastAssistantText?.();
+            const output = session.getLastAssistantText?.();
+            if (output !== undefined) {
+              const maximum = controllerOptions.maxOutputBytes ?? DEFAULT_MAX_OUTPUT_BYTES;
+              const encoded = Buffer.from(output, "utf8");
+              runtime.outputTruncated = encoded.byteLength > maximum;
+              runtime.output = encoded.subarray(0, maximum).toString("utf8");
+            }
             finish(task.id, "completed");
           },
           () => { finish(task.id, cancellation.signal.aborted ? "cancelled" : "failed"); },

@@ -106,7 +106,7 @@ export function createBackgroundEventBuffer(
         if (previous >= 0) remove(previous);
       }
 
-      const bounded = boundedPayload(normalized.payload, limits.maxEventBytes);
+      const bounded = boundedPayload(normalized.payload, Math.min(limits.maxEventBytes, limits.maxTotalBytes));
       while (events.length >= limits.maxEvents || bytes + bounded.bytes > limits.maxTotalBytes) {
         if (events.length === 0) break;
         remove(0);
