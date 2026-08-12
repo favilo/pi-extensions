@@ -6,6 +6,44 @@ import {
   type ManagedSubagentSession,
 } from "./background-lifecycle.ts";
 
+test("tracks permission waiting without changing terminal children", async () => {
+  let settle: (() => void) | undefined;
+  const pending = new Promise<void>((resolve) => { settle = resolve; });
+  const session: ManagedSubagentSession = {
+    prompt: () => pending,
+    subscribe: () => () => {},
+    dispose() {},
+  };
+  const controller = createBackgroundSessionController(async () => session);
+  const launched = await controller.launch({ cwd: "/workspace", parentContext: "policy", task: "wait" });
+
+  assert.equal(controller.setStatus(launched.id, "waiting-for-permission")?.status, "waiting-for-permission");
+  assert.equal(controller.setStatus(launched.id, "running")?.status, "running");
+  settle?.();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(controller.setStatus(launched.id, "waiting-for-permission")?.status, "completed");
+});
+
+test("bounds shutdown cleanup when child abort never settles", async () => {
+  const calls: string[] = [];
+  const session: ManagedSubagentSession = {
+    prompt: () => new Promise<void>(() => {}),
+    subscribe: () => () => calls.push("unsubscribe"),
+    abort: () => new Promise<void>(() => {}),
+    dispose: () => calls.push("dispose"),
+  };
+  const controller = createBackgroundSessionController(async () => session, { cleanupTimeoutMs: 5 });
+  await controller.launch({ cwd: "/workspace", parentContext: "policy", task: "wait" });
+
+  const outcome = await Promise.race([
+    controller.close().then(() => "closed"),
+    new Promise<"timed-out">((resolve) => setTimeout(() => resolve("timed-out"), 50)),
+  ]);
+
+  assert.equal(outcome, "closed");
+  assert.deepEqual(calls, ["unsubscribe", "dispose"]);
+});
+
 test("closes idempotently and rejects stale work after shutdown", async () => {
   const calls: string[] = [];
   let settle: (() => void) | undefined;

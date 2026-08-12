@@ -28,6 +28,7 @@ export type BackgroundResult =
 export type BackgroundSessionController = {
   launch(options: BackgroundLaunchOptions): Promise<BackgroundTaskSnapshot>;
   result(id: string): BackgroundResult;
+  setStatus(id: string, status: "running" | "waiting-for-permission"): BackgroundTaskSnapshot | undefined;
   close(): Promise<void>;
 };
 
@@ -40,6 +41,7 @@ export type BackgroundCompletionSignal = {
 
 export type BackgroundControllerOptions = {
   notify?: (message: BackgroundCompletionSignal, options: { deliverAs: "nextTurn"; triggerTurn: false }) => void;
+  cleanupTimeoutMs?: number;
 };
 
 export type CreateManagedSubagentSession = (options: {
@@ -92,6 +94,10 @@ export function createBackgroundSessionController(
   }
 
   return {
+    setStatus(id, status) {
+      return registry.transition(id, status);
+    },
+
     async close() {
       if (closed) return;
       closed = true;
