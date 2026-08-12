@@ -109,6 +109,8 @@ Pi SDK detail verified from installed declarations:
 - Fixed next-turn completion notification with no trigger and no child-authored content.
 - Shutdown/reload/new/resume/fork abort, unsubscribe, bounded wait, disposal, and stale-callback rejection.
 - Proof that raw events do not enter audit/debug logs, completion signals, or parent context before explicit retrieval.
+- Main-versus-child and child-versus-main prompt overlap through one session-owned FIFO presentation seam, with exact-request cancellation, prompt-error, shutdown, and no-double-settlement coverage.
+- Child parity with main cwd-aware permission semantics, including in-cwd read/search auto-allow, configured allow/deny precedence, and `.aiignore` denial.
 
 ## Numeric risk score: 7 / 10
 
@@ -116,7 +118,7 @@ Pi SDK detail verified from installed declarations:
 - **Fan-out: 3 / 3** — SDK session/events, lifecycle, persistence, tool registry, schema validation, and authorization all participate.
 - **Recent churn: 1 / 3** — one relevant consolidated change appears in the last 20 ancestors for each target path.
 
-The score does not exceed the mandatory `grill-me` threshold. Qualitative risk remains **High** because the change extends execution beyond invocation lifetime across an authorization boundary.
+The score does not exceed the mandatory `grill-me` threshold. Qualitative risk remains **High** because the change extends execution beyond invocation lifetime across an authorization boundary. Manual UAT subsequently proved the shared prompt UI is also a direct dependent: main and child prompt callers can overlap even while only one child is active.
 
 ## Recommended action
 

@@ -1,7 +1,7 @@
 active_flow: build_epic
 active_epic_id: e06
-active_story_id: e06s07
-active_story: e06s07
+active_story_id: e06s05
+active_story: e06s05
 active_bug_id: null
 git:
   bookmark: e06-observable-background-subagents
@@ -21,18 +21,16 @@ planning:
     constraints:
       - "Do not modify the e06 repair flow or child-private bridge catalog."
 handoff:
-  last_step_completed: Scoped e06s07 child account/model runtime selection: selected Codex OAuth accounts use child-local provider auth, broad subagent allows cannot bypass selected-runtime approval, and account-switcher must export the shared resolver.
+  last_step_completed: Manual e06s05 verification found main-versus-child permission prompt cross-wiring; deterministic RED coverage is next
   open_decisions: []
   required_reading:
     - .specs/epics/e06-permission-enforced-subagents/e06s05-background-subagent-results.md
     - .specs/epics/e06-permission-enforced-subagents/e06s05-tasks.yaml
     - .specs/epics/e06-permission-enforced-subagents/e06s06-switchable-live-transcripts.md
-    - .specs/epics/e06-permission-enforced-subagents/e06s07-child-account-model-selection.md
-    - .specs/epics/e06-permission-enforced-subagents/e06s07-tasks.yaml
     - .specs/security/epics/e06/THREAT_MODEL.md
   next_skill: develop-tdd
-  context: Phase Execute. e06s05 renderer/permission UAT remains incomplete; do not advance it to verify-work. e06s07 is now scoped as the follow-on account/model runtime slice. The first implementation supports account-switcher's existing openai-codex OAuth accounts (work, personal) only. Never inject account credentials through process.env: children run in the parent Node process. Extract an account-switcher public read-only resolver so tool-permissions and subagent share the same redacted selected account/model descriptor. A selected runtime always enters the existing parent-session FIFO launch approval despite broad subagent allow rules; deny wins. Build a child-local ModelRuntime/provider-auth override and persist refresh only to the selected account record. Consume NEXT_ID only after approved successful child construction. E07s01 remains paused.
-  blocker: e06s05 renderer automation is green, but live Ctrl+O expansion/color/large-result responsiveness, reload/cancellation, and deterministic main-to-child overlap UAT remain required before verify-work. e06s07 requires a public account-switcher resolver/credential adapter before this repository can safely construct a child runtime; do not couple to its private JSON files or mutate process.env. A same-model rerun presently fails before child launch with Codex usage-limit exhaustion, so do not attribute provider failure to renderer/runtime code without evidence.
+  context: Phase Execute. E06s05 mechanical gates were green at 110 tests, but manual verification exposed a blocking shared-UI race: a child permission prompt arriving while a main prompt was open could cause one interaction to approve both requests. Continue strict TDD at the shared tool-permissions presentation seam. The fix must provide one session-owned FIFO queue with immutable request identity for main and child prompts, exact-request cancellation/shutdown, and child parity with the main cwd-aware allow/deny model. Preserve the sole tool-permissions authorization boundary and separate RED/GREEN Jujutsu changes. E07s01 remains paused.
+  blocker: Main and child permission prompts can overlap and cross-settle; manual verification is blocked until shared FIFO identity binding and policy parity pass.
   deferred_work:
     - "Resume e07s01 at build-epic Step 2 after e06 observable background subagents"
     - "Persist completed and active child sessions for later external analysis"

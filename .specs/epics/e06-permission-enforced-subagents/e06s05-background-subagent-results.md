@@ -30,7 +30,9 @@ Start a child as a parent-owned background task, return its stable ID immediatel
 - Make `subagent_result` return the current structured status for incomplete children and a stable bounded result snapshot for terminal children; repeated retrieval is read-only.
 - Send a fixed `subagent_finished` signal containing only generated child ID and enumerated terminal status into the parent's next natural turn without triggering a turn.
 - Cancel, unsubscribe, await bounded cleanup, and dispose active children on parent cancellation or session shutdown for quit, reload, new, resume, and fork.
-- Until e06s06 provides keyed permission-prompt serialization, allow at most one active child because every child can reach an interactive permission decision.
+- Present all main-agent and child permission requests through one parent-session-owned FIFO queue; bind each waiter to immutable request ID, actor, tool name, cwd, and safe input identity so one decision can settle only its visible request.
+- Apply the same cwd-aware permission model to child requests as main requests: configured denies win, configured allows execute without prompting, and reads/searches inside the child cwd auto-allow unless excluded by `.aiignore`.
+- Until e06s06 permits multiple active children, continue to allow at most one active child even though main-versus-child prompts are serialized.
 - Bound retained event count, per-event UTF-8 bytes, total UTF-8 bytes, retained terminal results, and cleanup time; truncation or limit failure must be explicit.
 - Preserve Pi's existing child `SessionManager` as the sole durable child-message store; normalized events remain session-scoped memory only.
 
@@ -98,10 +100,20 @@ Changes `extensions/subagent/agent-session.ts` from invocation-scoped execution 
 **When** the parent session exits or reloads
 **Then** every child is cancelled and disposed without persistence or orphan work.
 
-### Scenario: Prompt concurrency before e06s06
-**Given** one background child can require interactive permission
-**When** another child launch is requested before keyed prompt serialization exists
-**Then** the second launch is rejected rather than risking a crossed permission decision.
+### Scenario: Main and child prompt concurrency
+**Given** a main-agent permission prompt is visible and a child permission request arrives, or the requests arrive in the reverse order
+**When** the user decides the visible prompt
+**Then** only that immutable request settles, the next request appears in FIFO order, and it requires an independent decision.
+
+### Scenario: Child permission parity
+**Given** a child requests a tool in its effective cwd
+**When** the request matches an automatic in-project read/search rule, configured allow rule, configured deny rule, or `.aiignore`
+**Then** the shared main-agent permission model produces the same allow, deny, or prompt outcome without a second evaluator.
+
+### Scenario: Temporary child admission limit
+**Given** one background child is active
+**When** another child launch is requested before e06s06
+**Then** the second launch is rejected while the temporary one-active-child limit remains in force.
 
 ## 18. Automated verification
 - `node --test extensions/subagent/background-session.test.ts`
@@ -121,6 +133,7 @@ For every behavior, first add the smallest compilable public stub, record a beha
 5. Queue a fixed ID-plus-status `subagent_finished` message for the next natural turn without child-authored content or an automatic turn → verify: node --test extensions/subagent/background-lifecycle.test.ts
 6. Close on abort and every session-shutdown reason by denying pending work, aborting children, unsubscribing, bounding cleanup, disposing, and rejecting stale callbacks → verify: node --test extensions/subagent/background-lifecycle.test.ts
 7. Preserve schema validation, cwd-aware authorization, fail-closed prompting, exactly-once execution/audit, and absence of raw child events from logs or parent context → verify: node --test extensions/subagent/agent-session.test.ts extensions/subagent/index.test.ts extensions/subagent/missing-ui.test.ts extensions/subagent/permission-boundary.test.ts extensions/subagent/working-directory.test.ts extensions/tool-permissions/permission-boundary.test.ts && npm run check
+8. Serialize main and child permission presentation through one session-owned immutable-identity FIFO queue, cancel/close exact waiters fail-closed, and route child requests through the same cwd-aware automatic/configured allow and deny model as main requests → verify: node --test extensions/tool-permissions/prompt-queue.test.ts extensions/subagent/missing-ui.test.ts extensions/subagent/permission-boundary.test.ts
 
 ## 20. Definition of done
 A child runs without blocking the foreground agent, exposes a bounded observable event stream, signals completion without triggering a turn, returns output only through explicit retrieval, and leaves no active work after shutdown.

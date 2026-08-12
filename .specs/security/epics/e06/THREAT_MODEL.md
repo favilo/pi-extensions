@@ -25,7 +25,7 @@ Out of scope:
 | Asset | Boundary / concern |
 |---|---|
 | User files, repositories, and credentials | A background child remains untrusted model output; every capability request must cross the same scoped permission boundary as foreground work. |
-| User approval | A decision for one child and tool request must never authorize another queued request or child. |
+| User approval | A decision for one main-agent or child tool request must never authorize another queued request or actor. |
 | Parent foreground session | Child completion and event streaming must not mutate parent model context unexpectedly, trigger unsolicited turns, or make the foreground unusable. |
 | Child task registry | IDs, state, cancellation controllers, buffers, and results must remain scoped to one live parent extension instance. |
 | Child transcript | Assistant text, tool arguments, tool results, paths, and permission details may contain secrets and must not leak into audit/debug logs or unrelated sessions. |
@@ -42,9 +42,9 @@ Returning from the launch tool before child completion could detach the child fr
 
 ### Permission decision cross-wiring — HIGH — CWE-362 / CWE-863
 
-Concurrent children can request permission while focus changes. Overlapping dialogs or an unkeyed resolver may deliver one user's decision to another child or request.
+Main-agent and child requests can overlap while focus changes. Overlapping dialogs or an unkeyed resolver may deliver one user's decision to multiple requests or to the wrong actor; limiting child concurrency does not prevent this main-versus-child race.
 
-**Required mitigation:** Assign immutable request IDs bound to child ID, tool name, safe input identity, and cwd. Present permission dialogs through one FIFO parent-owned queue and resolve only the matching waiter. Cancellation removes or resolves that exact request as denied. Until the queue ships in e06s06, e06s05 must permit at most one active child capable of prompting.
+**Required mitigation:** Assign immutable request IDs bound to actor identity, tool name, safe input identity, and cwd. Present every main and child permission dialog through one FIFO parent-session-owned queue and resolve only the matching waiter. Active or queued cancellation resolves that exact request fail-closed; prompt errors and shutdown deny/cancel every still-pending request exactly once. Keep the temporary one-active-child admission limit until e06s06 separately expands child concurrency.
 
 ### Missing UI or hidden permission prompt — HIGH — CWE-754 / CWE-863
 
@@ -111,7 +111,8 @@ The working tree changes only planning and threat-model artifacts; no new runtim
 - Prove launch returns before child completion while the foreground remains usable.
 - Prove every background tool request still crosses schema validation, cwd-aware policy evaluation, permission prompting, execution, and audit exactly once.
 - Prove e06s05 rejects a second prompt-capable active child until keyed prompt serialization exists.
-- Prove request IDs prevent concurrent permission decisions from crossing child identity, tool, or cwd.
+- Prove request IDs prevent concurrent permission decisions from crossing main/child actor identity, tool, cwd, or safe input identity in both arrival orders.
+- Prove child requests receive the same cwd-aware automatic allow, configured allow, configured deny, and `.aiignore` outcomes as equivalent main requests.
 - Prove missing/hidden UI, prompt cancellation, queue cancellation, and shutdown all deny rather than allow.
 - Prove reload, session replacement, abort, and exit unsubscribe and dispose every child with no late state mutation.
 - Prove generated child IDs cannot retrieve another parent registry's status, events, or result.
