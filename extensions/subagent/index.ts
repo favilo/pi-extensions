@@ -7,17 +7,24 @@ import {
   createLsToolDefinition,
   createReadToolDefinition,
   createWriteToolDefinition,
+  highlightCode,
   SessionManager,
   type ExtensionAPI,
   type ExtensionContext,
   type ToolDefinition,
 } from "@earendil-works/pi-coding-agent";
+import { Text } from "@earendil-works/pi-tui";
 import { getPublishedToolDefinitions } from "../tool-registry/index.ts";
 import { createToolPermissionBoundary, logSubagentDebug, promptToolPermissionRequest, type PermissionContext } from "../tool-permissions/index.ts";
 import type { ToolPermissionBoundary } from "../tool-permissions/permission-boundary.ts";
 import { createSubagentSession, executeChildToolRequest, resolveSubagentCwd } from "./agent-session.ts";
-import { createBackgroundSessionController, type BackgroundSessionController } from "./background-lifecycle.ts";
+import {
+  createBackgroundSessionController,
+  type BackgroundResult,
+  type BackgroundSessionController,
+} from "./background-lifecycle.ts";
 import { createCompletionSignalDispatcher } from "./completion-delivery.ts";
+import { subagentResultDisplay } from "./result-renderer.ts";
 
 const subagentParameters = {
   type: "object",
@@ -212,6 +219,33 @@ export default function subagentExtension(pi: ExtensionAPI): void {
         content: [{ type: "text", text: JSON.stringify(result) }],
         details: result,
       };
+    },
+    renderCall(args: SubagentResultParameters, theme) {
+      return new Text(
+        theme.fg("toolTitle", theme.bold("subagent_result ")) + theme.fg("accent", args.id),
+        0,
+        0,
+      );
+    },
+    renderResult(result, { expanded, isPartial }, theme) {
+      if (isPartial) return new Text(theme.fg("warning", "Retrieving..."), 0, 0);
+      const details = result.details as BackgroundResult | undefined;
+      if (!details) {
+        const content = result.content[0];
+        return new Text(content?.type === "text" ? content.text : "No result", 0, 0);
+      }
+
+      const display = subagentResultDisplay(details, expanded);
+      const statusColor = !details.found
+        ? "warning"
+        : details.status === "completed"
+          ? "success"
+          : details.status === "failed" || details.status === "cancelled"
+            ? "error"
+            : "accent";
+      let text = theme.fg(statusColor, display.summary);
+      if (display.expandedJson) text += `\n${highlightCode(display.expandedJson, "json").join("\n")}`;
+      return new Text(text, 0, 0);
     },
   });
 

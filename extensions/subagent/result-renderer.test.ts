@@ -37,6 +37,6 @@ test("pretty-prints the structured result only when expanded", () => {
   const expanded = subagentResultDisplay(completed, true);
 
   assert.match(expanded.expandedJson ?? "", /\n  "found": true/);
-  assert.match(expanded.expandedJson ?? "", /\n    "events": \{/);
+  assert.match(expanded.expandedJson ?? "", /\n  "events": \{/);
   assert.match(expanded.expandedJson ?? "", /finished ✓/);
 });
