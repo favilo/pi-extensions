@@ -59,7 +59,7 @@ tasks:
     description: >-
       Register subagent_result as the sole explicit lookup operation, returning current structured status without fabricated output for active children and atomic stable bounded snapshots for terminal children.
     verify: node --test extensions/subagent/background-session.test.ts
-    status: failing
+    status: passing
     risk: P0
     security: high
     security_verification: >-
