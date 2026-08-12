@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createBackgroundTaskRegistry } from "./background-session.ts";
+import { createBackgroundSessionController, type ManagedSubagentSession } from "./background-lifecycle.ts";
 
 test("generates distinct opaque IDs scoped to one parent registry", () => {
   const firstRegistry = createBackgroundTaskRegistry();
@@ -26,6 +27,34 @@ test("admits only one active child until the first becomes terminal", () => {
 
   assert.equal(registry.transition(first.id, "completed")?.terminal, true);
   assert.doesNotThrow(() => registry.register("/workspace/second"));
+});
+
+test("returns active status and stable terminal output only through explicit scoped lookup", async () => {
+  let settle: (() => void) | undefined;
+  const pending = new Promise<void>((resolve) => { settle = resolve; });
+  const session: ManagedSubagentSession = {
+    prompt: () => pending,
+    subscribe: () => () => {},
+    getLastAssistantText: () => "bounded child output",
+    dispose() {},
+  };
+  const controller = createBackgroundSessionController(async () => session);
+  const foreign = createBackgroundSessionController(async () => session);
+  const launched = await controller.launch({ cwd: "/workspace", parentContext: "policy", task: "inspect" });
+
+  const active = controller.result(launched.id);
+  assert.equal(active.found, true);
+  assert.equal(active.status, "running");
+  assert.equal("output" in active, false);
+  assert.deepEqual(controller.result("unknown-child"), { found: false, status: "unknown" });
+  assert.deepEqual(foreign.result(launched.id), { found: false, status: "unknown" });
+
+  settle?.();
+  await new Promise((resolve) => setImmediate(resolve));
+  const completed = controller.result(launched.id);
+  assert.equal(completed.status, "completed");
+  assert.equal(completed.found && completed.output, "bounded child output");
+  assert.deepEqual(controller.result(launched.id), completed);
 });
 
 test("tracks lifecycle states and seals the first terminal transition", () => {

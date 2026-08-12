@@ -16,8 +16,17 @@ export type BackgroundLaunchOptions = {
   task: string;
 };
 
+export type BackgroundResult =
+  | { found: false; status: "unknown" }
+  | (BackgroundTaskSnapshot & {
+    found: true;
+    events: ReturnType<ReturnType<typeof createBackgroundEventBuffer>["snapshot"]>;
+    output?: string;
+  });
+
 export type BackgroundSessionController = {
   launch(options: BackgroundLaunchOptions): Promise<BackgroundTaskSnapshot>;
+  result(id: string): BackgroundResult;
 };
 
 export type CreateManagedSubagentSession = (options: {
@@ -39,6 +48,10 @@ export function createBackgroundSessionController(
   const registry = createBackgroundTaskRegistry();
 
   return {
+    result() {
+      return { found: false, status: "unknown" };
+    },
+
     async launch(options) {
       const task = registry.register(options.cwd);
       const cancellation = new AbortController();
