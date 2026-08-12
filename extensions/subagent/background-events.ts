@@ -58,24 +58,30 @@ function candidate(event: AgentSessionEvent): Candidate | undefined {
   return undefined;
 }
 
+function serialize(payload: unknown): string {
+  try {
+    return JSON.stringify(payload, (_key, value) => typeof value === "bigint" ? value.toString() : value) ?? "null";
+  } catch {
+    return JSON.stringify({ unavailable: true });
+  }
+}
+
 function payloadBytes(payload: unknown): number {
-  return Buffer.byteLength(JSON.stringify(payload), "utf8");
+  return Buffer.byteLength(serialize(payload), "utf8");
 }
 
 function boundedPayload(payload: unknown, maximum: number): { payload: unknown; bytes: number; truncated: boolean } {
-  const serialized = JSON.stringify(payload);
+  const serialized = serialize(payload);
   const bytes = Buffer.byteLength(serialized, "utf8");
   if (bytes <= maximum) return { payload, bytes, truncated: false };
 
-  const empty = JSON.stringify({ truncated: "" });
-  const budget = Math.max(0, maximum - Buffer.byteLength(empty, "utf8"));
-  let value = Buffer.from(serialized, "utf8").subarray(0, budget).toString("utf8");
-  let bounded = { truncated: value };
-  while (value && payloadBytes(bounded) > maximum) {
-    value = value.slice(0, -1);
-    bounded = { truncated: value };
+  let value = "";
+  for (const character of serialized) {
+    const candidate = `${value}${character}`;
+    if (Buffer.byteLength(JSON.stringify(candidate), "utf8") > maximum) break;
+    value = candidate;
   }
-  return { payload: bounded, bytes: payloadBytes(bounded), truncated: true };
+  return { payload: value, bytes: Buffer.byteLength(JSON.stringify(value), "utf8"), truncated: true };
 }
 
 /** Creates a session-memory adapter for exposed, non-reasoning child events. */

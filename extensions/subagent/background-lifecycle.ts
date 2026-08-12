@@ -54,8 +54,19 @@ export type CreateManagedSubagentSession = (options: {
 }) => Promise<ManagedSubagentSession>;
 
 const DEFAULT_CLEANUP_TIMEOUT_MS = 2_000;
-const DEFAULT_MAX_OUTPUT_BYTES = 256 * 1_024;
+const DEFAULT_MAX_OUTPUT_BYTES = 1_024 * 1_024;
 const DEFAULT_MAX_RETAINED_RESULTS = 20;
+
+function truncateUtf8(value: string, maximum: number): { value: string; truncated: boolean } {
+  const encoded = Buffer.byteLength(value, "utf8");
+  if (encoded <= maximum) return { value, truncated: false };
+  let bounded = "";
+  for (const character of value) {
+    if (Buffer.byteLength(`${bounded}${character}`, "utf8") > maximum) break;
+    bounded += character;
+  }
+  return { value: bounded, truncated: true };
+}
 
 const DEFAULT_EVENT_LIMITS: BackgroundEventLimits = {
   maxEvents: 1_000,
@@ -185,10 +196,9 @@ export function createBackgroundSessionController(
           () => {
             const output = session.getLastAssistantText?.();
             if (output !== undefined) {
-              const maximum = controllerOptions.maxOutputBytes ?? DEFAULT_MAX_OUTPUT_BYTES;
-              const encoded = Buffer.from(output, "utf8");
-              runtime.outputTruncated = encoded.byteLength > maximum;
-              runtime.output = encoded.subarray(0, maximum).toString("utf8");
+              const bounded = truncateUtf8(output, controllerOptions.maxOutputBytes ?? DEFAULT_MAX_OUTPUT_BYTES);
+              runtime.outputTruncated = bounded.truncated;
+              runtime.output = bounded.value;
             }
             finish(task.id, "completed");
           },
