@@ -191,6 +191,20 @@ test("an active cancellation cannot be overwritten by a late prompt result", asy
   assert.equal(await first, "cancel");
 });
 
+test("shares one queue across separately loaded extension module graphs", async () => {
+  const firstModule = await import(new URL("./prompt-queue.ts?extension=main", import.meta.url).href);
+  const secondModule = await import(new URL("./prompt-queue.ts?extension=child", import.meta.url).href);
+  const first = firstModule.permissionPromptQueueFor({});
+  const second = secondModule.permissionPromptQueueFor({});
+
+  try {
+    assert.equal(first, second);
+  } finally {
+    firstModule.closePermissionPromptQueue({});
+    secondModule.closePermissionPromptQueue({});
+  }
+});
+
 test("uses main-agent cwd and configured policy semantics for child requests", () => {
   const root = mkdtempSync(join(tmpdir(), "pi-permission-parity-"));
   const cwd = join(root, "project");
