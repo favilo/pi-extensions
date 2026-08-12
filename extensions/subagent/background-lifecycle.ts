@@ -109,12 +109,14 @@ export function createBackgroundSessionController(
     if (!current || current.terminal) return;
     registry.transition(id, status);
     retainTerminal(id);
-    controllerOptions.notify?.({
-      customType: "subagent_finished",
-      content: `subagent_finished:${id}:${status}`,
-      display: false,
-      details: { id, status },
-    }, { deliverAs: "steer", triggerTurn: true });
+    if (!closed) {
+      controllerOptions.notify?.({
+        customType: "subagent_finished",
+        content: `subagent_finished:${id}:${status}`,
+        display: false,
+        details: { id, status },
+      }, { deliverAs: "steer", triggerTurn: true });
+    }
   }
 
   async function waitForAbort(session: ManagedSubagentSession): Promise<void> {
