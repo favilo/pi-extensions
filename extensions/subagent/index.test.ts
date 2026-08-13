@@ -55,7 +55,7 @@ test("registers background launch, explicit result lookup, and shutdown cleanup"
   assert.match(expanded, /visible only when expanded/);
 });
 
-test("gives a child only the permission bridge tool", () => {
+test("gives a child only the permission bridge tool with structured object arguments", () => {
   const boundary = {
     evaluate: async () => "deny" as const,
     prompt: async () => "deny" as const,
@@ -70,6 +70,11 @@ test("gives a child only the permission bridge tool", () => {
     assert.equal((tool.parameters as { type?: string }).type, "object");
     assert.equal(typeof tool.execute, "function");
   }
+  const parameters = tools[0].parameters as {
+    properties?: { input?: { type?: string; description?: string } };
+  };
+  assert.equal(parameters.properties?.input?.type, "object");
+  assert.match(parameters.properties?.input?.description ?? "", /not a JSON-encoded string/i);
 });
 
 test("does not invoke the underlying tool when the boundary denies", async () => {
