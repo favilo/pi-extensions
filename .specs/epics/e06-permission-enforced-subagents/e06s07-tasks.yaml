@@ -1,0 +1,64 @@
+story_id: e06s07
+title: Launch subagents with an isolated account and model
+status: todo
+bcps: 5
+delta: ADDED
+spec: e06s07-child-account-model-selection.md
+tdd_policy: >-
+  Before each RED run, add the smallest compilable public stub. Record behavioral RED and GREEN implementation in separate Jujutsu changes; missing modules, exports, imports, or functions are invalid RED evidence.
+tasks:
+  - id: 1
+    description: >-
+      Extract a public read-only account-switcher child-runtime selection and OAuth credential adapter. Persist refreshes only to the selected account through serialized updates.
+    verify: >-
+      Run the account-switcher resolver and refresh-persistence tests in its repository.
+    status: todo
+    risk: P0
+    security: high
+    tdd:
+      red: A compilable resolver stub fails precedence, redaction, selected-record-only refresh, and concurrent update assertions.
+      green: The resolver returns one immutable selection descriptor and refresh persistence updates only its selected account.
+
+  - id: 2
+    description: >-
+      Add account/model launch fields and one shared resolution path used by both permission presentation and child construction.
+    verify: node --test extensions/subagent/account-runtime.test.ts extensions/subagent/index.test.ts
+    status: todo
+    risk: P0
+    security: high
+    tdd:
+      red: A compilable selection seam fails explicit, one-shot, inherited, unknown-account, malformed-selector, and provider-mismatch assertions.
+      green: Selection is deterministic and no credential material enters a descriptor or result.
+
+  - id: 3
+    description: >-
+      Require serialized interactive approval for resolved child account/model selection despite broad subagent allow rules, preserving deny precedence and fail-closed no-UI behavior.
+    verify: node --test extensions/tool-permissions/index.test.ts extensions/tool-permissions/prompt-queue.test.ts
+    status: todo
+    risk: P0
+    security: high
+    tdd:
+      red: A broad allow bypasses a selected runtime or a queued launch approval settles the wrong request.
+      green: The FIFO shows the resolved runtime once and only its visible request may settle.
+
+  - id: 4
+    description: >-
+      Create an isolated child ModelRuntime for selected openai-codex OAuth accounts, install child-only auth resolution, persist selected-account refresh, and pass the selected model into AgentSession.
+    verify: node --test extensions/subagent/agent-session.test.ts extensions/subagent/account-runtime.test.ts && npm run check
+    status: todo
+    risk: P0
+    security: high
+    tdd:
+      red: A child runtime stub shares parent auth/environment or uses the wrong selected account/model.
+      green: Parent and child runtimes remain independent and refresh updates only the selected account record.
+
+  - id: 5
+    description: >-
+      Consume one-shot selection only after approved successful construction and reject unsupported raw-env, API-key, custom-provider, and Antigravity selections without child launch.
+    verify: node --test extensions/subagent/account-runtime.test.ts extensions/subagent/agent-session.test.ts
+    status: todo
+    risk: P0
+    security: high
+    tdd:
+      red: Failed/denied launch consumes the override or unsupported credentials reach process environment.
+      green: Consumption is exactly once after construction and unsupported selections fail closed.

@@ -2,7 +2,7 @@
 
 ## Scope
 
-This threat model covers the existing permission-enforced child runtime and the e06s05–e06s06 increment: parent-session-owned background execution, normalized `AgentSessionEvent` buffering, explicit status/result retrieval, minimal completion signals, switchable read-only transcript panels, and main-window permission prompts.
+This threat model covers the existing permission-enforced child runtime and the e06s05–e06s07 increment: parent-session-owned background execution, normalized `AgentSessionEvent` buffering, explicit status/result retrieval, minimal completion signals, switchable read-only transcript panels, selected child account/model runtimes, and main-window permission prompts.
 
 In scope:
 
@@ -11,6 +11,7 @@ In scope:
 - Child working-directory and permission-policy resolution.
 - Child tool-call interception through the existing `tool-permissions` boundary.
 - Concurrent children, serialized permission prompts, panel identity, focus, and shutdown/reload behavior.
+- Read-only account-switcher selection, child-local OAuth provider overrides, and selected-account credential refresh persistence.
 
 Out of scope:
 
@@ -19,6 +20,7 @@ Out of scope:
 - External transcript-analysis APIs.
 - Private provider reasoning not published by Pi.
 - Bash subcommand parsing (e07).
+- Raw environment-backed, API-key, custom-provider, and Antigravity account adapters; e06s07 rejects them until a child-local provider contract is specified.
 
 ## Assets and trust boundaries
 
@@ -31,8 +33,15 @@ Out of scope:
 | Child transcript | Assistant text, tool arguments, tool results, paths, and permission details may contain secrets and must not leak into audit/debug logs or unrelated sessions. |
 | UI identity and focus | The visible child, requesting child, and permission decision recipient must remain unambiguous during concurrent updates and panel switches. |
 | Child session storage | Pi may persist child messages through a file-backed `SessionManager`; event buffering must not silently create a second durable secret-bearing store. |
+| Account selection and OAuth credentials | A child must receive the approved account only; parent process environment, parent runtime, other account records, and prompt/result/audit surfaces must not receive credentials. |
 
 ## Abuse cases and required mitigations
+
+### Account/model selection mismatch or credential cross-contamination — HIGH — CWE-863 / CWE-362
+
+A broad delegation allow, stale one-shot override, duplicated resolver, or process-wide environment mutation could approve one account/model while launching another, change the parent account, or expose one account’s OAuth credential to another child.
+
+**Required mitigation:** Use one shared read-only account-switcher resolver for launch approval and construction. The resolver returns a redacted immutable descriptor; credential values never enter prompts, logs, results, or parent context. Explicit and env-derived selection always requires the existing parent-session FIFO approval even under broad allow rules; configured deny wins and no-UI selection fails closed. Install OAuth only into a child-local provider/runtime override. Consume one-shot selection only after approved successful construction. Serialize refresh persistence and update only the descriptor’s selected account record. Reject unsupported environment/API-key/custom-provider adapters rather than mutating `process.env`.
 
 ### Authorization bypass in detached execution — HIGH — CWE-863 / CWE-284
 
@@ -109,6 +118,9 @@ The implemented e06s05 runtime keeps child execution behind `tool-permissions`, 
 ## Verification obligations
 
 - Prove launch returns before child completion while the foreground remains usable.
+- Prove explicit, one-shot, and inherited selected runtimes resolve identically for the prompt and child construction; broad allow rules cannot suppress that prompt, deny rules win, and no UI fails closed.
+- Prove selected `openai-codex` OAuth credentials are installed only into the child runtime, refresh only the selected account record, and never mutate the parent runtime or process environment.
+- Prove one-shot overrides survive denial/cancellation/construction failure and are consumed exactly once after successful construction.
 - Prove every background tool request still crosses schema validation, cwd-aware policy evaluation, permission prompting, execution, and audit exactly once.
 - Prove e06s05 rejects a second prompt-capable active child until keyed prompt serialization exists.
 - Prove request IDs prevent concurrent permission decisions from crossing main/child actor identity, tool, cwd, or safe input identity in both arrival orders.

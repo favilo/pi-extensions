@@ -1,7 +1,7 @@
 id: e06
 title: Permission-enforced runnable subagents
 wsjf: 6.0
-total_bcps: 19
+total_bcps: 24
 status: planned
 stories:
   - id: e06s01
@@ -46,3 +46,10 @@ stories:
     delta: ADDED
     spec: e06s06-switchable-live-transcripts.md
     tasks: e06s06-tasks.yaml
+  - id: e06s07
+    title: Launch subagents with an isolated account and model
+    bcps: 5
+    status: todo
+    delta: ADDED
+    spec: e06s07-child-account-model-selection.md
+    tasks: e06s07-tasks.yaml
