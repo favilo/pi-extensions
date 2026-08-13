@@ -62,6 +62,20 @@ function promptHarness() {
   };
 }
 
+test("renders child permission details with actual line breaks", async () => {
+  const { components, context, childPi } = promptHarness();
+  const pending = promptToolPermissionRequest(childPi, context, request({ kind: "child", childId: "amber-otter" }, "bash", { command: "pwd" }));
+
+  try {
+    const text = components[0].render(100).join("\n");
+    assert.match(text, /\nTool: bash\nWorking directory:/);
+    assert.doesNotMatch(text, /\\nTool:/);
+  } finally {
+    components[0].handleInput("\x04");
+    assert.equal(await pending, "deny");
+  }
+});
+
 for (const actors of [
   [{ kind: "main" } as const, { kind: "child", childId: "amber-otter" } as const],
   [{ kind: "child", childId: "amber-otter" } as const, { kind: "main" } as const],
