@@ -54,6 +54,33 @@ test("refuses invalid and untrusted local permission editor targets", () => {
   });
 });
 
+test("configured custom tools allow non-interactive calls", async () => {
+  const agentDir = mkdtempSync(join(tmpdir(), "pi-permissions-agent-"));
+  writeFileSync(join(agentDir, "permissions.toml"), stringifyToml({
+    permissions: { subagent_result: { allow: [{}], deny: [] } },
+  }));
+  const handlers = new Map<string, (event: { toolName: string; input: unknown }, ctx: { cwd: string; hasUI: boolean }) => Promise<unknown>>();
+  const previousAgentDir = process.env.PI_CODING_AGENT_DIR;
+  process.env.PI_CODING_AGENT_DIR = agentDir;
+  try {
+    const { default: toolPermissionPolicy } = await import(`./index.ts?agent-dir=${encodeURIComponent(agentDir)}`);
+    toolPermissionPolicy({
+      registerCommand() {},
+      on(event: string, handler: (event: { toolName: string; input: unknown }, ctx: { cwd: string; hasUI: boolean }) => Promise<unknown>) {
+        if (event === "tool_call") handlers.set(event, handler);
+      },
+      getAllTools: () => [{ name: "subagent_result" }],
+    } as never);
+    assert.equal(await handlers.get("tool_call")?.({ toolName: "subagent_result", input: { id: "child-1" } }, {
+      cwd: "/tmp/project",
+      hasUI: false,
+    }), undefined);
+  } finally {
+    if (previousAgentDir === undefined) delete process.env.PI_CODING_AGENT_DIR;
+    else process.env.PI_CODING_AGENT_DIR = previousAgentDir;
+  }
+});
+
 test("all protected tool families use the scoped decision boundary", () => {
   const userPath = join(mkdtempSync(join(tmpdir(), "pi-permissions-index-")), "permissions.toml");
   writeFileSync(userPath, userPolicy);
