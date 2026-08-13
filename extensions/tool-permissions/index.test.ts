@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import { stringify as stringifyToml } from "smol-toml";
-import { resolvePermissionEditorTarget, resolveToolPermissionDecision } from "./index.ts";
+import { requiresSubagentRuntimeApproval, resolvePermissionEditorTarget, resolveToolPermissionDecision } from "./index.ts";
 
 const userPolicy = stringifyToml({
   permissions: {
@@ -79,6 +79,14 @@ test("configured custom tools allow non-interactive calls", async () => {
     if (previousAgentDir === undefined) delete process.env.PI_CODING_AGENT_DIR;
     else process.env.PI_CODING_AGENT_DIR = previousAgentDir;
   }
+});
+
+test("requires a runtime-selection prompt for explicit and inherited subagent accounts", () => {
+  assert.equal(requiresSubagentRuntimeApproval({ task: "inspect", account: "personal" }, {}), true);
+  assert.equal(requiresSubagentRuntimeApproval({ task: "inspect", model: "openai-codex/gpt-5.6" }, {}), true);
+  assert.equal(requiresSubagentRuntimeApproval({ task: "inspect" }, { PI_ACCOUNT_SWITCHER_NEXT_ID: "work" }), true);
+  assert.equal(requiresSubagentRuntimeApproval({ task: "inspect" }, { PI_ACCOUNT_SWITCHER_ACTIVE_ID: "personal" }), true);
+  assert.equal(requiresSubagentRuntimeApproval({ task: "inspect" }, {}), false);
 });
 
 test("all protected tool families use the scoped decision boundary", () => {
