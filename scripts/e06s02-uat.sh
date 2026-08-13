@@ -26,6 +26,8 @@ case "$scenario" in
     cat >"$tmp_dir/agent/permissions.toml" <<'EOF'
 [[permissions.subagent.allow]]
 
+[[permissions.subagent_result.allow]]
+
 [[permissions.bash.allow]]
 command = "^ls -l$"
 EOF
