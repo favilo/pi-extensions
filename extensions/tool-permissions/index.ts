@@ -637,7 +637,7 @@ export async function promptToolPermissionRequest(
       "",
       "Arguments:",
       compact(request.input, 8000),
-    ].join("\\n"),
+    ].join("\n"),
   );
   const decision = result.allowed ? "allow" : result.decision;
   logSubagentDebug("permission-prompt-result", { request, decision, result });
