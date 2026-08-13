@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { resolveSubagentRuntime, type SubagentAccount } from "./account-runtime.ts";
+import { getPublishedChildRuntimeApi, resolveSubagentRuntime, type SubagentAccount } from "./account-runtime.ts";
 
 const accounts: SubagentAccount[] = [
   {
@@ -25,6 +25,19 @@ const accounts: SubagentAccount[] = [
 ];
 
 const parentModel = { provider: "openai-codex", id: "gpt-5.5" };
+
+test("finds the account-switcher runtime capability without importing its private storage", () => {
+  const api = {
+    resolve: async () => undefined,
+  };
+  const key = Symbol.for("pi-account-switcher.child-runtime.v1");
+  (globalThis as Record<symbol, unknown>)[key] = api;
+  try {
+    assert.equal(getPublishedChildRuntimeApi(), api);
+  } finally {
+    delete (globalThis as Record<symbol, unknown>)[key];
+  }
+});
 
 test("resolves an explicit child account without changing inherited selection", () => {
   const environment = { PI_ACCOUNT_SWITCHER_NEXT_ID: "personal", PI_ACCOUNT_SWITCHER_ACTIVE_ID: "work" };
