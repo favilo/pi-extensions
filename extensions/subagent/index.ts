@@ -68,7 +68,11 @@ const childToolRequestParameters = {
   type: "object",
   properties: {
     toolName: { type: "string", description: "The exact parent tool name to request." },
-    input: { description: "The arguments for the requested tool." },
+    input: {
+      type: "object",
+      additionalProperties: true,
+      description: "The arguments object for the requested tool; pass JSON fields directly, not a JSON-encoded string.",
+    },
   },
   required: ["toolName", "input"],
   additionalProperties: false,
@@ -142,7 +146,7 @@ function executeParentTool(
 
   return controller.launch({
     cwd,
-    parentContext: `${parentContext.getSystemPrompt()}\n\nYou are a background subagent. Child tool policy: you have only the subagent-tool-request tool. For every file, shell, search, MCP, or other tool action, call it with the exact toolName and JSON input. Do not attempt to call tools directly, and do not ask the main agent to repeat or duplicate your requested action. Tool permission UI and activity are attributed to your generated subagent ID.\n\nAvailable parent tools and input schemas:\n${JSON.stringify(toolCatalog)}`,
+    parentContext: `${parentContext.getSystemPrompt()}\n\nYou are a background subagent. Child tool policy: you have only the subagent-tool-request tool. For every file, shell, search, MCP, or other tool action, call it with the exact toolName and an input object. Put arguments directly in that object (for example, input: {"command":"pwd"}), never as a JSON-encoded string. Do not attempt to call tools directly, and do not ask the main agent to repeat or duplicate your requested action. Tool permission UI and activity are attributed to your generated subagent ID.\n\nAvailable parent tools and input schemas:\n${JSON.stringify(toolCatalog)}`,
     task: params.task,
     createSession: async ({ childId, cwd: childCwd, signal }) => {
       const boundary = createToolPermissionBoundary({
