@@ -5,7 +5,11 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import subagentExtension, { createChildToolDefinitions } from "./index.ts";
 
 test("registers background launch, explicit result lookup, and shutdown cleanup", () => {
-  const tools: Array<{ name: string }> = [];
+  const tools: Array<{
+    name: string;
+    renderCall?: unknown;
+    renderResult?: (result: unknown, options: { expanded: boolean; isPartial: boolean }, theme: unknown) => { render(width: number): string[] };
+  }> = [];
   const events: string[] = [];
   const pi = {
     registerTool(tool: { name: string }) {
@@ -21,6 +25,34 @@ test("registers background launch, explicit result lookup, and shutdown cleanup"
 
   assert.deepEqual(tools.map(({ name }) => name), ["subagent", "subagent_result"]);
   assert.deepEqual(events, ["message_start", "agent_settled", "session_shutdown"]);
+
+  const resultTool = tools.find(({ name }) => name === "subagent_result");
+  assert.equal(typeof resultTool?.renderCall, "function");
+  assert.equal(typeof resultTool?.renderResult, "function");
+
+  const theme = { fg: (_color: string, text: string) => text, bold: (text: string) => text };
+  const result = {
+    content: [{ type: "text", text: "model-facing result" }],
+    details: {
+      found: true,
+      id: "child-1234",
+      cwd: "/workspace",
+      status: "completed",
+      terminal: true,
+      events: {
+        events: [{ childId: "child-1234", sequence: 1, type: "assistant-text", payload: { text: "visible only when expanded" }, truncated: false }],
+        bytes: 32,
+        truncated: false,
+      },
+      output: "visible only when expanded",
+    },
+  };
+  const collapsed = resultTool?.renderResult?.(result, { expanded: false, isPartial: false }, theme)?.render(160).join("\n") ?? "";
+  const expanded = resultTool?.renderResult?.(result, { expanded: true, isPartial: false }, theme)?.render(160).join("\n") ?? "";
+
+  assert.match(collapsed, /completed.*1 event.*32 bytes/i);
+  assert.doesNotMatch(collapsed, /visible only when expanded/);
+  assert.match(expanded, /visible only when expanded/);
 });
 
 test("gives a child only the permission bridge tool", () => {

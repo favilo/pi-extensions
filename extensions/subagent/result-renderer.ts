@@ -1,5 +1,9 @@
 import type { BackgroundResult } from "./background-lifecycle.ts";
 
+/** Terminal display bounds prevent result retrieval from flooding the TUI. */
+export const MAX_EXPANDED_RESULT_BYTES = 64 * 1_024;
+export const MAX_EXPANDED_RESULT_EVENTS = 20;
+
 export type SubagentResultDisplay = {
   summary: string;
   expandedJson?: string;
