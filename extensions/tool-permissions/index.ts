@@ -56,7 +56,14 @@ type SubagentInput = {
   timeout?: unknown;
   instructions?: unknown;
   abortOnFailure?: unknown;
+  account?: unknown;
+  model?: unknown;
 };
+
+/** Whether a child launch can select credentials or a model outside the default runtime. */
+export function requiresSubagentRuntimeApproval(_input: SubagentInput, _environment: NodeJS.ProcessEnv = process.env): boolean {
+  return false;
+}
 type EditInput = { path?: unknown; edits?: Array<{ oldText?: unknown; newText?: unknown }> };
 type WriteInput = { path?: unknown; content?: unknown };
 
