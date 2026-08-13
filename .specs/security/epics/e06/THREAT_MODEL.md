@@ -86,7 +86,7 @@ Child assistant text, tool inputs/results, environment values, permission detail
 
 A model can emit unbounded text/tool updates or launch many children, consuming provider quota, memory, CPU, and terminal rendering time after the foreground tool already returned.
 
-**Required mitigation:** Set limits for active children, queued launches, event count, UTF-8 bytes, individual event size, completed-result retention, and cleanup time. Coalesce high-frequency partial updates, truncate deterministically, and render only the visible panel viewport. Surface limit failures as terminal child states.
+**Required mitigation:** Set limits for active children, queued launches, event count, UTF-8 bytes, individual event size, completed-result retention, and cleanup time. Coalesce high-frequency partial updates and truncate deterministically. Keep `subagent_result` collapsed rows output-free; its explicit Ctrl+O JSON view must use a valid presentation snapshot capped at 20 events, 2 KiB per event payload, 8 KiB output, and 64 KiB total, with `presentationTruncated` when content is omitted or represented by a preview. Render only the visible panel viewport. Surface limit failures as terminal child states.
 
 ### UI spoofing, attribution loss, or focus capture — MEDIUM — CWE-451
 
@@ -120,4 +120,5 @@ The implemented e06s05 runtime keeps child execution behind `tool-permissions`, 
 - Prove ordered bounded buffers, truncation, terminal sealing, stable repeated retrieval, and late-event rejection.
 - Prove raw child events are absent from audit/debug logs, completion signals, and parent context before explicit retrieval.
 - Prove transcript content is sanitized, width-bounded, viewport-limited, and cannot imitate trusted panel headers.
+- Prove `subagent_result` custom rendering keeps collapsed rows free of child output, honors Pi's explicit expanded state, and limits expanded JSON to a valid, clearly marked presentation snapshot.
 - Prove `Ctrl+Tab`, `Escape`, child completion, prompt display, and panel disposal restore the correct focus without swallowing permission input.

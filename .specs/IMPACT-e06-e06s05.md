@@ -4,6 +4,7 @@
 
 - `extensions/subagent/agent-session.ts`
 - `extensions/subagent/index.ts`
+- `extensions/subagent/result-renderer.ts`
 - Shared authorization boundary: `extensions/tool-permissions/permission-boundary.ts` and `extensions/tool-permissions/index.ts`
 
 ## Zoom-out map
@@ -45,6 +46,7 @@
 - Missing UI, prompt cancellation, abort, or shutdown never becomes approval.
 - The public launch returns only after lifecycle authority, cancellation, boundary, and subscription are installed.
 - Result access is explicit and scoped to the current parent registry; no child output enters parent context before retrieval.
+- `subagent_result` custom rendering is display-only: collapsed rows expose status/count/byte/truncation summary without output, while explicit Ctrl+O expansion uses valid pretty JSON capped to a presentation snapshot so retained 2 MiB results cannot flood the TUI.
 
 ### Shared tool-permission boundary
 
@@ -109,6 +111,7 @@ Pi SDK detail verified from installed declarations:
 - Fixed next-turn completion notification with no trigger and no child-authored content.
 - Shutdown/reload/new/resume/fork abort, unsubscribe, bounded wait, disposal, and stale-callback rejection.
 - Proof that raw events do not enter audit/debug logs, completion signals, or parent context before explicit retrieval.
+- Renderer registration honors Pi's `expanded` option, keeps collapsed output hidden, pretty-prints/highlights expanded details, and marks presentation truncation while bounding events, payloads, output, and total JSON.
 - Main-versus-child and child-versus-main prompt overlap through one session-owned FIFO presentation seam, with exact-request cancellation, prompt-error, shutdown, and no-double-settlement coverage.
 - Child parity with main cwd-aware permission semantics, including in-cwd read/search auto-allow, configured allow/deny precedence, and `.aiignore` denial.
 

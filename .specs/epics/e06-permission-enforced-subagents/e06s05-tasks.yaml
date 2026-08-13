@@ -57,13 +57,13 @@ tasks:
 
   - id: 4
     description: >-
-      Register subagent_result as the sole explicit lookup operation, returning current structured status without fabricated output for active children and atomic stable bounded snapshots for terminal children.
-    verify: node --test extensions/subagent/background-session.test.ts
+      Register subagent_result as the sole explicit lookup operation, returning current structured status without fabricated output for active children and atomic stable bounded snapshots for terminal children. Render collapsed tool rows as a summary only; render Ctrl+O-expanded structured details as syntax-highlighted, pretty, valid JSON presentation snapshots bounded to 20 events, 2 KiB event payloads, 8 KiB output, and 64 KiB total, with explicit presentation truncation.
+    verify: node --test extensions/subagent/background-session.test.ts extensions/subagent/result-renderer.test.ts extensions/subagent/index.test.ts
     status: passing
     risk: P0
     security: high
     security_verification: >-
-      No new security findings in affected paths; prove generic unknown-ID handling, cross-registry nondisclosure, stable repeated retrieval, and no automatic child-output injection.
+      No new security findings in affected paths; prove generic unknown-ID handling, cross-registry nondisclosure, stable repeated retrieval, no automatic child-output injection, collapsed-output non-disclosure, expanded display bounds, and explicit presentation truncation.
     tdd:
       red: A compilable result tool stub fails active, terminal, repeated, unknown, and foreign-registry retrieval assertions.
       green: Explicit result retrieval passes without reading arbitrary session files or filesystem paths.

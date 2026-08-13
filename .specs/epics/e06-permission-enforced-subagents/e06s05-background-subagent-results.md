@@ -27,7 +27,7 @@ Start a child as a parent-owned background task, return its stable ID immediatel
 - Track queued, running, waiting-for-permission, completed, failed, and cancelled states under one parent-session registry.
 - Subscribe to published `AgentSessionEvent` values and retain ordered assistant text, tool calls, tool updates, tool results, and terminal outcomes through a project-owned normalized event contract.
 - Keep child events out of parent model context until an explicit `subagent_result` request.
-- Make `subagent_result` return the current structured status for incomplete children and a stable bounded result snapshot for terminal children; repeated retrieval is read-only.
+- Make `subagent_result` return the current structured status for incomplete children and a stable bounded result snapshot for terminal children; repeated retrieval is read-only. Its collapsed tool row must expose only status/event-count/byte/truncation summary; Ctrl+O expansion renders a syntax-highlighted, pretty, presentation-bounded JSON snapshot without changing model-facing content or result details.
 - Send a fixed `subagent_finished` signal containing only generated child ID and enumerated terminal status through the parent's steering queue, triggering a new parent turn when the parent is idle; retain it until the parent message stream acknowledges delivery and retry after parent settlement if late steering was not consumed.
 - Cancel, unsubscribe, await bounded cleanup, and dispose active children on parent cancellation or session shutdown for quit, reload, new, resume, and fork.
 - Present all main-agent and child permission requests through one parent-session-owned FIFO queue; bind each waiter to immutable request ID, actor, tool name, cwd, and safe input identity so one decision can settle only its visible request.
@@ -58,7 +58,7 @@ Foreground responsiveness, deterministic cleanup, ordered events, bounded memory
 - A parent-owned task registry is the authority for child state and result lookup. **Reason for Depth:** launch, retrieval, notification, and shutdown need one owner to reject stale callbacks and detached authorization consistently.
 - `AgentSession.subscribe(listener): () => void` is adapted into a stable project event contract rather than leaked directly to UI code. **Reason for Depth:** one bounded adapter centralizes event ordering, terminal sealing, and secret-handling rules for retrieval and the e06s06 UI.
 - Published SDK events used by the adapter include `message_update`, `message_end`, `tool_execution_start`, `tool_execution_update`, `tool_execution_end`, `agent_end`, and `agent_settled`.
-- The public retrieval operation is `subagent_result({ id })`; before termination it returns status without fabricated output, and after termination it returns an atomic stable snapshot.
+- The public retrieval operation is `subagent_result({ id })`; before termination it returns status without fabricated output, and after termination it returns an atomic stable snapshot. Custom call/result renderers use Pi's `expanded` option: the collapsed row does not expose child output, while expanded rendering is JSON-highlighted and limited to 20 events, 2 KiB per event payload, 8 KiB of output, and a 64 KiB JSON presentation budget; omitted or transformed content is marked `presentationTruncated: true`.
 - `subagent_finished` is notification-only and is delivered through `pi.sendMessage(..., { deliverAs: "steer", triggerTurn: true })`, so an active parent receives it before its next model call and an idle parent starts a new turn. The extension retains each signal until the main `message_start` stream acknowledges its exact generated ID, status, and content; an unacknowledged signal is retried after `agent_settled` to close Pi's late-steering settlement race. `subagent_result(id)` is authoritative for output.
 - The registry is closed from Pi's `session_shutdown` event, whose declared reasons are quit, reload, new, resume, and fork.
 
@@ -120,6 +120,7 @@ Changes `extensions/subagent/agent-session.ts` from invocation-scoped execution 
 - `node --test extensions/subagent/background-session.test.ts`
 - `node --test extensions/subagent/background-events.test.ts`
 - `node --test extensions/subagent/background-lifecycle.test.ts extensions/subagent/completion-delivery.test.ts`
+- `node --test extensions/subagent/result-renderer.test.ts extensions/subagent/index.test.ts`
 - `node --test extensions/subagent/agent-session.test.ts extensions/subagent/index.test.ts extensions/subagent/missing-ui.test.ts extensions/subagent/permission-boundary.test.ts extensions/subagent/working-directory.test.ts extensions/tool-permissions/permission-boundary.test.ts`
 - `npm run check`
 
