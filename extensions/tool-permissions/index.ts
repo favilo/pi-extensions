@@ -61,8 +61,11 @@ type SubagentInput = {
 };
 
 /** Whether a child launch can select credentials or a model outside the default runtime. */
-export function requiresSubagentRuntimeApproval(_input: SubagentInput, _environment: NodeJS.ProcessEnv = process.env): boolean {
-  return false;
+export function requiresSubagentRuntimeApproval(input: SubagentInput, environment: NodeJS.ProcessEnv = process.env): boolean {
+  return typeof input.account === "string"
+    || typeof input.model === "string"
+    || Boolean(environment.PI_ACCOUNT_SWITCHER_NEXT_ID)
+    || Boolean(environment.PI_ACCOUNT_SWITCHER_ACTIVE_ID);
 }
 type EditInput = { path?: unknown; edits?: Array<{ oldText?: unknown; newText?: unknown }> };
 type WriteInput = { path?: unknown; content?: unknown };
@@ -852,16 +855,18 @@ async function handleBashPermission(input: BashInput, ctx: PermissionContext, pi
 
 async function handleSubagentPermission(input: SubagentInput, ctx: PermissionContext, pi: ExtensionAPI): Promise<ToolCallEventResult> {
   const decision = configuredDecision("subagent", input, ctx.cwd);
+  const requiresRuntimeApproval = requiresSubagentRuntimeApproval(input);
   const configurationResult = await handleConfigurationDiagnostic(decision, ctx, pi);
-  if (configurationResult === "allow_once") return;
-  if (configurationResult) return configurationResult;
+  if (configurationResult && configurationResult !== "allow_once") return configurationResult;
   if (decision.decision === "deny") return configuredDeny("subagent", ctx);
-  if (decision.decision === "allow") {
+  if (decision.decision === "allow" && !requiresRuntimeApproval) {
     audit({ tool: "subagent", decision: "allow_pattern", cwd: ctx.cwd });
     return;
   }
   if (!ctx.hasUI) {
-    const reason = "Blocked subagent: delegation requires explicit interactive permission or an allow rule.";
+    const reason = requiresRuntimeApproval
+      ? "Blocked subagent: selected account or model requires interactive approval."
+      : "Blocked subagent: delegation requires explicit interactive permission or an allow rule.";
     audit({ tool: "subagent", decision: "deny_no_ui", cwd: ctx.cwd, reason });
     return { block: true, reason };
   }
@@ -870,10 +875,13 @@ async function handleSubagentPermission(input: SubagentInput, ctx: PermissionCon
     pi,
     ctx,
     { actor: { kind: "main" }, toolName: "subagent", input, cwd: ctx.cwd },
-    "Allow subagent delegation?",
+    requiresRuntimeApproval ? "Allow subagent delegation with selected runtime?" : "Allow subagent delegation?",
     [
       "pi wants to delegate work to one or more child agents.",
       "",
+      ...(requiresRuntimeApproval
+        ? ["This launch selects a child account or model. Approval authorizes that runtime selection; later child tool actions require separate approval.", ""]
+        : []),
       "Child agents run in isolated Pi sessions. Depending on the selected agent, they may execute shell commands and modify files. Their nested tool calls do not pass through this parent permission prompt.",
       "",
       "Requested delegation:",
