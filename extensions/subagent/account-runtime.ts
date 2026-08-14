@@ -60,22 +60,28 @@ type RuntimeSelectionCarrier = Record<symbol, PublishedChildRuntimeSelection | u
  * mutable tool-call input for the matching executor invocation.
  */
 export async function resolveChildRuntimeSelection(
-  _parameters: SubagentRuntimeParameters,
-  _parentModel: { provider: string; id: string } | undefined,
-  _api = getPublishedChildRuntimeApi(),
+  parameters: SubagentRuntimeParameters,
+  parentModel: { provider: string; id: string } | undefined,
+  api = getPublishedChildRuntimeApi(),
 ): Promise<PublishedChildRuntimeSelection | undefined> {
-  void _parameters;
-  void _parentModel;
-  void _api;
-  return undefined;
+  return api?.resolve({ ...parameters, parentModel });
 }
 
 export function attachChildRuntimeSelection(
-  _input: object,
-  _selection: PublishedChildRuntimeSelection | undefined,
+  input: object,
+  selection: PublishedChildRuntimeSelection | undefined,
 ): void {
-  void _input;
-  void _selection;
+  const carrier = input as RuntimeSelectionCarrier;
+  if (!selection) {
+    delete carrier[CHILD_RUNTIME_SELECTION];
+    return;
+  }
+  Object.defineProperty(carrier, CHILD_RUNTIME_SELECTION, {
+    configurable: true,
+    enumerable: false,
+    value: selection,
+    writable: false,
+  });
 }
 
 export function childRuntimeSelectionFor(

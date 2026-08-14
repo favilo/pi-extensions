@@ -7,6 +7,7 @@ import { appendFileSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } fr
 import { tmpdir } from "node:os";
 import { dirname, join, relative, resolve } from "node:path";
 import { createAuditLogger } from "./audit.ts";
+import { attachChildRuntimeSelection, resolveChildRuntimeSelection } from "../subagent/account-runtime.ts";
 import {
   parsePermissionRuleJson,
   permissionKeyForTool,
@@ -40,6 +41,7 @@ export type PermissionContext = {
   signal?: AbortSignal;
   sessionId?: string;
   sessionManager?: { getSessionId(): string };
+  model?: { provider: string; id: string };
 };
 
 type ReadInput = { path?: unknown };
@@ -855,10 +857,23 @@ async function handleBashPermission(input: BashInput, ctx: PermissionContext, pi
 
 async function handleSubagentPermission(input: SubagentInput, ctx: PermissionContext, pi: ExtensionAPI): Promise<ToolCallEventResult> {
   const decision = configuredDecision("subagent", input, ctx.cwd);
-  const requiresRuntimeApproval = requiresSubagentRuntimeApproval(input);
+  const requestedRuntime = requiresSubagentRuntimeApproval(input);
   const configurationResult = await handleConfigurationDiagnostic(decision, ctx, pi);
   if (configurationResult && configurationResult !== "allow_once") return configurationResult;
   if (decision.decision === "deny") return configuredDeny("subagent", ctx);
+
+  const selection = await resolveChildRuntimeSelection({
+    ...(typeof input.account === "string" ? { account: input.account } : {}),
+    ...(typeof input.model === "string" ? { model: input.model } : {}),
+  }, ctx.model);
+  if (requestedRuntime && !selection) {
+    const reason = "Blocked subagent: selected account or model could not be resolved through account-switcher.";
+    audit({ tool: "subagent", decision: "deny_runtime_unavailable", cwd: ctx.cwd, reason });
+    return { block: true, reason };
+  }
+  if (selection) attachChildRuntimeSelection(input, selection);
+  const requiresRuntimeApproval = selection !== undefined;
+
   if (decision.decision === "allow" && !requiresRuntimeApproval) {
     audit({ tool: "subagent", decision: "allow_pattern", cwd: ctx.cwd });
     return;
@@ -879,8 +894,14 @@ async function handleSubagentPermission(input: SubagentInput, ctx: PermissionCon
     [
       "pi wants to delegate work to one or more child agents.",
       "",
-      ...(requiresRuntimeApproval
-        ? ["This launch selects a child account or model. Approval authorizes that runtime selection; later child tool actions require separate approval.", ""]
+      ...(selection
+        ? [
+            `Account: ${selection.descriptor.accountId}`,
+            `Source: ${selection.descriptor.source}`,
+            `Runtime: ${selection.descriptor.provider}/${selection.descriptor.modelId}`,
+            "Later child tool actions require separate approval.",
+            "",
+          ]
         : []),
       "Child agents run in isolated Pi sessions. Depending on the selected agent, they may execute shell commands and modify files. Their nested tool calls do not pass through this parent permission prompt.",
       "",
