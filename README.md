@@ -24,6 +24,19 @@ pi update git:github.com/favilo/pi-extensions
 
 Use `pi config` to enable or disable individual extensions.
 
+### Required account-switcher dependency
+
+The `subagent` account/model runtime requires the local [`pi-account-switcher`](../pi-account-switcher) fork to be installed and enabled in the same Pi process. It publishes the redacted child-runtime selection capability used to select an isolated OAuth account; without it, subagents retain Pi's default runtime.
+
+Install both local packages, then reload Pi:
+
+```bash
+pi install "${HOME}/git/agent-skills/pi-account-switcher"
+pi install "${HOME}/git/agent-skills/pi-extensions"
+```
+
+The account-switcher fork must remain the configured package. Do not substitute a stale package-manager cache for it.
+
 ## Extensions
 
 | Extension | Purpose |
