@@ -63,11 +63,18 @@ export type ChildRuntime = {
 };
 
 export async function createChildRuntime(
-  _parameters: SubagentRuntimeParameters,
-  _parentModel: { provider: string; id: string } | undefined,
-  _api = getPublishedChildRuntimeApi(),
+  parameters: SubagentRuntimeParameters,
+  parentModel: { provider: string; id: string } | undefined,
+  api = getPublishedChildRuntimeApi(),
 ): Promise<ChildRuntime | undefined> {
-  return undefined;
+  if (!api) return undefined;
+  const selection = await api.resolve({ ...parameters, parentModel });
+  if (!selection) return undefined;
+  const modelRuntime = await ModelRuntime.create({ modelsPath: null });
+  selection.installOauth(new ModelRegistry(modelRuntime));
+  const model = modelRuntime.getModel(selection.descriptor.provider, selection.descriptor.modelId);
+  if (!model) throw new Error(`Selected child model is unavailable: ${selection.descriptor.provider}/${selection.descriptor.modelId}`);
+  return { modelRuntime, model, selection };
 }
 
 export type DebugChildRuntime = {
