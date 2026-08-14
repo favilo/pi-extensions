@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createChildRuntime, getPublishedChildRuntimeApi, resolveSubagentRuntime, type SubagentAccount } from "./account-runtime.ts";
+import { createChildRuntime, createChildRuntimeFromSelection, getPublishedChildRuntimeApi, resolveSubagentRuntime, type SubagentAccount } from "./account-runtime.ts";
 
 const accounts: SubagentAccount[] = [
   {
@@ -63,6 +63,26 @@ test("creates an isolated runtime using the account-switcher selection capabilit
   assert.equal(runtime?.selection.descriptor.accountId, "personal");
   assert.equal(installed.registry !== undefined, true);
   assert.notEqual(runtime?.modelRuntime, undefined);
+});
+
+test("constructs a child runtime from its approved selection without resolving again", async () => {
+  let installs = 0;
+  const selection = {
+    descriptor: Object.freeze({
+      accountId: "personal",
+      provider: "openai-codex",
+      modelId: "gpt-5.6-terra",
+      source: "explicit" as const,
+    }),
+    installOauth: () => { installs += 1; },
+    consume: async () => {},
+  };
+
+  const runtime = await createChildRuntimeFromSelection(selection);
+
+  assert.equal(installs, 1);
+  assert.equal(runtime.selection, selection);
+  assert.notEqual(runtime.modelRuntime, undefined);
 });
 
 test("resolves an explicit child account without changing inherited selection", () => {
