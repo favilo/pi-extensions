@@ -24,6 +24,39 @@ test("tracks permission waiting without changing terminal children", async () =>
   assert.equal(controller.setStatus(launched.id, "waiting-for-permission")?.status, "completed");
 });
 
+test("shutdown cancels and disposes a child whose session construction completes after close begins", async () => {
+  const calls: string[] = [];
+  let resolveConstruction: ((session: ManagedSubagentSession) => void) | undefined;
+  let constructionSignal: AbortSignal | undefined;
+  const construction = new Promise<ManagedSubagentSession>((resolve) => {
+    resolveConstruction = resolve;
+  });
+  const session: ManagedSubagentSession = {
+    prompt: async () => { calls.push("prompt"); },
+    subscribe: () => {
+      calls.push("subscribe");
+      return () => calls.push("unsubscribe");
+    },
+    abort: () => { calls.push("abort"); },
+    dispose: () => calls.push("dispose"),
+  };
+  const controller = createBackgroundSessionController(async ({ signal }) => {
+    constructionSignal = signal;
+    return construction;
+  }, { cleanupTimeoutMs: 20 });
+
+  const launch = controller.launch({ cwd: "/workspace", parentContext: "policy", task: "wait" });
+  await new Promise((resolve) => setImmediate(resolve));
+  const closing = controller.close();
+  await new Promise((resolve) => setImmediate(resolve));
+  resolveConstruction?.(session);
+
+  await closing;
+  await assert.rejects(launch, /closed|shutdown/i);
+  assert.equal(constructionSignal?.aborted, true);
+  assert.deepEqual(calls, ["abort", "dispose"]);
+});
+
 test("bounds shutdown cleanup when child abort never settles", async () => {
   const calls: string[] = [];
   const session: ManagedSubagentSession = {
