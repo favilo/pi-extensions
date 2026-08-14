@@ -18,6 +18,7 @@ import { getPublishedToolDefinitions } from "../tool-registry/index.ts";
 import { createToolPermissionBoundary, logSubagentDebug, promptToolPermissionRequest, type PermissionContext } from "../tool-permissions/index.ts";
 import type { ToolPermissionBoundary } from "../tool-permissions/permission-boundary.ts";
 import { createSubagentSession, executeChildToolRequest, resolveSubagentCwd } from "./agent-session.ts";
+import { childRuntimeSelectionFor, createChildRuntimeFromSelection } from "./account-runtime.ts";
 import {
   createBackgroundSessionController,
   type BackgroundResult,
@@ -32,11 +33,13 @@ const subagentParameters = {
     task: { type: "string", description: "The task for the child agent." },
     agent: { type: "string", description: "A stable short name for the child agent." },
     cwd: { type: "string", description: "Child working directory, relative to the parent cwd." },
+    account: { type: "string", description: "Optional account-switcher account ID for the child runtime." },
+    model: { type: "string", description: "Optional child model in provider/model-id format." },
   },
   required: ["task"],
   additionalProperties: false,
 } as never;
-type SubagentParameters = { task: string; agent?: string; cwd?: string };
+type SubagentParameters = { task: string; agent?: string; cwd?: string; account?: string; model?: string };
 
 const subagentResultParameters = {
   type: "object",
@@ -174,10 +177,14 @@ function executeParentTool(
           return tool.execute(childId, request.input as never, signal, undefined, parentContext);
         },
       });
+      const selection = childRuntimeSelectionFor(params);
+      const childRuntime = selection ? await createChildRuntimeFromSelection(selection) : undefined;
       const session = await createSubagentSession(childCwd, {
         customTools: createChildToolDefinitions(childId, childCwd, boundary),
         sessionManager: parentSessionDir ? SessionManager.create(childCwd, parentSessionDir) : undefined,
+        ...(childRuntime ? { modelRuntime: childRuntime.modelRuntime, model: childRuntime.model } : {}),
       });
+      await selection?.consume();
       logSubagentDebug("child-session-created", { childId, cwd: childCwd, activeTools: session.getActiveToolNames?.() });
       return session;
     },
@@ -200,7 +207,13 @@ export default function subagentExtension(pi: ExtensionAPI): void {
   pi.registerTool({
     name: "subagent",
     label: "subagent",
-    description: "Launch a permission-enforced child in the background and return its generated task ID.",
+    description: "Launch a permission-enforced child in the background and return its generated task ID. Use account and model directly for this launch; do not call set_subagent_account when an explicit child account is requested.",
+    promptSnippet: "Launch a permission-enforced background child with optional account/model selection.",
+    promptGuidelines: [
+      "When a child needs a specific account or model, pass account and model directly to subagent in the same call.",
+      "Do not call set_subagent_account before an explicit subagent account/model launch; it is only for legacy inherited selection.",
+      "The single subagent approval covers its selected runtime; each later child tool action is approved separately.",
+    ],
     parameters: subagentParameters,
     async execute(_toolCallId, params: SubagentParameters, _signal, _onUpdate, ctx) {
       const cwd = resolveSubagentCwd(ctx.cwd, params.cwd);

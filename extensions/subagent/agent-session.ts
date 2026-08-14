@@ -1,6 +1,6 @@
 import { statSync, realpathSync } from "node:fs";
 import { isAbsolute, relative, resolve, sep } from "node:path";
-import { createAgentSession, DefaultResourceLoader, getAgentDir, SessionManager, type AgentSessionEvent, type ToolDefinition } from "@earendil-works/pi-coding-agent";
+import { createAgentSession, DefaultResourceLoader, getAgentDir, ModelRuntime, SessionManager, type AgentSessionEvent, type ToolDefinition } from "@earendil-works/pi-coding-agent";
 import { executeToolRequest, type ToolExecutionResult, type ToolPermissionBoundary, type ToolRequest } from "../tool-permissions/permission-boundary.ts";
 
 export type SubagentSession = {
@@ -23,6 +23,8 @@ export type CreateSubagentSession = (options: { cwd: string }) => Promise<Subage
 export type SubagentSessionOptions = {
   customTools?: ToolDefinition[];
   sessionManager?: SessionManager;
+  modelRuntime?: ModelRuntime;
+  model?: unknown;
 };
 
 export type SubagentSessionRunOptions = {
@@ -104,6 +106,8 @@ export async function createSubagentSession(cwd: string, options: SubagentSessio
     tools: options.customTools?.map((tool) => tool.name) ?? [],
     customTools: options.customTools ?? [],
     resourceLoader: new DefaultResourceLoader({ cwd, agentDir: getAgentDir(), noExtensions: true }),
+    ...(options.modelRuntime ? { modelRuntime: options.modelRuntime } : {}),
+    ...(options.model ? { model: options.model as never } : {}),
     sessionManager: options.sessionManager ?? SessionManager.inMemory(cwd),
   });
   return {
