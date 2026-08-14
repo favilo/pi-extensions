@@ -3,9 +3,9 @@ import { CONFIG_DIR_NAME, generateDiffString, getAgentDir, isToolCallEventType, 
 import { CURSOR_MARKER, matchesKey, visibleWidth, wrapTextWithAnsi, type Component, type Focusable } from "@earendil-works/pi-tui";
 import ignore from "ignore";
 import { spawn } from "node:child_process";
-import { appendFileSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
+import { appendFileSync, mkdirSync, readFileSync, realpathSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join, relative, resolve } from "node:path";
+import { basename, dirname, join, relative, resolve } from "node:path";
 import { createAuditLogger } from "./audit.ts";
 import { attachChildRuntimeSelection, resolveChildRuntimeSelection } from "../subagent/account-runtime.ts";
 import {
@@ -694,14 +694,36 @@ type PermissionResolverOptions = Parameters<typeof resolveToolPermissionDecision
 
 const IMPLICIT_PROJECT_PATH_TOOLS = new Set(["read", "grep", "find", "ls"]);
 const CONFIGURED_PATH_TOOLS = new Set(["read", "grep", "find", "ls", "write", "edit"]);
+const NONEXISTENT_PATH_TOOLS = new Set(["write", "edit"]);
 
-function normalizedPermissionInput(request: ToolRequest): unknown {
+type CanonicalPermissionPath = { path: string; cwd: string };
+
+function canonicalPermissionPath(toolName: string, requestedPath: string, cwd: string): CanonicalPermissionPath {
+  try {
+    const canonicalCwd = realpathSync(cwd);
+    const absolutePath = resolve(canonicalCwd, requestedPath || ".");
+    try {
+      return { path: realpathSync(absolutePath), cwd: canonicalCwd };
+    } catch (error) {
+      if (!NONEXISTENT_PATH_TOOLS.has(toolName) || (error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+      const canonicalParent = realpathSync(dirname(absolutePath));
+      return { path: join(canonicalParent, basename(absolutePath)), cwd: canonicalCwd };
+    }
+  } catch (error) {
+    throw new Error(`Could not canonicalize ${toolName} path: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
+function normalizedPermissionInput(request: ToolRequest): { input: unknown; canonicalCwd?: string } {
   if (!CONFIGURED_PATH_TOOLS.has(request.toolName) || typeof request.input !== "object" || request.input === null) {
-    return request.input;
+    return { input: request.input };
   }
   const input = request.input as Record<string, unknown>;
   const requestedPath = typeof input.path === "string" ? input.path : "";
-  return { ...input, path: resolve(request.cwd, requestedPath || ".") };
+  const canonical = canonicalPermissionPath(request.toolName, requestedPath, request.cwd);
+  const normalizedInput = { ...input, path: canonical.path };
+  request.input = normalizedInput;
+  return { input: normalizedInput, canonicalCwd: canonical.cwd };
 }
 
 /** Shared policy contract for equivalent main-agent and child tool requests. */
@@ -709,16 +731,17 @@ export function resolvePermissionDecisionForRequest(
   request: ToolRequest,
   options: PermissionResolverOptions = {},
 ): PermissionDecision {
-  const input = normalizedPermissionInput(request);
+  const { input, canonicalCwd } = normalizedPermissionInput(request);
   const resolved = resolveToolPermissionDecision(request.toolName, input, request.cwd, options);
   if (resolved.diagnostic) throw new Error(resolved.diagnostic);
   if (resolved.decision === "deny") return "deny";
   if (!IMPLICIT_PROJECT_PATH_TOOLS.has(request.toolName)) return resolved.decision;
 
   const path = (input as { path: string }).path;
-  if (isAiIgnoredPath(path, request.cwd)) return "deny";
+  const projectCwd = canonicalCwd ?? request.cwd;
+  if (isAiIgnoredPath(path, projectCwd)) return "deny";
   if (resolved.decision === "allow") return "allow";
-  return isInsideDirectory(path, request.cwd) ? "allow" : "ask";
+  return isInsideDirectory(path, projectCwd) ? "allow" : "ask";
 }
 
 export function createToolPermissionBoundary(
@@ -750,7 +773,16 @@ function configuredDeny(toolName: string, ctx: PermissionContext, details: Pick<
 
 async function handlePathPermission(toolName: string, input: PathToolInput, ctx: PermissionContext, pi: ExtensionAPI): Promise<ToolCallEventResult> {
   const requestedPath = typeof input.path === "string" ? input.path : "";
-  const absolutePath = resolve(ctx.cwd, requestedPath || ".");
+  let canonical: CanonicalPermissionPath;
+  try {
+    canonical = canonicalPermissionPath(toolName, requestedPath, ctx.cwd);
+    input.path = canonical.path;
+  } catch (error) {
+    const reason = `Blocked ${toolName}: ${error instanceof Error ? error.message : String(error)}`;
+    audit({ tool: toolName, decision: "deny_path_resolution", cwd: ctx.cwd, reason });
+    return { block: true, reason };
+  }
+  const absolutePath = canonical.path;
   const normalizedInput = { ...input, path: absolutePath };
   const decision = configuredDecision(toolName, normalizedInput, ctx.cwd);
   const configurationResult = await handleConfigurationDiagnostic(decision, ctx, pi);
@@ -758,12 +790,12 @@ async function handlePathPermission(toolName: string, input: PathToolInput, ctx:
   if (configurationResult) return configurationResult;
 
   if (decision.decision === "deny") return configuredDeny(toolName, ctx, { path: absolutePath });
-  if (isAiIgnoredPath(absolutePath, ctx.cwd)) {
-    const reason = `Blocked ${toolName}: ${requestedPath || "."} is matched by ${resolve(ctx.cwd, ".aiignore")}.`;
+  if (isAiIgnoredPath(absolutePath, canonical.cwd)) {
+    const reason = `Blocked ${toolName}: ${requestedPath || "."} is matched by ${resolve(canonical.cwd, ".aiignore")}.`;
     audit({ tool: toolName, decision: "deny_aiignore", cwd: ctx.cwd, path: absolutePath, reason });
     return { block: true, reason };
   }
-  if (decision.decision === "allow" || isInsideDirectory(absolutePath, ctx.cwd)) {
+  if (decision.decision === "allow" || isInsideDirectory(absolutePath, canonical.cwd)) {
     if (decision.decision === "allow") audit({ tool: toolName, decision: "allow_pattern", cwd: ctx.cwd, path: absolutePath, reason: decision.source });
     return;
   }
@@ -778,7 +810,7 @@ async function handlePathPermission(toolName: string, input: PathToolInput, ctx:
     ctx,
     { actor: { kind: "main" }, toolName, input: normalizedInput, cwd: ctx.cwd },
     `Allow external ${toolName} path?`,
-    `pi wants to use ${toolName} on a path outside the project directory.\n\nProject: ${ctx.cwd}\nPath: ${absolutePath}\n\nRules are stored under permissions.read in ${getUserPermissionsPath()}.`,
+    `pi wants to use ${toolName} on a path outside the project directory.\n\nProject: ${canonical.cwd}\nPath: ${absolutePath}\n\nRules are stored under permissions.read in ${getUserPermissionsPath()}.`,
     { toolName, suggestedRule: { path: exactPattern(absolutePath) }, subject: absolutePath },
   );
 
@@ -792,7 +824,15 @@ async function handleReadPermission(input: ReadInput, ctx: PermissionContext, pi
 
 async function handleFileEditPermission(toolName: string, input: FileEditInput, ctx: PermissionContext, pi: ExtensionAPI): Promise<ToolCallEventResult> {
   const requestedPath = typeof input.path === "string" ? input.path : "";
-  const absolutePath = resolve(ctx.cwd, requestedPath);
+  let absolutePath: string;
+  try {
+    absolutePath = canonicalPermissionPath(toolName, requestedPath, ctx.cwd).path;
+    input.path = absolutePath;
+  } catch (error) {
+    const reason = `Blocked ${toolName}: ${error instanceof Error ? error.message : String(error)}`;
+    audit({ tool: toolName, decision: "deny_path_resolution", cwd: ctx.cwd, reason });
+    return { block: true, reason };
+  }
   const decision = configuredDecision(toolName, { ...input, path: absolutePath }, ctx.cwd);
   const configurationResult = await handleConfigurationDiagnostic(decision, ctx, pi);
   if (configurationResult === "allow_once") return;

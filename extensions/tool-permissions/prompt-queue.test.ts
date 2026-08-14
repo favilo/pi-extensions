@@ -227,6 +227,11 @@ test("uses main-agent cwd and configured policy semantics for child requests", (
   const cwd = join(root, "project");
   const policy = join(root, "permissions.toml");
   mkdirSync(cwd);
+  mkdirSync(join(cwd, "private"));
+  writeFileSync(join(cwd, "notes.md"), "notes", "utf8");
+  writeFileSync(join(cwd, "allow-listed.txt"), "allowed", "utf8");
+  writeFileSync(join(cwd, "denied.txt"), "denied", "utf8");
+  writeFileSync(join(cwd, "private", "secret.txt"), "secret", "utf8");
   writeFileSync(join(cwd, ".aiignore"), "private/**\n", "utf8");
   writeFileSync(policy, stringifyToml({
     permissions: {
