@@ -1,0 +1,9 @@
+bugs:
+  - bug_id: BUG-2026-08-13T231226
+    date: '2026-08-13'
+    severity: high
+    priority: high
+    scope: windows-portability
+    summary: Windows preflight fails on POSIX-only fixtures and symlink-dependent audit rotation
+    file: .specs/bugs/BUG-2026-08-13T231226-windows-preflight-portability.md
+    status: fixed

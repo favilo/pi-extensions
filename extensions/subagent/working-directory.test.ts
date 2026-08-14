@@ -37,6 +37,12 @@ test("rejects missing and non-directory child cwds before startup", () => {
 test("rejects symlink paths that escape the parent cwd", () => {
   const root = fixture();
   const outside = mkdtempSync(join(tmpdir(), "pi-subagent-outside-"));
-  symlinkSync(outside, join(root, "escape"), "dir");
+  const escapePath = join(root, "escape");
+  try {
+    symlinkSync(outside, escapePath, "dir");
+  } catch (error) {
+    if (process.platform !== "win32") throw error;
+    symlinkSync(outside, escapePath, "junction");
+  }
   assert.throws(() => resolveSubagentCwd(root, "escape"), /outside the parent/);
 });

@@ -17,6 +17,14 @@ Controls verified:
 
 No credential-shaped values or reportable injection, traversal, authorization-bypass, or unsafe-deserialization findings were found.
 
+## e08s01 Windows preflight portability
+
+- Reviewed: 2026-08-14T00:00:00Z
+- Scope: `fix/windows-preflight` portability fixtures, preflight test selection, and audit alias fallback
+- Result: **PASS — no reportable HIGH findings**
+
+The change preserves canonical subagent containment and permission evaluation. Audit writes remain authoritative in dated files; symbolic-link failure falls back to a same-directory hard link, and alias/retention maintenance cannot block authorization. The preflight configuration excludes optional examples without modifying their source test. No new command execution, network, credential, or deserialization boundary was introduced.
+
 ## e03s02 scoped permission saves
 
 - Reviewed: 2026-07-30T21:34:01Z

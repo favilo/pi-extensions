@@ -1,0 +1,37 @@
+story_id: e08s01
+verified_at: '2026-08-14T00:00:00Z'
+verifier: verify-work
+status: passed
+vcs:
+  kind: git
+  bookmark: fix/windows-preflight
+phases:
+  task_verification:
+    passed: true
+    commands:
+      - command: npm run check
+        exit_code: 0
+        note: Typecheck and 92 extension preflight tests passed; example tests are excluded by design.
+      - command: node --test extensions/subagent/agent-session.test.ts
+        exit_code: 0
+        note: Exact Windows-path permission authorization passed.
+      - command: node --test extensions/subagent/working-directory.test.ts
+        exit_code: 0
+        note: Canonical escape rejection passed with the portable link fixture.
+      - command: node --test extensions/tool-permissions/audit.test.ts
+        exit_code: 0
+        note: Audit alias fallback and independent retention behavior passed.
+  terminal_verdict:
+    passed: true
+    command: npm run check:ci
+    exit_code: 0
+    note: Typecheck, extension preflight tests, active-plan consistency, and portability checks passed.
+  security:
+    passed: true
+    note: Canonical containment and permission decisions remain unchanged; audit maintenance remains non-blocking.
+  scope_note:
+    passed: true
+    note: examples/bevy-debugger-mcp/index.test.ts was intentionally left unchanged and is excluded from npm run check; npm test remains the explicit full-suite command.
+gaps:
+  closed: true
+  note: Story acceptance criteria are satisfied within the approved preflight scope.
