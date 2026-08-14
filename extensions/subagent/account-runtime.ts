@@ -100,6 +100,13 @@ export type ChildRuntime = {
   selection: PublishedChildRuntimeSelection;
 };
 
+/** Creates a child-local runtime from the exact selection previously approved. */
+export async function createChildRuntimeFromSelection(
+  _selection: PublishedChildRuntimeSelection,
+): Promise<ChildRuntime> {
+  throw new Error("Child runtime construction is not implemented.");
+}
+
 export async function createChildRuntime(
   parameters: SubagentRuntimeParameters,
   parentModel: { provider: string; id: string } | undefined,
