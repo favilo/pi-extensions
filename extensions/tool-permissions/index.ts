@@ -3,7 +3,8 @@ import { CONFIG_DIR_NAME, generateDiffString, getAgentDir, isToolCallEventType, 
 import { CURSOR_MARKER, matchesKey, visibleWidth, wrapTextWithAnsi, type Component, type Focusable } from "@earendil-works/pi-tui";
 import ignore from "ignore";
 import { spawn } from "node:child_process";
-import { appendFileSync, mkdirSync, readFileSync, realpathSync, unlinkSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { appendFileSync, closeSync, constants as fsConstants, fchmodSync, mkdirSync, openSync, readFileSync, realpathSync, unlinkSync, writeFileSync, writeSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, dirname, join, relative, resolve } from "node:path";
 import { createAuditLogger } from "./audit.ts";
@@ -181,16 +182,75 @@ function compact(value: unknown, max = 2000): string {
   return text.length > max ? `${text.slice(0, max)}\n…` : text;
 }
 
+const SAFE_DEBUG_STRING_FIELDS = new Set([
+  "requestId", "childId", "toolName", "cwd", "inputHash", "decision", "status",
+  "eventType", "parentMode", "mode", "errorType", "customType",
+]);
+const SAFE_DEBUG_BOOLEAN_FIELDS = new Set(["parentHasUI", "hasUI", "hasCustomUI"]);
+const SAFE_DEBUG_NUMBER_FIELDS = new Set(["attempt", "attempts"]);
+
+function debugValueHash(value: unknown): string {
+  let serialized: string;
+  try {
+    serialized = JSON.stringify(value, (_key, candidate) => typeof candidate === "bigint" ? candidate.toString() : candidate) ?? "null";
+  } catch {
+    serialized = "[unserializable]";
+  }
+  return createHash("sha256").update(serialized).digest("hex");
+}
+
+function safeDebugActor(value: unknown): Record<string, string> | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const actor = value as { kind?: unknown; childId?: unknown };
+  if (actor.kind === "main") return { kind: "main" };
+  if (actor.kind === "child" && typeof actor.childId === "string") return { kind: "child", childId: actor.childId };
+  return undefined;
+}
+
+function safeDebugDetails(value: unknown): Record<string, unknown> {
+  if (!value || typeof value !== "object") return {};
+  const source = value as Record<string, unknown>;
+  const safe: Record<string, unknown> = {};
+
+  for (const [key, candidate] of Object.entries(source)) {
+    if (SAFE_DEBUG_STRING_FIELDS.has(key) && typeof candidate === "string") safe[key] = candidate;
+    else if (SAFE_DEBUG_BOOLEAN_FIELDS.has(key) && typeof candidate === "boolean") safe[key] = candidate;
+    else if (SAFE_DEBUG_NUMBER_FIELDS.has(key) && typeof candidate === "number") safe[key] = candidate;
+    else if (key === "actor") safe.actor = safeDebugActor(candidate);
+    else if (key === "identity") safe.identity = safeDebugDetails(candidate);
+    else if (key === "request" && candidate && typeof candidate === "object") {
+      const request = candidate as Record<string, unknown>;
+      safe.request = {
+        ...safeDebugDetails(request),
+        inputHash: debugValueHash(request.input),
+      };
+    } else if (key === "result") {
+      safe.result = safeDebugDetails(candidate);
+    } else if (key === "input") {
+      safe.inputHash = debugValueHash(candidate);
+    } else if (key === "activeTools" && Array.isArray(candidate)) {
+      safe.activeTools = candidate.filter((tool): tool is string => typeof tool === "string");
+    }
+  }
+
+  return safe;
+}
+
 export function logSubagentDebug(event: string, details: unknown): void {
   if (process.env.PI_SUBAGENT_DEBUG !== "1") return;
+  let descriptor: number | undefined;
   try {
-    appendFileSync(
-      join(tmpdir(), "pi-subagent-debug.jsonl"),
-      `${JSON.stringify({ time: new Date().toISOString(), event, details })}\n`,
-      "utf8",
-    );
+    const debugPath = join(tmpdir(), "pi-subagent-debug.jsonl");
+    const noFollow = process.platform === "win32" ? 0 : fsConstants.O_NOFOLLOW;
+    descriptor = openSync(debugPath, fsConstants.O_APPEND | fsConstants.O_CREAT | fsConstants.O_WRONLY | noFollow, 0o600);
+    if (process.platform !== "win32") fchmodSync(descriptor, 0o600);
+    writeSync(descriptor, `${JSON.stringify({ time: new Date().toISOString(), event, details: safeDebugDetails(details) })}\n`, undefined, "utf8");
   } catch {
     // Debug logging must never affect permission behavior.
+  } finally {
+    if (descriptor !== undefined) {
+      try { closeSync(descriptor); } catch { /* Ignore debug cleanup errors. */ }
+    }
   }
 }
 
