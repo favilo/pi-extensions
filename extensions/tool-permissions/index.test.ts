@@ -89,6 +89,91 @@ test("requires a runtime-selection prompt for explicit and inherited subagent ac
   assert.equal(requiresSubagentRuntimeApproval({ task: "inspect" }, {}), false);
 });
 
+test("resolves and displays the selected runtime before approving a broadly allowed launch", async () => {
+  const agentDir = mkdtempSync(join(tmpdir(), "pi-permissions-runtime-"));
+  writeFileSync(join(agentDir, "permissions.toml"), stringifyToml({
+    permissions: { subagent: { allow: [{}], deny: [] } },
+  }));
+  const previousAgentDir = process.env.PI_CODING_AGENT_DIR;
+  const key = Symbol.for("pi-account-switcher.child-runtime.v1");
+  const originalApi = (globalThis as Record<symbol, unknown>)[key];
+  const resolveCalls: unknown[] = [];
+  const components: Array<{ handleInput(data: string): void; render(width: number): string[] }> = [];
+  const handlers = new Map<string, (event: { toolName: string; input: Record<string, unknown>; toolCallId: string }, ctx: unknown) => Promise<unknown>>();
+  (globalThis as Record<symbol, unknown>)[key] = {
+    resolve: async (input: unknown) => {
+      resolveCalls.push(input);
+      return {
+        descriptor: Object.freeze({
+          accountId: "personal",
+          provider: "openai-codex",
+          modelId: "gpt-5.6-terra",
+          source: "explicit",
+        }),
+        installOauth() {},
+        consume: async () => {},
+      };
+    },
+  };
+  process.env.PI_CODING_AGENT_DIR = agentDir;
+
+  try {
+    const { default: toolPermissionPolicy } = await import(`./index.ts?runtime-prompt=${encodeURIComponent(agentDir)}`);
+    toolPermissionPolicy({
+      registerCommand() {},
+      on(event: string, handler: (event: { toolName: string; input: Record<string, unknown>; toolCallId: string }, ctx: unknown) => Promise<unknown>) {
+        if (event === "tool_call") handlers.set(event, handler);
+      },
+      getAllTools: () => [{ name: "subagent" }],
+    } as never);
+
+    const pending = handlers.get("tool_call")?.({
+      toolName: "subagent",
+      toolCallId: "launch-1",
+      input: { task: "inspect", account: "personal" },
+    }, {
+      cwd: "/tmp/project",
+      hasUI: true,
+      mode: "tui",
+      sessionId: "runtime-parent",
+      model: { provider: "openai-codex", id: "gpt-5.5" },
+      ui: {
+        confirm: async () => false,
+        custom<T>(factory: (
+          tui: { requestRender(force?: boolean): void; stop(): void; start(): void },
+          theme: unknown,
+          keybindings: unknown,
+          done: (value: T) => void,
+        ) => unknown): Promise<T> {
+          return new Promise<T>((resolve) => {
+            components.push(factory(
+              { requestRender() {}, stop() {}, start() {} },
+              { fg: (_color: string, text: string) => text, bold: (text: string) => text },
+              {},
+              resolve,
+            ) as { handleInput(data: string): void; render(width: number): string[] });
+          });
+        },
+      },
+    });
+
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(resolveCalls.length, 1);
+    const text = components[0].render(120).join("\n");
+    assert.match(text, /Account: personal/);
+    assert.match(text, /Source: explicit/);
+    assert.match(text, /Runtime: openai-codex\/gpt-5\.6-terra/);
+    assert.match(text, /later child tool actions require separate approval/i);
+    components[0].handleInput("\x04");
+    assert.deepEqual(await pending, { block: true, reason: "User denied subagent delegation." });
+  } finally {
+    if (originalApi === undefined) delete (globalThis as Record<symbol, unknown>)[key];
+    else (globalThis as Record<symbol, unknown>)[key] = originalApi;
+    if (previousAgentDir === undefined) delete process.env.PI_CODING_AGENT_DIR;
+    else process.env.PI_CODING_AGENT_DIR = previousAgentDir;
+  }
+});
+
 test("all protected tool families use the scoped decision boundary", () => {
   const userPath = join(mkdtempSync(join(tmpdir(), "pi-permissions-index-")), "permissions.toml");
   writeFileSync(userPath, userPolicy);
