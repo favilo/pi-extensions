@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdtempSync, readFileSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import { stringify as stringifyToml } from "smol-toml";
-import { requiresSubagentRuntimeApproval, resolvePermissionEditorTarget, resolveToolPermissionDecision } from "./index.ts";
+import { logSubagentDebug, requiresSubagentRuntimeApproval, resolvePermissionEditorTarget, resolveToolPermissionDecision } from "./index.ts";
 
 const userPolicy = stringifyToml({
   permissions: {
@@ -14,6 +14,42 @@ const userPolicy = stringifyToml({
     subagent: { allow: [{}], deny: [] },
     "mcp__example__search": { allow: [{}], deny: [] },
   },
+});
+
+test("debug logging hashes raw permission data and restricts the retained file mode", () => {
+  const debugPath = join(tmpdir(), "pi-subagent-debug.jsonl");
+  const previousDebug = process.env.PI_SUBAGENT_DEBUG;
+  const previousFile = existsSync(debugPath)
+    ? { content: readFileSync(debugPath), mode: statSync(debugPath).mode & 0o777 }
+    : undefined;
+  if (previousFile) unlinkSync(debugPath);
+  process.env.PI_SUBAGENT_DEBUG = "1";
+
+  try {
+    logSubagentDebug("permission-prompt-enter", {
+      request: {
+        actor: { kind: "child", childId: "worker-safe" },
+        toolName: "bash",
+        cwd: "/workspace",
+        input: { command: "curl -H 'Authorization: secret-token' https://example.invalid" },
+      },
+      result: { status: "allowed", value: "secret-result" },
+    });
+
+    const logged = readFileSync(debugPath, "utf8");
+    assert.match(logged, /worker-safe/);
+    assert.match(logged, /inputHash/);
+    assert.doesNotMatch(logged, /secret-token|secret-result|Authorization|curl/);
+    if (process.platform !== "win32") assert.equal(statSync(debugPath).mode & 0o077, 0);
+  } finally {
+    if (existsSync(debugPath)) unlinkSync(debugPath);
+    if (previousFile) {
+      writeFileSync(debugPath, previousFile.content, { mode: previousFile.mode });
+      chmodSync(debugPath, previousFile.mode);
+    }
+    if (previousDebug === undefined) delete process.env.PI_SUBAGENT_DEBUG;
+    else process.env.PI_SUBAGENT_DEBUG = previousDebug;
+  }
 });
 
 test("resolves bare and explicit user permission editor targets", () => {
