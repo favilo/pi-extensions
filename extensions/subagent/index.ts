@@ -18,7 +18,7 @@ import { getPublishedToolDefinitions } from "../tool-registry/index.ts";
 import { createToolPermissionBoundary, logSubagentDebug, promptToolPermissionRequest, type PermissionContext } from "../tool-permissions/index.ts";
 import type { ToolPermissionBoundary } from "../tool-permissions/permission-boundary.ts";
 import { createSubagentSession, executeChildToolRequest, resolveSubagentCwd } from "./agent-session.ts";
-import { childRuntimeSelectionFor, createChildRuntimeFromSelection } from "./account-runtime.ts";
+import { createChildSessionWithRuntime } from "./account-runtime.ts";
 import {
   createBackgroundSessionController,
   type BackgroundResult,
@@ -177,14 +177,13 @@ function executeParentTool(
           return tool.execute(childId, request.input as never, signal, undefined, parentContext);
         },
       });
-      const selection = childRuntimeSelectionFor(params);
-      const childRuntime = selection ? await createChildRuntimeFromSelection(selection) : undefined;
-      const session = await createSubagentSession(childCwd, {
-        customTools: createChildToolDefinitions(childId, childCwd, boundary),
-        sessionManager: parentSessionDir ? SessionManager.create(childCwd, parentSessionDir) : undefined,
-        ...(childRuntime ? { modelRuntime: childRuntime.modelRuntime, model: childRuntime.model } : {}),
-      });
-      await selection?.consume();
+      const session = await createChildSessionWithRuntime(params, async (childRuntime) =>
+        createSubagentSession(childCwd, {
+          customTools: createChildToolDefinitions(childId, childCwd, boundary),
+          sessionManager: parentSessionDir ? SessionManager.create(childCwd, parentSessionDir) : undefined,
+          ...(childRuntime ? { modelRuntime: childRuntime.modelRuntime, model: childRuntime.model } : {}),
+        }),
+      );
       logSubagentDebug("child-session-created", { childId, cwd: childCwd, activeTools: session.getActiveToolNames?.() });
       return session;
     },

@@ -82,11 +82,15 @@ export async function createChildRuntimeFromSelection(
 }
 
 export async function createChildSessionWithRuntime<T>(
-  _input: object,
-  _createSession: (runtime: ChildRuntime | undefined) => Promise<T>,
-  _createRuntime: (selection: PublishedChildRuntimeSelection) => Promise<ChildRuntime> = createChildRuntimeFromSelection,
+  input: object,
+  createSession: (runtime: ChildRuntime | undefined) => Promise<T>,
+  createRuntime: (selection: PublishedChildRuntimeSelection) => Promise<ChildRuntime> = createChildRuntimeFromSelection,
 ): Promise<T> {
-  throw new Error("Child session construction is not implemented.");
+  const selection = childRuntimeSelectionFor(input);
+  const runtime = selection ? await createRuntime(selection) : undefined;
+  const session = await createSession(runtime);
+  await selection?.consume();
+  return session;
 }
 
 export async function createChildRuntime(
