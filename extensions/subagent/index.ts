@@ -135,6 +135,7 @@ function executeParentTool(
   cwd: string,
   parentContext: ExtensionContext,
   params: SubagentParameters,
+  invocationSignal: AbortSignal | undefined,
   controller: BackgroundSessionController,
 ) {
   const tools = Object.fromEntries(normalToolDefinitions(cwd).map((tool) => [tool.name, tool]));
@@ -151,6 +152,7 @@ function executeParentTool(
     cwd,
     parentContext: `${parentContext.getSystemPrompt()}\n\nYou are a background subagent. Child tool policy: you have only the subagent-tool-request tool. For every file, shell, search, MCP, or other tool action, call it with the exact toolName and an input object. Put arguments directly in that object (for example, input: {"command":"pwd"}), never as a JSON-encoded string. Do not attempt to call tools directly, and do not ask the main agent to repeat or duplicate your requested action. Tool permission UI and activity are attributed to your generated subagent ID.\n\nAvailable parent tools and input schemas:\n${JSON.stringify(toolCatalog)}`,
     task: params.task,
+    invocationSignal,
     createSession: async ({ childId, cwd: childCwd, signal }) => {
       const boundary = createToolPermissionBoundary({
         validate: (request) => {
@@ -214,9 +216,9 @@ export default function subagentExtension(pi: ExtensionAPI): void {
       "The single subagent approval covers its selected runtime; each later child tool action is approved separately.",
     ],
     parameters: subagentParameters,
-    async execute(_toolCallId, params: SubagentParameters, _signal, _onUpdate, ctx) {
+    async execute(_toolCallId, params: SubagentParameters, signal, _onUpdate, ctx) {
       const cwd = resolveSubagentCwd(ctx.cwd, params.cwd);
-      const result = await executeParentTool(pi, cwd, ctx, params, controller);
+      const result = await executeParentTool(pi, cwd, ctx, params, signal, controller);
       return {
         content: [{ type: "text", text: JSON.stringify(result) }],
         details: result,

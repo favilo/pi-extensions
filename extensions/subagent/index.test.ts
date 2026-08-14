@@ -7,6 +7,7 @@ import subagentExtension, { createChildToolDefinitions } from "./index.ts";
 test("registers background launch, explicit result lookup, and shutdown cleanup", () => {
   const tools: Array<{
     name: string;
+    execute?: (toolCallId: string, params: unknown, signal: AbortSignal | undefined, onUpdate: unknown, ctx: unknown) => Promise<unknown>;
     renderCall?: unknown;
     renderResult?: (result: unknown, options: { expanded: boolean; isPartial: boolean }, theme: unknown) => { render(width: number): string[] };
   }> = [];
@@ -53,6 +54,37 @@ test("registers background launch, explicit result lookup, and shutdown cleanup"
   assert.match(collapsed, /completed.*1 event.*32 bytes/i);
   assert.doesNotMatch(collapsed, /visible only when expanded/);
   assert.match(expanded, /visible only when expanded/);
+});
+
+test("forwards an already-cancelled launch invocation before constructing a child session", async () => {
+  const tools: Array<{
+    name: string;
+    execute?: (toolCallId: string, params: unknown, signal: AbortSignal | undefined, onUpdate: unknown, ctx: unknown) => Promise<unknown>;
+  }> = [];
+  const pi = {
+    registerTool(tool: { name: string }) {
+      tools.push(tool);
+    },
+    on() {},
+    sendMessage() {},
+  } as unknown as ExtensionAPI;
+  subagentExtension(pi);
+  const launchTool = tools.find(({ name }) => name === "subagent");
+  const invocation = new AbortController();
+  invocation.abort();
+  assert.ok(launchTool?.execute);
+
+  await assert.rejects(
+    launchTool.execute("launch-cancelled", { task: "do not start" }, invocation.signal, undefined, {
+      cwd: process.cwd(),
+      getSystemPrompt: () => "policy",
+      sessionManager: {
+        getSessionFile: () => undefined,
+        getSessionDir: () => "/tmp",
+      },
+    }),
+    /cancel/i,
+  );
 });
 
 test("gives a child only the permission bridge tool with structured object arguments", () => {
