@@ -89,6 +89,130 @@ test("requires a runtime-selection prompt for explicit and inherited subagent ac
   assert.equal(requiresSubagentRuntimeApproval({ task: "inspect" }, {}), false);
 });
 
+test("configured subagent deny wins before child runtime resolution or a permission prompt", async () => {
+  const agentDir = mkdtempSync(join(tmpdir(), "pi-permissions-runtime-deny-"));
+  writeFileSync(join(agentDir, "permissions.toml"), stringifyToml({
+    permissions: { subagent: { allow: [{}], deny: [{}] } },
+  }));
+  const previousAgentDir = process.env.PI_CODING_AGENT_DIR;
+  const key = Symbol.for("pi-account-switcher.child-runtime.v1");
+  const originalApi = (globalThis as Record<symbol, unknown>)[key];
+  let resolveCalls = 0;
+  let promptCalls = 0;
+  const handlers = new Map<string, (event: { toolName: string; input: Record<string, unknown>; toolCallId: string }, ctx: unknown) => Promise<unknown>>();
+  (globalThis as Record<symbol, unknown>)[key] = {
+    resolve: async () => {
+      resolveCalls += 1;
+      return undefined;
+    },
+  };
+  process.env.PI_CODING_AGENT_DIR = agentDir;
+
+  try {
+    const { default: toolPermissionPolicy } = await import(`./index.ts?runtime-deny=${encodeURIComponent(agentDir)}`);
+    toolPermissionPolicy({
+      registerCommand() {},
+      on(event: string, handler: (event: { toolName: string; input: Record<string, unknown>; toolCallId: string }, ctx: unknown) => Promise<unknown>) {
+        if (event === "tool_call") handlers.set(event, handler);
+      },
+      getAllTools: () => [{ name: "subagent" }],
+    } as never);
+
+    const result = await handlers.get("tool_call")?.({
+      toolName: "subagent",
+      toolCallId: "launch-denied",
+      input: { task: "inspect", account: "personal" },
+    }, {
+      cwd: "/tmp/project",
+      hasUI: true,
+      mode: "tui",
+      sessionId: "runtime-parent",
+      ui: {
+        confirm: async () => {
+          promptCalls += 1;
+          return true;
+        },
+        custom: async () => {
+          promptCalls += 1;
+          return undefined;
+        },
+      },
+    });
+
+    assert.deepEqual(result, { block: true, reason: "Blocked subagent: arguments match a configured deny rule." });
+    assert.equal(resolveCalls, 0);
+    assert.equal(promptCalls, 0);
+  } finally {
+    if (originalApi === undefined) delete (globalThis as Record<symbol, unknown>)[key];
+    else (globalThis as Record<symbol, unknown>)[key] = originalApi;
+    if (previousAgentDir === undefined) delete process.env.PI_CODING_AGENT_DIR;
+    else process.env.PI_CODING_AGENT_DIR = previousAgentDir;
+  }
+});
+
+test("resolved child runtime fails closed without a UI despite a broad subagent allow rule", async () => {
+  const agentDir = mkdtempSync(join(tmpdir(), "pi-permissions-runtime-headless-"));
+  writeFileSync(join(agentDir, "permissions.toml"), stringifyToml({
+    permissions: { subagent: { allow: [{}], deny: [] } },
+  }));
+  const previousAgentDir = process.env.PI_CODING_AGENT_DIR;
+  const key = Symbol.for("pi-account-switcher.child-runtime.v1");
+  const originalApi = (globalThis as Record<symbol, unknown>)[key];
+  let resolveCalls = 0;
+  const handlers = new Map<string, (event: { toolName: string; input: Record<string, unknown>; toolCallId: string }, ctx: unknown) => Promise<unknown>>();
+  (globalThis as Record<symbol, unknown>)[key] = {
+    resolve: async () => {
+      resolveCalls += 1;
+      return {
+        descriptor: Object.freeze({
+          accountId: "personal",
+          provider: "openai-codex",
+          modelId: "gpt-5.6-terra",
+          source: "explicit",
+        }),
+        installOauth() {},
+        consume: async () => {},
+      };
+    },
+  };
+  process.env.PI_CODING_AGENT_DIR = agentDir;
+
+  try {
+    const { default: toolPermissionPolicy } = await import(`./index.ts?runtime-headless=${encodeURIComponent(agentDir)}`);
+    toolPermissionPolicy({
+      registerCommand() {},
+      on(event: string, handler: (event: { toolName: string; input: Record<string, unknown>; toolCallId: string }, ctx: unknown) => Promise<unknown>) {
+        if (event === "tool_call") handlers.set(event, handler);
+      },
+      getAllTools: () => [{ name: "subagent" }],
+    } as never);
+
+    const result = await handlers.get("tool_call")?.({
+      toolName: "subagent",
+      toolCallId: "launch-headless",
+      input: { task: "inspect", account: "personal" },
+    }, {
+      cwd: "/tmp/project",
+      hasUI: false,
+      mode: "json",
+      model: { provider: "openai-codex", id: "gpt-5.5" },
+      ui: {
+        confirm: async () => {
+          throw new Error("headless launches must not prompt");
+        },
+      },
+    });
+
+    assert.deepEqual(result, { block: true, reason: "Blocked subagent: selected account or model requires interactive approval." });
+    assert.equal(resolveCalls, 1);
+  } finally {
+    if (originalApi === undefined) delete (globalThis as Record<symbol, unknown>)[key];
+    else (globalThis as Record<symbol, unknown>)[key] = originalApi;
+    if (previousAgentDir === undefined) delete process.env.PI_CODING_AGENT_DIR;
+    else process.env.PI_CODING_AGENT_DIR = previousAgentDir;
+  }
+});
+
 test("resolves and displays the selected runtime before approving a broadly allowed launch", async () => {
   const agentDir = mkdtempSync(join(tmpdir(), "pi-permissions-runtime-"));
   writeFileSync(join(agentDir, "permissions.toml"), stringifyToml({
