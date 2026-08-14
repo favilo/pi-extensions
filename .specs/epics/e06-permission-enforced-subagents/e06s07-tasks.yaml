@@ -1,6 +1,6 @@
 story_id: e06s07
 title: Launch subagents with an isolated account and model
-status: todo
+status: failing
 bcps: 5
 delta: ADDED
 spec: e06s07-child-account-model-selection.md
@@ -12,7 +12,7 @@ tasks:
       Extract a public read-only account-switcher child-runtime selection and OAuth credential adapter. Persist refreshes only to the selected account through serialized updates.
     verify: >-
       Run the account-switcher resolver and refresh-persistence tests in its repository.
-    status: todo
+    status: passing
     risk: P0
     security: high
     tdd:
@@ -23,7 +23,7 @@ tasks:
     description: >-
       Add account/model launch fields and one shared resolution path used by both permission presentation and child construction.
     verify: node --test extensions/subagent/account-runtime.test.ts extensions/subagent/index.test.ts
-    status: todo
+    status: passing
     risk: P0
     security: high
     tdd:
@@ -45,7 +45,7 @@ tasks:
     description: >-
       Create an isolated child ModelRuntime for selected openai-codex OAuth accounts, install child-only auth resolution, persist selected-account refresh, and pass the selected model into AgentSession.
     verify: node --test extensions/subagent/agent-session.test.ts extensions/subagent/account-runtime.test.ts && npm run check
-    status: todo
+    status: passing
     risk: P0
     security: high
     tdd:
