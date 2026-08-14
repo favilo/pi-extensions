@@ -28,8 +28,8 @@ phases:
         passed: true
       - step: "Reload while a long-running child is active"
         expected: "Reload cancels and disposes the child; the replacement session cannot retrieve or observe orphan work."
-        actual: null
-        passed: null
+        actual: "After approving child 2d8be18b-3c7a-4ee0-82a7-33506c65b8f4 to run sleep 120, /reload made its lookup return found: false/status: unknown and no sleep 120 process remained."
+        passed: true
       - step: "Exercise overlapping main-agent and child permission prompts in both arrival orders"
         expected: "One FIFO prompt is visible at a time; each immutable request requires an independent decision and settles only its own action."
         actual: null
