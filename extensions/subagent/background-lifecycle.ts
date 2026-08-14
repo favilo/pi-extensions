@@ -90,6 +90,10 @@ export function createBackgroundSessionController(
     outputTruncated?: boolean;
     cleaned: boolean;
   }>();
+  const pendingConstructions = new Map<string, {
+    cancellation: AbortController;
+    settled: Promise<void>;
+  }>();
   let closed = false;
   const terminalOrder: string[] = [];
 
@@ -119,14 +123,26 @@ export function createBackgroundSessionController(
     }
   }
 
-  async function waitForAbort(session: ManagedSubagentSession): Promise<void> {
+  async function waitWithinCleanupBound(operation: Promise<unknown>): Promise<void> {
     let timer: ReturnType<typeof setTimeout> | undefined;
-    const abort = Promise.resolve(session.abort?.()).catch(() => undefined);
     const timeout = new Promise<void>((resolve) => {
       timer = setTimeout(resolve, controllerOptions.cleanupTimeoutMs ?? DEFAULT_CLEANUP_TIMEOUT_MS);
     });
-    await Promise.race([abort, timeout]);
+    await Promise.race([operation.then(() => undefined, () => undefined), timeout]);
     if (timer) clearTimeout(timer);
+  }
+
+  async function waitForAbort(session: ManagedSubagentSession): Promise<void> {
+    await waitWithinCleanupBound(Promise.resolve().then(() => session.abort?.()));
+  }
+
+  async function disposeStaleSession(session: ManagedSubagentSession): Promise<void> {
+    await waitForAbort(session);
+    try {
+      session.dispose();
+    } catch {
+      // A stale session must not escape shutdown even if disposal reports an error.
+    }
   }
 
   function cleanup(id: string): void {
@@ -146,6 +162,10 @@ export function createBackgroundSessionController(
     async close() {
       if (closed) return;
       closed = true;
+      const constructions = [...pendingConstructions.values()];
+      for (const construction of constructions) construction.cancellation.abort();
+      await waitWithinCleanupBound(Promise.all(constructions.map(({ settled }) => settled)));
+
       for (const [id, runtime] of runtimes) {
         if (!registry.get(id)?.terminal) {
           runtime.cancellation.abort();
@@ -173,12 +193,27 @@ export function createBackgroundSessionController(
       if (closed) throw new Error("Background child registry is closed.");
       const task = registry.register(options.cwd);
       const cancellation = new AbortController();
+      let markConstructionSettled: (() => void) | undefined;
+      const settled = new Promise<void>((resolve) => { markConstructionSettled = resolve; });
+      pendingConstructions.set(task.id, { cancellation, settled });
+
       let session: ManagedSubagentSession;
       try {
         session = await (options.createSession ?? createSession)({ childId: task.id, cwd: options.cwd, signal: cancellation.signal });
       } catch (error) {
-        registry.transition(task.id, "failed");
+        registry.transition(task.id, closed ? "cancelled" : "failed");
+        pendingConstructions.delete(task.id);
+        markConstructionSettled?.();
+        if (closed) throw new Error("Background child registry closed during session construction.");
         throw error;
+      }
+
+      if (closed) {
+        registry.transition(task.id, "cancelled");
+        await disposeStaleSession(session);
+        pendingConstructions.delete(task.id);
+        markConstructionSettled?.();
+        throw new Error("Background child registry closed during session construction.");
       }
 
       const events = createBackgroundEventBuffer(task.id, DEFAULT_EVENT_LIMITS);
@@ -192,6 +227,8 @@ export function createBackgroundSessionController(
         cleaned: false,
       };
       runtimes.set(task.id, runtime);
+      pendingConstructions.delete(task.id);
+      markConstructionSettled?.();
       runtime.unsubscribe = session.subscribe((event) => {
         controllerOptions.debug?.("child-session-event", { childId: task.id, eventType: event.type });
         events.append(event);
