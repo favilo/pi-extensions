@@ -57,6 +57,74 @@ test("shutdown cancels and disposes a child whose session construction completes
   assert.deepEqual(calls, ["abort", "dispose"]);
 });
 
+test("parent invocation cancellation stops and disposes an active child", async () => {
+  const calls: string[] = [];
+  const invocation = new AbortController();
+  let childSignal: AbortSignal | undefined;
+  const session: ManagedSubagentSession = {
+    prompt: () => new Promise<void>(() => {}),
+    subscribe: () => () => calls.push("unsubscribe"),
+    abort: () => { calls.push("abort"); },
+    dispose: () => calls.push("dispose"),
+  };
+  const controller = createBackgroundSessionController(async ({ signal }) => {
+    childSignal = signal;
+    return session;
+  }, { cleanupTimeoutMs: 20 });
+  const options: Parameters<typeof controller.launch>[0] & { invocationSignal: AbortSignal } = {
+    cwd: "/workspace",
+    parentContext: "policy",
+    task: "wait",
+    invocationSignal: invocation.signal,
+  };
+  const launched = await controller.launch(options);
+
+  invocation.abort();
+  await new Promise((resolve) => setImmediate(resolve));
+
+  assert.equal(childSignal?.aborted, true);
+  assert.equal(controller.result(launched.id).status, "cancelled");
+  assert.deepEqual(calls, ["abort", "unsubscribe", "dispose"]);
+});
+
+test("parent invocation cancellation rejects a session still being constructed", async () => {
+  const calls: string[] = [];
+  const invocation = new AbortController();
+  let childSignal: AbortSignal | undefined;
+  let resolveConstruction: ((session: ManagedSubagentSession) => void) | undefined;
+  const construction = new Promise<ManagedSubagentSession>((resolve) => {
+    resolveConstruction = resolve;
+  });
+  const session: ManagedSubagentSession = {
+    prompt: async () => { calls.push("prompt"); },
+    subscribe: () => {
+      calls.push("subscribe");
+      return () => calls.push("unsubscribe");
+    },
+    abort: () => { calls.push("abort"); },
+    dispose: () => calls.push("dispose"),
+  };
+  const controller = createBackgroundSessionController(async ({ signal }) => {
+    childSignal = signal;
+    return construction;
+  }, { cleanupTimeoutMs: 20 });
+  const options: Parameters<typeof controller.launch>[0] & { invocationSignal: AbortSignal } = {
+    cwd: "/workspace",
+    parentContext: "policy",
+    task: "wait",
+    invocationSignal: invocation.signal,
+  };
+
+  const launch = controller.launch(options);
+  await new Promise((resolve) => setImmediate(resolve));
+  invocation.abort();
+  resolveConstruction?.(session);
+
+  await assert.rejects(launch, /cancel/i);
+  assert.equal(childSignal?.aborted, true);
+  assert.deepEqual(calls, ["abort", "dispose"]);
+});
+
 test("bounds shutdown cleanup when child abort never settles", async () => {
   const calls: string[] = [];
   const session: ManagedSubagentSession = {
