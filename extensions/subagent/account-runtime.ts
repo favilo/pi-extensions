@@ -81,6 +81,14 @@ export async function createChildRuntimeFromSelection(
   return { modelRuntime, model, selection };
 }
 
+export async function createChildSessionWithRuntime<T>(
+  _input: object,
+  _createSession: (runtime: ChildRuntime | undefined) => Promise<T>,
+  _createRuntime: (selection: PublishedChildRuntimeSelection) => Promise<ChildRuntime> = createChildRuntimeFromSelection,
+): Promise<T> {
+  throw new Error("Child session construction is not implemented.");
+}
+
 export async function createChildRuntime(
   parameters: SubagentRuntimeParameters,
   parentModel: { provider: string; id: string } | undefined,
