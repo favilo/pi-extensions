@@ -56,6 +56,20 @@ export function getPublishedChildRuntimeApi(): PublishedChildRuntimeApi | undefi
   return (globalThis as Record<symbol, PublishedChildRuntimeApi | undefined>)[CHILD_RUNTIME_API];
 }
 
+export type ChildRuntime = {
+  modelRuntime: ModelRuntime;
+  model: unknown;
+  selection: PublishedChildRuntimeSelection;
+};
+
+export async function createChildRuntime(
+  _parameters: SubagentRuntimeParameters,
+  _parentModel: { provider: string; id: string } | undefined,
+  _api = getPublishedChildRuntimeApi(),
+): Promise<ChildRuntime | undefined> {
+  return undefined;
+}
+
 export type DebugChildRuntime = {
   modelRuntime: ModelRuntime;
   model: unknown;
