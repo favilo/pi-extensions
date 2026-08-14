@@ -51,6 +51,38 @@ export type PublishedChildRuntimeApi = {
 };
 
 export const CHILD_RUNTIME_API = Symbol.for("pi-account-switcher.child-runtime.v1");
+const CHILD_RUNTIME_SELECTION = Symbol.for("pi-extensions.subagent.runtime-selection.v1");
+
+type RuntimeSelectionCarrier = Record<symbol, PublishedChildRuntimeSelection | undefined>;
+
+/**
+ * Resolve a redacted child selection before approval and preserve it on Pi's
+ * mutable tool-call input for the matching executor invocation.
+ */
+export async function resolveChildRuntimeSelection(
+  _parameters: SubagentRuntimeParameters,
+  _parentModel: { provider: string; id: string } | undefined,
+  _api = getPublishedChildRuntimeApi(),
+): Promise<PublishedChildRuntimeSelection | undefined> {
+  void _parameters;
+  void _parentModel;
+  void _api;
+  return undefined;
+}
+
+export function attachChildRuntimeSelection(
+  _input: object,
+  _selection: PublishedChildRuntimeSelection | undefined,
+): void {
+  void _input;
+  void _selection;
+}
+
+export function childRuntimeSelectionFor(
+  input: object,
+): PublishedChildRuntimeSelection | undefined {
+  return (input as RuntimeSelectionCarrier)[CHILD_RUNTIME_SELECTION];
+}
 
 export function getPublishedChildRuntimeApi(): PublishedChildRuntimeApi | undefined {
   return (globalThis as Record<symbol, PublishedChildRuntimeApi | undefined>)[CHILD_RUNTIME_API];
