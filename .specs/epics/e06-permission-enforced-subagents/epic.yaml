@@ -49,7 +49,7 @@ stories:
   - id: e06s07
     title: Launch subagents with an isolated account and model
     bcps: 5
-    status: failing
+    status: passing
     delta: ADDED
     spec: e06s07-child-account-model-selection.md
     tasks: e06s07-tasks.yaml

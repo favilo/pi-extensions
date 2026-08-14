@@ -87,7 +87,7 @@ The shared resolver returns a redacted selection descriptor. Credential values n
 
 ## Implementation status
 
-Tasks 1, 2, and 4 have passing focused verification: the account-switcher publishes the redacted resolver and selected-account OAuth refresh persistence, while the subagent constructs the approved child-local runtime without re-resolving it. Tasks 3 and 5 remain failing until targeted coverage proves configured-deny precedence without resolver/prompt use, selected-runtime no-UI denial, and pre-launch actionable rejection of raw-env, API-key, custom-provider, and Antigravity selections. Live Pi UAT remains required for the FIFO approval and parent-isolation contract.
+All implementation tasks have passing focused verification: the account-switcher publishes the redacted resolver, rejects unsupported raw-env, API-key, custom-provider, and Antigravity selections before installation, and persists selected-account OAuth refreshes. The subagent constructs the approved child-local runtime without re-resolving it; configured deny precedes resolution and prompts, while selected runtimes fail closed without a UI. Live Pi UAT remains required for the FIFO approval and parent-isolation contract.
 
 ## Definition of done
 A user can explicitly or implicitly select either existing Codex OAuth account for a child, approve the exact resolved runtime once through the existing FIFO, and run that child without changing the parent account/model/environment or exposing account-switcher capabilities to the child.

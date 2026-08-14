@@ -1,6 +1,6 @@
 story_id: e06s07
 title: Launch subagents with an isolated account and model
-status: failing
+status: passing
 bcps: 5
 delta: ADDED
 spec: e06s07-child-account-model-selection.md
@@ -34,7 +34,7 @@ tasks:
     description: >-
       Require serialized interactive approval for resolved child account/model selection despite broad subagent allow rules, preserving deny precedence and fail-closed no-UI behavior.
     verify: node --test extensions/tool-permissions/index.test.ts extensions/tool-permissions/prompt-queue.test.ts
-    status: todo
+    status: passing
     risk: P0
     security: high
     tdd:
@@ -56,7 +56,7 @@ tasks:
     description: >-
       Consume one-shot selection only after approved successful construction and reject unsupported raw-env, API-key, custom-provider, and Antigravity selections without child launch.
     verify: node --test extensions/subagent/account-runtime.test.ts extensions/subagent/agent-session.test.ts
-    status: todo
+    status: passing
     risk: P0
     security: high
     tdd:
