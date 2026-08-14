@@ -1,7 +1,7 @@
 active_flow: build_epic
 active_epic_id: e06
-active_story_id: e06s07
-active_story: e06s07
+active_story_id: e06s05
+active_story: e06s05
 active_bug_id: null
 git:
   bookmark: e06-observable-background-subagents
@@ -21,18 +21,18 @@ planning:
     constraints:
       - "Do not modify the e06 repair flow or child-private bridge catalog."
 handoff:
-  last_step_completed: Scoped e06s07 child account/model runtime selection: selected Codex OAuth accounts use child-local provider auth, broad subagent allows cannot bypass selected-runtime approval, and account-switcher must export the shared resolver.
-  open_decisions: []
+  last_step_completed: Completed e06s07 implementation and recorded UAT handoff state
+  open_decisions:
+    - Reconcile the e06-observable-background-subagents bookmark's remote divergence before another push.
   required_reading:
     - .specs/epics/e06-permission-enforced-subagents/e06s05-background-subagent-results.md
     - .specs/epics/e06-permission-enforced-subagents/e06s05-tasks.yaml
-    - .specs/epics/e06-permission-enforced-subagents/e06s06-switchable-live-transcripts.md
     - .specs/epics/e06-permission-enforced-subagents/e06s07-child-account-model-selection.md
     - .specs/epics/e06-permission-enforced-subagents/e06s07-tasks.yaml
     - .specs/security/epics/e06/THREAT_MODEL.md
-  next_skill: develop-tdd
-  context: Phase Execute. e06s07 implementation and baseline verification are complete; continue test-first hardening for configured-deny precedence, selected-runtime no-UI fail-closed behavior, and actionable rejection of unsupported raw-env/API-key/custom-provider/Antigravity accounts before child launch. Keep every behavioral RED and GREEN in separate Jujutsu changes. e06s05 renderer/permission UAT remains incomplete and must not advance to verify-work. The supported e06s07 path is account-switcher's existing openai-codex OAuth accounts (work, personal) only: never inject credentials through process.env, share the redacted resolver between approval and construction, always use one FIFO selected-runtime approval despite broad allows, preserve deny precedence, construct child-local ModelRuntime/provider auth, persist refreshes only to the selected account, and consume NEXT_ID only after successful construction. E07s01 remains paused.
-  blocker: e06s05 renderer automation is green, but live Ctrl+O expansion/color/large-result responsiveness, reload/cancellation, and deterministic main-to-child overlap UAT remain required before verify-work. e06s07 requires a public account-switcher resolver/credential adapter before this repository can safely construct a child runtime; do not couple to its private JSON files or mutate process.env. A same-model rerun presently fails before child launch with Codex usage-limit exhaustion, so do not attribute provider failure to renderer/runtime code without evidence.
+  next_skill: verify-work
+  context: Phase Execute. e06s07 is passing and documented. Resume e06s05 at its live Pi UAT gate; do not change e06s05 status or advance to e06s06 until the listed interactive checks succeed. The account-switcher fork is https://github.com/favilo/pi-account-switcher on branch favilo/e06s07-child-runtime; its origin points to the fork and upstream points to hieplp/pi-account-switcher.
+  blocker: e06s05 automated coverage is green, but live Ctrl+O expansion/color/large-result responsiveness, reload/cancellation, and deterministic main-to-child overlap UAT remain required. The e06-observable-background-subagents bookmark has diverged from origin and must be reconciled before a further push.
   deferred_work:
     - "Resume e07s01 at build-epic Step 2 after e06 observable background subagents"
     - "Persist completed and active child sessions for later external analysis"
