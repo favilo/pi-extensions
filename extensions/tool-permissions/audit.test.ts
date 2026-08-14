@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { existsSync, mkdirSync, readFileSync, readlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readlinkSync, statSync, writeFileSync } from "node:fs";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -18,7 +18,14 @@ test("writes to the current UTC log and points audit.log at it", () => {
   const datedPath = join(home, ".pi", "tool-permissions", "audit-2026-07-31.log");
   const linkPath = join(home, ".pi", "tool-permissions", "audit.log");
   assert.equal(existsSync(datedPath), true);
-  assert.equal(readlinkSync(linkPath), "audit-2026-07-31.log");
+  try {
+    assert.equal(readlinkSync(linkPath), "audit-2026-07-31.log");
+  } catch {
+    const aliasStats = statSync(linkPath);
+    const datedStats = statSync(datedPath);
+    assert.equal(aliasStats.dev, datedStats.dev);
+    assert.equal(aliasStats.ino, datedStats.ino);
+  }
   assert.match(readFileSync(datedPath, "utf8"), /"decision":"allow_once"/);
 });
 

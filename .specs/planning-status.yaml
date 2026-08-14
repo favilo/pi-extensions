@@ -20,3 +20,7 @@ workflows:
   slice-tasks:
     required: true
     status: done
+  plan-work:
+    required: true
+    status: done
+    note: "e08s01 capsule and failing task ledger validated by the native plan-consistency gate"

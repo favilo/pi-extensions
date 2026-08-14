@@ -122,8 +122,9 @@ test("routes child authorization through the existing tool-permissions resolver"
   const root = mkdtempSync(join(tmpdir(), "pi-subagent-permissions-"));
   const userPermissionsPath = join(root, "permissions.toml");
   const target = join(root, "notes.md");
-  const escapedTarget = target.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\\\$&");
-  writeFileSync(userPermissionsPath, `[[permissions.read.allow]]\npath = "^${escapedTarget}$"\n`);
+  const escapedTarget = target.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const serializedPattern = JSON.stringify(`^${escapedTarget}$`);
+  writeFileSync(userPermissionsPath, `[[permissions.read.allow]]\npath = ${serializedPattern}\n`);
 
   const result = await runToolInterceptionProbe({
     call: { toolName: "read", input: { path: target } },

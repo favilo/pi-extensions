@@ -1,0 +1,14 @@
+id: e08
+title: Windows preflight portability
+wsjf: 9.0
+total_bcps: 6
+status: passing
+source_bug: BUG-2026-08-13T231226
+stories:
+  - id: e08s01
+    title: Restore portable Windows preflight contracts
+    bcps: 6
+    status: passing
+    delta: MODIFIED
+    spec: e08s01-portable-preflight-contracts.md
+    tasks: e08s01-tasks.yaml

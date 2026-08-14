@@ -9,6 +9,13 @@ release:
   merged_pr: null
   merged_commit: null
 epics:
+  - id: e08
+    title: Windows preflight portability
+    capsule_dir: epics/e08-windows-preflight-portability
+    wsjf: 9.0
+    bcps: 6
+    note: >-
+      WSJF = (business value 7 + time criticality 9 + risk reduction 11) / job size 3 = 9.0. Restore a green Windows Git Bash baseline without platform-specific wrappers or elevated link privileges before feature work resumes.
   - id: e04
     title: Repository-bounded local agent context
     capsule_dir: epics/e04-repository-bounded-local-agent-context
@@ -45,9 +52,9 @@ epics:
     note: >-
       WSJF = (business value 6 + time criticality 4 + risk reduction 7) / job size 10 = 1.7. The epic extends the existing permission boundary with trusted project hierarchy, explicit save scope, and scoped policy editor commands.
 bugs:
-  total: 0
+  total: 1
   fixed: 0
   deferred: 0
   wontfix: 0
-  open: 0
-  registry: null
+  open: 1
+  registry: .specs/bugs/registry.yaml

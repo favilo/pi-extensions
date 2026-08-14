@@ -1,0 +1,79 @@
+story_id: e08s01
+title: Restore portable Windows preflight contracts
+status: passing
+bcps: 6
+delta: MODIFIED
+spec: e08s01-portable-preflight-contracts.md
+tasks:
+  - id: 1
+    description: Configure npm run check to run typecheck and extension tests only while preserving npm test as the complete extension-and-example suite.
+    verify: npm run check
+    status: passing
+    risk: P1
+    security: none
+    allure:
+      severity: high
+      categories:
+        - preflight
+        - portability
+  - id: 2
+    description: Serialize an exact temporary path safely through regular-expression and TOML layers, then prove the intended child read is allowed.
+    verify: node --test extensions/subagent/agent-session.test.ts
+    status: passing
+    risk: P1
+    security: low
+    allure:
+      severity: high
+      categories:
+        - unit
+        - portability
+        - permission-boundary
+  - id: 3
+    description: Build the test-only escaping directory alias through Node symlink capability with junction fallback and retain canonical containment rejection.
+    verify: node --test extensions/subagent/working-directory.test.ts
+    status: passing
+    risk: P1
+    security: low
+    allure:
+      severity: high
+      categories:
+        - unit
+        - portability
+        - containment
+        - Security Review
+  - id: 4
+    description: Make current-log alias maintenance prefer a relative symbolic link and fall back to a same-directory hard link without altering dated writes or authorization behavior.
+    verify: node --test extensions/tool-permissions/audit.test.ts
+    status: passing
+    risk: P1
+    security: low
+    allure:
+      severity: high
+      categories:
+        - unit
+        - audit
+        - portability
+  - id: 5
+    description: Separate alias maintenance from retention cleanup and preserve independent non-blocking warnings.
+    verify: node --test extensions/tool-permissions/audit.test.ts
+    status: passing
+    risk: P1
+    security: low
+    allure:
+      severity: high
+      categories:
+        - unit
+        - audit
+        - retention
+  - id: 6
+    description: Run the complete configured preflight and planning gates from the repository root in Bash.
+    verify: npm run check:ci
+    status: passing
+    risk: P1
+    security: low
+    allure:
+      severity: high
+      categories:
+        - regression
+        - portability
+        - Windows Git Bash

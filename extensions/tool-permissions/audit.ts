@@ -1,4 +1,4 @@
-import { appendFileSync, existsSync, mkdirSync, readFileSync, readlinkSync, symlinkSync, unlinkSync, renameSync, readdirSync } from "node:fs";
+import { appendFileSync, existsSync, linkSync, mkdirSync, readFileSync, readlinkSync, symlinkSync, unlinkSync, renameSync, readdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 
@@ -25,7 +25,7 @@ function legacyPath(homeDir: string): string {
   return join(homeDir, ".config", "pi", "audit.log");
 }
 
-function ensureCurrentLink(linkPath: string, targetName: string): void {
+function ensureCurrentLink(linkPath: string, targetPath: string, targetName: string): void {
   try {
     if (readlinkSync(linkPath) === targetName) return;
   } catch {
@@ -37,7 +37,12 @@ function ensureCurrentLink(linkPath: string, targetName: string): void {
   } catch (error) {
     if (!(error && typeof error === "object" && "code" in error && error.code === "ENOENT")) throw error;
   }
-  symlinkSync(targetName, linkPath);
+
+  try {
+    symlinkSync(targetName, linkPath);
+  } catch {
+    linkSync(targetPath, linkPath);
+  }
 }
 
 function migrateLegacy(homeDir: string, target: string): void {
@@ -94,7 +99,12 @@ export function createAuditLogger(options: AuditLoggerOptions = {}): { write(rec
       }
 
       try {
-        ensureCurrentLink(join(directory, "audit.log"), `audit-${date}.log`);
+        ensureCurrentLink(join(directory, "audit.log"), target, `audit-${date}.log`);
+      } catch (error) {
+        warn(`Could not update current permission audit alias at ${directory}: ${error instanceof Error ? error.message : String(error)}`);
+      }
+
+      try {
         removeExpiredLogs(directory, date);
       } catch (error) {
         warn(`Could not rotate permission audit logs at ${directory}: ${error instanceof Error ? error.message : String(error)}`);
