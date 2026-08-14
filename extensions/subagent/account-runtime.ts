@@ -53,7 +53,7 @@ export type PublishedChildRuntimeApi = {
 export const CHILD_RUNTIME_API = Symbol.for("pi-account-switcher.child-runtime.v1");
 
 export function getPublishedChildRuntimeApi(): PublishedChildRuntimeApi | undefined {
-  return undefined;
+  return (globalThis as Record<symbol, PublishedChildRuntimeApi | undefined>)[CHILD_RUNTIME_API];
 }
 
 export type DebugChildRuntime = {
