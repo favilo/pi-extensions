@@ -1,7 +1,7 @@
 id: e06
 title: Permission-enforced runnable subagents
 wsjf: 6.0
-total_bcps: 24
+total_bcps: 29
 status: planned
 stories:
   - id: e06s01
@@ -53,3 +53,11 @@ stories:
     delta: ADDED
     spec: e06s07-child-account-model-selection.md
     tasks: e06s07-tasks.yaml
+  - id: e06s08
+    title: Export compact or complete subagent context
+    bcps: 5
+    status: todo
+    delta: ADDED
+    wsjf: 5.0
+    spec: e06s08-export-subagent-context.md
+    tasks: e06s08-tasks.yaml

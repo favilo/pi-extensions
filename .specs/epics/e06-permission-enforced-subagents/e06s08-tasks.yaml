@@ -1,0 +1,88 @@
+story_id: e06s08
+title: Export compact or complete subagent context
+status: failing
+bcps: 5
+delta: ADDED
+spec: e06s08-export-subagent-context.md
+tdd_policy: >-
+  Before each RED run, add the smallest compilable public stub. Record behavioral RED and GREEN implementation in separate Jujutsu changes; missing modules, exports, imports, or functions are invalid RED evidence.
+tasks:
+  - id: 1
+    description: >-
+      Split compact model-facing subagent results from internal export snapshots, returning status only while active and at most 8 KiB of valid UTF-8 final assistant text with original/returned byte counts and explicit truncation metadata when terminal.
+    verify: node --test extensions/subagent/background-session.test.ts extensions/subagent/index.test.ts
+    status: failing
+    risk: P0
+    security: high
+    security_verification: >-
+      Prove normalized events, tool inputs/results, hidden reasoning, and export content never enter default model-facing content or details.
+    tdd:
+      red: A compilable compact projection preserving the existing oversized event-rich result fails status-only, 8 KiB, UTF-8, and disclosure assertions.
+      green: Compact active and terminal projections pass without weakening stable repeated retrieval or cross-registry isolation.
+    allure:
+      severity: critical
+      categories: ["Result contract", "Context bounds", "Information disclosure"]
+
+  - id: 2
+    description: >-
+      Build deterministic schema-v1 snapshots from all finalized exposed child SessionManager entries available at the capture boundary for every lifecycle state, preserving source values without exporter-added truncation and excluding private reasoning.
+    verify: node --test extensions/subagent/result-export.test.ts
+    status: failing
+    risk: P0
+    security: high
+    security_verification: >-
+      Prove the sole Pi session store is used, thinking blocks and internal authority are absent, active snapshots are marked incomplete, ordering is stable, and data beyond live-buffer limits remains present.
+    tdd:
+      red: A compilable export snapshot stub fails large-session, active-state, ordering, final-output, and reasoning-exclusion assertions.
+      green: Schema-v1 snapshots contain every finalized exposed session event available at capture with no exporter cap.
+    allure:
+      severity: critical
+      categories: ["Full context", "Session normalization", "Reasoning confidentiality"]
+
+  - id: 3
+    description: >-
+      Resolve relative and absolute export destinations canonically, map the export variant to the shared write-class permission policy, and show canonical path plus overwrite intent in the parent-session FIFO prompt.
+    verify: node --test extensions/tool-permissions/index.test.ts extensions/tool-permissions/prompt-queue.test.ts
+    status: failing
+    risk: P0
+    security: high
+    security_verification: >-
+      Prove deny precedence, configured allow behavior, unmatched prompting, exact request settlement, canonical target identity, and fail-closed missing-parent/symlink handling.
+    tdd:
+      red: Current custom-tool policy classification fails write-policy, visible-destination, and canonical identity assertions.
+      green: Export authorization reuses one immutable shared permission request and the exact canonical execution target.
+    allure:
+      severity: critical
+      categories: ["Filesystem authorization", "Permission queue", "Path safety"]
+
+  - id: 4
+    description: >-
+      Stream JSON to a destination-local restrictive temporary file and publish atomically, defaulting to no overwrite and allowing explicit approved replacement only for regular files while cleaning every error, cancellation, and shutdown path.
+    verify: node --test extensions/subagent/result-export.test.ts
+    status: failing
+    risk: P0
+    security: high
+    security_verification: >-
+      Prove no partial final file, old-or-new atomic replacement, 0600 POSIX mode, symlink/non-regular refusal, destination mutation serialization, ENOSPC/error cleanup, and invocation/shutdown cancellation.
+    tdd:
+      red: A compilable exporter that writes directly fails atomicity, overwrite, mode, cancellation, and cleanup assertions.
+      green: The canonical queued exporter passes every publication and cleanup contract without truncating serialized content.
+    allure:
+      severity: critical
+      categories: ["Atomic export", "Safe overwrite", "Resource cleanup"]
+
+  - id: 5
+    description: >-
+      Keep subagent_result rendering compact for both retrieval modes, document schema and path semantics, update the e06 threat model for explicit transcript persistence, and run package regressions.
+    verify: node --test extensions/subagent/index.test.ts extensions/subagent/result-renderer.test.ts && npm run check
+    status: failing
+    risk: P1
+    security: high
+    security_verification: >-
+      Prove exported content is absent from tool content/details/rendering and debug/audit logs, while safe metadata remains visible and versioned.
+    tdd:
+      red: Focused integration and documentation assertions fail against the previous event-rich result renderer and threat model.
+      green: Compact rendering, documentation, threat model, and complete package checks pass.
+    allure:
+      severity: high
+      categories: ["Rendering", "Documentation", "Security Review", "Regression"]

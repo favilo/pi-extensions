@@ -48,9 +48,9 @@ epics:
     title: Permission-enforced runnable subagents
     capsule_dir: epics/e06-permission-enforced-subagents
     wsjf: 6.0
-    bcps: 19
+    bcps: 29
     note: >-
-      Original provisional WSJF = 6.0. E06 now extends the completed permission-enforced runtime with observable background execution and switchable live transcripts. The increment scores 4.8 = (business value 8 + time criticality 8 + risk reduction 8) / job size 5; explicit user priority pauses e07 despite its provisional 5.5 score.
+      Original provisional WSJF = 6.0. E06 extends the completed permission-enforced runtime with observable background execution, switchable live transcripts, and explicit full-context export. The e06s08 increment scores 5.0 = (business value 7 + time criticality 5 + risk reduction 8) / job size 4; explicit user priority places its planning before the blocking e06s05 security repair and its implementation after that repair.
   - id: e07
     title: Bash subcommand permission evaluation
     capsule_dir: epics/e07-bash-subcommand-permissions
