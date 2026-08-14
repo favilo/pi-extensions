@@ -21,7 +21,7 @@ planning:
     constraints:
       - "Do not modify the e06 repair flow or child-private bridge catalog."
 handoff:
-  last_step_completed: Completed e06s07 implementation and recorded UAT handoff state
+  last_step_completed: Recorded live rendering evidence for e06s05 UAT
   open_decisions:
     - Reconcile the e06-observable-background-subagents bookmark's remote divergence before another push.
   required_reading:

@@ -1,0 +1,38 @@
+story_id: e06s05
+verified_at: null
+verifier: verify-work
+status: in_progress
+vcs:
+  kind: jj
+  bookmark: e06-observable-background-subagents
+phases:
+  task_verification:
+    passed: null
+  terminal_verdict:
+    passed: null
+  security:
+    passed: true
+    report: ".specs/security/epics/e06/THREAT_MODEL.md"
+    note: "Threat model verdict is PASS; live TUI reverification remains mandatory."
+  manual:
+    passed: null
+    confirmed_by_user: false
+    steps:
+      - step: "Launch a large-result child and use the foreground while it runs"
+        expected: "Launch returns a stable ID immediately and the foreground remains responsive."
+        actual: "Child 6561c3cf-7b47-4aae-afa3-3253a9dcc3ab returned a running handle immediately; a foreground jj status completed; user confirmed responsiveness."
+        passed: true
+      - step: "Retrieve the completed large result and toggle Ctrl+O"
+        expected: "Collapsed output stays bounded; expansion is pretty, syntax-colored JSON with explicit truncation and responsive rendering."
+        actual: "User confirmed good formatting, responsive expansion/collapse, and presentationTruncated: true."
+        passed: true
+      - step: "Reload while a long-running child is active"
+        expected: "Reload cancels and disposes the child; the replacement session cannot retrieve or observe orphan work."
+        actual: null
+        passed: null
+      - step: "Exercise overlapping main-agent and child permission prompts in both arrival orders"
+        expected: "One FIFO prompt is visible at a time; each immutable request requires an independent decision and settles only its own action."
+        actual: null
+        passed: null
+  gaps:
+    closed: null
