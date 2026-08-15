@@ -22,8 +22,8 @@ export type BackgroundResult =
   | { found: false; status: "unknown" }
   | (BackgroundTaskSnapshot & {
     found: true;
-    events: ReturnType<ReturnType<typeof createBackgroundEventBuffer>["snapshot"]>;
     output?: string;
+    outputBytes?: { original: number; returned: number };
     outputTruncated?: boolean;
   });
 
@@ -56,7 +56,7 @@ export type CreateManagedSubagentSession = (options: {
 }) => Promise<ManagedSubagentSession>;
 
 const DEFAULT_CLEANUP_TIMEOUT_MS = 2_000;
-const DEFAULT_MAX_OUTPUT_BYTES = 1_024 * 1_024;
+const DEFAULT_MAX_OUTPUT_BYTES = 8 * 1_024;
 const DEFAULT_MAX_RETAINED_RESULTS = 20;
 
 function truncateUtf8(value: string, maximum: number): { value: string; truncated: boolean } {
@@ -88,6 +88,7 @@ export function createBackgroundSessionController(
     cancellation: AbortController;
     unsubscribe: () => void;
     output?: string;
+    outputBytes?: { original: number; returned: number };
     outputTruncated?: boolean;
     cleaned: boolean;
     detachInvocationAbort: () => void;
@@ -199,9 +200,11 @@ export function createBackgroundSessionController(
       return {
         found: true,
         ...task,
-        events: runtime.events.snapshot(),
-        ...(task.terminal && runtime.output !== undefined ? { output: runtime.output } : {}),
-        ...(task.terminal && runtime.outputTruncated ? { outputTruncated: true } : {}),
+        ...(task.terminal && runtime.output !== undefined ? {
+          output: runtime.output,
+          outputBytes: runtime.outputBytes,
+          outputTruncated: runtime.outputTruncated,
+        } : {}),
       };
     },
 
@@ -286,6 +289,7 @@ export function createBackgroundSessionController(
         cancellation,
         unsubscribe: () => {},
         output: undefined as string | undefined,
+        outputBytes: undefined as { original: number; returned: number } | undefined,
         outputTruncated: undefined as boolean | undefined,
         cleaned: false,
         detachInvocationAbort,
@@ -309,8 +313,12 @@ export function createBackgroundSessionController(
             const output = session.getLastAssistantText?.();
             if (output !== undefined) {
               const bounded = truncateUtf8(output, controllerOptions.maxOutputBytes ?? DEFAULT_MAX_OUTPUT_BYTES);
-              runtime.outputTruncated = bounded.truncated;
               runtime.output = bounded.value;
+              runtime.outputBytes = {
+                original: Buffer.byteLength(output, "utf8"),
+                returned: Buffer.byteLength(bounded.value, "utf8"),
+              };
+              runtime.outputTruncated = bounded.truncated;
             }
             finish(task.id, "completed");
           },
