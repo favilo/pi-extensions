@@ -183,7 +183,7 @@ function compact(value: unknown, max = 2000): string {
 }
 
 const SAFE_DEBUG_STRING_FIELDS = new Set([
-  "requestId", "childId", "toolName", "cwd", "inputHash", "decision", "status",
+  "requestId", "childId", "cwd", "inputHash", "decision", "status",
   "eventType", "parentMode", "mode", "errorType", "customType",
 ]);
 const SAFE_DEBUG_BOOLEAN_FIELDS = new Set(["parentHasUI", "hasUI", "hasCustomUI"]);
@@ -226,6 +226,8 @@ function safeDebugDetails(value: unknown): Record<string, unknown> {
       };
     } else if (key === "result") {
       safe.result = safeDebugDetails(candidate);
+    } else if (key === "toolName" && typeof candidate === "string") {
+      safe.toolNameHash = debugValueHash(candidate);
     } else if (key === "input") {
       safe.inputHash = debugValueHash(candidate);
     } else if (key === "activeTools" && Array.isArray(candidate)) {
