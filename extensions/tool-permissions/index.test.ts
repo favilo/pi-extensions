@@ -16,7 +16,7 @@ const userPolicy = stringifyToml({
   },
 });
 
-test("debug logging hashes raw permission data and restricts the retained file mode", () => {
+test("debug logging hashes raw permission data and unvalidated tool names while restricting the retained file mode", () => {
   const debugPath = join(tmpdir(), "pi-subagent-debug.jsonl");
   const previousDebug = process.env.PI_SUBAGENT_DEBUG;
   const previousFile = existsSync(debugPath)
@@ -35,11 +35,16 @@ test("debug logging hashes raw permission data and restricts the retained file m
       },
       result: { status: "allowed", value: "secret-result" },
     });
+    logSubagentDebug("child-tool-request-start", {
+      childId: "worker-safe",
+      toolName: "unknown-secret-bearing-tool-name",
+    });
 
     const logged = readFileSync(debugPath, "utf8");
     assert.match(logged, /worker-safe/);
     assert.match(logged, /inputHash/);
-    assert.doesNotMatch(logged, /secret-token|secret-result|Authorization|curl/);
+    assert.match(logged, /toolNameHash/);
+    assert.doesNotMatch(logged, /secret-token|secret-result|Authorization|curl|unknown-secret-bearing-tool-name/);
     if (process.platform !== "win32") assert.equal(statSync(debugPath).mode & 0o077, 0);
   } finally {
     if (existsSync(debugPath)) unlinkSync(debugPath);
