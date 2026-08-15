@@ -45,14 +45,17 @@ test("shutdown cancels and disposes a child whose session construction completes
     return construction;
   }, { cleanupTimeoutMs: 20 });
 
-  const launch = controller.launch({ cwd: "/workspace", parentContext: "policy", task: "wait" });
+  const launch = assert.rejects(
+    controller.launch({ cwd: "/workspace", parentContext: "policy", task: "wait" }),
+    /closed|shutdown/i,
+  );
   await new Promise((resolve) => setImmediate(resolve));
   const closing = controller.close();
   await new Promise((resolve) => setImmediate(resolve));
   resolveConstruction?.(session);
 
   await closing;
-  await assert.rejects(launch, /closed|shutdown/i);
+  await launch;
   assert.equal(constructionSignal?.aborted, true);
   assert.deepEqual(calls, ["abort", "dispose"]);
 });
@@ -115,12 +118,13 @@ test("parent invocation cancellation rejects a session still being constructed",
     invocationSignal: invocation.signal,
   };
 
-  const launch = controller.launch(options);
+  const launch = assert.rejects(controller.launch(options), /cancel/i);
   await new Promise((resolve) => setImmediate(resolve));
   invocation.abort();
   resolveConstruction?.(session);
 
-  await assert.rejects(launch, /cancel/i);
+  await launch;
+  await new Promise((resolve) => setImmediate(resolve));
   assert.equal(childSignal?.aborted, true);
   assert.deepEqual(calls, ["abort", "dispose"]);
 });

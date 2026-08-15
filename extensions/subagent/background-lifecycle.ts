@@ -93,9 +93,9 @@ export function createBackgroundSessionController(
     detachInvocationAbort: () => void;
   }>();
   const pendingConstructions = new Map<string, {
-    cancellation: AbortController;
     settled: Promise<void>;
     detachInvocationAbort: () => void;
+    interruptLaunch: (error: Error) => void;
   }>();
   let closed = false;
   const terminalOrder: string[] = [];
@@ -178,7 +178,7 @@ export function createBackgroundSessionController(
       const constructions = [...pendingConstructions.values()];
       for (const construction of constructions) {
         construction.detachInvocationAbort();
-        construction.cancellation.abort();
+        construction.interruptLaunch(new Error("Background child registry closed during session construction."));
       }
       await waitWithinCleanupBound(Promise.all(constructions.map(({ settled }) => settled)));
 
@@ -209,35 +209,61 @@ export function createBackgroundSessionController(
       if (closed) throw new Error("Background child registry is closed.");
       const task = registry.register(options.cwd);
       const cancellation = new AbortController();
+      if (options.invocationSignal?.aborted) {
+        cancellation.abort();
+        registry.transition(task.id, "cancelled");
+        throw new Error("Background child launch was cancelled before session construction.");
+      }
+
       let markConstructionSettled: (() => void) | undefined;
       const settled = new Promise<void>((resolve) => { markConstructionSettled = resolve; });
-      const onInvocationAbort = (): void => {
+      let rejectInterruptedLaunch: ((error: Error) => void) | undefined;
+      const interruptedLaunch = new Promise<never>((_resolve, reject) => { rejectInterruptedLaunch = reject; });
+      let launchInterrupted = false;
+      const finishPendingConstruction = (): void => {
+        if (pendingConstructions.get(task.id)?.settled !== settled) return;
+        pendingConstructions.delete(task.id);
+        markConstructionSettled?.();
+      };
+      const interruptLaunch = (error: Error): void => {
+        if (launchInterrupted) return;
+        launchInterrupted = true;
         cancellation.abort();
+        rejectInterruptedLaunch?.(error);
+      };
+      const onInvocationAbort = (): void => {
+        interruptLaunch(new Error("Background child launch was cancelled during session construction."));
         if (runtimes.has(task.id)) void cancelRuntime(task.id);
       };
       const detachInvocationAbort = options.invocationSignal
         ? () => options.invocationSignal?.removeEventListener("abort", onInvocationAbort)
         : () => {};
       options.invocationSignal?.addEventListener("abort", onInvocationAbort, { once: true });
-      pendingConstructions.set(task.id, { cancellation, settled, detachInvocationAbort });
+      pendingConstructions.set(task.id, { settled, detachInvocationAbort, interruptLaunch });
       if (options.invocationSignal?.aborted) onInvocationAbort();
-      if (cancellation.signal.aborted) {
-        registry.transition(task.id, "cancelled");
-        detachInvocationAbort();
-        pendingConstructions.delete(task.id);
-        markConstructionSettled?.();
-        throw new Error("Background child launch was cancelled before session construction.");
-      }
+
+      const construction = Promise.resolve()
+        .then(() => (options.createSession ?? createSession)({ childId: task.id, cwd: options.cwd, signal: cancellation.signal }))
+        .then(async (session) => {
+          if (!closed && !cancellation.signal.aborted) return session;
+          await disposeStaleSession(session);
+          throw new Error(closed
+            ? "Background child registry closed during session construction."
+            : "Background child launch was cancelled during session construction.");
+        });
+      void construction.then(
+        () => { if (launchInterrupted) finishPendingConstruction(); },
+        () => { if (launchInterrupted) finishPendingConstruction(); },
+      );
 
       let session: ManagedSubagentSession;
       try {
-        session = await (options.createSession ?? createSession)({ childId: task.id, cwd: options.cwd, signal: cancellation.signal });
+        session = await Promise.race([construction, interruptedLaunch]);
       } catch (error) {
         const cancelled = closed || cancellation.signal.aborted;
         registry.transition(task.id, cancelled ? "cancelled" : "failed");
         detachInvocationAbort();
-        pendingConstructions.delete(task.id);
-        markConstructionSettled?.();
+        if (!launchInterrupted) finishPendingConstruction();
         if (closed) throw new Error("Background child registry closed during session construction.");
         if (cancelled) throw new Error("Background child launch was cancelled during session construction.");
         throw error;
@@ -247,8 +273,7 @@ export function createBackgroundSessionController(
         registry.transition(task.id, "cancelled");
         await disposeStaleSession(session);
         detachInvocationAbort();
-        pendingConstructions.delete(task.id);
-        markConstructionSettled?.();
+        finishPendingConstruction();
         throw new Error(closed
           ? "Background child registry closed during session construction."
           : "Background child launch was cancelled during session construction.");
@@ -266,8 +291,7 @@ export function createBackgroundSessionController(
         detachInvocationAbort,
       };
       runtimes.set(task.id, runtime);
-      pendingConstructions.delete(task.id);
-      markConstructionSettled?.();
+      finishPendingConstruction();
       runtime.unsubscribe = session.subscribe((event) => {
         controllerOptions.debug?.("child-session-event", { childId: task.id, eventType: event.type });
         events.append(event);
