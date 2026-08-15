@@ -66,6 +66,29 @@ test("returns active status and stable terminal output only through explicit sco
   assert.deepEqual(controller.result(launched.id), completed);
 });
 
+test("returns final exposed text for failed children without normalized events", async () => {
+  const session: ManagedSubagentSession = {
+    prompt: async () => { throw new Error("provider interrupted"); },
+    subscribe: () => () => {},
+    getLastAssistantText: () => "partial final answer",
+    dispose() {},
+  };
+  const controller = createBackgroundSessionController(async () => session);
+  const launched = await controller.launch({ cwd: "/workspace", parentContext: "policy", task: "inspect" });
+  await new Promise((resolve) => setImmediate(resolve));
+
+  assert.deepEqual(controller.result(launched.id), {
+    found: true,
+    id: launched.id,
+    cwd: "/workspace",
+    status: "failed",
+    terminal: true,
+    output: "partial final answer",
+    outputBytes: { original: 20, returned: 20 },
+    outputTruncated: false,
+  });
+});
+
 test("bounds terminal output and evicts the oldest retained result", async () => {
   const outputs = ["first child output", "ééé"];
   let created = 0;
