@@ -301,30 +301,29 @@ export function createBackgroundSessionController(
         events.append(event);
       });
       registry.transition(task.id, "running");
+      const captureFinalOutput = (): void => {
+        const output = session.getLastAssistantText?.();
+        if (output === undefined) return;
+        const bounded = truncateUtf8(output, controllerOptions.maxOutputBytes ?? DEFAULT_MAX_OUTPUT_BYTES);
+        runtime.output = bounded.value;
+        runtime.outputBytes = {
+          original: Buffer.byteLength(output, "utf8"),
+          returned: Buffer.byteLength(bounded.value, "utf8"),
+        };
+        runtime.outputTruncated = bounded.truncated;
+      };
       controllerOptions.debug?.("child-prompt-start", { childId: task.id });
       void session.prompt(`${options.parentContext}\n\n${options.task}`)
         .then(
           () => {
             controllerOptions.debug?.("child-prompt-resolved", { childId: task.id });
-            if (cancellation.signal.aborted) {
-              finish(task.id, "cancelled");
-              return;
-            }
-            const output = session.getLastAssistantText?.();
-            if (output !== undefined) {
-              const bounded = truncateUtf8(output, controllerOptions.maxOutputBytes ?? DEFAULT_MAX_OUTPUT_BYTES);
-              runtime.output = bounded.value;
-              runtime.outputBytes = {
-                original: Buffer.byteLength(output, "utf8"),
-                returned: Buffer.byteLength(bounded.value, "utf8"),
-              };
-              runtime.outputTruncated = bounded.truncated;
-            }
-            finish(task.id, "completed");
+            captureFinalOutput();
+            finish(task.id, cancellation.signal.aborted ? "cancelled" : "completed");
           },
           () => {
             const status = cancellation.signal.aborted ? "cancelled" : "failed";
             controllerOptions.debug?.("child-prompt-rejected", { childId: task.id, status });
+            captureFinalOutput();
             finish(task.id, status);
           },
         )
