@@ -125,6 +125,48 @@ test("parent invocation cancellation rejects a session still being constructed",
   assert.deepEqual(calls, ["abort", "dispose"]);
 });
 
+test("parent invocation cancellation returns before ignored session construction settles and disposes the stale session", async () => {
+  const calls: string[] = [];
+  const invocation = new AbortController();
+  let resolveConstruction: ((session: ManagedSubagentSession) => void) | undefined;
+  const construction = new Promise<ManagedSubagentSession>((resolve) => {
+    resolveConstruction = resolve;
+  });
+  const session: ManagedSubagentSession = {
+    prompt: async () => { calls.push("prompt"); },
+    subscribe: () => {
+      calls.push("subscribe");
+      return () => calls.push("unsubscribe");
+    },
+    abort: () => { calls.push("abort"); },
+    dispose: () => calls.push("dispose"),
+  };
+  const controller = createBackgroundSessionController(async () => construction, { cleanupTimeoutMs: 20 });
+
+  const launchResult = controller.launch({
+    cwd: "/workspace",
+    parentContext: "policy",
+    task: "wait",
+    invocationSignal: invocation.signal,
+  }).then(
+    () => "launched" as const,
+    () => "cancelled" as const,
+  );
+  await new Promise((resolve) => setImmediate(resolve));
+  invocation.abort();
+
+  const promptOutcome = await Promise.race([
+    launchResult,
+    new Promise<"blocked">((resolve) => setTimeout(() => resolve("blocked"), 50)),
+  ]);
+  resolveConstruction?.(session);
+  await launchResult;
+  await new Promise((resolve) => setImmediate(resolve));
+
+  assert.equal(promptOutcome, "cancelled");
+  assert.deepEqual(calls, ["abort", "dispose"]);
+});
+
 test("bounds shutdown cleanup when child abort never settles", async () => {
   const calls: string[] = [];
   const session: ManagedSubagentSession = {
