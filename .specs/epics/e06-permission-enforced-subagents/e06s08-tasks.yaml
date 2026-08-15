@@ -11,7 +11,7 @@ tasks:
     description: >-
       Split compact model-facing subagent results from internal export snapshots, returning status only while active and at most 8 KiB of valid UTF-8 final assistant text with original/returned byte counts and explicit truncation metadata when terminal.
     verify: node --test extensions/subagent/background-session.test.ts extensions/subagent/index.test.ts
-    status: failing
+    status: passing
     risk: P0
     security: high
     security_verification: >-
