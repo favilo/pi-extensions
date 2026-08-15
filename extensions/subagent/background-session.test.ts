@@ -46,14 +46,23 @@ test("returns active status and stable terminal output only through explicit sco
   assert.equal(active.found, true);
   assert.equal(active.status, "running");
   assert.equal("output" in active, false);
+  assert.equal("events" in active, false);
   assert.deepEqual(controller.result("unknown-child"), { found: false, status: "unknown" });
   assert.deepEqual(foreign.result(launched.id), { found: false, status: "unknown" });
 
   settle?.();
   await new Promise((resolve) => setImmediate(resolve));
   const completed = controller.result(launched.id);
-  assert.equal(completed.status, "completed");
-  assert.equal(completed.found && completed.output, "bounded child output");
+  assert.deepEqual(completed, {
+    found: true,
+    id: launched.id,
+    cwd: "/workspace",
+    status: "completed",
+    terminal: true,
+    output: "bounded child output",
+    outputBytes: { original: 20, returned: 20 },
+    outputTruncated: false,
+  });
   assert.deepEqual(controller.result(launched.id), completed);
 });
 
@@ -79,7 +88,35 @@ test("bounds terminal output and evicts the oldest retained result", async () =>
   const retained = controller.result(second.id);
   assert.equal(retained.found && Buffer.byteLength(retained.output ?? "", "utf8") <= 3, true);
   assert.equal(retained.found && retained.output?.includes("�"), false);
+  assert.deepEqual(retained.found && "outputBytes" in retained ? retained.outputBytes : undefined, {
+    original: 6,
+    returned: 2,
+  });
   assert.equal(retained.found && retained.outputTruncated, true);
+  assert.equal("events" in retained, false);
+});
+
+test("caps default terminal results at 8 KiB without returning normalized events", async () => {
+  const output = "é".repeat(5_000);
+  const session: ManagedSubagentSession = {
+    prompt: async () => {},
+    subscribe: () => () => {},
+    getLastAssistantText: () => output,
+    dispose() {},
+  };
+  const controller = createBackgroundSessionController(async () => session);
+  const launched = await controller.launch({ cwd: "/workspace", parentContext: "policy", task: "inspect" });
+  await new Promise((resolve) => setImmediate(resolve));
+
+  const result = controller.result(launched.id);
+  assert.equal(result.found, true);
+  assert.equal(result.found && Buffer.byteLength(result.output ?? "", "utf8"), 8 * 1024);
+  assert.deepEqual(result.found && "outputBytes" in result ? result.outputBytes : undefined, {
+    original: 10_000,
+    returned: 8 * 1024,
+  });
+  assert.equal(result.found && result.outputTruncated, true);
+  assert.equal("events" in result, false);
 });
 
 test("tracks lifecycle states and seals the first terminal transition", () => {

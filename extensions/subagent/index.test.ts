@@ -40,18 +40,15 @@ test("registers background launch, explicit result lookup, and shutdown cleanup"
       cwd: "/workspace",
       status: "completed",
       terminal: true,
-      events: {
-        events: [{ childId: "child-1234", sequence: 1, type: "assistant-text", payload: { text: "visible only when expanded" }, truncated: false }],
-        bytes: 32,
-        truncated: false,
-      },
       output: "visible only when expanded",
+      outputBytes: { original: 26, returned: 26 },
+      outputTruncated: false,
     },
   };
   const collapsed = resultTool?.renderResult?.(result, { expanded: false, isPartial: false }, theme)?.render(160).join("\n") ?? "";
   const expanded = resultTool?.renderResult?.(result, { expanded: true, isPartial: false }, theme)?.render(160).join("\n") ?? "";
 
-  assert.match(collapsed, /completed.*1 event.*32 bytes/i);
+  assert.match(collapsed, /completed.*26 bytes/i);
   assert.doesNotMatch(collapsed, /visible only when expanded/);
   assert.match(expanded, /visible only when expanded/);
 });
