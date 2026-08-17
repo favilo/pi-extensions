@@ -4,7 +4,7 @@ import { CURSOR_MARKER, matchesKey, visibleWidth, wrapTextWithAnsi, type Compone
 import ignore from "ignore";
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
-import { appendFileSync, chmodSync, closeSync, constants as fsConstants, fchmodSync, fstatSync, lstatSync, mkdirSync, openSync, readFileSync, realpathSync, unlinkSync, writeFileSync, writeSync } from "node:fs";
+import { appendFileSync, chmodSync, closeSync, constants as fsConstants, fchmodSync, fstatSync, mkdirSync, mkdtempSync, openSync, readFileSync, realpathSync, unlinkSync, writeFileSync, writeSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, dirname, join, relative, resolve } from "node:path";
 import { createAuditLogger } from "./audit.ts";
@@ -238,22 +238,24 @@ function safeDebugDetails(value: unknown): Record<string, unknown> {
   return safe;
 }
 
-const SUBAGENT_DEBUG_DIRECTORY = join(tmpdir(), `pi-subagent-debug-${process.pid}`);
-const SUBAGENT_DEBUG_PATH = join(SUBAGENT_DEBUG_DIRECTORY, "events.jsonl");
+let subagentDebugDirectory: string | undefined;
+
+function subagentDebugPath(): string {
+  if (!subagentDebugDirectory) {
+    subagentDebugDirectory = mkdtempSync(join(tmpdir(), "pi-subagent-debug-"));
+    if (process.platform !== "win32") chmodSync(subagentDebugDirectory, 0o700);
+  }
+  return join(subagentDebugDirectory, "events.jsonl");
+}
 
 export function logSubagentDebug(event: string, details: unknown): void {
   if (process.env.PI_SUBAGENT_DEBUG !== "1") return;
   let descriptor: number | undefined;
   try {
-    mkdirSync(SUBAGENT_DEBUG_DIRECTORY, { recursive: true, mode: 0o700 });
-    const directory = lstatSync(SUBAGENT_DEBUG_DIRECTORY);
-    if (!directory.isDirectory() || directory.isSymbolicLink()) return;
-    chmodSync(SUBAGENT_DEBUG_DIRECTORY, 0o700);
-
     const noFollow = process.platform === "win32" ? 0 : fsConstants.O_NOFOLLOW;
     const nonBlocking = process.platform === "win32" ? 0 : fsConstants.O_NONBLOCK;
     descriptor = openSync(
-      SUBAGENT_DEBUG_PATH,
+      subagentDebugPath(),
       fsConstants.O_APPEND | fsConstants.O_CREAT | fsConstants.O_WRONLY | noFollow | nonBlocking,
       0o600,
     );
