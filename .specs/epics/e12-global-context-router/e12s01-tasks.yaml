@@ -43,7 +43,7 @@ tasks:
     description: >-
       Cache structured loaded-skill metadata during before_agent_start and remove exactly one canonical formatSkillsForPrompt(skills) rendering from the chained system prompt, preserving absent or ambiguous prompts unchanged; expose find_skills records that direct the model to read the chosen SKILL.md and do not intercept input.
     verify: node --test extensions/context-router/prompt.test.ts
-    status: failing
+    status: passing
     risk: P0
     security: high
     security_verification: >-
