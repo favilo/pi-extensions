@@ -1,10 +1,13 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import {
+  projectSkillCatalog,
   projectToolCatalog,
   selectCurrentToolMatches,
+  type SkillRecord,
   type ToolRecord,
 } from "./catalog.ts";
+import { sanitizeSkillsPrompt } from "./prompt.ts";
 
 const BASELINE_TOOLS = [
   "read",
@@ -20,6 +23,7 @@ const BASELINE_TOOLS = [
 ] as const;
 
 type FindToolsInput = { query: string; select?: string[] };
+type FindSkillsInput = { query: string };
 
 function currentRegisteredNames(pi: ExtensionAPI): string[] {
   return pi.getAllTools()
@@ -41,6 +45,7 @@ function applySessionToolSet(pi: ExtensionAPI, selected: Set<string>): void {
 
 export default function contextRouter(pi: ExtensionAPI): void {
   const selectedTools = new Set<string>();
+  let cachedSkills: SkillRecord[] = [];
 
   pi.registerTool({
     name: "find_tools",
@@ -81,12 +86,37 @@ export default function contextRouter(pi: ExtensionAPI): void {
     label: "Find skills",
     description: "Find loaded skills by capability.",
     parameters: Type.Object({ query: Type.String({ minLength: 1, maxLength: 160 }) }),
-    async execute() {
-      return { content: [{ type: "text", text: "Skill discovery is unavailable." }], details: {} };
+    async execute(_toolCallId, input: FindSkillsInput) {
+      const matches = projectSkillCatalog(cachedSkills, input.query);
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify({
+              matches,
+              instruction: "Use the read tool on a skill's path to inspect its full SKILL.md instructions.",
+            }),
+          },
+        ],
+        details: { matches: matches.map((match) => match.name) },
+      };
     },
   });
 
-  pi.on("session_start", () => applySessionToolSet(pi, selectedTools));
+  pi.on("session_start", () => {
+    cachedSkills = [];
+    applySessionToolSet(pi, selectedTools);
+  });
   pi.on("turn_start", () => applySessionToolSet(pi, selectedTools));
-  pi.on("session_shutdown", () => selectedTools.clear());
+  pi.on("before_agent_start", (event) => {
+    cachedSkills = (event.systemPromptOptions?.skills as unknown as SkillRecord[]) ?? [];
+    const result = sanitizeSkillsPrompt(event.systemPrompt, cachedSkills);
+    if (result.outcome === "replaced") {
+      return { systemPrompt: result.systemPrompt };
+    }
+  });
+  pi.on("session_shutdown", () => {
+    selectedTools.clear();
+    cachedSkills = [];
+  });
 }
