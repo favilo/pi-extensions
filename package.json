@@ -28,7 +28,8 @@
       "./extensions/local-agent-context/index.ts",
       "./extensions/mcp/index.ts",
       "./extensions/tool-permissions/index.ts",
-      "./extensions/subagent/index.ts"
+      "./extensions/subagent/index.ts",
+      "./extensions/context-router/index.ts"
     ]
   },
   "dependencies": {

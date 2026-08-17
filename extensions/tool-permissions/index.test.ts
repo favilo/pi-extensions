@@ -76,3 +76,75 @@ test("all protected tool families use the scoped decision boundary", () => {
     }).decision, "allow", toolName);
   }
 });
+
+test("find_tools and find_skills policy evaluation matches generic custom-tool behavior", async () => {
+  const agentDir = mkdtempSync(join(tmpdir(), "pi-permissions-finders-"));
+  writeFileSync(join(agentDir, "permissions.toml"), stringifyToml({
+    permissions: {
+      find_tools: { allow: [{}], deny: [] },
+      find_skills: { allow: [], deny: [{}] },
+    },
+  }));
+  const emptyAgentDir = mkdtempSync(join(tmpdir(), "pi-permissions-finders-empty-"));
+  writeFileSync(join(emptyAgentDir, "permissions.toml"), stringifyToml({
+    permissions: {},
+  }));
+
+  const previousAgentDir = process.env.PI_CODING_AGENT_DIR;
+  process.env.PI_CODING_AGENT_DIR = agentDir;
+
+  const handlers = new Map<string, (event: { toolName: string; input: Record<string, unknown> }, ctx: unknown) => Promise<unknown>>();
+  try {
+    const { default: toolPermissionPolicy } = await import(`./index.ts?finders=${encodeURIComponent(agentDir)}`);
+    toolPermissionPolicy({
+      registerCommand() {},
+      on(event: string, handler: (event: { toolName: string; input: Record<string, unknown> }, ctx: unknown) => Promise<unknown>) {
+        if (event === "tool_call") handlers.set(event, handler);
+      },
+      getAllTools: () => [{ name: "find_tools" }, { name: "find_skills" }],
+    } as never);
+
+    const toolCall = handlers.get("tool_call")!;
+
+    // 1. Configured allow rule for find_tools allows execution without prompt in headless mode
+    const allowResult = await toolCall(
+      { toolName: "find_tools", input: { query: "grep" } },
+      { cwd: "/tmp/project", hasUI: false, mode: "json" },
+    );
+    assert.equal(allowResult, undefined);
+
+    // 2. Configured deny rule for find_skills blocks execution
+    const denyResult = await toolCall(
+      { toolName: "find_skills", input: { query: "tdd" } },
+      { cwd: "/tmp/project", hasUI: false, mode: "json" },
+    );
+    assert.deepEqual(denyResult, {
+      block: true,
+      reason: "Blocked find_skills: arguments match a configured deny rule.",
+    });
+
+    // 3. Unmatched finder without UI in empty permissions config blocks execution
+    process.env.PI_CODING_AGENT_DIR = emptyAgentDir;
+    const emptyHandlers = new Map<string, (event: { toolName: string; input: Record<string, unknown> }, ctx: unknown) => Promise<unknown>>();
+    const { default: emptyPermissionPolicy } = await import(`./index.ts?finders-empty=${encodeURIComponent(emptyAgentDir)}`);
+    emptyPermissionPolicy({
+      registerCommand() {},
+      on(event: string, handler: (event: { toolName: string; input: Record<string, unknown> }, ctx: unknown) => Promise<unknown>) {
+        if (event === "tool_call") emptyHandlers.set(event, handler);
+      },
+      getAllTools: () => [{ name: "find_tools" }, { name: "find_skills" }],
+    } as never);
+
+    const unmatchedResult = await emptyHandlers.get("tool_call")!(
+      { toolName: "find_tools", input: { query: "unmatched" } },
+      { cwd: "/tmp/project", hasUI: false, mode: "json" },
+    );
+    assert.deepEqual(unmatchedResult, {
+      block: true,
+      reason: "Blocked find_tools: tool use requires explicit interactive permission or an allow rule.",
+    });
+  } finally {
+    if (previousAgentDir === undefined) delete process.env.PI_CODING_AGENT_DIR;
+    else process.env.PI_CODING_AGENT_DIR = previousAgentDir;
+  }
+});

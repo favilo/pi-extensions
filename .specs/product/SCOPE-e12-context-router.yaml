@@ -1,0 +1,140 @@
+feature_name: global_context_router
+
+core_value: >-
+  Give every Pi project a small, capable initial model context while preserving deliberate,
+  permission-governed access to the full installed tool and skill catalog.
+
+summary: |-
+  Pi currently contributes every registered custom tool schema and every model-invocable skill
+  descriptor to the initial model context. This is expensive in a global installation that imports
+  MCP providers and a large user skill catalog. This repository will add a new package extension at
+  `extensions/context-router/`; it will migrate and adapt the relevant skill-catalog discovery and
+  prompt-replacement code from `SeanPedersen/pi-context-skills`, rather than install that package
+  or create a new Pi skill.
+
+  The extension exposes two small discovery tools in the initial tool set. `find_tools` searches
+  registered but inactive tools and enables selected matches using Pi's documented additive
+  dynamic-tool API. `find_skills` searches loaded skill metadata and directs the model to read an
+  explicit SKILL.md only when relevant. The extension preserves the seven built-in file/shell tools
+  (`read`, `bash`, `edit`, `write`, `grep`, `find`, and `ls`) and `subagent` at startup.
+  `subagent_result`, MCP tools, and every other custom tool are discoverable rather than initially
+  active. The existing tool-permissions extension remains the only decision point for the discovery
+  tools and every enabled capability.
+
+in_scope:
+  - epic_id: e12
+    outcome: Add and register `extensions/context-router/` as the final repository package extension so it applies globally through the existing package installation.
+  - story_id: e12s01
+    outcome: Migrate the upstream extension's conservative skill metadata handling and prompt-section replacement intent into repository-owned, tested code with upstream provenance and MIT attribution.
+  - story_id: e12s01
+    outcome: Search registered inactive tools by bounded name/description/source metadata, return no parameter schema in search results, and add selected matches through Pi's additive active-tool API.
+  - story_id: e12s01
+    outcome: Reapply the baseline-plus-selected active set before every model turn so tools registered asynchronously after startup remain inactive until selected.
+  - story_id: e12s01
+    outcome: Replace only Pi's exact generated model-invocable skill section with an empty catalog, retain skill metadata inside the extension, and let `find_skills` return a bounded list of names, descriptions, and SKILL.md paths.
+  - story_id: e12s01
+    outcome: Preserve explicit `/skill:name` expansion and direct `read` of a returned SKILL.md path.
+  - story_id: e12s01
+    outcome: Demonstrate that `find_tools` and `find_skills` use the existing configured-custom-tool permission path, including configured allow/deny and headless fail-closed behavior.
+  - story_id: e12s01
+    outcome: Provide a debug command with catalog/active/selected counts and prompt-reduction measurements without rendering tool schemas, skill bodies, permissions, or credential-shaped values.
+
+out_of_scope:
+  - item: Installing or depending on the upstream pi-context-skills package
+    reason: The required behavior must be a maintained extension in this repository and must also cover dynamic tool activation and local permission integration.
+    disposition: rejected
+  - item: Patching Pi core or provider request payloads
+    reason: Pi documents active-tool management and structured before-agent prompt options; the repository extension can use those supported boundaries.
+    disposition: excluded
+  - item: Automatic model-driven skill selection, project-local selection files, or an extra LLM request at startup
+    reason: These increase latency, create persisted project state, and make the initial route nondeterministic; the model can call `find_skills` when needed.
+    disposition: excluded
+  - item: Activating `subagent_result` at startup
+    reason: The user explicitly retained `subagent` only; result lookup remains available through `find_tools` after a child is launched.
+    disposition: decided
+  - item: Altering permission policy, auto-allow behavior, audit retention, or approvals for any tool
+    reason: "`tool-permissions` remains the single authorization boundary; discovery is not an authorization bypass."
+    disposition: prohibited
+  - item: Rewriting tool definitions, exposing schemas before discovery, or serializing schema catalogs into tool results/debug output
+    reason: The reduction is defeated and schema-bearing metadata can disclose unnecessary detail.
+    disposition: prohibited
+  - item: Routing the subagent's private bridge catalog or changing child tool authorization
+    reason: Child tool transport has a separate constrained design under e06; it must not be changed incidentally by a parent-context optimization.
+    disposition: deferred
+
+constraints:
+  behavioral:
+    - The baseline is exactly read, bash, edit, write, grep, find, ls, subagent, find_tools, and find_skills when those registered names exist.
+    - Tool discovery is additive for selected registered names and selected tools remain available for the parent session until unregistered or shutdown.
+    - Unselected late registrations are removed before the next model turn, never by modifying a tool currently executing.
+    - Search results are deterministic, bounded, and contain no parameter schema.
+    - Prompt sanitization must match one exact Pi-generated skills rendering; zero or multiple matches leave the prompt unchanged and surface a safe diagnostic.
+    - Explicit skill commands must remain on Pi's normal input-expansion path.
+  security:
+    - Discovery tools must use the existing generic configured-custom-tool permission branch.
+    - No tool schema, skill body, raw policy, token, or tool input is emitted by discovery or debug output.
+    - Headless unmatched discovery calls deny through the existing permission boundary.
+  compatibility:
+    - Use Pi 0.82.1's documented `getAllTools`, `getActiveTools`, `setActiveTools`, `turn_start`, `before_agent_start`, and `formatSkillsForPrompt` interfaces only.
+    - No new runtime dependency is introduced.
+
+success_criteria:
+  - story_id: e12s01
+    criterion: The first model turn receives only the baseline tools, while an inactive MCP/custom tool becomes callable only after `find_tools` selects it.
+  - story_id: e12s01
+    criterion: A tool registered asynchronously after startup is absent before the next model turn unless it was already selected.
+  - story_id: e12s01
+    criterion: The initial system prompt omits the full model-invocable skill catalog and `find_skills` returns a bounded matching list that includes each selected SKILL.md path.
+  - story_id: e12s01
+    criterion: An explicit `/skill:name` invocation remains expanded by Pi and the context-router extension does not intercept it.
+  - story_id: e12s01
+    criterion: Configured allow/deny and no-UI behavior for each discovery tool match the existing configured-custom-tool policy contract.
+  - story_id: e12s01
+    criterion: Focused tests prove prompt length is reduced whenever Pi's canonical skills section is present and no schema/body is present in discovery/debug output.
+
+references:
+  - path: package.json
+    purpose: Global Pi package extension order
+  - path: extensions/mcp/index.ts
+    purpose: Asynchronous provider tool registration and unregister lifecycle
+  - path: extensions/tool-permissions/index.ts
+    purpose: Existing generic custom-tool authorization branch
+  - path: extensions/subagent/index.ts
+    purpose: Baseline `subagent` registration and deferred `subagent_result` lookup
+  - path: ${HOME}/.nvm/versions/node/v24.6.0/lib/node_modules/@earendil-works/pi-coding-agent/docs/extensions.md
+    purpose: Documented dynamic tool loading and before-agent prompt APIs
+  - url: https://github.com/SeanPedersen/pi-context-skills/tree/5493713bcff23f29d00d113bc9d3c9294596b18a
+    purpose: Migrated upstream extension source (MIT declared in package metadata)
+
+research_notes: |-
+  ## Prior Art
+
+  **Verdict: migrate and extend `SeanPedersen/pi-context-skills` into this repository as
+  `extensions/context-router/`; do not install it as a package and do not create a Pi skill.**
+
+  The upstream package is an MIT TypeScript Pi extension, version 0.1.0, published 2026-05-26;
+  its last source push was 2026-05-27. It provides useful source material: conservative metadata
+  parsing/discovery, a skill-section replacement seam, and status rendering. The local migration
+  must retain upstream provenance in source/docs but replace its project-persisted LLM selection
+  (`.pi/skills-selection.json`) with the requested explicit `find_skills` discovery tool. It must
+  use Pi's structured `systemPromptOptions.skills`, thereby including the installed Pi skill sources
+  the upstream extension misses and avoiding duplicate filesystem discovery.
+
+  Pi 0.82.1 documents the required supported tool mechanism: register all tools, keep loader tools
+  active, and use additive `setActiveTools([...current, ...matches])` during loader execution. Pi
+  records additions on the result and provides native deferred definitions for OpenAI GPT-5.4+; the
+  configured Codex GPT-5.6 family is eligible. Pi falls back safely to the complete active set on
+  providers that do not support deferred loading. `turn_start` is emitted before each model turn,
+  and Pi's late `registerTool()` refresh otherwise automatically adds newly registered tools, so the
+  extension must reapply baseline plus its session selections at that point.
+
+  Pi's `before_agent_start` exposes both the generated `systemPrompt` and structured loaded skills.
+  `formatSkillsForPrompt(skills)` produces the exact canonical block. The migrated helper can replace
+  exactly one occurrence of that rendered block with `formatSkillsForPrompt([])`, preserving the
+  whole prompt when matching is ambiguous instead of using the upstream substring-oriented approach.
+  `/skill:name` expands in Pi's input phase before `before_agent_start`, so no context-router input
+  interception is needed.
+
+  Other located projects (`pi-dcp`, `pi-condense`, and `@hypabolic/pi-hypa`) prune or compress
+  post-turn context/tool output, not the initial tool-schema and skill-catalog payload. No external
+  dependency is proposed.

@@ -72,6 +72,13 @@ epics:
     bcps: 10
     note: >-
       WSJF = (business value 6 + time criticality 4 + risk reduction 7) / job size 10 = 1.7. The epic extends the existing permission boundary with trusted project hierarchy, explicit save scope, and scoped policy editor commands.
+  - id: e12
+    title: Global context router
+    capsule_dir: epics/e12-global-context-router
+    wsjf: 5.4
+    bcps: 8
+    note: >-
+      WSJF = (business value 10 + time criticality 10 + risk reduction 7) / job size 5 = 5.4. User priority: smaller models are unusable without a bounded initial tool and skill context. The router has urgent value, while its moderate security benefit and five-task implementation size keep it behind only higher-cost-of-delay work.
 bugs:
   total: 1
   fixed: 0

@@ -1,26 +1,39 @@
-active_flow: fix_bug
-active_epic_id: e08
-active_story_id: e08s01
-active_story: e08s01
-active_bug_id: BUG-2026-08-13T231226
+active_flow: build_epic
+active_epic_id: e12
+active_story_id: e12s01
+active_story: e12s01
+active_bug_id: null
 git:
-  bookmark: fix/windows-preflight
+  bookmark: e12-context-router
   parent_bookmark: main
+planning:
+  e12:
+    status: completed
+    story_id: e12s01
+    capsule: .specs/epics/e12-global-context-router
+    wsjf: 5.4
+    scoring:
+      business_value: 10
+      time_criticality: 10
+      risk_reduction: 7
+      job_size: 5
+      rationale: "User priority: smaller models are unusable without a bounded initial tool and skill context."
+    constraints:
+      - "Do not modify the e06 repair flow or child-private bridge catalog."
 handoff:
-  last_step_completed: Completed e08s01 implementation, verification, and story finalization
+  last_step_completed: Completed e12s01 Global Context Router implementation with 5 passing TDD tasks and clean verification.
   open_decisions: []
   required_reading:
-    - .specs/bugs/BUG-2026-08-13T231226-windows-preflight-portability.md
-    - .specs/bugs/BUG-2026-08-13T231226-windows-preflight-portability-design.md
-    - .specs/epics/e08-windows-preflight-portability/epic.yaml
-    - .specs/epics/e08-windows-preflight-portability/e08s01-portable-preflight-contracts.md
-    - .specs/epics/e08-windows-preflight-portability/e08s01-tasks.yaml
-  next_skill: release-branch
-  context: e08s01 is implemented and verified. npm run check:ci passes with extension-only preflight tests; npm test remains the explicit full suite and still reports the unchanged optional Bevy example failure.
+    - .specs/epics/e12-global-context-router/e12s01-context-router.md
+    - .specs/epics/e12-global-context-router/e12s01-tasks.yaml
+    - .specs/security/epics/e12/THREAT_MODEL.md
+  next_skill: verify-work
+  context: e12s01 Global Context Router implementation is complete. All 5 tasks are passing.
   blocker: null
   deferred_work:
-    - Resume the tool-permissions lean-ctx integration after the Windows baseline is green
-  verified_at: '2026-08-14T00:00:00Z'
+    - "Resume e06s05 security repairs after e12s01 verification."
+    - "Resume e07s01 after e12s01 verification."
+  verified_at: '2026-08-17T14:30:00-07:00'
 release:
   pr: https://github.com/favilo/pi-extensions/pull/3
   merged_commit: 70d47f101b7e74b847c50265bbfe8097d409da68
