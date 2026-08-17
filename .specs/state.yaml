@@ -8,7 +8,7 @@ git:
   parent_bookmark: main
 planning:
   e12:
-    status: active
+    status: completed
     story_id: e12s01
     capsule: .specs/epics/e12-global-context-router
     wsjf: 5.4
@@ -21,19 +21,19 @@ planning:
     constraints:
       - Do not modify the e06 repair flow or child-private bridge catalog.
 handoff:
-  last_step_completed: E12 was scored at WSJF 5.4 and explicitly scheduled by the user because smaller models are unusable without bounded initial context.
+  last_step_completed: Completed e12s01 Global Context Router implementation with 5 passing TDD tasks and clean verification.
   open_decisions: []
   required_reading:
     - .specs/epics/e12-global-context-router/e12s01-context-router.md
     - .specs/epics/e12-global-context-router/e12s01-tasks.yaml
     - .specs/security/epics/e12/THREAT_MODEL.md
-  next_skill: develop-tdd
-  context: Execute e12s01 in this dedicated Jujutsu workspace. Keep e06 code and its child-private subagent bridge catalog unchanged. Every behavior requires a compilable stub, behavioral RED evidence, and a separate GREEN Jujutsu change.
+  next_skill: verify-work
+  context: e12s01 Global Context Router implementation is complete. All 5 tasks are passing.
   blocker: null
   deferred_work:
-    - Resume e06s05 security repairs after e12s01 is verified.
-    - Resume e07s01 after the active e12 story.
-  verified_at: '2026-08-17T13:18:51-07:00'
+    - Resume e06s05 security repairs after e12s01 verification.
+    - Resume e07s01 after e12s01 verification.
+  verified_at: '2026-08-17T14:30:00-07:00'
 release:
   pr: https://github.com/favilo/pi-extensions/pull/3
   merged_commit: 70d47f101b7e74b847c50265bbfe8097d409da68

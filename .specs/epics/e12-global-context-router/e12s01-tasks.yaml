@@ -1,6 +1,6 @@
 story_id: e12s01
 title: Route tool and skill catalogs through bounded discovery
-status: failing
+status: passing
 bcps: 8
 delta: ADDED
 spec: e12s01-context-router.md
@@ -75,7 +75,7 @@ tasks:
     description: >-
       Add upstream MIT provenance/attribution, a count-only context-router debug command, package registration last in the Pi extension list, focused integration tests, and complete type/regression/planning gates.
     verify: npm run check && npm run check:plans
-    status: failing
+    status: passing
     risk: P1
     security: high
     security_verification: >-
