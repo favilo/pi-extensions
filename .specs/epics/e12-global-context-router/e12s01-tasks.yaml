@@ -1,0 +1,88 @@
+story_id: e12s01
+title: Route tool and skill catalogs through bounded discovery
+status: failing
+bcps: 8
+delta: ADDED
+spec: e12s01-context-router.md
+tdd_policy: >-
+  Before each RED run, add the smallest compilable public stub. Record behavioral RED and GREEN implementation in separate Jujutsu changes; missing modules, exports, imports, or functions are invalid RED evidence.
+tasks:
+  - id: 1
+    description: >-
+      Add pure, deterministic catalog projections for registered parent tools and loaded skills: normalize and bound searchable metadata, redact source identity, omit every parameter schema/body/policy/input value, rank ties stably, and reject activation names not returned by the current tool search.
+    verify: node --test extensions/context-router/catalog.test.ts
+    status: failing
+    risk: P0
+    security: high
+    security_verification: >-
+      Prove bounded results contain no tool parameters, raw source path, skill body, raw policy, tool input, token, credential-shaped value, or control-character injection; prove ranking is deterministic.
+    tdd:
+      red: A compilable catalog helper returning raw or unbounded metadata fails redaction, bounds, deterministic tie-order, and selected-match-only assertions.
+      green: The projection returns only the documented safe fields and stable rankings without inspecting tool schemas at result rendering time.
+    allure:
+      severity: critical
+      categories: ["Catalog routing", "Information disclosure", "Deterministic ranking"]
+
+  - id: 2
+    description: >-
+      Register find_tools and find_skills, maintain one parent-session coordinator, establish the exact startup baseline, and reapply baseline plus selected names at turn_start so late unselected registration disappears before the next model request while finder-driven additions remain purely additive.
+    verify: node --test extensions/context-router/index.test.ts
+    status: failing
+    risk: P0
+    security: high
+    security_verification: >-
+      Prove the baseline is exactly the registered intersection of read/bash/edit/write/grep/find/ls/subagent/find_tools/find_skills, subagent_result and unselected MCP/custom tools are inactive, selections do not activate unmatched names, and no new security findings exist in active-tool lifecycle paths.
+    tdd:
+      red: A compilable router stub that preserves Pi's full or late-auto-activated set fails startup, turn-start, additive-selection, unregister, and shutdown-isolation assertions.
+      green: The coordinator uses only documented Pi APIs, resets only between turns, and preserves selected registered names across the parent session.
+    allure:
+      severity: critical
+      categories: ["Dynamic tool loading", "Late registration", "Parent session isolation"]
+
+  - id: 3
+    description: >-
+      Cache structured loaded-skill metadata during before_agent_start and remove exactly one canonical formatSkillsForPrompt(skills) rendering from the chained system prompt, preserving absent or ambiguous prompts unchanged; expose find_skills records that direct the model to read the chosen SKILL.md and do not intercept input.
+    verify: node --test extensions/context-router/prompt.test.ts
+    status: failing
+    risk: P0
+    security: high
+    security_verification: >-
+      Prove exact-one replacement alone reduces prompt bytes, zero/multiple matches are fail-safe, explicit /skill:name remains on Pi's expansion path, and no skill body or unrelated prompt text reaches finder/debug output.
+    tdd:
+      red: A compilable sanitizer with substring/regex replacement or an input interception fails exact-one, chained-prompt preservation, explicit-invocation, and disclosure-negative assertions.
+      green: The sanitizer replaces only the canonical rendering and the finder returns bounded metadata plus a SKILL.md path.
+    allure:
+      severity: critical
+      categories: ["System prompt", "Skill discovery", "Prompt integrity"]
+
+  - id: 4
+    description: >-
+      Extend the existing generic custom-tool permission regression harness to prove configured allow, configured deny precedence, and no-UI unmatched denial for find_tools and find_skills without adding a router-specific policy branch or changing selected-tool authorization.
+    verify: node --test extensions/tool-permissions/index.test.ts extensions/context-router/index.test.ts
+    status: failing
+    risk: P0
+    security: high
+    security_verification: >-
+      Prove both finder names are known registered custom tools at call time, deny wins without UI/prompt, allow executes without prompt, unmatched headless calls deny, and no new security findings exist in the authorization path.
+    tdd:
+      red: Current generic-policy coverage fails finder-specific allow/deny/headless cases against a compilable router registration stub.
+      green: The existing tool-permissions generic branch settles every finder case with unchanged semantics and no bypass.
+    allure:
+      severity: critical
+      categories: ["Authorization", "Configured custom tools", "Headless fail closed"]
+
+  - id: 5
+    description: >-
+      Add upstream MIT provenance/attribution, a count-only context-router debug command, package registration last in the Pi extension list, focused integration tests, and complete type/regression/planning gates.
+    verify: npm run check && npm run check:plans
+    status: failing
+    risk: P1
+    security: high
+    security_verification: >-
+      Prove diagnostics expose only catalog/active/selected counts, byte deltas, and sanitizer outcome; package order is final; no schema/body/policy/input/credential value is rendered; and no new security findings exist in affected paths.
+    tdd:
+      red: Focused integration tests fail against missing provenance, non-final package order, catalog-detail diagnostics, or absent router registration.
+      green: Attribution, count-only diagnostics, package integration, and all package/planning checks pass without a runtime dependency.
+    allure:
+      severity: high
+      categories: ["Provenance", "Diagnostics", "Package integration", "Regression"]
