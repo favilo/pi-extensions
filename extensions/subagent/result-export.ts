@@ -53,8 +53,23 @@ export type BuildSnapshotOptions = {
   sessionManager: SessionManager;
 };
 
+export type ExportToFileOptions = BuildSnapshotOptions & {
+  destinationPath: string;
+  overwrite?: boolean;
+  signal?: AbortSignal;
+};
+
+export type ExportToFileResult = {
+  success: boolean;
+  destinationPath: string;
+  bytesWritten: number;
+  overwritten: boolean;
+  snapshot: SubagentExportSnapshot;
+};
+
 export type SubagentResultExporter = {
   buildSnapshot(options: BuildSnapshotOptions): SubagentExportSnapshot;
+  exportToFile(options: ExportToFileOptions): Promise<ExportToFileResult>;
 };
 
 function extractText(content: MessageContentBlock[]): string | undefined {
@@ -69,6 +84,16 @@ function extractText(content: MessageContentBlock[]): string | undefined {
 
 export function createSubagentResultExporter(): SubagentResultExporter {
   return {
+    async exportToFile(options) {
+      const snapshot = this.buildSnapshot(options);
+      return {
+        success: false,
+        destinationPath: options.destinationPath,
+        bytesWritten: 0,
+        overwritten: false,
+        snapshot,
+      };
+    },
     buildSnapshot(options) {
       const entries = options.sessionManager.getBranch();
       const events: ExportedEvent[] = [];

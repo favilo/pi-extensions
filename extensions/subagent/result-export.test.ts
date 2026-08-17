@@ -1,4 +1,7 @@
 import assert from "node:assert/strict";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import test from "node:test";
 import { SessionManager } from "@earendil-works/pi-coding-agent";
 import { createSubagentResultExporter, type SubagentExportSnapshot } from "./result-export.ts";
@@ -116,4 +119,77 @@ test("marks incomplete snapshots for non-terminal children", () => {
   assert.equal(snapshot.complete, false);
   assert.equal(snapshot.finalOutput, undefined);
   assert.equal(snapshot.events.length, 0);
+});
+
+test("exportToFile streams JSON atomically with 0600 mode and refuses improper overwrite targets", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "pi-export-test-"));
+  const destPath = join(dir, "exported.json");
+  const cwd = "/workspace/project";
+  const sessionManager = SessionManager.inMemory(cwd);
+  const exporter = createSubagentResultExporter();
+
+  try {
+    const res1 = await exporter.exportToFile({
+      id: "child-101",
+      cwd,
+      status: "completed",
+      terminal: true,
+      sessionManager,
+      destinationPath: destPath,
+    });
+
+    assert.equal(res1.success, true);
+    assert.equal(res1.destinationPath, destPath);
+    assert.equal(res1.overwritten, false);
+    assert.equal(existsSync(destPath), true);
+    if (process.platform !== "win32") {
+      assert.equal(statSync(destPath).mode & 0o077, 0);
+    }
+    const read1 = JSON.parse(readFileSync(destPath, "utf8")) as SubagentExportSnapshot;
+    assert.equal(read1.childId, "child-101");
+
+    // Overwrite default false fails when file exists
+    await assert.rejects(
+      exporter.exportToFile({
+        id: "child-101",
+        cwd,
+        status: "completed",
+        terminal: true,
+        sessionManager,
+        destinationPath: destPath,
+      }),
+      /already exists/i,
+    );
+
+    // Overwrite true succeeds on regular file
+    const res2 = await exporter.exportToFile({
+      id: "child-101",
+      cwd,
+      status: "completed",
+      terminal: true,
+      sessionManager,
+      destinationPath: destPath,
+      overwrite: true,
+    });
+    assert.equal(res2.success, true);
+    assert.equal(res2.overwritten, true);
+
+    // Overwrite true fails on directory target
+    const subDir = join(dir, "dir-target.json");
+    mkdirSync(subDir);
+    await assert.rejects(
+      exporter.exportToFile({
+        id: "child-101",
+        cwd,
+        status: "completed",
+        terminal: true,
+        sessionManager,
+        destinationPath: subDir,
+        overwrite: true,
+      }),
+      /regular file/i,
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
