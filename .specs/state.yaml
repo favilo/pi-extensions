@@ -30,8 +30,8 @@ handoff:
     - .specs/epics/e06-permission-enforced-subagents/e06s08-tasks.yaml
     - .specs/security/epics/e06/THREAT_MODEL.md
   next_skill: investigate-bug
-  context: Phase Verify/Repair. e06s05 live UAT and mechanical checks passed, and the bookmark now matches origin. A fresh security review blocks completion on construction/shutdown races, parent invocation cancellation, symlink-safe permission paths, and raw debug-log disclosure. E06s08 is planned but must not be implemented until those e06s05 blockers are repaired and verification passes.
-  blocker: e06s05 security review found four blockers requiring behavioral RED tests and separate GREEN Jujutsu changes before the story can pass.
+  context: Phase Verify/Repair complete. e06s05 security review passed with zero confidence >=8/10 findings.
+  blocker: null
   deferred_work:
     - "Resume e07s01 at build-epic Step 2 after e06 observable background subagents"
     - "Persist completed and active child sessions for later external analysis"
@@ -46,10 +46,10 @@ release:
   ci_verified: false
   ci_note: No GitHub Actions workflows are configured
 epic_cycle:
-  step: 4
-  current_step: 4
+  step: 5
+  current_step: 5
   story_bcps: 5
-  security_review: fail
+  security_review: pass
   plan_consistency: pass
 metrics:
   skill_timings:
