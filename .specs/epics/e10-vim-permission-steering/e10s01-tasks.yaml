@@ -1,0 +1,17 @@
+story_id: e10s01
+title: Spike reuse of Pi prompt editor input behavior
+status: todo
+bcps: 2
+delta: ADDED
+spec: e10s01-editor-integration-spike.md
+tasks:
+  - id: 1
+    description: Inspect the installed Pi TUI editor APIs and document supported reuse options and compatibility risks.
+    verify: test -f .specs/epics/e10-vim-permission-steering/SPIKE-editor-integration.md
+    status: todo
+    risk: P2
+  - id: 2
+    description: Prototype the chosen editor boundary and record test seams for configured Vim mode.
+    verify: npm run typecheck
+    status: todo
+    risk: P2

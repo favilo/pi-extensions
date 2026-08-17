@@ -1,0 +1,13 @@
+id: e09
+title: Invocation-bound permission steering
+wsjf: 0.0
+total_bcps: 4
+status: planned
+stories:
+  - id: e09s01
+    title: Identify the exact tool invocation receiving steering feedback
+    bcps: 4
+    status: todo
+    delta: MODIFIED
+    spec: e09s01-command-bound-steering.md
+    tasks: e09s01-tasks.yaml
