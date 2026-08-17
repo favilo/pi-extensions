@@ -27,7 +27,7 @@ tasks:
     description: >-
       Register find_tools and find_skills, maintain one parent-session coordinator, establish the exact startup baseline, and reapply baseline plus selected names at turn_start so late unselected registration disappears before the next model request while finder-driven additions remain purely additive.
     verify: node --test extensions/context-router/index.test.ts
-    status: failing
+    status: passing
     risk: P0
     security: high
     security_verification: >-
