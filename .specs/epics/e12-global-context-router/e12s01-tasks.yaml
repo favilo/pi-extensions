@@ -11,7 +11,7 @@ tasks:
     description: >-
       Add pure, deterministic catalog projections for registered parent tools and loaded skills: normalize and bound searchable metadata, redact source identity, omit every parameter schema/body/policy/input value, rank ties stably, and reject activation names not returned by the current tool search.
     verify: node --test extensions/context-router/catalog.test.ts
-    status: failing
+    status: passing
     risk: P0
     security: high
     security_verification: >-
