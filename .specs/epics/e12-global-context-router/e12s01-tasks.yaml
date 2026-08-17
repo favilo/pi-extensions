@@ -59,7 +59,7 @@ tasks:
     description: >-
       Extend the existing generic custom-tool permission regression harness to prove configured allow, configured deny precedence, and no-UI unmatched denial for find_tools and find_skills without adding a router-specific policy branch or changing selected-tool authorization.
     verify: node --test extensions/tool-permissions/index.test.ts extensions/context-router/index.test.ts
-    status: failing
+    status: passing
     risk: P0
     security: high
     security_verification: >-
