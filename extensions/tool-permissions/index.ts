@@ -4,7 +4,7 @@ import { CURSOR_MARKER, matchesKey, visibleWidth, wrapTextWithAnsi, type Compone
 import ignore from "ignore";
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
-import { appendFileSync, chmodSync, closeSync, constants as fsConstants, fchmodSync, fstatSync, mkdirSync, mkdtempSync, openSync, readFileSync, realpathSync, unlinkSync, writeFileSync, writeSync } from "node:fs";
+import { appendFileSync, chmodSync, closeSync, constants as fsConstants, existsSync, fchmodSync, fstatSync, mkdirSync, mkdtempSync, openSync, readFileSync, realpathSync, unlinkSync, writeFileSync, writeSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, dirname, join, relative, resolve } from "node:path";
 import { createAuditLogger } from "./audit.ts";
@@ -241,7 +241,7 @@ function safeDebugDetails(value: unknown): Record<string, unknown> {
 let subagentDebugDirectory: string | undefined;
 
 function subagentDebugPath(): string {
-  if (!subagentDebugDirectory) {
+  if (!subagentDebugDirectory || !existsSync(subagentDebugDirectory)) {
     subagentDebugDirectory = mkdtempSync(join(tmpdir(), "pi-subagent-debug-"));
     if (process.platform !== "win32") chmodSync(subagentDebugDirectory, 0o700);
   }
@@ -1078,6 +1078,12 @@ async function handleUnknownToolPermission(toolName: string, input: unknown, ctx
 }
 
 export default function toolPermissionPolicy(pi: ExtensionAPI) {
+  pi.on("session_start", (_event, ctx) => {
+    if (process.env.PI_SUBAGENT_DEBUG === "1" && ctx.hasUI) {
+      ctx.ui.notify(`Subagent debug log: ${subagentDebugPath()}`, "info");
+    }
+  });
+
   pi.registerCommand("permissions", {
     description: `Edit user or local tool permissions`,
     handler: async (args, ctx) => {
