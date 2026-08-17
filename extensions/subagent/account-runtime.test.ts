@@ -89,23 +89,44 @@ test("consumes a one-shot selection only after child session construction succee
   assert.equal(consumes, 1, "a failed child construction must retain the one-shot selection");
 });
 
-test("constructs a child runtime from its approved selection without resolving again", async () => {
-  let installs = 0;
-  const selection = {
-    descriptor: Object.freeze({
-      accountId: "personal",
-      provider: "openai-codex",
-      modelId: "gpt-5.6-terra",
-      source: "explicit" as const,
-    }),
-    installOauth: () => { installs += 1; },
-    consume: async () => {},
-  };
+test("constructs a child runtime from any published provider selection (antigravity, openai-compat, anthropic, etc.)", async () => {
+  const cases = [
+    { accountId: "gemini-acc", provider: "antigravity", modelId: "gemini-2.5-pro" },
+    { accountId: "compat-acc", provider: "openai-compat", modelId: "gpt-4o" },
+    { accountId: "claude-acc", provider: "anthropic", modelId: "claude-3-7-sonnet" },
+  ];
 
-  const runtime = await createChildRuntimeFromSelection(selection);
+  for (const c of cases) {
+    let installedRegistry: unknown = undefined;
+    const selection = {
+      descriptor: Object.freeze({
+        accountId: c.accountId,
+        provider: c.provider,
+        modelId: c.modelId,
+        source: "explicit" as const,
+      }),
+      installOauth: (registry: unknown) => {
+        installedRegistry = registry;
+        if (registry && typeof (registry as Record<string, unknown>).registerProvider === "function") {
+          (registry as { registerProvider: (id: string, def: unknown) => void }).registerProvider(c.provider, {
+            name: c.provider,
+            baseUrl: "https://example.invalid",
+            api: "openai-completions",
+            models: [{ id: c.modelId, name: c.modelId, reasoning: false, input: ["text"], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 128000, maxTokens: 4096 }],
+          });
+        }
+      },
+      consume: async () => {},
+    };
 
-  assert.equal(installs, 1);
-  assert.equal(runtime.selection, selection);
-  assert.notEqual(runtime.modelRuntime, undefined);
+    const runtime = await createChildRuntimeFromSelection(selection);
+
+    assert.equal(runtime.selection.descriptor.accountId, c.accountId);
+    assert.equal(runtime.selection.descriptor.provider, c.provider);
+    assert.equal(runtime.selection.descriptor.modelId, c.modelId);
+    assert.notEqual(installedRegistry, undefined);
+    assert.notEqual(runtime.modelRuntime, undefined);
+    assert.notEqual(runtime.model, undefined);
+  }
 });
 
