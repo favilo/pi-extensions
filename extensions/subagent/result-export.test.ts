@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { SessionManager, type AgentMessage } from "@earendil-works/pi-coding-agent";
+import { SessionManager } from "@earendil-works/pi-coding-agent";
 import { createSubagentResultExporter, type SubagentExportSnapshot } from "./result-export.ts";
 
 test("builds a schema-v1 snapshot from a SessionManager instance with full untruncated exposed events and no thinking blocks", async () => {
@@ -8,7 +8,7 @@ test("builds a schema-v1 snapshot from a SessionManager instance with full untru
   const sessionManager = SessionManager.inMemory(cwd);
   const largeOutput = "a".repeat(100_000);
 
-  const messages: AgentMessage[] = [
+  const messages = [
     {
       role: "user",
       content: [{ type: "text", text: "Task prompt" }],
@@ -42,7 +42,7 @@ test("builds a schema-v1 snapshot from a SessionManager instance with full untru
   ];
 
   for (const message of messages) {
-    sessionManager.appendMessage(message);
+    sessionManager.appendMessage(message as never);
   }
 
   const exporter = createSubagentResultExporter();

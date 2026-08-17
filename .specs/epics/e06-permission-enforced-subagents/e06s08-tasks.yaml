@@ -27,7 +27,7 @@ tasks:
     description: >-
       Build deterministic schema-v1 snapshots from all finalized exposed child SessionManager entries available at the capture boundary for every lifecycle state, preserving source values without exporter-added truncation and excluding private reasoning.
     verify: node --test extensions/subagent/result-export.test.ts
-    status: failing
+    status: passing
     risk: P0
     security: high
     security_verification: >-
