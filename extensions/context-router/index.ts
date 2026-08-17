@@ -1,7 +1,47 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
+import {
+  projectToolCatalog,
+  selectCurrentToolMatches,
+  type ToolRecord,
+} from "./catalog.ts";
+
+const BASELINE_TOOLS = [
+  "read",
+  "bash",
+  "edit",
+  "write",
+  "grep",
+  "find",
+  "ls",
+  "subagent",
+  "find_tools",
+  "find_skills",
+] as const;
+
+type FindToolsInput = { query: string; select?: string[] };
+
+function currentRegisteredNames(pi: ExtensionAPI): string[] {
+  return pi.getAllTools()
+    .map((tool) => tool.name)
+    .filter((name): name is string => typeof name === "string");
+}
+
+function applySessionToolSet(pi: ExtensionAPI, selected: Set<string>): void {
+  const registered = new Set(currentRegisteredNames(pi));
+  const retainedSelections = [...selected].filter((name) => registered.has(name));
+  selected.clear();
+  for (const name of retainedSelections) selected.add(name);
+
+  pi.setActiveTools([
+    ...BASELINE_TOOLS.filter((name) => registered.has(name)),
+    ...retainedSelections,
+  ]);
+}
 
 export default function contextRouter(pi: ExtensionAPI): void {
+  const selectedTools = new Set<string>();
+
   pi.registerTool({
     name: "find_tools",
     label: "Find tools",
@@ -10,8 +50,29 @@ export default function contextRouter(pi: ExtensionAPI): void {
       query: Type.String({ minLength: 1, maxLength: 160 }),
       select: Type.Optional(Type.Array(Type.String({ maxLength: 80 }), { maxItems: 8 })),
     }),
-    async execute() {
-      return { content: [{ type: "text", text: "Tool discovery is unavailable." }], details: {} };
+    async execute(_toolCallId, input: FindToolsInput) {
+      const registeredNames = currentRegisteredNames(pi);
+      const matches = projectToolCatalog(
+        pi.getAllTools() as unknown as ToolRecord[],
+        pi.getActiveTools(),
+        input.query,
+      );
+      const accepted = selectCurrentToolMatches(matches, input.select ?? [], registeredNames);
+      for (const name of accepted) selectedTools.add(name);
+
+      const active = pi.getActiveTools();
+      const added = accepted.filter((name) => !active.includes(name));
+      pi.setActiveTools([...new Set([...active, ...added])]);
+
+      const visibleMatches = matches.map((match) => ({
+        ...match,
+        selected: accepted.includes(match.name),
+        added: added.includes(match.name),
+      }));
+      return {
+        content: [{ type: "text", text: JSON.stringify({ matches: visibleMatches }) }],
+        details: { matches: matches.map((match) => match.name), added },
+      };
     },
   });
 
@@ -24,4 +85,8 @@ export default function contextRouter(pi: ExtensionAPI): void {
       return { content: [{ type: "text", text: "Skill discovery is unavailable." }], details: {} };
     },
   });
+
+  pi.on("session_start", () => applySessionToolSet(pi, selectedTools));
+  pi.on("turn_start", () => applySessionToolSet(pi, selectedTools));
+  pi.on("session_shutdown", () => selectedTools.clear());
 }
