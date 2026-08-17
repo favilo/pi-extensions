@@ -35,6 +35,20 @@ test("tool discovery projects normalized, redacted metadata without schemas or r
   assert.doesNotMatch(JSON.stringify(matches), /private|credential|super-secret|parameters|guidelines/i);
 });
 
+test("tool discovery supports wildcard, all, and multi-term OR matching", () => {
+  const tools: ToolRecord[] = [
+    { name: "mcp_build", description: "Build packages" },
+    { name: "mcp_deploy", description: "Deploy packages" },
+  ];
+
+  const wildcard = projectToolCatalog(tools, [], "*");
+  assert.equal(wildcard.length, 2);
+
+  const multiTerm = projectToolCatalog(tools, [], "all available tools build");
+  assert.equal(multiTerm.length, 1);
+  assert.equal(multiTerm[0].name, "mcp_build");
+});
+
 test("tool discovery bounds fields, rejects empty queries, and uses stable score/name ordering", () => {
   const overlong = "x".repeat(1_000);
   const tools: ToolRecord[] = [

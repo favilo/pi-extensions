@@ -17,9 +17,9 @@ planning:
       time_criticality: 10
       risk_reduction: 7
       job_size: 5
-      rationale: User priority: smaller models are unusable without a bounded initial tool and skill context.
+      rationale: "User priority: smaller models are unusable without a bounded initial tool and skill context."
     constraints:
-      - Do not modify the e06 repair flow or child-private bridge catalog.
+      - "Do not modify the e06 repair flow or child-private bridge catalog."
 handoff:
   last_step_completed: Completed e12s01 Global Context Router implementation with 5 passing TDD tasks and clean verification.
   open_decisions: []
@@ -31,8 +31,8 @@ handoff:
   context: e12s01 Global Context Router implementation is complete. All 5 tasks are passing.
   blocker: null
   deferred_work:
-    - Resume e06s05 security repairs after e12s01 verification.
-    - Resume e07s01 after e12s01 verification.
+    - "Resume e06s05 security repairs after e12s01 verification."
+    - "Resume e07s01 after e12s01 verification."
   verified_at: '2026-08-17T14:30:00-07:00'
 release:
   pr: https://github.com/favilo/pi-extensions/pull/3

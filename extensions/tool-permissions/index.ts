@@ -77,7 +77,9 @@ type PermissionResult =
   | { allowed: true; decision: "allow_pattern"; pattern: string; scope: "project" | "user"; steering?: string }
   | { allowed: false; decision: "deny" | "cancel"; steering?: string };
 
-const CONFIG_PATH = join(getAgentDir(), "permissions.toml");
+function getUserPermissionsPath(): string {
+  return join(getAgentDir(), "permissions.toml");
+}
 const auditLogger = createAuditLogger();
 
 type PermissionEditorTarget = { scope: "user" | "local"; path: string } | { error: string };
@@ -93,7 +95,7 @@ export function resolvePermissionEditorTarget(
   }
 
   if (!tokens[0] || tokens[0] === "user") {
-    return { scope: "user", path: options.userPermissionsPath ?? CONFIG_PATH };
+    return { scope: "user", path: options.userPermissionsPath ?? getUserPermissionsPath() };
   }
 
   const path = resolveCurrentProjectPolicyPath({
@@ -385,7 +387,7 @@ async function askScrollablePermission(
     : undefined;
   const savePattern = (scope: "project" | "user"): boolean => {
     if (!allowPattern) return false;
-    const target = scope === "project" ? projectPath : CONFIG_PATH;
+    const target = scope === "project" ? projectPath : getUserPermissionsPath();
     if (!target) {
       ctx.ui.notify?.("Project permissions cannot be saved because this directory is not trusted.", "warning");
       return false;
@@ -519,7 +521,7 @@ async function askScrollablePermission(
       if (allowPattern && matchesKey(data, "ctrl+e")) {
         void editPatternInExternalEditor(tui, allowPattern).then((rule) => {
           if (rule) {
-            saveAllowedRule(CONFIG_PATH, permissionKeyForTool(allowPattern.toolName), rule);
+            saveAllowedRule(getUserPermissionsPath(), permissionKeyForTool(allowPattern.toolName), rule);
             done({ allowed: true, decision: "allow_pattern", pattern: JSON.stringify(rule), scope: "user" });
           }
         });
@@ -608,7 +610,7 @@ export function resolveToolPermissionDecision(
     cwd,
     toolName,
     input,
-    userPermissionsPath: options.userPermissionsPath ?? CONFIG_PATH,
+    userPermissionsPath: options.userPermissionsPath ?? getUserPermissionsPath(),
     configDirName: CONFIG_DIR_NAME,
     trustResolver: options.trustResolver ?? createPersistedTrustResolver(getAgentDir()),
   });
@@ -674,7 +676,7 @@ async function handlePathPermission(toolName: string, input: PathToolInput, ctx:
     pi,
     ctx,
     `Allow external ${toolName} path?`,
-    `pi wants to use ${toolName} on a path outside the project directory.\n\nProject: ${ctx.cwd}\nPath: ${absolutePath}\n\nRules are stored under permissions.read in ${CONFIG_PATH}.`,
+    `pi wants to use ${toolName} on a path outside the project directory.\n\nProject: ${ctx.cwd}\nPath: ${absolutePath}\n\nRules are stored under permissions.read in ${getUserPermissionsPath()}.`,
     { toolName, suggestedRule: { path: exactPattern(absolutePath) }, subject: absolutePath },
   );
 
@@ -741,7 +743,7 @@ async function handleBashPermission(input: BashInput, ctx: PermissionContext, pi
     pi,
     ctx,
     "Allow bash command?",
-    `pi wants to run this shell command.\n\n${compact(command)}\n\nRules are stored under permissions.bash in ${CONFIG_PATH}.`,
+    `pi wants to run this shell command.\n\n${compact(command)}\n\nRules are stored under permissions.bash in ${getUserPermissionsPath()}.`,
     { toolName: "bash", suggestedRule: { command: exactPattern(command) }, subject: command },
   );
 
@@ -789,8 +791,9 @@ function isKnownMcpTool(toolName: string, pi: ExtensionAPI): boolean {
 }
 
 async function handleUnknownToolPermission(toolName: string, input: unknown, ctx: PermissionContext, pi: ExtensionAPI): Promise<ToolCallEventResult> {
+  const knownTool = pi.getAllTools().some((tool) => tool.name === toolName);
   const knownMcpTool = isKnownMcpTool(toolName, pi);
-  if (knownMcpTool) {
+  if (knownTool) {
     const decision = configuredDecision(toolName, input, ctx.cwd);
     const configurationResult = await handleConfigurationDiagnostic(decision, ctx, pi);
     if (configurationResult === "allow_once") return;

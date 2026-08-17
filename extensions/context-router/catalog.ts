@@ -48,10 +48,13 @@ function redactSecrets(value: string): string {
 }
 
 function queryTerms(query: string): string[] {
-  return normalizeText(query, MAX_QUERY_LENGTH)
-    .toLocaleLowerCase()
+  const normalized = normalizeText(query, MAX_QUERY_LENGTH).toLocaleLowerCase().trim();
+  if (!normalized) return [];
+  if (normalized === "*" || normalized === "all") return ["*"];
+  const terms = normalized
     .split(/[^\p{L}\p{N}_-]+/u)
     .filter(Boolean);
+  return terms.length > 0 ? terms : [];
 }
 
 function sourceCategory(source: unknown): ToolMatch["source"] {
@@ -72,20 +75,24 @@ function countOccurrences(value: string, term: string): number {
 }
 
 function scoreMatch(name: string, description: string, source: string, terms: readonly string[]): number | undefined {
+  if (terms.length === 1 && terms[0] === "*") return 1;
+
   const searchableName = name.toLocaleLowerCase();
   const searchableDescription = description.toLocaleLowerCase();
   const searchableSource = source.toLocaleLowerCase();
   let score = 0;
 
-  for (const term of terms) {
+  const activeTerms = terms.filter((term) => term !== "all" && term !== "*");
+  const termsToUse = activeTerms.length > 0 ? activeTerms : terms;
+
+  for (const term of termsToUse) {
     const termScore = (countOccurrences(searchableName, term) * 2)
       + countOccurrences(searchableDescription, term)
       + countOccurrences(searchableSource, term);
-    if (termScore === 0) return undefined;
     score += termScore;
   }
 
-  return score;
+  return score > 0 ? score : undefined;
 }
 
 function orderMatches<T extends { name: string }>(matches: Ranked<T>[]): T[] {
