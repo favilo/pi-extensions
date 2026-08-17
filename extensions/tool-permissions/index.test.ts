@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -16,11 +16,13 @@ const userPolicy = stringifyToml({
   },
 });
 
-test("debug logging writes sanitized data to a private per-process file", () => {
-  const debugDirectory = join(tmpdir(), `pi-subagent-debug-${process.pid}`);
-  const debugPath = join(debugDirectory, "events.jsonl");
+test("debug logging uses a random private directory and rejects non-regular targets", () => {
+  const debugParent = tmpdir();
+  const predictableDirectory = join(debugParent, `pi-subagent-debug-${process.pid}`);
   const previousDebug = process.env.PI_SUBAGENT_DEBUG;
-  rmSync(debugDirectory, { recursive: true, force: true });
+  let debugDirectory: string | undefined;
+  rmSync(predictableDirectory, { recursive: true, force: true });
+  const existingDirectories = new Set(readdirSync(debugParent));
   process.env.PI_SUBAGENT_DEBUG = "1";
 
   try {
@@ -38,6 +40,13 @@ test("debug logging writes sanitized data to a private per-process file", () => 
       toolName: "unknown-secret-bearing-tool-name",
     });
 
+    const createdDirectories = readdirSync(debugParent).filter((name) =>
+      name.startsWith("pi-subagent-debug-") && !existingDirectories.has(name),
+    );
+    assert.equal(createdDirectories.length, 1);
+    debugDirectory = join(debugParent, createdDirectories[0]!);
+    assert.notEqual(createdDirectories[0], `pi-subagent-debug-${process.pid}`);
+    const debugPath = join(debugDirectory, "events.jsonl");
     const logged = readFileSync(debugPath, "utf8");
     assert.match(logged, /worker-safe/);
     if (process.platform !== "win32") assert.equal(statSync(debugDirectory).mode & 0o077, 0);
@@ -45,23 +54,9 @@ test("debug logging writes sanitized data to a private per-process file", () => 
     assert.match(logged, /toolNameHash/);
     assert.doesNotMatch(logged, /secret-token|secret-result|Authorization|curl|unknown-secret-bearing-tool-name/);
     if (process.platform !== "win32") assert.equal(statSync(debugPath).mode & 0o077, 0);
-  } finally {
-    rmSync(debugDirectory, { recursive: true, force: true });
-    if (previousDebug === undefined) delete process.env.PI_SUBAGENT_DEBUG;
-    else process.env.PI_SUBAGENT_DEBUG = previousDebug;
-  }
-});
 
-test("debug logging rejects a pre-created non-regular log target", () => {
-  const debugDirectory = join(tmpdir(), `pi-subagent-debug-${process.pid}`);
-  const debugPath = join(debugDirectory, "events.jsonl");
-  const previousDebug = process.env.PI_SUBAGENT_DEBUG;
-  rmSync(debugDirectory, { recursive: true, force: true });
-  mkdirSync(debugDirectory, { recursive: true, mode: 0o700 });
-  mkdirSync(debugPath);
-  process.env.PI_SUBAGENT_DEBUG = "1";
-
-  try {
+    rmSync(debugPath);
+    mkdirSync(debugPath);
     logSubagentDebug("permission-prompt-enter", { childId: "worker-safe" });
     assert.equal(statSync(debugPath).isDirectory(), true);
 
@@ -69,7 +64,7 @@ test("debug logging rejects a pre-created non-regular log target", () => {
     logSubagentDebug("permission-prompt-enter", { childId: "worker-safe" });
     assert.match(readFileSync(debugPath, "utf8"), /worker-safe/);
   } finally {
-    rmSync(debugDirectory, { recursive: true, force: true });
+    rmSync(debugDirectory ?? predictableDirectory, { recursive: true, force: true });
     if (previousDebug === undefined) delete process.env.PI_SUBAGENT_DEBUG;
     else process.env.PI_SUBAGENT_DEBUG = previousDebug;
   }
