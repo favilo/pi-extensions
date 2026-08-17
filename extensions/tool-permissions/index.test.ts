@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { chmodSync, existsSync, mkdtempSync, readFileSync, statSync, unlinkSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -16,13 +16,11 @@ const userPolicy = stringifyToml({
   },
 });
 
-test("debug logging hashes raw permission data and unvalidated tool names while restricting the retained file mode", () => {
-  const debugPath = join(tmpdir(), "pi-subagent-debug.jsonl");
+test("debug logging writes sanitized data to a private per-process file", () => {
+  const debugDirectory = join(tmpdir(), `pi-subagent-debug-${process.pid}`);
+  const debugPath = join(debugDirectory, "events.jsonl");
   const previousDebug = process.env.PI_SUBAGENT_DEBUG;
-  const previousFile = existsSync(debugPath)
-    ? { content: readFileSync(debugPath), mode: statSync(debugPath).mode & 0o777 }
-    : undefined;
-  if (previousFile) unlinkSync(debugPath);
+  rmSync(debugDirectory, { recursive: true, force: true });
   process.env.PI_SUBAGENT_DEBUG = "1";
 
   try {
@@ -42,16 +40,36 @@ test("debug logging hashes raw permission data and unvalidated tool names while 
 
     const logged = readFileSync(debugPath, "utf8");
     assert.match(logged, /worker-safe/);
+    if (process.platform !== "win32") assert.equal(statSync(debugDirectory).mode & 0o077, 0);
     assert.match(logged, /inputHash/);
     assert.match(logged, /toolNameHash/);
     assert.doesNotMatch(logged, /secret-token|secret-result|Authorization|curl|unknown-secret-bearing-tool-name/);
     if (process.platform !== "win32") assert.equal(statSync(debugPath).mode & 0o077, 0);
   } finally {
-    if (existsSync(debugPath)) unlinkSync(debugPath);
-    if (previousFile) {
-      writeFileSync(debugPath, previousFile.content, { mode: previousFile.mode });
-      chmodSync(debugPath, previousFile.mode);
-    }
+    rmSync(debugDirectory, { recursive: true, force: true });
+    if (previousDebug === undefined) delete process.env.PI_SUBAGENT_DEBUG;
+    else process.env.PI_SUBAGENT_DEBUG = previousDebug;
+  }
+});
+
+test("debug logging rejects a pre-created non-regular log target", () => {
+  const debugDirectory = join(tmpdir(), `pi-subagent-debug-${process.pid}`);
+  const debugPath = join(debugDirectory, "events.jsonl");
+  const previousDebug = process.env.PI_SUBAGENT_DEBUG;
+  rmSync(debugDirectory, { recursive: true, force: true });
+  mkdirSync(debugDirectory, { recursive: true, mode: 0o700 });
+  mkdirSync(debugPath);
+  process.env.PI_SUBAGENT_DEBUG = "1";
+
+  try {
+    logSubagentDebug("permission-prompt-enter", { childId: "worker-safe" });
+    assert.equal(statSync(debugPath).isDirectory(), true);
+
+    rmSync(debugPath, { recursive: true });
+    logSubagentDebug("permission-prompt-enter", { childId: "worker-safe" });
+    assert.match(readFileSync(debugPath, "utf8"), /worker-safe/);
+  } finally {
+    rmSync(debugDirectory, { recursive: true, force: true });
     if (previousDebug === undefined) delete process.env.PI_SUBAGENT_DEBUG;
     else process.env.PI_SUBAGENT_DEBUG = previousDebug;
   }
