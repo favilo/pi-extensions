@@ -6,6 +6,7 @@ import { executeToolRequest, type ToolExecutionResult, type ToolPermissionBounda
 export type SubagentSession = {
   sessionId: string;
   cwd?: string;
+  sessionManager?: SessionManager;
   prompt(text: string): Promise<void>;
   getLastAssistantText?(): string | undefined;
   getActiveToolNames?(): string[];
@@ -100,6 +101,7 @@ export function validateNestingDepth(depth: number, maximum: number): void {
 }
 
 export async function createSubagentSession(cwd: string, options: SubagentSessionOptions = {}): Promise<ObservableSubagentSession> {
+  const sessionManager = options.sessionManager ?? SessionManager.inMemory(cwd);
   const { session } = await createAgentSession({
     cwd,
     noTools: "all",
@@ -108,11 +110,12 @@ export async function createSubagentSession(cwd: string, options: SubagentSessio
     resourceLoader: new DefaultResourceLoader({ cwd, agentDir: getAgentDir(), noExtensions: true }),
     ...(options.modelRuntime ? { modelRuntime: options.modelRuntime } : {}),
     ...(options.model ? { model: options.model as never } : {}),
-    sessionManager: options.sessionManager ?? SessionManager.inMemory(cwd),
+    sessionManager,
   });
   return {
     sessionId: session.sessionId,
     cwd,
+    sessionManager,
     prompt: (text) => session.prompt(text),
     getLastAssistantText: () => session.getLastAssistantText(),
     getActiveToolNames: () => session.getActiveToolNames(),

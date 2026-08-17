@@ -109,7 +109,8 @@ test("bounds terminal output and evicts the oldest retained result", async () =>
 
   assert.deepEqual(controller.result(first.id), { found: false, status: "unknown" });
   const retained = controller.result(second.id);
-  assert.equal(retained.found && Buffer.byteLength(retained.output ?? "", "utf8") <= 3, true);
+  if (!retained.found || ("exported" in retained && retained.exported)) throw new Error("expected compact result");
+  assert.equal(Buffer.byteLength(retained.output ?? "", "utf8") <= 3, true);
   assert.equal(retained.found && retained.output?.includes("�"), false);
   assert.deepEqual(retained.found && "outputBytes" in retained ? retained.outputBytes : undefined, {
     original: 6,
@@ -133,7 +134,8 @@ test("caps default terminal results at 8 KiB without returning normalized events
 
   const result = controller.result(launched.id);
   assert.equal(result.found, true);
-  assert.equal(result.found && Buffer.byteLength(result.output ?? "", "utf8"), 8 * 1024);
+  if (!result.found || ("exported" in result && result.exported)) throw new Error("expected compact result");
+  assert.equal(Buffer.byteLength(result.output ?? "", "utf8"), 8 * 1024);
   assert.deepEqual(result.found && "outputBytes" in result ? result.outputBytes : undefined, {
     original: 10_000,
     returned: 8 * 1024,

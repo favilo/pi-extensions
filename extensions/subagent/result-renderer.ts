@@ -26,7 +26,7 @@ function truncateUtf8(value: string, maximum: number): string {
   return truncated;
 }
 
-function presentationSnapshot(result: Exclude<BackgroundResult, { found: false }>): unknown {
+function presentationSnapshot(result: Exclude<BackgroundResult, { found: false } | { exported: true }>): unknown {
   if (result.output === undefined || Buffer.byteLength(result.output, "utf8") <= MAX_EXPANDED_OUTPUT_BYTES) {
     return result;
   }
@@ -50,6 +50,14 @@ export function subagentResultDisplay(
   if (!result.found) {
     return {
       summary: "unknown subagent",
+      ...(expanded ? { expandedJson: prettyJson(result) } : {}),
+    };
+  }
+
+  if ("exported" in result && result.exported) {
+    const summary = `${result.status} • exported ${result.bytesWritten} bytes -> ${result.destinationPath}`;
+    return {
+      summary,
       ...(expanded ? { expandedJson: prettyJson(result) } : {}),
     };
   }

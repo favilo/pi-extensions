@@ -91,6 +91,12 @@ Child assistant text, tool inputs/results, environment values, permission detail
 
 **Required mitigation:** Keep the MVP event buffer session-scoped and bounded. Do not copy raw events into permission audit/debug logs, parent context, completion signals, or custom persistent entries. Mark truncation explicitly. If Pi's child `SessionManager` persists messages, document that single store and its path/lifetime; do not add another durable transcript store until a separate retention, access, and redaction design is approved.
 
+### Subagent result export destination mutation and disclosure — HIGH — CWE-73 / CWE-532
+
+An explicit `subagent_result({ id, full_context, overwrite? })` call persists a full versioned transcript file. A model could attempt path traversal, directory creation outside authorized bounds, overwriting symlinks or device files, or flooding model context with the exported file contents.
+
+**Required mitigation:** Resolve export destinations canonically against the parent session cwd. Validate that the parent directory exists and canonicalize the target before evaluation. Map export requests directly to the shared write-class permission policy so configured allow/deny rules apply, and unmatched requests trigger the parent FIFO permission prompt showing the canonical path and explicit overwrite intent. Enforce atomic streaming publication through a restrictive destination-local temporary file (`0600` mode on POSIX systems). Default `overwrite` to `false` and permit replacement only on regular files while rejecting symlinks, directories, and non-regular targets. Return only compact export metadata (ID, path, bytes written, status, completeness, schema version) to model context and details; never inject the serialized transcript into parent model context or result rendering.
+
 ### Memory, model, and rendering exhaustion — MEDIUM — CWE-400
 
 A model can emit unbounded text/tool updates or launch many children, consuming provider quota, memory, CPU, and terminal rendering time after the foreground tool already returned.

@@ -45,11 +45,13 @@ const subagentResultParameters = {
   type: "object",
   properties: {
     id: { type: "string", description: "The generated background child task ID." },
+    full_context: { type: "string", description: "Optional destination file path to export the complete versioned JSON snapshot." },
+    overwrite: { type: "boolean", description: "Optional flag to allow overwriting an existing regular file destination." },
   },
   required: ["id"],
   additionalProperties: false,
 } as never;
-type SubagentResultParameters = { id: string };
+type SubagentResultParameters = { id: string; full_context?: string; overwrite?: boolean };
 
 /** Normal tools available to the parent-side permission executor. */
 function normalToolDefinitions(cwd: string): ToolDefinition[] {
@@ -231,7 +233,18 @@ export default function subagentExtension(pi: ExtensionAPI): void {
     label: "subagent_result",
     description: "Retrieve current status and bounded output for a background child owned by this parent session.",
     parameters: subagentResultParameters,
-    async execute(_toolCallId, params: SubagentResultParameters) {
+    async execute(_toolCallId, params: SubagentResultParameters, signal) {
+      if (typeof params.full_context === "string" && params.full_context.length > 0) {
+        const exportResult = await controller.exportResult(params.id, {
+          destinationPath: params.full_context,
+          overwrite: params.overwrite,
+          signal,
+        });
+        return {
+          content: [{ type: "text", text: JSON.stringify(exportResult) }],
+          details: exportResult,
+        };
+      }
       const result = controller.result(params.id);
       return {
         content: [{ type: "text", text: JSON.stringify(result) }],

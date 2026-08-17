@@ -1,6 +1,6 @@
 story_id: e06s08
 title: Export compact or complete subagent context
-status: failing
+status: passing
 bcps: 5
 delta: ADDED
 spec: e06s08-export-subagent-context.md
@@ -75,7 +75,7 @@ tasks:
     description: >-
       Keep subagent_result rendering compact for both retrieval modes, document schema and path semantics, update the e06 threat model for explicit transcript persistence, and run package regressions.
     verify: node --test extensions/subagent/index.test.ts extensions/subagent/result-renderer.test.ts && npm run check
-    status: failing
+    status: passing
     risk: P1
     security: high
     security_verification: >-

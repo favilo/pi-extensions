@@ -1,6 +1,7 @@
-import type { AgentSessionEvent } from "@earendil-works/pi-coding-agent";
+import type { AgentSessionEvent, SessionManager } from "@earendil-works/pi-coding-agent";
 import { createBackgroundEventBuffer, type BackgroundEventLimits } from "./background-events.ts";
 import { createBackgroundTaskRegistry, type BackgroundTaskSnapshot } from "./background-session.ts";
+import { createSubagentResultExporter } from "./result-export.ts";
 
 export type ManagedSubagentSession = {
   prompt(text: string): Promise<void>;
@@ -8,6 +9,7 @@ export type ManagedSubagentSession = {
   abort?(): Promise<void> | void;
   dispose(): void;
   getLastAssistantText?(): string | undefined;
+  sessionManager?: SessionManager;
 };
 
 export type BackgroundLaunchOptions = {
@@ -22,14 +24,34 @@ export type BackgroundResult =
   | { found: false; status: "unknown" }
   | (BackgroundTaskSnapshot & {
     found: true;
+    exported?: false;
     output?: string;
     outputBytes?: { original: number; returned: number };
     outputTruncated?: boolean;
-  });
+  })
+  | {
+    found: true;
+    id: string;
+    exported: true;
+    destinationPath: string;
+    bytesWritten: number;
+    overwritten: boolean;
+    status: string;
+    terminal: boolean;
+    complete: boolean;
+    schemaVersion: 1;
+  };
+
+export type ExportResultOptions = {
+  destinationPath: string;
+  overwrite?: boolean;
+  signal?: AbortSignal;
+};
 
 export type BackgroundSessionController = {
   launch(options: BackgroundLaunchOptions): Promise<BackgroundTaskSnapshot>;
   result(id: string): BackgroundResult;
+  exportResult(id: string, options: ExportResultOptions): Promise<BackgroundResult>;
   setStatus(id: string, status: "running" | "waiting-for-permission"): BackgroundTaskSnapshot | undefined;
   close(): Promise<void>;
 };
@@ -205,6 +227,39 @@ export function createBackgroundSessionController(
           outputBytes: runtime.outputBytes,
           outputTruncated: runtime.outputTruncated,
         } : {}),
+      };
+    },
+
+    async exportResult(id, options) {
+      const task = registry.get(id);
+      const runtime = runtimes.get(id);
+      if (!task || !runtime || !runtime.session.sessionManager) {
+        return { found: false, status: "unknown" };
+      }
+
+      const exporter = createSubagentResultExporter();
+      const exportRes = await exporter.exportToFile({
+        id: task.id,
+        cwd: task.cwd,
+        status: task.status,
+        terminal: task.terminal,
+        sessionManager: runtime.session.sessionManager,
+        destinationPath: options.destinationPath,
+        overwrite: options.overwrite,
+        signal: options.signal,
+      });
+
+      return {
+        found: true,
+        id: task.id,
+        exported: true,
+        destinationPath: exportRes.destinationPath,
+        bytesWritten: exportRes.bytesWritten,
+        overwritten: exportRes.overwritten,
+        status: exportRes.snapshot.status,
+        terminal: exportRes.snapshot.terminal,
+        complete: exportRes.snapshot.complete,
+        schemaVersion: exportRes.snapshot.schemaVersion,
       };
     },
 
