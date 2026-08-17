@@ -86,14 +86,14 @@ test("skill discovery returns bounded SKILL.md metadata without bodies or proven
     {
       name: "deploy\u0007",
       description: "Deploy\nservices with api_key=super-secret-value-1234567890",
-      filePath: "/home/user/skills/deploy/SKILL.md",
+      filePath: "/tmp/skills/deploy/SKILL.md",
       body: "must not reach the model",
       sourceInfo: { path: "/private/provenance" },
     } as SkillRecord,
     {
       name: "root-markdown",
       description: "A direct markdown skill",
-      filePath: "/home/user/skills/root.md",
+      filePath: "/tmp/skills/root.md",
     },
   ];
 
@@ -103,7 +103,7 @@ test("skill discovery returns bounded SKILL.md metadata without bodies or proven
     {
       name: "deploy",
       description: "Deploy services with api_key=[REDACTED]",
-      path: "/home/user/skills/deploy/SKILL.md",
+      path: "/tmp/skills/deploy/SKILL.md",
     },
   ]);
   assert.doesNotMatch(JSON.stringify(matches), /super-secret|must not reach|private\/provenance|body/i);
