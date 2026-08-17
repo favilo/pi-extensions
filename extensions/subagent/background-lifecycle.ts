@@ -302,6 +302,7 @@ export function createBackgroundSessionController(
       });
       registry.transition(task.id, "running");
       const captureFinalOutput = (): void => {
+        if (cancellation.signal.aborted || runtime.cleaned) return;
         const output = session.getLastAssistantText?.();
         if (output === undefined) return;
         const bounded = truncateUtf8(output, controllerOptions.maxOutputBytes ?? DEFAULT_MAX_OUTPUT_BYTES);
