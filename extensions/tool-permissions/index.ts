@@ -771,7 +771,7 @@ type PermissionResolverOptions = Parameters<typeof resolveToolPermissionDecision
 
 const IMPLICIT_PROJECT_PATH_TOOLS = new Set(["read", "grep", "find", "ls"]);
 const CONFIGURED_PATH_TOOLS = new Set(["read", "grep", "find", "ls", "write", "edit"]);
-const NONEXISTENT_PATH_TOOLS = new Set(["write", "edit"]);
+const NONEXISTENT_PATH_TOOLS = new Set(["write", "edit", "subagent_result"]);
 
 type CanonicalPermissionPath = { path: string; cwd: string };
 
@@ -897,6 +897,60 @@ async function handlePathPermission(toolName: string, input: PathToolInput, ctx:
 
 async function handleReadPermission(input: ReadInput, ctx: PermissionContext, pi: ExtensionAPI): Promise<ToolCallEventResult> {
   return handlePathPermission("read", input, ctx, pi);
+}
+
+type SubagentResultExportInput = { id?: unknown; full_context?: unknown; overwrite?: unknown };
+
+async function handleSubagentResultExportPermission(input: SubagentResultExportInput, ctx: PermissionContext, pi: ExtensionAPI): Promise<ToolCallEventResult> {
+  let requestedPath = typeof input.full_context === "string" ? input.full_context : "";
+  if (requestedPath.startsWith("@")) requestedPath = requestedPath.slice(1);
+  let absolutePath: string;
+  try {
+    absolutePath = canonicalPermissionPath("write", requestedPath, ctx.cwd).path;
+    input.full_context = absolutePath;
+  } catch (error) {
+    const reason = `Blocked write: ${error instanceof Error ? error.message : String(error)}`;
+    audit({ tool: "write", decision: "deny_path_resolution", cwd: ctx.cwd, reason });
+    return { block: true, reason };
+  }
+
+  const decision = configuredDecision("write", { path: absolutePath }, ctx.cwd);
+  const configurationResult = await handleConfigurationDiagnostic(decision, ctx, pi);
+  if (configurationResult === "allow_once") return;
+  if (configurationResult) return configurationResult;
+
+  if (decision.decision === "deny") return configuredDeny("write", ctx, { path: absolutePath });
+  if (decision.decision === "allow") {
+    audit({ tool: "write", decision: "allow_pattern", cwd: ctx.cwd, path: absolutePath });
+    return;
+  }
+  if (!ctx.hasUI) {
+    const reason = "Blocked write: file edits require explicit interactive permission or an allow rule.";
+    audit({ tool: "write", decision: "deny_no_ui", cwd: ctx.cwd, path: absolutePath, reason });
+    return { block: true, reason };
+  }
+
+  const childId = typeof input.id === "string" ? input.id : "unknown";
+  const overwriteStr = input.overwrite ? "true" : "false";
+
+  const result = await askScrollablePermission(
+    pi,
+    ctx,
+    { actor: { kind: "main" }, toolName: "write", input: { path: absolutePath }, cwd: ctx.cwd },
+    "Export subagent result?",
+    [
+      "Export full versioned child context to a local file.",
+      "",
+      `Child ID: ${childId}`,
+      `Target: ${absolutePath}`,
+      `Overwrite: ${overwriteStr}`,
+    ].join("\n"),
+    { toolName: "write", suggestedRule: { path: exactPattern(absolutePath) }, subject: absolutePath },
+    `Path: ${requestedPath || absolutePath}`,
+  );
+
+  audit({ tool: "write", decision: result.decision, cwd: ctx.cwd, path: absolutePath, ...permissionResultAudit(result) });
+  if (!result.allowed) return { block: true, reason: "User denied write." };
 }
 
 async function handleFileEditPermission(toolName: string, input: FileEditInput, ctx: PermissionContext, pi: ExtensionAPI): Promise<ToolCallEventResult> {
@@ -1140,6 +1194,13 @@ export default function toolPermissionPolicy(pi: ExtensionAPI) {
 
     if (isToolCallEventType<"subagent", SubagentInput>("subagent", event)) {
       return handleSubagentPermission(event.input, ctx, pi);
+    }
+
+    if (event.toolName === "subagent_result") {
+      if (typeof (event.input as Record<string, unknown>)?.full_context === "string") {
+        return handleSubagentResultExportPermission(event.input as SubagentResultExportInput, ctx, pi);
+      }
+      return undefined;
     }
 
     return handleUnknownToolPermission(event.toolName, event.input, ctx, pi);

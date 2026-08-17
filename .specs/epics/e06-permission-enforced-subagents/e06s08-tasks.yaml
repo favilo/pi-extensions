@@ -43,7 +43,7 @@ tasks:
     description: >-
       Resolve relative and absolute export destinations canonically, map the export variant to the shared write-class permission policy, and show canonical path plus overwrite intent in the parent-session FIFO prompt.
     verify: node --test extensions/tool-permissions/index.test.ts extensions/tool-permissions/prompt-queue.test.ts
-    status: failing
+    status: passing
     risk: P0
     security: high
     security_verification: >-
