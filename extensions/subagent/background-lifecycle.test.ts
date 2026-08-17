@@ -90,6 +90,44 @@ test("parent invocation cancellation stops and disposes an active child", async 
   assert.deepEqual(calls, ["abort", "unsubscribe", "dispose"]);
 });
 
+test("cancelled children never retain output produced after revocation", async () => {
+  const invocation = new AbortController();
+  let settlePrompt: (() => void) | undefined;
+  const promptPending = new Promise<void>((resolve) => { settlePrompt = resolve; });
+  const session: ManagedSubagentSession = {
+    prompt: () => promptPending,
+    subscribe: () => () => {},
+    abort() {},
+    getLastAssistantText: () => "post-revocation child output",
+    dispose() {},
+  };
+  const controller = createBackgroundSessionController(async () => session, { cleanupTimeoutMs: 20 });
+  const launched = await controller.launch({
+    cwd: "/workspace",
+    parentContext: "policy",
+    task: "wait",
+    invocationSignal: invocation.signal,
+  });
+
+  invocation.abort();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.deepEqual(controller.result(launched.id), {
+    found: true,
+    ...launched,
+    status: "cancelled",
+    terminal: true,
+  });
+
+  settlePrompt?.();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.deepEqual(controller.result(launched.id), {
+    found: true,
+    ...launched,
+    status: "cancelled",
+    terminal: true,
+  });
+});
+
 test("parent invocation cancellation rejects a session still being constructed", async () => {
   const calls: string[] = [];
   const invocation = new AbortController();
