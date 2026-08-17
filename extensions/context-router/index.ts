@@ -7,7 +7,7 @@ import {
   type SkillRecord,
   type ToolRecord,
 } from "./catalog.ts";
-import { sanitizeSkillsPrompt } from "./prompt.ts";
+import { sanitizeSkillsPrompt, type SanitizerOutcome } from "./prompt.ts";
 
 const BASELINE_TOOLS = [
   "read",
@@ -46,6 +46,22 @@ function applySessionToolSet(pi: ExtensionAPI, selected: Set<string>): void {
 export default function contextRouter(pi: ExtensionAPI): void {
   const selectedTools = new Set<string>();
   let cachedSkills: SkillRecord[] = [];
+  let lastPromptInputBytes = 0;
+  let lastPromptOutputBytes = 0;
+  let lastByteDelta = 0;
+  let lastSanitizerOutcome: SanitizerOutcome = "absent";
+
+  pi.registerCommand("context-router-debug", {
+    description: "Display count-only context-router status diagnostics",
+    async handler(_args, ctx) {
+      const registeredToolsCount = pi.getAllTools().length;
+      const activeToolsCount = pi.getActiveTools().length;
+      const selectedToolsCount = selectedTools.size;
+      const loadedSkillsCount = cachedSkills.length;
+      const message = `Context Router Debug: registeredTools=${registeredToolsCount} activeTools=${activeToolsCount} selectedTools=${selectedToolsCount} loadedSkills=${loadedSkillsCount} promptInputBytes=${lastPromptInputBytes} promptOutputBytes=${lastPromptOutputBytes} byteDelta=${lastByteDelta} sanitizerOutcome=${lastSanitizerOutcome}`;
+      ctx.ui.notify(message, "info");
+    },
+  });
 
   pi.registerTool({
     name: "find_tools",
@@ -111,6 +127,10 @@ export default function contextRouter(pi: ExtensionAPI): void {
   pi.on("before_agent_start", (event) => {
     cachedSkills = (event.systemPromptOptions?.skills as unknown as SkillRecord[]) ?? [];
     const result = sanitizeSkillsPrompt(event.systemPrompt, cachedSkills);
+    lastPromptInputBytes = event.systemPrompt.length;
+    lastPromptOutputBytes = result.systemPrompt.length;
+    lastByteDelta = result.byteDelta;
+    lastSanitizerOutcome = result.outcome;
     if (result.outcome === "replaced") {
       return { systemPrompt: result.systemPrompt };
     }

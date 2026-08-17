@@ -26,6 +26,7 @@ function routerHarness(initial: ToolInfo[]) {
     on(event: string, handler: Handler) {
       handlers.set(event, [...(handlers.get(event) ?? []), handler]);
     },
+    registerCommand() {},
     registerTool(tool: RegisteredTool) {
       tools.set(tool.name, tool);
       allTools.push({ name: tool.name, description: tool.name, sourceInfo: { source: "extension" } });
