@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import test from "node:test";
 import { stringify as stringifyToml } from "smol-toml";
-import { logSubagentDebug, requiresSubagentRuntimeApproval, resolvePermissionEditorTarget, resolveToolPermissionDecision } from "./index.ts";
+import toolPermissionPolicy, { logSubagentDebug, requiresSubagentRuntimeApproval, resolvePermissionEditorTarget, resolveToolPermissionDecision } from "./index.ts";
 
 const userPolicy = stringifyToml({
   permissions: {
@@ -65,6 +65,42 @@ test("debug logging uses a random private directory and rejects non-regular targ
     assert.match(readFileSync(debugPath, "utf8"), /worker-safe/);
   } finally {
     rmSync(debugDirectory ?? predictableDirectory, { recursive: true, force: true });
+    if (previousDebug === undefined) delete process.env.PI_SUBAGENT_DEBUG;
+    else process.env.PI_SUBAGENT_DEBUG = previousDebug;
+  }
+});
+
+test("announces the debug log location only to interactive sessions", async () => {
+  const previousDebug = process.env.PI_SUBAGENT_DEBUG;
+  const handlers = new Map<string, (event: unknown, ctx: unknown) => unknown>();
+  const notices: Array<{ message: string; level: string }> = [];
+  process.env.PI_SUBAGENT_DEBUG = "1";
+
+  try {
+    toolPermissionPolicy({
+      registerCommand() {},
+      on(event: string, handler: (event: unknown, ctx: unknown) => unknown) {
+        handlers.set(event, handler);
+      },
+    } as never);
+    const onSessionStart = handlers.get("session_start");
+    assert.ok(onSessionStart);
+
+    await onSessionStart({}, { hasUI: false, ui: { notify() {} } });
+    assert.equal(notices.length, 0);
+
+    await onSessionStart({}, {
+      hasUI: true,
+      ui: { notify: (message: string, level: string) => notices.push({ message, level }) },
+    });
+    assert.equal(notices.length, 1);
+    assert.match(notices[0]?.message ?? "", /^Subagent debug log: .+events\.jsonl$/);
+    assert.equal(notices[0]?.level, "info");
+    const debugPath = notices[0]?.message.slice("Subagent debug log: ".length);
+    assert.ok(debugPath);
+    assert.equal(existsSync(dirname(debugPath)), true);
+    rmSync(dirname(debugPath), { recursive: true, force: true });
+  } finally {
     if (previousDebug === undefined) delete process.env.PI_SUBAGENT_DEBUG;
     else process.env.PI_SUBAGENT_DEBUG = previousDebug;
   }
