@@ -59,7 +59,7 @@ tasks:
     description: >-
       Stream JSON to a destination-local restrictive temporary file and publish atomically, defaulting to no overwrite and allowing explicit approved replacement only for regular files while cleaning every error, cancellation, and shutdown path.
     verify: node --test extensions/subagent/result-export.test.ts
-    status: failing
+    status: passing
     risk: P0
     security: high
     security_verification: >-

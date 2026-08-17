@@ -1,3 +1,6 @@
+import { chmodSync, closeSync, constants as fsConstants, existsSync, fchmodSync, lstatSync, openSync, renameSync, rmSync, writeSync } from "node:fs";
+import { randomUUID } from "node:crypto";
+import { basename, dirname, join } from "node:path";
 import type { SessionManager } from "@earendil-works/pi-coding-agent";
 
 export type ExportedAssistantEvent = {
@@ -85,14 +88,70 @@ function extractText(content: MessageContentBlock[]): string | undefined {
 export function createSubagentResultExporter(): SubagentResultExporter {
   return {
     async exportToFile(options) {
-      const snapshot = this.buildSnapshot(options);
-      return {
-        success: false,
-        destinationPath: options.destinationPath,
-        bytesWritten: 0,
-        overwritten: false,
-        snapshot,
-      };
+      if (options.signal?.aborted) throw new Error("Subagent export aborted.");
+      const destinationPath = options.destinationPath;
+      let overwritten = false;
+
+      if (existsSync(destinationPath)) {
+        const stat = lstatSync(destinationPath);
+        if (!options.overwrite) {
+          throw new Error("Destination file already exists.");
+        }
+        if (!stat.isFile() || stat.isSymbolicLink()) {
+          throw new Error("Destination is not a regular file.");
+        }
+        overwritten = true;
+      }
+
+      const parentDir = dirname(destinationPath);
+      if (!existsSync(parentDir) || !lstatSync(parentDir).isDirectory()) {
+        throw new Error("Destination directory does not exist.");
+      }
+
+      const tempPath = join(parentDir, `.${basename(destinationPath)}.tmp-${randomUUID()}`);
+      let fd: number | undefined;
+
+      try {
+        const snapshot = this.buildSnapshot(options);
+        const json = JSON.stringify(snapshot, null, 2);
+        const bytesWritten = Buffer.byteLength(json, "utf8");
+
+        const noFollow = process.platform === "win32" ? 0 : fsConstants.O_NOFOLLOW;
+        fd = openSync(
+          tempPath,
+          fsConstants.O_CREAT | fsConstants.O_EXCL | fsConstants.O_WRONLY | noFollow,
+          0o600,
+        );
+
+        if (process.platform !== "win32") fchmodSync(fd, 0o600);
+        writeSync(fd, json, undefined, "utf8");
+        closeSync(fd);
+        fd = undefined;
+
+        if (process.platform !== "win32") chmodSync(tempPath, 0o600);
+
+        if (options.signal?.aborted) {
+          throw new Error("Subagent export aborted.");
+        }
+
+        renameSync(tempPath, destinationPath);
+
+        return {
+          success: true,
+          destinationPath,
+          bytesWritten,
+          overwritten,
+          snapshot,
+        };
+      } catch (error) {
+        if (fd !== undefined) {
+          try { closeSync(fd); } catch { /* Ignore file descriptor close error */ }
+        }
+        if (existsSync(tempPath)) {
+          try { rmSync(tempPath, { force: true }); } catch { /* Ignore temp file cleanup error */ }
+        }
+        throw error;
+      }
     },
     buildSnapshot(options) {
       const entries = options.sessionManager.getBranch();
