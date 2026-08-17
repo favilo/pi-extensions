@@ -388,6 +388,47 @@ test("resolves and displays the selected runtime before approving a broadly allo
   }
 });
 
+test("subagent_result with full_context evaluates under write permission policy", async () => {
+  const agentDir = mkdtempSync(join(tmpdir(), "pi-permissions-export-deny-"));
+  const exportDir = mkdtempSync(join(tmpdir(), "pi-export-dest-"));
+  const exportPath = join(exportDir, "output.json");
+  writeFileSync(join(agentDir, "permissions.toml"), stringifyToml({
+    permissions: { write: { allow: [], deny: [{ path: exportDir }] } },
+  }));
+  const previousAgentDir = process.env.PI_CODING_AGENT_DIR;
+  const handlers = new Map<string, (event: { toolName: string; input: Record<string, unknown>; toolCallId: string }, ctx: unknown) => Promise<unknown>>();
+  process.env.PI_CODING_AGENT_DIR = agentDir;
+
+  try {
+    const { default: toolPermissionPolicy } = await import(`./index.ts?export-deny=${encodeURIComponent(agentDir)}`);
+    toolPermissionPolicy({
+      registerCommand() {},
+      on(event: string, handler: (event: { toolName: string; input: Record<string, unknown>; toolCallId: string }, ctx: unknown) => Promise<unknown>) {
+        if (event === "tool_call") handlers.set(event, handler);
+      },
+      getAllTools: () => [{ name: "subagent_result" }],
+    } as never);
+
+    const input = { id: "child-1234", full_context: exportPath, overwrite: true };
+    const result = await handlers.get("tool_call")?.({
+      toolName: "subagent_result",
+      toolCallId: "export-call-1",
+      input,
+    }, {
+      cwd: exportDir,
+      hasUI: false,
+      mode: "json",
+    });
+
+    assert.deepEqual(result, { block: true, reason: "Blocked write: arguments match a configured deny rule." });
+    assert.equal(input.full_context, exportPath);
+  } finally {
+    rmSync(exportDir, { recursive: true, force: true });
+    if (previousAgentDir === undefined) delete process.env.PI_CODING_AGENT_DIR;
+    else process.env.PI_CODING_AGENT_DIR = previousAgentDir;
+  }
+});
+
 test("all protected tool families use the scoped decision boundary", () => {
   const userPath = join(mkdtempSync(join(tmpdir(), "pi-permissions-index-")), "permissions.toml");
   writeFileSync(userPath, userPolicy);
