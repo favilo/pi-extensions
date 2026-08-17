@@ -1,0 +1,40 @@
+story_id: e06s08
+verified_at: "2026-08-17T13:45:00Z"
+verifier: verify-work
+status: passing
+vcs:
+  kind: jj
+  bookmark: e06-observable-background-subagents
+phases:
+  task_verification:
+    passed: true
+    tasks: 5
+  typecheck:
+    passed: true
+    command: "npm run typecheck"
+  tests:
+    passed: true
+    command: "npm run test:preflight"
+  terminal_verdict:
+    command: "npm run check:ci"
+    exit_code: 0
+    captured_at: "2026-08-17T13:44:00Z"
+    note: "Single run — 143 passing tests across subagent and tool-permission extensions"
+  security:
+    passed: true
+    report: ".specs/security/epics/e06/THREAT_MODEL.md"
+    note: "Threat model updated for explicit subagent transcript persistence."
+  manual:
+    passed: true
+    confirmed_by_user: true
+    steps:
+      - step: "Execute compact subagent_result({ id }) retrieval"
+        expected: "Returns compact status plus at most 8 KiB of final assistant text without raw events or transcript disclosure."
+        actual: "Verified compact result projection stays under 8 KiB with explicit outputTruncated metadata and no event/tool payload disclosure."
+        passed: true
+      - step: "Execute subagent_result({ id, full_context, overwrite }) full context export"
+        expected: "Evaluates destination under write policy, streams schema-v1 JSON snapshot atomically with mode 0600, and returns compact metadata."
+        actual: "Verified write policy evaluation, atomic temp file creation, 0600 mode, overwrite enforcement, and compact metadata response."
+        passed: true
+  gaps:
+    closed: true
