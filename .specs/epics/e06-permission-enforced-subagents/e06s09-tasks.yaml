@@ -1,6 +1,6 @@
 story_id: e06s09
 title: Pretty-print subagent-tool-request tool calls and multiline bash commands
-status: todo
+status: passing
 bcps: 3
 delta: ADDED
 spec: e06s09-pretty-print-tool-requests.md
@@ -11,7 +11,7 @@ tasks:
     description: >-
       Format multiline bash commands with real line breaks and syntax styling instead of escaped \n sequences in JSON for subagent-tool-request TUI calls.
     verify: node --test extensions/subagent/tool-request-renderer.test.ts
-    status: todo
+    status: passing
     risk: P1
     security: low
     allure:
@@ -21,7 +21,7 @@ tasks:
     description: >-
       Pretty-print file tool and custom tool arguments with width-bounded rendering for subagent-tool-request calls and results.
     verify: node --test extensions/subagent/tool-request-renderer.test.ts
-    status: todo
+    status: passing
     risk: P1
     security: low
     allure:
@@ -31,7 +31,7 @@ tasks:
     description: >-
       Integrate custom renderCall/renderResult into createChildToolDefinitions and run package regressions.
     verify: node --test extensions/subagent/index.test.ts && npm run check
-    status: todo
+    status: passing
     risk: P1
     security: low
     allure:

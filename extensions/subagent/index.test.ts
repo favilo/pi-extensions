@@ -184,6 +184,7 @@ test("gives a child only the permission bridge tool with structured object argum
   for (const tool of tools) {
     assert.equal((tool.parameters as { type?: string }).type, "object");
     assert.equal(typeof tool.execute, "function");
+    assert.equal(typeof tool.renderCall, "function");
   }
   const parameters = tools[0].parameters as {
     properties?: { input?: { type?: string; description?: string } };

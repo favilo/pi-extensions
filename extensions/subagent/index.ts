@@ -26,6 +26,7 @@ import {
 } from "./background-lifecycle.ts";
 import { createCompletionSignalDispatcher } from "./completion-delivery.ts";
 import { subagentResultDisplay } from "./result-renderer.ts";
+import { renderSubagentToolRequestCall } from "./tool-request-renderer.ts";
 import { createPanelManager, createSubagentTranscriptPanel } from "./transcript-panel.ts";
 
 const subagentParameters = {
@@ -109,6 +110,9 @@ export function createChildToolDefinitions(
         content: [{ type: "text", text: JSON.stringify(result) }],
         details: result,
       };
+    },
+    renderCall(args, theme) {
+      return renderSubagentToolRequestCall((args ?? {}) as SubagentToolRequestCallArgs, theme as never) as never;
     },
   }];
 }

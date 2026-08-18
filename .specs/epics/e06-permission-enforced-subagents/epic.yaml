@@ -64,7 +64,7 @@ stories:
   - id: e06s09
     title: Pretty-print subagent-tool-request tool calls and multiline bash commands
     bcps: 3
-    status: todo
+    status: passing
     delta: ADDED
     spec: e06s09-pretty-print-tool-requests.md
     tasks: e06s09-tasks.yaml
