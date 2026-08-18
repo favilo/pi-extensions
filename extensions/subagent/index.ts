@@ -133,13 +133,14 @@ export function createParentPermissionPrompt(
   };
 }
 
-function executeParentTool(
+async function executeParentTool(
   pi: ExtensionAPI,
   cwd: string,
   parentContext: ExtensionContext,
   params: SubagentParameters,
   invocationSignal: AbortSignal | undefined,
   controller: BackgroundSessionController,
+  panelManager: ReturnType<typeof createPanelManager>,
 ) {
   const tools = Object.fromEntries(normalToolDefinitions(cwd).map((tool) => [tool.name, tool]));
   const parentSessionDir = parentContext.sessionManager.getSessionFile()
@@ -151,7 +152,7 @@ function executeParentTool(
     parameters: tool.parameters,
   }));
 
-  return controller.launch({
+  const launched = await controller.launch({
     cwd,
     parentContext: `${parentContext.getSystemPrompt()}\n\nYou are a background subagent. Child tool policy: you have only the subagent-tool-request tool. For every file, shell, search, MCP, or other tool action, call it with the exact toolName and an input object. Put arguments directly in that object (for example, input: {"command":"pwd"}), never as a JSON-encoded string. Do not attempt to call tools directly, and do not ask the main agent to repeat or duplicate your requested action. Tool permission UI and activity are attributed to your generated subagent ID.\n\nAvailable parent tools and input schemas:\n${JSON.stringify(toolCatalog)}`,
     task: params.task,
@@ -193,6 +194,15 @@ function executeParentTool(
       return session;
     },
   });
+
+  panelManager.registerChildPanel(launched.id, cwd);
+  if (parentContext.hasUI) {
+    parentContext.ui.setStatus("subagent", `Subagent running: ${launched.id} • Ctrl+Tab / Alt+T`);
+    parentContext.ui.setWidget("subagent", [
+      `Subagent running: ${launched.id} • Press Ctrl+Tab or Alt+T, or type /subagent:panels`,
+    ]);
+  }
+  return launched;
 }
 
 export default function subagentExtension(pi: ExtensionAPI): void {
@@ -259,7 +269,7 @@ export default function subagentExtension(pi: ExtensionAPI): void {
     parameters: subagentParameters,
     async execute(_toolCallId, params: SubagentParameters, signal, _onUpdate, ctx) {
       const cwd = resolveSubagentCwd(ctx.cwd, params.cwd);
-      const result = await executeParentTool(pi, cwd, ctx, params, signal, controller);
+      const result = await executeParentTool(pi, cwd, ctx, params, signal, controller, panelManager);
       return {
         content: [{ type: "text", text: JSON.stringify(result) }],
         details: result,
