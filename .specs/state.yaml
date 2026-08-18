@@ -31,6 +31,7 @@ handoff:
   context: Phase Verify/Repair. e06s05 live UAT and mechanical checks passed, and the bookmark now matches origin. A fresh security review blocks completion on construction/shutdown races, parent invocation cancellation, symlink-safe permission paths, and raw debug-log disclosure. E06s08 is planned but must not be implemented until those e06s05 blockers are repaired and verification passes.
   blocker: e06s05 security review found four blockers requiring behavioral RED tests and separate GREEN Jujutsu changes before the story can pass.
   deferred_work:
+    - "Consolidate safeStringify and JSON formatting helpers into a shared utility module"
     - "Resume e07s01 at build-epic Step 2 after e06 observable background subagents"
     - "Persist completed and active child sessions for later external analysis"
     - "Add interactive child steering after the read-only transcript slice"
