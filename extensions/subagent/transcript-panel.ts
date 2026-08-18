@@ -78,3 +78,31 @@ export function createSubagentTranscriptPanel(options: SubagentTranscriptPanelOp
     },
   };
 }
+
+export type PanelManager = {
+  getActivePanelId(): string;
+  registerChildPanel(childId: string, cwd: string): void;
+  unregisterChildPanel(childId: string): void;
+  selectPanel(panelId: string): string;
+  cycleNext(): string;
+  returnToMain(): string;
+};
+
+export function createPanelManager(): PanelManager {
+  return {
+    getActivePanelId() {
+      return "main";
+    },
+    registerChildPanel(_childId, _cwd) {},
+    unregisterChildPanel(_childId) {},
+    selectPanel(_panelId) {
+      return "main";
+    },
+    cycleNext() {
+      return "main";
+    },
+    returnToMain() {
+      return "main";
+    },
+  };
+}
