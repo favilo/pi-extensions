@@ -89,19 +89,43 @@ export type PanelManager = {
 };
 
 export function createPanelManager(): PanelManager {
+  const panels: string[] = ["main"];
+  let activeIndex = 0;
+
   return {
     getActivePanelId() {
-      return "main";
+      return panels[activeIndex] ?? "main";
     },
-    registerChildPanel(_childId, _cwd) {},
-    unregisterChildPanel(_childId) {},
-    selectPanel(_panelId) {
-      return "main";
+    registerChildPanel(childId) {
+      if (!panels.includes(childId)) {
+        panels.push(childId);
+      }
+    },
+    unregisterChildPanel(childId) {
+      const idx = panels.indexOf(childId);
+      if (idx !== -1) {
+        panels.splice(idx, 1);
+        if (activeIndex >= panels.length || activeIndex === idx) {
+          activeIndex = 0;
+        }
+      }
+    },
+    selectPanel(panelId) {
+      const idx = panels.indexOf(panelId);
+      if (idx !== -1) {
+        activeIndex = idx;
+      } else {
+        activeIndex = 0;
+      }
+      return panels[activeIndex] ?? "main";
     },
     cycleNext() {
-      return "main";
+      if (panels.length <= 1) return "main";
+      activeIndex = (activeIndex + 1) % panels.length;
+      return panels[activeIndex] ?? "main";
     },
     returnToMain() {
+      activeIndex = 0;
       return "main";
     },
   };
