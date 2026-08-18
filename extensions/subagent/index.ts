@@ -26,6 +26,7 @@ import {
 } from "./background-lifecycle.ts";
 import { createCompletionSignalDispatcher } from "./completion-delivery.ts";
 import { subagentResultDisplay } from "./result-renderer.ts";
+import { createPanelManager } from "./transcript-panel.ts";
 
 const subagentParameters = {
   type: "object",
@@ -195,6 +196,26 @@ function executeParentTool(
 }
 
 export default function subagentExtension(pi: ExtensionAPI): void {
+  const panelManager = createPanelManager();
+
+  if (typeof pi.registerShortcut === "function") {
+    pi.registerShortcut("ctrl+tab", {
+      description: "Cycle subagent transcript panels",
+      handler: (ctx) => {
+        const active = panelManager.cycleNext();
+        if (active === "main") {
+          if (ctx.hasUI) {
+            ctx.ui.setStatus("subagent-panel", undefined);
+          }
+          return;
+        }
+        if (ctx.hasUI) {
+          ctx.ui.setStatus("subagent-panel", `Panel: ${active} (Press Escape to return to main)`);
+        }
+      },
+    });
+  }
+
   const completionSignals = createCompletionSignalDispatcher(
     (message, options) => pi.sendMessage(message, options),
     (event, details) => logSubagentDebug(event, details),
