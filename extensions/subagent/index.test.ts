@@ -58,6 +58,70 @@ test("registers background launch, explicit result lookup, ctrl+tab shortcut, an
   assert.match(expanded, /visible only when expanded/);
 });
 
+test("launching a subagent sets UI status, widget, and registers child panel in PanelManager", async () => {
+  const tools: Array<{
+    name: string;
+    execute?: (toolCallId: string, params: unknown, signal: AbortSignal | undefined, onUpdate: unknown, ctx: unknown) => Promise<unknown>;
+  }> = [];
+  const commands: Map<string, (args: string, ctx: unknown) => Promise<void>> = new Map();
+  const statuses = new Map<string, string | undefined>();
+  const widgets = new Map<string, string[] | undefined>();
+
+  const pi = {
+    registerTool(tool: { name: string }) {
+      tools.push(tool);
+    },
+    registerShortcut() {},
+    registerCommand(name: string, options: { handler: (args: string, ctx: unknown) => Promise<void> }) {
+      commands.set(name, options.handler);
+    },
+    on() {},
+    sendMessage() {},
+  } as unknown as ExtensionAPI;
+
+  subagentExtension(pi);
+
+  const subagentTool = tools.find(({ name }) => name === "subagent");
+  assert.ok(subagentTool?.execute);
+
+  const ctx = {
+    cwd: process.cwd(),
+    hasUI: true,
+    mode: "tui",
+    getSystemPrompt: () => "parent policy prompt",
+    sessionManager: {
+      getSessionFile: () => undefined,
+      getSessionDir: () => "/tmp",
+    },
+    ui: {
+      setStatus: (key: string, text: string | undefined) => { statuses.set(key, text); },
+      setWidget: (key: string, content: string[] | undefined) => { widgets.set(key, content); },
+      notify() {},
+    },
+  };
+
+  const launchResult = await subagentTool.execute("launch-1", { task: "inspect repo" }, undefined, undefined, ctx) as { details: { id: string } };
+  assert.ok(launchResult.details.id);
+
+  assert.match(statuses.get("subagent") ?? "", /Subagent running/);
+  assert.equal((widgets.get("subagent") ?? []).length > 0, true);
+
+  const panelsHandler = commands.get("subagent:panels");
+  assert.ok(panelsHandler);
+
+  let notifiedMessage = "";
+  const panelsCtx = {
+    ...ctx,
+    ui: {
+      ...ctx.ui,
+      notify: (msg: string) => { notifiedMessage = msg; },
+    },
+  };
+
+  await panelsHandler("next", panelsCtx);
+  assert.match(notifiedMessage, new RegExp(launchResult.details.id));
+});
+
 test("forwards an already-cancelled launch invocation before constructing a child session", async () => {
   const tools: Array<{
     name: string;
