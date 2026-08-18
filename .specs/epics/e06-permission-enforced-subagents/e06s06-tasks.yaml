@@ -1,6 +1,6 @@
 story_id: e06s06
 title: Switch between live subagent transcript panels
-status: failing
+status: passing
 bcps: 3
 delta: ADDED
 spec: e06s06-switchable-live-transcripts.md
@@ -25,8 +25,8 @@ tasks:
       categories: ["Panel navigation", "TUI focus"]
   - id: 3
     description: Route child permission asks to the main window and serialize concurrent prompts without crossing child decisions.
-    verify: node --test extensions/subagent/permission-prompt-queue.test.ts
-    status: failing
+    verify: node --test extensions/tool-permissions/prompt-queue.test.ts
+    status: passing
     risk: P0
     security: high
     allure:
@@ -35,7 +35,7 @@ tasks:
   - id: 4
     description: Verify narrow-terminal rendering, completion during panel switching, custom-editor composition, and package regressions.
     verify: npm run check
-    status: failing
+    status: passing
     risk: P1
     security: medium
     allure:
