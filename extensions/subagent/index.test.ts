@@ -4,7 +4,7 @@ import test from "node:test";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import subagentExtension, { createChildToolDefinitions } from "./index.ts";
 
-test("registers background launch, explicit result lookup, and shutdown cleanup", () => {
+test("registers background launch, explicit result lookup, ctrl+tab shortcut, and shutdown cleanup", () => {
   const tools: Array<{
     name: string;
     execute?: (toolCallId: string, params: unknown, signal: AbortSignal | undefined, onUpdate: unknown, ctx: unknown) => Promise<unknown>;
@@ -12,9 +12,13 @@ test("registers background launch, explicit result lookup, and shutdown cleanup"
     renderResult?: (result: unknown, options: { expanded: boolean; isPartial: boolean }, theme: unknown) => { render(width: number): string[] };
   }> = [];
   const events: string[] = [];
+  const shortcuts: string[] = [];
   const pi = {
     registerTool(tool: { name: string }) {
       tools.push(tool);
+    },
+    registerShortcut(shortcut: string) {
+      shortcuts.push(shortcut);
     },
     on(event: string) {
       events.push(event);
@@ -25,6 +29,7 @@ test("registers background launch, explicit result lookup, and shutdown cleanup"
   subagentExtension(pi);
 
   assert.deepEqual(tools.map(({ name }) => name), ["subagent", "subagent_result"]);
+  assert.deepEqual(shortcuts, ["ctrl+tab"]);
   assert.deepEqual(events, ["message_start", "agent_settled", "session_shutdown"]);
 
   const resultTool = tools.find(({ name }) => name === "subagent_result");
