@@ -38,6 +38,18 @@ in_scope:
     outcome: Demonstrate that `find_tools` and `find_skills` use the existing configured-custom-tool permission path, including configured allow/deny and headless fail-closed behavior.
   - story_id: e12s01
     outcome: Provide a debug command with catalog/active/selected counts and prompt-reduction measurements without rendering tool schemas, skill bodies, permissions, or credential-shaped values.
+  - story_id: e12s02
+    outcome: Append a system-prompt section listing one-line summaries (name + bounded description) of every registered non-MCP tool, without parameter schemas, source paths, or secrets.
+  - story_id: e12s02
+    outcome: Append a compressed XML list of suppressed tool names (including MCP tools) and a compressed XML list of skill names, without descriptions, paths, or bodies.
+  - story_id: e12s02
+    outcome: Make every non-MCP tool callable even when not active via lazy activation, reversing the e12s01 decision that left subagent_result inactive at startup.
+  - story_id: e12s02
+    outcome: Exclude MCP tools from the non-MCP summary list; list them only as suppressed names.
+  - story_id: e12s02
+    outcome: Handle async-registered and prompt-direct tools (Codex) so they appear exactly once in the correct prompt section at the next turn boundary.
+  - story_id: e12s02
+    outcome: Preserve e12s01 sanitizer behavior and prompt integrity; every pre-existing byte is preserved when appending new sections.
 
 out_of_scope:
   - item: Installing or depending on the upstream pi-context-skills package
@@ -50,8 +62,8 @@ out_of_scope:
     reason: These increase latency, create persisted project state, and make the initial route nondeterministic; the model can call `find_skills` when needed.
     disposition: excluded
   - item: Activating `subagent_result` at startup
-    reason: The user explicitly retained `subagent` only; result lookup remains available through `find_tools` after a child is launched.
-    disposition: decided
+    reason: Reversed by e12s02; lazy activation now makes every non-MCP tool callable without a discovery round-trip.
+    disposition: reversed
   - item: Altering permission policy, auto-allow behavior, audit retention, or approvals for any tool
     reason: "`tool-permissions` remains the single authorization boundary; discovery is not an authorization bypass."
     disposition: prohibited

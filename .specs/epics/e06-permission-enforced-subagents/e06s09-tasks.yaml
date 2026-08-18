@@ -1,0 +1,39 @@
+story_id: e06s09
+title: Pretty-print subagent-tool-request tool calls and multiline bash commands
+status: todo
+bcps: 3
+delta: ADDED
+spec: e06s09-pretty-print-tool-requests.md
+tdd_policy: >-
+  Before each RED run, add the smallest compilable public stub. Record behavioral RED and GREEN implementation in separate Jujutsu changes; missing modules, exports, imports, or functions are invalid RED evidence.
+tasks:
+  - id: 1
+    description: >-
+      Format multiline bash commands with real line breaks and syntax styling instead of escaped \n sequences in JSON for subagent-tool-request TUI calls.
+    verify: node --test extensions/subagent/tool-request-renderer.test.ts
+    status: todo
+    risk: P1
+    security: low
+    allure:
+      severity: normal
+      categories: ["Formatting", "TUI"]
+  - id: 2
+    description: >-
+      Pretty-print file tool and custom tool arguments with width-bounded rendering for subagent-tool-request calls and results.
+    verify: node --test extensions/subagent/tool-request-renderer.test.ts
+    status: todo
+    risk: P1
+    security: low
+    allure:
+      severity: normal
+      categories: ["Formatting", "TUI"]
+  - id: 3
+    description: >-
+      Integrate custom renderCall/renderResult into createChildToolDefinitions and run package regressions.
+    verify: node --test extensions/subagent/index.test.ts && npm run check
+    status: todo
+    risk: P1
+    security: low
+    allure:
+      severity: high
+      categories: ["Integration", "Regression"]

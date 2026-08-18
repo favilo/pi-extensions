@@ -1,8 +1,8 @@
 id: e12
 title: Global context router
 wsjf: 5.4
-total_bcps: 8
-status: completed
+total_bcps: 17
+status: in_progress
 stories:
   - id: e12s01
     title: Route tool and skill catalogs through bounded discovery
@@ -11,3 +11,10 @@ stories:
     delta: ADDED
     spec: e12s01-context-router.md
     tasks: e12s01-tasks.yaml
+  - id: e12s02
+    title: Expose the full tool and skill landscape while keeping every tool callable
+    bcps: 9
+    status: in_progress
+    delta: ADDED
+    spec: e12s02-tool-skill-availability.md
+    tasks: e12s02-tasks.yaml

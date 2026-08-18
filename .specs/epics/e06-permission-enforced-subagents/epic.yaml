@@ -35,14 +35,14 @@ stories:
   - id: e06s05
     title: Run observable subagents in the background
     bcps: 5
-    status: todo
+    status: passing
     delta: ADDED
     spec: e06s05-background-subagent-results.md
     tasks: e06s05-tasks.yaml
   - id: e06s06
     title: Switch between live subagent transcript panels
     bcps: 3
-    status: todo
+    status: passing
     delta: ADDED
     spec: e06s06-switchable-live-transcripts.md
     tasks: e06s06-tasks.yaml
@@ -56,8 +56,15 @@ stories:
   - id: e06s08
     title: Export compact or complete subagent context
     bcps: 5
-    status: todo
+    status: passing
     delta: ADDED
     wsjf: 5.0
     spec: e06s08-export-subagent-context.md
     tasks: e06s08-tasks.yaml
+  - id: e06s09
+    title: Pretty-print subagent-tool-request tool calls and multiline bash commands
+    bcps: 3
+    status: todo
+    delta: ADDED
+    spec: e06s09-pretty-print-tool-requests.md
+    tasks: e06s09-tasks.yaml

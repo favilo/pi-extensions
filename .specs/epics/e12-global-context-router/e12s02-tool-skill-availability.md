@@ -64,7 +64,7 @@ Extend `extensions/context-router/` so the parent system prompt carries a bounde
 
 - The new sections are appended only to the chained system prompt in `before_agent_start`; every pre-existing byte is preserved.
 - The skills sanitization from e12s01 still applies; the compressed skill-name list is added in addition to (not instead of) the sanitizer's behavior.
-- When the skills section is absent or ambiguous, the sanitizer remains a no-op and the new sections are still appended.
+- When the skills section is absent or multiple stanzas exist, the sanitizer remains a no-op and the new sections are still appended.
 
 ## 6. Failure modes
 
@@ -96,10 +96,10 @@ Small but complete initial context, deterministic ordering, disclosure minimizat
 
 **Open design questions (resolved during planning/implementation, recorded here so later context windows do not re-derive them):**
 
-- **DQ1 — Callability when `active=false`:** Pi sends only active tool schemas to the provider, so a non-active tool cannot be called. The router must pick a mechanism: (a) keep every non-MCP tool in the active set and bound only the prompt; (b) add definitions to the prompt text and rely on Pi accepting known-name calls (requires verification Pi accepts calls to non-active registered tools); or (c) auto-activate a tool on first call. Decision affects how `setActiveTools` is used and whether the e12s01 active-set restriction is removed.
-- **DQ2 — MCP identification:** extension-registered tools carry `source: "local"` and MCP name prefixes vary (`mcp__…` in Codex, bare names in the repo mcp extension). Choose: (a) a name-prefix convention; (b) tagging MCP tools at registration in the mcp extension; or (c) a registry of MCP-owned tool names.
-- **DQ3 — Prompt-direct tools:** decide whether to fix the machine-local Codex extension to register through the router's registry, or to detect prompt-added tools from `systemPromptOptions`/`event.systemPrompt` and fold them into the landscape without duplication.
-- **DQ4 — Compressed XML shape:** define the exact compressed XML element set for suppressed tools and skills (e.g. `<suppressed_tools><tool name="…"/></suppressed_tools>`), including bounds and escaping.
+- **DQ1 — Callability when `active=false`:** Pi sends only active tool schemas to the provider, so a non-active tool cannot be called. **DECISION (user): lazy activation** — a tool becomes active on its first call (option (c)). A tool that is listed in the prompt summaries is callable; the router activates it lazily when the model calls it, without a prior `find_tools` selection round-trip. Verify Pi's call-dispatch path accepts a call to a registered-but-inactive tool and triggers activation before execution.
+- **DQ2 — MCP identification:** extension-registered tools carry `source: "local"` and MCP name prefixes vary. **DECISION (user): no identification needed.** Instead, the MCP extension must not auto-load its tools, or must load them as `active=false`, and lazy activation (DQ1) makes them callable on demand. The fix is in the MCP extension's registration/activation behavior, not in a router-side classifier.
+- **DQ3 — Prompt-direct tools:** **DECISION (user): fix the machine-local Codex extension** to register through the router's registry (`pi.registerTool`/`getAllTools`) instead of adding itself to the prompt directly, so the router's landscape sees it exactly once.
+- **DQ4 — Compressed XML shape:** **DECISION (user): undecided / flexible** — the exact element set is left to implementation; keep it bounded, deterministic, escaped, and free of descriptions/paths/bodies.
 
 ## 12. State
 
