@@ -1,5 +1,5 @@
 import type { AgentSessionEvent, SessionManager } from "@earendil-works/pi-coding-agent";
-import { createBackgroundEventBuffer, type BackgroundEventLimits } from "./background-events.ts";
+import { createBackgroundEventBuffer, type BackgroundEventLimits, type NormalizedBackgroundEvent } from "./background-events.ts";
 import { createBackgroundTaskRegistry, type BackgroundTaskSnapshot } from "./background-session.ts";
 import { createSubagentResultExporter } from "./result-export.ts";
 
@@ -52,6 +52,7 @@ export type BackgroundSessionController = {
   launch(options: BackgroundLaunchOptions): Promise<BackgroundTaskSnapshot>;
   result(id: string): BackgroundResult;
   exportResult(id: string, options: ExportResultOptions): Promise<BackgroundResult>;
+  getEvents(id: string): NormalizedBackgroundEvent[];
   setStatus(id: string, status: "running" | "waiting-for-permission"): BackgroundTaskSnapshot | undefined;
   close(): Promise<void>;
 };
@@ -228,6 +229,11 @@ export function createBackgroundSessionController(
           outputTruncated: runtime.outputTruncated,
         } : {}),
       };
+    },
+
+    getEvents(id) {
+      const runtime = runtimes.get(id);
+      return runtime ? runtime.events.snapshot().events : [];
     },
 
     async exportResult(id, options) {

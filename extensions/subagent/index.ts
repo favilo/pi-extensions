@@ -26,7 +26,7 @@ import {
 } from "./background-lifecycle.ts";
 import { createCompletionSignalDispatcher } from "./completion-delivery.ts";
 import { subagentResultDisplay } from "./result-renderer.ts";
-import { createPanelManager } from "./transcript-panel.ts";
+import { createPanelManager, createSubagentTranscriptPanel } from "./transcript-panel.ts";
 
 const subagentParameters = {
   type: "object",
@@ -208,8 +208,54 @@ async function executeParentTool(
 export default function subagentExtension(pi: ExtensionAPI): void {
   const panelManager = createPanelManager();
 
+  const openTranscriptOverlay = async (ctx: ExtensionContext, childId: string) => {
+    if (!ctx.hasUI || typeof ctx.ui.custom !== "function") return;
+
+    await ctx.ui.custom((_tui, theme, _keybindings, done) => {
+      const snapshot = controller.result(childId);
+      const events = controller.getEvents(childId);
+      const cwd = snapshot.found && "cwd" in snapshot ? snapshot.cwd : ctx.cwd;
+      const status = snapshot.found ? snapshot.status : "unknown";
+
+      const panel = createSubagentTranscriptPanel({
+        childId,
+        status,
+        cwd,
+        theme: theme as never,
+      });
+
+      for (const event of events) {
+        panel.addEvent(event);
+      }
+
+      const unsubscribeInput = ctx.ui.onTerminalInput((data) => {
+        if (data === "\x1b" || data === "q" || data === "Q" || data === "\x1bt" || data === "\x1b[15;5~") {
+          unsubscribeInput();
+          done(undefined);
+          return { consume: true };
+        }
+        return undefined;
+      });
+
+      return {
+        render(width: number) {
+          return panel.render(width);
+        },
+        invalidate() {},
+        dispose() {
+          unsubscribeInput();
+        },
+      };
+    });
+
+    panelManager.returnToMain();
+    if (ctx.hasUI) {
+      ctx.ui.setStatus("subagent-panel", undefined);
+    }
+  };
+
   if (typeof pi.registerShortcut === "function") {
-    const cycleHandler = (ctx: ExtensionContext) => {
+    const cycleHandler = async (ctx: ExtensionContext) => {
       const active = panelManager.cycleNext();
       if (active === "main") {
         if (ctx.hasUI) {
@@ -219,6 +265,7 @@ export default function subagentExtension(pi: ExtensionAPI): void {
       }
       if (ctx.hasUI) {
         ctx.ui.setStatus("subagent-panel", `Panel: ${active} (Press Escape or Alt+T to return to main)`);
+        await openTranscriptOverlay(ctx, active);
       }
     };
 
@@ -237,8 +284,17 @@ export default function subagentExtension(pi: ExtensionAPI): void {
       description: "Cycle or view subagent transcript panels",
       handler: async (args, ctx) => {
         const active = args.trim() === "main" ? panelManager.returnToMain() : panelManager.cycleNext();
+        if (active === "main") {
+          if (ctx.hasUI) {
+            ctx.ui.notify("Active panel: main", "info");
+            ctx.ui.setStatus("subagent-panel", undefined);
+          }
+          return;
+        }
         if (ctx.hasUI) {
           ctx.ui.notify(`Active panel: ${active}`, "info");
+          ctx.ui.setStatus("subagent-panel", `Panel: ${active} (Press Escape or Alt+T to return to main)`);
+          await openTranscriptOverlay(ctx, active);
         }
       },
     });

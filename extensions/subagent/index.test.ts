@@ -100,7 +100,15 @@ test("launching a subagent sets UI status, widget, and registers child panel in 
     },
   };
 
-  const launchResult = await subagentTool.execute("launch-1", { task: "inspect repo" }, undefined, undefined, ctx) as { details: { id: string } };
+  const launchResult = await subagentTool.execute("launch-1", {
+    task: "inspect repo",
+    createSession: async () => ({
+      sessionId: "child-mock-1234",
+      prompt: async () => {},
+      subscribe: () => () => {},
+      dispose: () => {},
+    }),
+  }, undefined, undefined, ctx) as { details: { id: string } };
   assert.ok(launchResult.details.id);
 
   assert.match(statuses.get("subagent") ?? "", /Subagent running/);
@@ -110,16 +118,25 @@ test("launching a subagent sets UI status, widget, and registers child panel in 
   assert.ok(panelsHandler);
 
   let notifiedMessage = "";
+  let customRenderedLines: string[] = [];
   const panelsCtx = {
     ...ctx,
     ui: {
       ...ctx.ui,
       notify: (msg: string) => { notifiedMessage = msg; },
+      custom: async (factory: (tui: unknown, theme: unknown, keybindings: unknown, done: (res: unknown) => void) => { render(width: number): string[]; dispose?(): void }) => {
+        const theme = { fg: (_c: string, t: string) => t, bold: (t: string) => t };
+        const component = await factory({ requestRender() {} }, theme, {}, () => {});
+        customRenderedLines = component.render(80);
+      },
+      onTerminalInput: () => () => {},
     },
   };
 
   await panelsHandler("next", panelsCtx);
   assert.match(notifiedMessage, new RegExp(launchResult.details.id));
+  assert.equal(customRenderedLines.length > 0, true);
+  assert.match(customRenderedLines.join("\n"), new RegExp(`Subagent ${launchResult.details.id}`));
 });
 
 test("forwards an already-cancelled launch invocation before constructing a child session", async () => {
