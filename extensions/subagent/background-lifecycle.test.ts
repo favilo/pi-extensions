@@ -289,7 +289,7 @@ test("steers an active parent or starts an idle parent turn with only generated 
   assert.deepEqual(notifications, [{
     message: {
       customType: "subagent_finished",
-      content: `subagent_finished:${launched.id}:completed`,
+      content: `Subagent background task ${launched.id} finished with status "completed". Call subagent_result({ id: "${launched.id}" }) to retrieve its result.`,
       display: false,
       details: { id: launched.id, status: "completed" },
     },

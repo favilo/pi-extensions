@@ -125,7 +125,9 @@ export function createBackgroundSessionController(
   const terminalOrder: string[] = [];
 
   function retainTerminal(id: string): void {
-    terminalOrder.push(id);
+    if (!terminalOrder.includes(id)) {
+      terminalOrder.push(id);
+    }
     const maximum = controllerOptions.maxRetainedResults ?? DEFAULT_MAX_RETAINED_RESULTS;
     while (terminalOrder.length > maximum) {
       const evicted = terminalOrder.shift();
@@ -143,7 +145,7 @@ export function createBackgroundSessionController(
     if (!closed) {
       controllerOptions.notify?.({
         customType: "subagent_finished",
-        content: `subagent_finished:${id}:${status}`,
+        content: `Subagent background task ${id} finished with status "${status}". Call subagent_result({ id: "${id}" }) to retrieve its result.`,
         display: false,
         details: { id, status },
       }, { deliverAs: "steer", triggerTurn: true });

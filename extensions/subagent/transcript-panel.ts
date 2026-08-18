@@ -98,10 +98,13 @@ export function createSubagentTranscriptPanel(options: SubagentTranscriptPanelOp
 
 export type PanelManager = {
   getActivePanelId(): string;
+  getActiveIndex(): number;
+  getPanels(): readonly string[];
   registerChildPanel(childId: string, cwd: string): void;
   unregisterChildPanel(childId: string): void;
   selectPanel(panelId: string): string;
   cycleNext(): string;
+  cyclePrevious(): string;
   returnToMain(): string;
 };
 
@@ -112,6 +115,12 @@ export function createPanelManager(): PanelManager {
   return {
     getActivePanelId() {
       return panels[activeIndex] ?? "main";
+    },
+    getActiveIndex() {
+      return activeIndex;
+    },
+    getPanels() {
+      return [...panels];
     },
     registerChildPanel(childId) {
       if (!panels.includes(childId)) {
@@ -139,6 +148,11 @@ export function createPanelManager(): PanelManager {
     cycleNext() {
       if (panels.length <= 1) return "main";
       activeIndex = (activeIndex + 1) % panels.length;
+      return panels[activeIndex] ?? "main";
+    },
+    cyclePrevious() {
+      if (panels.length <= 1) return "main";
+      activeIndex = (activeIndex - 1 + panels.length) % panels.length;
       return panels[activeIndex] ?? "main";
     },
     returnToMain() {

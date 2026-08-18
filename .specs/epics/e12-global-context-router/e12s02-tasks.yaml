@@ -11,7 +11,7 @@ tasks:
     description: >-
       Add a pure availability-section projector: non-MCP tool summaries plus compressed XML suppressed-tool and skill-name lists, with bounds, deterministic ordering, escaping, and no schema/body/path/secret disclosure.
     verify: node --test extensions/context-router/prompt.test.ts
-    status: todo
+    status: passing
     risk: P0
     security: high
     security_verification: >-
@@ -43,7 +43,7 @@ tasks:
     description: >-
       Integrate the availability section into before_agent_start while preserving e12s01 sanitizer behavior and prompt integrity; every pre-existing byte is preserved.
     verify: node --test extensions/context-router/index.test.ts
-    status: todo
+    status: passing
     risk: P0
     security: high
     security_verification: >-
@@ -59,7 +59,7 @@ tasks:
     description: >-
       Make every non-MCP tool callable when not active (lazy activation, DQ1); prove subagent_result is callable from the start without a finder round-trip.
     verify: node --test extensions/context-router/index.test.ts
-    status: todo
+    status: passing
     risk: P0
     security: high
     security_verification: >-

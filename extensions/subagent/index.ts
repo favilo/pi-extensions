@@ -26,7 +26,7 @@ import {
 } from "./background-lifecycle.ts";
 import { createCompletionSignalDispatcher } from "./completion-delivery.ts";
 import { subagentResultDisplay } from "./result-renderer.ts";
-import { renderSubagentToolRequestCall } from "./tool-request-renderer.ts";
+import { renderSubagentToolRequestCall, type SubagentToolRequestCallArgs } from "./tool-request-renderer.ts";
 import { createPanelManager, createSubagentTranscriptPanel } from "./transcript-panel.ts";
 
 const subagentParameters = {
@@ -212,29 +212,59 @@ async function executeParentTool(
 export default function subagentExtension(pi: ExtensionAPI): void {
   const panelManager = createPanelManager();
 
-  const openTranscriptOverlay = async (ctx: ExtensionContext, childId: string) => {
+  const openTranscriptOverlay = async (ctx: ExtensionContext, initialChildId: string) => {
     if (!ctx.hasUI || typeof ctx.ui.custom !== "function") return;
 
-    await ctx.ui.custom((_tui, theme, _keybindings, done) => {
-      const snapshot = controller.result(childId);
-      const events = controller.getEvents(childId);
-      const cwd = snapshot.found && "cwd" in snapshot ? snapshot.cwd : ctx.cwd;
-      const status = snapshot.found ? snapshot.status : "unknown";
+    await ctx.ui.custom((tui, theme, _keybindings, done) => {
+      let currentChildId = initialChildId;
 
-      const panel = createSubagentTranscriptPanel({
-        childId,
-        status,
-        cwd,
-        theme: theme as never,
-      });
+      const buildPanel = (id: string) => {
+        const snapshot = controller.result(id);
+        const events = controller.getEvents(id);
+        const cwd = snapshot.found && "cwd" in snapshot ? snapshot.cwd : ctx.cwd;
+        const status = snapshot.found ? snapshot.status : "unknown";
 
-      for (const event of events) {
-        panel.addEvent(event);
-      }
+        const panel = createSubagentTranscriptPanel({
+          childId: id,
+          status,
+          cwd,
+          theme: theme as never,
+        });
+
+        for (const event of events) {
+          panel.addEvent(event);
+        }
+        return panel;
+      };
+
+      let activePanel = buildPanel(currentChildId);
+
+      const switchChildPanel = (newId: string) => {
+        if (newId === "main") {
+          done(undefined);
+          return;
+        }
+        currentChildId = newId;
+        activePanel = buildPanel(currentChildId);
+        if (ctx.hasUI) {
+          ctx.ui.setStatus("subagent-panel", `Panel: ${currentChildId} (Ctrl+Tab/Alt+T: next, Escape: main)`);
+        }
+        tui.requestRender();
+      };
 
       const unsubscribeInput = ctx.ui.onTerminalInput((data) => {
-        if (data === "\x1b" || data === "q" || data === "Q" || data === "\x1bt" || data === "\x1b[15;5~") {
-          unsubscribeInput();
+        if (data === "\x1bt" || data === "\t" || data === "\x1b[15;5~" || data === "\x1b[9;5u" || data === "\x1b[27;5;9~") {
+          const next = panelManager.cycleNext();
+          switchChildPanel(next);
+          return { consume: true };
+        }
+        if (data === "\x1b[Z" || data === "\x1bT" || data === "\x1b[15;6~") {
+          const prev = panelManager.cyclePrevious();
+          switchChildPanel(prev);
+          return { consume: true };
+        }
+        if (data === "\x1b" || data === "q" || data === "Q") {
+          panelManager.returnToMain();
           done(undefined);
           return { consume: true };
         }
@@ -243,7 +273,7 @@ export default function subagentExtension(pi: ExtensionAPI): void {
 
       return {
         render(width: number) {
-          return panel.render(width);
+          return activePanel.render(width);
         },
         invalidate() {},
         dispose() {
@@ -343,6 +373,13 @@ export default function subagentExtension(pi: ExtensionAPI): void {
     description: "Retrieve current status and bounded output for a background child owned by this parent session.",
     parameters: subagentResultParameters,
     async execute(_toolCallId, params: SubagentResultParameters, signal) {
+      if (!params || typeof params.id !== "string" || params.id.trim().length === 0) {
+        const errorResult = { error: "subagent_result requires a valid child task id string (e.g. subagent_result({ id: \"child-xxxx\" }))." };
+        return {
+          content: [{ type: "text", text: JSON.stringify(errorResult) }],
+          details: { found: false, status: "invalid_id" },
+        };
+      }
       if (typeof params.full_context === "string" && params.full_context.length > 0) {
         const exportResult = await controller.exportResult(params.id, {
           destinationPath: params.full_context,
