@@ -7,7 +7,7 @@ import {
   type SkillRecord,
   type ToolRecord,
 } from "./catalog.ts";
-import { sanitizeSkillsPrompt, type SanitizerOutcome } from "./prompt.ts";
+import { buildAvailabilityPrompt, sanitizeSkillsPrompt, type SanitizerOutcome } from "./prompt.ts";
 
 const BASELINE_TOOLS = [
   "read",
@@ -41,6 +41,43 @@ function applySessionToolSet(pi: ExtensionAPI, selected: Set<string>): void {
     ...BASELINE_TOOLS.filter((name) => registered.has(name)),
     ...retainedSelections,
   ]);
+}
+
+function isMcpTool(source: string | undefined, name: string): boolean {
+  // MCP tools have source "mcp" or names prefixed with mcp__
+  if (source === "mcp") return true;
+  if (name.startsWith("mcp__")) return true;
+  return false;
+}
+
+function buildToolSummaries(allTools: ToolRecord[]): Array<{ name: string; description: string }> {
+  const seen = new Set<string>();
+  const summaries: Array<{ name: string; description: string }> = [];
+  for (const tool of allTools) {
+    const name = typeof tool.name === "string" ? tool.name : "";
+    const description = typeof tool.description === "string" ? tool.description : "";
+    const source = typeof tool.sourceInfo?.source === "string" ? tool.sourceInfo.source : "";
+    if (!name || seen.has(name)) continue;
+    if (isMcpTool(source, name)) continue;
+    seen.add(name);
+    summaries.push({ name, description });
+  }
+  return summaries.sort((a, b) => a.name.localeCompare(b.name));
+}
+
+function buildSuppressedTools(allTools: ToolRecord[], activeNames: string[]): string[] {
+  const active = new Set(activeNames);
+  const suppressed: string[] = [];
+  const seen = new Set<string>();
+  for (const tool of allTools) {
+    const name = typeof tool.name === "string" ? tool.name : "";
+    if (!name || seen.has(name)) continue;
+    seen.add(name);
+    if (!active.has(name)) {
+      suppressed.push(name);
+    }
+  }
+  return suppressed.sort((a, b) => a.localeCompare(b));
 }
 
 export default function contextRouter(pi: ExtensionAPI): void {
@@ -131,9 +168,41 @@ export default function contextRouter(pi: ExtensionAPI): void {
     lastPromptOutputBytes = result.systemPrompt.length;
     lastByteDelta = result.byteDelta;
     lastSanitizerOutcome = result.outcome;
-    if (result.outcome === "replaced") {
-      return { systemPrompt: result.systemPrompt };
-    }
+
+    const allTools = pi.getAllTools() as unknown as ToolRecord[];
+    const activeNames = pi.getActiveTools();
+    const summaries = buildToolSummaries(allTools);
+    const suppressed = buildSuppressedTools(allTools, activeNames);
+    const skillNames = cachedSkills
+      .map((skill) => typeof skill.name === "string" ? skill.name : "")
+      .filter(Boolean);
+
+    const availabilitySection = buildAvailabilityPrompt({
+      summaries,
+      suppressedTools: suppressed,
+      skillNames,
+    });
+
+    const systemPrompt = result.outcome === "replaced" ? result.systemPrompt : event.systemPrompt;
+    return { systemPrompt: systemPrompt + "\n\n" + availabilitySection };
+  });
+
+  pi.on("tool_call", (event) => {
+    const allTools = pi.getAllTools() as unknown as ToolRecord[];
+    const activeNames = pi.getActiveTools();
+    const toolName = event.toolName;
+
+    // Check if this is a registered but inactive non-MCP tool
+    if (activeNames.includes(toolName)) return; // Already active, let it proceed normally
+
+    const tool = allTools.find((t) => t.name === toolName);
+    if (!tool) return; // Not registered, let Pi handle the error
+
+    const source = typeof tool.sourceInfo?.source === "string" ? tool.sourceInfo.source : "";
+    if (isMcpTool(source, toolName)) return; // MCP tools require explicit activation via find_tools
+
+    // Lazy activation: add the tool to the active set
+    pi.setActiveTools([...activeNames, toolName]);
   });
   pi.on("session_shutdown", () => {
     selectedTools.clear();
