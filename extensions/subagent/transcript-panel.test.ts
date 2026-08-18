@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { visibleWidth } from "@earendil-works/pi-tui";
 import type { NormalizedBackgroundEvent } from "./background-events.ts";
 import { createPanelManager, createSubagentTranscriptPanel, type SubagentTranscriptPanelOptions } from "./transcript-panel.ts";
 
@@ -94,4 +95,43 @@ test("PanelManager cycles between main and child panels with deterministic retur
   manager.selectPanel("child-101");
   manager.unregisterChildPanel("child-101");
   assert.equal(manager.getActivePanelId(), "main");
+});
+
+test("guarantees no rendered line exceeds the requested terminal width", () => {
+  const panel = createSubagentTranscriptPanel({
+    childId: "child-oversized-12345678901234567890",
+    status: "running",
+    cwd: "/workspace/very/long/path/that/exceeds/normal/width/bounds/in/terminal",
+    theme: dummyTheme,
+  });
+
+  const hugeText = "x".repeat(500);
+  panel.addEvent({
+    childId: "child-oversized",
+    sequence: 1,
+    type: "assistant-text",
+    payload: { text: hugeText },
+    truncated: false,
+  });
+
+  panel.addEvent({
+    childId: "child-oversized",
+    sequence: 2,
+    type: "tool-call",
+    payload: { toolName: "read", input: { path: hugeText } },
+    truncated: false,
+  });
+
+  const width = 80;
+  const lines = panel.render(width);
+  assert.equal(lines.length > 0, true);
+
+  for (let i = 0; i < lines.length; i++) {
+    const lineWidth = visibleWidth(lines[i] ?? "");
+    assert.equal(
+      lineWidth <= width,
+      true,
+      `Line ${i + 1} exceeds width ${width}: ${lineWidth} chars ("${lines[i]?.slice(0, 30)}...")`,
+    );
+  }
 });
