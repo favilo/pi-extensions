@@ -29,7 +29,7 @@ test("registers background launch, explicit result lookup, ctrl+tab shortcut, an
   subagentExtension(pi);
 
   assert.deepEqual(tools.map(({ name }) => name), ["subagent", "subagent_result"]);
-  assert.deepEqual(shortcuts, ["ctrl+tab"]);
+  assert.deepEqual(shortcuts, ["ctrl+tab", "alt+t"]);
   assert.deepEqual(events, ["message_start", "agent_settled", "session_shutdown"]);
 
   const resultTool = tools.find(({ name }) => name === "subagent_result");

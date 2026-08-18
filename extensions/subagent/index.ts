@@ -199,18 +199,36 @@ export default function subagentExtension(pi: ExtensionAPI): void {
   const panelManager = createPanelManager();
 
   if (typeof pi.registerShortcut === "function") {
+    const cycleHandler = (ctx: ExtensionContext) => {
+      const active = panelManager.cycleNext();
+      if (active === "main") {
+        if (ctx.hasUI) {
+          ctx.ui.setStatus("subagent-panel", undefined);
+        }
+        return;
+      }
+      if (ctx.hasUI) {
+        ctx.ui.setStatus("subagent-panel", `Panel: ${active} (Press Escape or Alt+T to return to main)`);
+      }
+    };
+
     pi.registerShortcut("ctrl+tab", {
       description: "Cycle subagent transcript panels",
-      handler: (ctx) => {
-        const active = panelManager.cycleNext();
-        if (active === "main") {
-          if (ctx.hasUI) {
-            ctx.ui.setStatus("subagent-panel", undefined);
-          }
-          return;
-        }
+      handler: cycleHandler,
+    });
+    pi.registerShortcut("alt+t", {
+      description: "Cycle subagent transcript panels (terminal alias)",
+      handler: cycleHandler,
+    });
+  }
+
+  if (typeof pi.registerCommand === "function") {
+    pi.registerCommand("subagent:panels", {
+      description: "Cycle or view subagent transcript panels",
+      handler: async (args, ctx) => {
+        const active = args.trim() === "main" ? panelManager.returnToMain() : panelManager.cycleNext();
         if (ctx.hasUI) {
-          ctx.ui.setStatus("subagent-panel", `Panel: ${active} (Press Escape to return to main)`);
+          ctx.ui.notify(`Active panel: ${active}`, "info");
         }
       },
     });
