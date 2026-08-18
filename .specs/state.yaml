@@ -1,7 +1,7 @@
 active_flow: build_epic
 active_epic_id: e06
-active_story_id: e06s05
-active_story: e06s05
+active_story_id: e06s06
+active_story: e06s06
 active_bug_id: null
 git:
   bookmark: e06-observable-background-subagents
@@ -21,15 +21,13 @@ planning:
     constraints:
       - "Do not modify the e06 repair flow or child-private bridge catalog."
 handoff:
-  last_step_completed: e06s08 was added and impact-planned with compact 8 KiB default results plus permission-gated, versioned, exporter-untruncated JSON snapshots for every child lifecycle state.
+  last_step_completed: e06s08 completed and verified. Starting e06s06 (Switch between live subagent transcript panels).
   open_decisions: []
   required_reading:
-    - .specs/epics/e06-permission-enforced-subagents/e06s05-background-subagent-results.md
-    - .specs/epics/e06-permission-enforced-subagents/e06s05-tasks.yaml
-    - .specs/epics/e06-permission-enforced-subagents/e06s08-export-subagent-context.md
-    - .specs/epics/e06-permission-enforced-subagents/e06s08-tasks.yaml
+    - .specs/epics/e06-permission-enforced-subagents/e06s06-switchable-live-transcripts.md
+    - .specs/epics/e06-permission-enforced-subagents/e06s06-tasks.yaml
     - .specs/security/epics/e06/THREAT_MODEL.md
-  next_skill: investigate-bug
+  next_skill: develop-tdd
   context: Phase Verify/Repair. e06s05 live UAT and mechanical checks passed, and the bookmark now matches origin. A fresh security review blocks completion on construction/shutdown races, parent invocation cancellation, symlink-safe permission paths, and raw debug-log disclosure. E06s08 is planned but must not be implemented until those e06s05 blockers are repaired and verification passes.
   blocker: e06s05 security review found four blockers requiring behavioral RED tests and separate GREEN Jujutsu changes before the story can pass.
   deferred_work:
