@@ -1,7 +1,7 @@
 active_flow: build_epic
-active_epic_id: e12
-active_story_id: e12s02
-active_story: e12s02
+active_epic_id: e06
+active_story_id: e06s09
+active_story: e06s09
 active_bug_id: null
 git:
   bookmark: e06-observable-background-subagents
@@ -21,11 +21,11 @@ planning:
     constraints:
       - "Do not modify the e06 repair flow or child-private bridge catalog."
 handoff:
-  last_step_completed: e06s06 completed and verified (160 tests passing, check:ci exit 0). e06s06 tasks all passing; verification recorded.
+  last_step_completed: e06s09 was added to format subagent-tool-request calls and multiline bash commands.
   open_decisions: []
   required_reading:
-    - .specs/epics/e06-permission-enforced-subagents/e06s06-switchable-live-transcripts.md
-    - .specs/epics/e06-permission-enforced-subagents/e06s06-tasks.yaml
+    - .specs/epics/e06-permission-enforced-subagents/e06s09-pretty-print-tool-requests.md
+    - .specs/epics/e06-permission-enforced-subagents/e06s09-tasks.yaml
     - .specs/security/epics/e06/THREAT_MODEL.md
   next_skill: develop-tdd
   context: Phase Verify. e06s06 (Switch between live subagent transcript panels) implementation committed and verified — 160 tests passing, check:ci exit 0. e06s05 security blockers are resolved. e06s07 and e06s08 already passing. Still in e06 testing/verification.
