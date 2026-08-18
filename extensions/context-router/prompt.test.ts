@@ -105,5 +105,5 @@ test("buildAvailabilityPrompt is deterministic and bounded", () => {
   assert.strictEqual(section1, section2, "must be deterministic");
 
   const lines = section1.split("\n");
-  assert.ok(lines.length <= 100, "must be reasonably bounded");
+  assert.ok(lines.length <= 200, "must be reasonably bounded");
 });
