@@ -1,3 +1,4 @@
+import { wrapTextWithAnsi } from "@earendil-works/pi-tui";
 import type { NormalizedBackgroundEvent } from "./background-events.ts";
 
 export type SubagentTranscriptPanelOptions = {
@@ -24,6 +25,21 @@ function safeStringify(value: unknown): string {
   }
 }
 
+function pushSafeWrappedLines(lines: string[], text: string, width: number): void {
+  const targetWidth = Math.max(1, width);
+  const rawLines = text.split("\n");
+  for (const raw of rawLines) {
+    const wrapped = wrapTextWithAnsi(raw, targetWidth);
+    if (wrapped.length === 0) {
+      lines.push("");
+    } else {
+      for (const line of wrapped) {
+        lines.push(line);
+      }
+    }
+  }
+}
+
 export function createSubagentTranscriptPanel(options: SubagentTranscriptPanelOptions): SubagentTranscriptPanel {
   const events: NormalizedBackgroundEvent[] = [];
   let currentStatus = options.status;
@@ -40,13 +56,14 @@ export function createSubagentTranscriptPanel(options: SubagentTranscriptPanelOp
       currentStatus = status;
     },
     render(width) {
+      const targetWidth = Math.max(1, width);
       const lines: string[] = [];
       const headerText = `Subagent ${options.childId} • ${currentStatus} • ${options.cwd}`;
-      lines.push(theme.bold(theme.fg("accent", headerText)));
-      lines.push("─".repeat(Math.max(10, Math.min(width, 80))));
+      pushSafeWrappedLines(lines, theme.bold(theme.fg("accent", headerText)), targetWidth);
+      lines.push("─".repeat(targetWidth));
 
       if (events.length === 0) {
-        lines.push(theme.fg("dim", "(No events yet)"));
+        pushSafeWrappedLines(lines, theme.fg("dim", "(No events yet)"), targetWidth);
         return lines;
       }
 
@@ -54,23 +71,23 @@ export function createSubagentTranscriptPanel(options: SubagentTranscriptPanelOp
         if (event.type === "assistant-text") {
           const payload = event.payload as { text?: string } | undefined;
           if (payload?.text) {
-            lines.push(payload.text);
+            pushSafeWrappedLines(lines, payload.text, targetWidth);
           }
         } else if (event.type === "tool-call") {
           const payload = event.payload as { toolName?: string; input?: unknown } | undefined;
           const toolName = payload?.toolName ?? "unknown";
           const inputStr = payload?.input ? safeStringify(payload.input) : "";
-          lines.push(theme.fg("toolTitle", `→ tool: ${toolName} ${inputStr}`));
+          pushSafeWrappedLines(lines, theme.fg("toolTitle", `→ tool: ${toolName} ${inputStr}`), targetWidth);
         } else if (event.type === "tool-update") {
           const payload = event.payload as { toolName?: string; update?: unknown } | undefined;
           const toolName = payload?.toolName ?? "unknown";
-          lines.push(theme.fg("dim", `… tool update: ${toolName}`));
+          pushSafeWrappedLines(lines, theme.fg("dim", `… tool update: ${toolName}`), targetWidth);
         } else if (event.type === "tool-result") {
           const payload = event.payload as { toolName?: string; result?: unknown; isError?: boolean } | undefined;
           const toolName = payload?.toolName ?? "unknown";
           const resultStr = payload?.result ? safeStringify(payload.result) : "";
           const color = payload?.isError ? "error" : "success";
-          lines.push(theme.fg(color, `← tool result: ${toolName} ${resultStr}`));
+          pushSafeWrappedLines(lines, theme.fg(color, `← tool result: ${toolName} ${resultStr}`), targetWidth);
         }
       }
 
