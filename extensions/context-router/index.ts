@@ -87,6 +87,8 @@ export default function contextRouter(pi: ExtensionAPI): void {
   let lastPromptOutputBytes = 0;
   let lastByteDelta = 0;
   let lastSanitizerOutcome: SanitizerOutcome = "absent";
+  let lastSummarizedCount = 0;
+  let lastSuppressedCount = 0;
 
   pi.registerCommand("context-router-debug", {
     description: "Display count-only context-router status diagnostics",
@@ -95,7 +97,7 @@ export default function contextRouter(pi: ExtensionAPI): void {
       const activeToolsCount = pi.getActiveTools().length;
       const selectedToolsCount = selectedTools.size;
       const loadedSkillsCount = cachedSkills.length;
-      const message = `Context Router Debug: registeredTools=${registeredToolsCount} activeTools=${activeToolsCount} selectedTools=${selectedToolsCount} loadedSkills=${loadedSkillsCount} promptInputBytes=${lastPromptInputBytes} promptOutputBytes=${lastPromptOutputBytes} byteDelta=${lastByteDelta} sanitizerOutcome=${lastSanitizerOutcome}`;
+      const message = `Context Router Debug: registeredTools=${registeredToolsCount} activeTools=${activeToolsCount} selectedTools=${selectedToolsCount} loadedSkills=${loadedSkillsCount} summarizedTools=${lastSummarizedCount} suppressedTools=${lastSuppressedCount} promptInputBytes=${lastPromptInputBytes} promptOutputBytes=${lastPromptOutputBytes} byteDelta=${lastByteDelta} sanitizerOutcome=${lastSanitizerOutcome}`;
       ctx.ui.notify(message, "info");
     },
   });
@@ -183,8 +185,11 @@ export default function contextRouter(pi: ExtensionAPI): void {
       skillNames,
     });
 
+    lastSummarizedCount = summaries.length;
+    lastSuppressedCount = suppressed.length;
+
     const systemPrompt = result.outcome === "replaced" ? result.systemPrompt : event.systemPrompt;
-    return { systemPrompt: systemPrompt + "\n\n" + availabilitySection };
+    return { systemPrompt: systemPrompt + availabilitySection };
   });
 
   pi.on("tool_call", (event) => {
