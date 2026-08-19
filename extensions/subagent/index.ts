@@ -308,8 +308,24 @@ export default function subagentExtension(pi: ExtensionAPI): void {
       handler: cycleHandler,
     });
     pi.registerShortcut("alt+t", {
-      description: "Cycle subagent transcript panels (terminal alias)",
+      description: "Cycle next subagent transcript panel",
       handler: cycleHandler,
+    });
+    pi.registerShortcut("alt+shift+t", {
+      description: "Cycle previous subagent transcript panel",
+      handler: async (ctx: ExtensionContext) => {
+        const active = panelManager.cyclePrevious();
+        if (active === "main") {
+          if (ctx.hasUI) {
+            ctx.ui.setStatus("subagent-panel", undefined);
+          }
+          return;
+        }
+        if (ctx.hasUI) {
+          ctx.ui.setStatus("subagent-panel", `Panel: ${active} (Alt+T: next, Alt+Shift+T: prev, Escape: main)`);
+          await openTranscriptOverlay(ctx, active);
+        }
+      },
     });
   }
 
