@@ -10,9 +10,9 @@ export type AvailabilityOptions = {
 };
 
 const MAX_NAME_LENGTH = 80;
-const MAX_DESCRIPTION_LENGTH = 240;
-const MAX_SUPPRESSED_TOOLS = 100;
-const MAX_SKILL_NAMES = 100;
+const MAX_DESCRIPTION_LENGTH = 120;
+const MAX_SUPPRESSED_TOOLS = 50;
+const MAX_SKILL_NAMES = 50;
 
 function escapeXml(value: string): string {
   return value
@@ -39,63 +39,48 @@ function normalizeDescription(value: string): string {
 }
 
 export function buildAvailabilityPrompt(options: AvailabilityOptions): string {
-  const lines: string[] = [];
-  lines.push("## Available Tools");
-  lines.push("");
-  lines.push("The following tools are registered and callable:");
-  lines.push("");
+  const parts: string[] = [];
 
-  const sortedSummaries = [...options.summaries]
+  // Summaries: name + short description (truncated with ellipsis)
+  const summaries = [...options.summaries]
     .filter((s) => normalizeName(s.name))
     .sort((a, b) => a.name.localeCompare(b.name));
 
-  for (const summary of sortedSummaries) {
-    const name = normalizeName(summary.name);
-    const description = normalizeDescription(summary.description);
-    lines.push(`- ${escapeXml(name)}: ${escapeXml(description)}`);
+  if (summaries.length > 0) {
+    const summaryLine = summaries
+      .map((s) => {
+        const name = escapeXml(normalizeName(s.name));
+        const desc = escapeXml(normalizeDescription(s.description));
+        return desc ? `${name}(${desc}…)` : name;
+      })
+      .join(", ");
+    parts.push(`Tools: ${summaryLine}`);
   }
 
-  if (sortedSummaries.length === 0) {
-    lines.push("(none)");
-  }
-
-  lines.push("");
-
-  const sortedSuppressed = [...options.suppressedTools]
+  // Suppressed: just names, comma-separated
+  const suppressed = [...options.suppressedTools]
     .map(normalizeName)
     .filter(Boolean)
     .sort((a, b) => a.localeCompare(b))
     .slice(0, MAX_SUPPRESSED_TOOLS);
 
-  if (sortedSuppressed.length > 0) {
-    lines.push("## Suppressed Tools");
-    lines.push("These tools are registered but inactive. Call them directly to activate:");
-    lines.push("<suppressed_tools>");
-    for (const name of sortedSuppressed) {
-      lines.push(`  <tool>${escapeXml(name)}</tool>`);
-    }
-    lines.push("</suppressed_tools>");
-    lines.push("");
+  if (suppressed.length > 0) {
+    parts.push(`Suppressed: ${suppressed.map(escapeXml).join(", ")}`);
   }
 
-  const sortedSkills = [...options.skillNames]
+  // Skills: just names, comma-separated
+  const skills = [...options.skillNames]
     .map(normalizeName)
     .filter(Boolean)
     .sort((a, b) => a.localeCompare(b))
     .slice(0, MAX_SKILL_NAMES);
 
-  if (sortedSkills.length > 0) {
-    lines.push("## Available Skills");
-    lines.push("Use `find_skills` to discover capabilities, or `/skill:name` to invoke:");
-    lines.push("<available_skills>");
-    for (const name of sortedSkills) {
-      lines.push(`  <skill>${escapeXml(name)}</skill>`);
-    }
-    lines.push("</available_skills>");
-    lines.push("");
+  if (skills.length > 0) {
+    parts.push(`Skills: ${skills.map(escapeXml).join(", ")}`);
   }
 
-  return lines.join("\n");
+  if (parts.length === 0) return "";
+  return "\n" + parts.join("; ") + "\n";
 }
 
 export type PromptSanitizeResult = {

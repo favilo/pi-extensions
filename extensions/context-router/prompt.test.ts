@@ -54,7 +54,7 @@ test("sanitizeSkillsPrompt returns absent when skills array is empty", () => {
   assert.strictEqual(result.systemPrompt, initialPrompt);
 });
 
-test("buildAvailabilityPrompt returns bounded non-MCP summaries and compressed XML lists", () => {
+test("buildAvailabilityPrompt returns bounded non-MCP summaries and compressed lists", () => {
   const section = buildAvailabilityPrompt({
     summaries: [
       { name: "read", description: "Read file contents" },
@@ -65,15 +65,13 @@ test("buildAvailabilityPrompt returns bounded non-MCP summaries and compressed X
     skillNames: ["deploy", "test"],
   });
 
-  assert.match(section, /read.*Read file contents/);
-  assert.match(section, /bash.*Run shell commands/);
-  assert.match(section, /find_tools.*Find registered tools/);
-  assert.match(section, /<suppressed_tools>/);
-  assert.match(section, /<tool>mcp__deploy<\/tool>/);
-  assert.match(section, /<tool>mcp__build<\/tool>/);
-  assert.match(section, /<available_skills>/);
-  assert.match(section, /<skill>deploy<\/skill>/);
-  assert.match(section, /<skill>test<\/skill>/);
+  assert.match(section, /read\(Read file contents…\)/);
+  assert.match(section, /bash\(Run shell commands…\)/);
+  assert.match(section, /find_tools\(Find registered tools…\)/);
+  assert.match(section, /Suppressed:.*mcp__build/);
+  assert.match(section, /Suppressed:.*mcp__deploy/);
+  assert.match(section, /Skills:.*deploy/);
+  assert.match(section, /Skills:.*test/);
   assert.doesNotMatch(section, /parameters|schema|path\/to|secret|api_key/);
 });
 

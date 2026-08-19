@@ -134,16 +134,16 @@ test("before_agent_start appends availability section preserving existing prompt
 
   const result = harness.beforeAgentResult();
   assert.ok(result?.systemPrompt?.startsWith("EXISTING PROMPT"), "must preserve existing prompt");
-  assert.match(result?.systemPrompt, /Available Tools/);
+  assert.match(result?.systemPrompt, /Tools:/);
   assert.match(result?.systemPrompt, /subagent_result/);
   // mcp__deploy should NOT appear in the summary list, only in suppressed
-  const summaryEnd = result?.systemPrompt?.indexOf("## Suppressed Tools") ?? -1;
-  const summarySection = summaryEnd > 0 ? result?.systemPrompt?.slice(0, summaryEnd) : result?.systemPrompt;
+  const suppressedStart = result?.systemPrompt?.indexOf("Suppressed:") ?? -1;
+  const summarySection = suppressedStart > 0 ? result?.systemPrompt?.slice(0, suppressedStart) : result?.systemPrompt;
   assert.doesNotMatch(summarySection, /mcp__deploy/, "MCP tool must not appear in summary section");
-  assert.match(result?.systemPrompt, /<suppressed_tools>/);
-  assert.match(result?.systemPrompt, /<tool>mcp__deploy<\/tool>/);
-  assert.match(result?.systemPrompt, /<available_skills>/);
-  assert.match(result?.systemPrompt, /<skill>deploy<\/skill>/);
+  assert.match(result?.systemPrompt, /Suppressed:/);
+  assert.match(result?.systemPrompt, /mcp__deploy/);
+  assert.match(result?.systemPrompt, /Skills:/);
+  assert.match(result?.systemPrompt, /deploy/);
 });
 
 test("tool_call lazily activates registered but inactive non-MCP tools", async () => {
