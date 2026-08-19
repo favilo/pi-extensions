@@ -1,6 +1,6 @@
 story_id: e12s02
 title: Expose the full tool and skill landscape while keeping every tool callable
-status: todo
+status: passing
 bcps: 9
 delta: ADDED
 spec: e12s02-tool-skill-availability.md
@@ -27,7 +27,7 @@ tasks:
     description: >-
       Define MCP identification and project suppressed tools accordingly; prove MCP tools never enter the summary list. Codex/async tools register through the router registry.
     verify: node --test extensions/context-router/catalog.test.ts
-    status: todo
+    status: passing
     risk: P0
     security: high
     security_verification: >-
@@ -75,7 +75,7 @@ tasks:
     description: >-
       Handle async-registered and prompt-direct tools (Codex, DQ3) so they appear exactly once in the correct section at the next turn boundary.
     verify: node --test extensions/context-router/integration.test.ts
-    status: todo
+    status: passing
     risk: P0
     security: high
     security_verification: >-
@@ -91,7 +91,7 @@ tasks:
     description: >-
       Update count-only diagnostics, docs, and run full regressions including plan-consistency gate.
     verify: npm run check && "$BIGPOWERS_ROOT/scripts/lib/plan-consistency-check.sh" .specs/epics/e12-global-context-router
-    status: todo
+    status: passing
     risk: P1
     security: high
     security_verification: >-
