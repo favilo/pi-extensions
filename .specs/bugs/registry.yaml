@@ -25,5 +25,5 @@ bugs:
       - package.json
     approach: Add optional dispose() to the McpToolProvider contract, called on unregister/shutdown; wire the bevy example's stop handle to session_shutdown
     risk_level: low
-    commit_message: fix(mcp): dispose providers on unregister
+    commit_message: "fix(mcp): dispose providers on unregister"
     pull_request: https://github.com/favilo/pi-extensions/pull/9
