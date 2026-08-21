@@ -73,12 +73,18 @@ future providers (e.g. codex-mcp-style stdio clients) implement it.
 
 ## Acceptance Criteria
 
-- [ ] Registry calls `dispose()` (when defined) on provider unregister/shutdown
-- [ ] Bevy example extension invokes its stop handle on session shutdown
-- [ ] `pi -p` with mcp + bevy-debugger-mcp exits cleanly (<10s)
-- [ ] All new tests pass
-- [ ] Existing tests still pass (`npm run test`)
+- [x] Registry calls `dispose()` (when defined) on provider unregister/shutdown
+- [x] Bevy example extension invokes its stop handle on session shutdown
+- [x] `pi -p` with mcp + bevy-debugger-mcp exits cleanly (<10s) — verified: 4s (was 20s+ hang)
+- [x] All new tests pass
+- [x] Existing tests still pass (`npm run test`) — 178/178
+- [x] Full extension set `pi -p` exits cleanly — verified: 5s (was 40s+ hang)
 
 ## Resolution
 
-<!-- filled in by validate-fix -->
+**Fixed:** 2026-08-21
+**Root cause confirmed:** The MCP provider registry contract had no disposal hook, so `session_shutdown` unregistered tools but never released provider resources; the bevy-debugger-mcp provider's spawned `bevy_brp_mcp` stdio child kept the Node event loop alive, hanging `pi -p` after it printed.
+**Fix applied:** Added optional `dispose()` to the `McpToolProvider` contract, called from `McpProviderRegistry.unregister` (covering `unregisterAll`/`session_shutdown`); the bevy example's default export now keeps its registration stop handle and wires it to `session_shutdown`; added a package.json `exports` wildcard so the example's documented `pi-extensions/*` self-imports resolve at runtime in-repo.
+**Hardening added:** Invariant tests locking the dispose contract (unregister exactly-once, unregisterAll, session_shutdown at both registry and extension level); README documents the dispose contract with an explicit `pi -p` hang warning; generalize-fix sweep of the defect class (resource acquisition without shutdown disposal) recorded in `.specs/verifications/generalize-sweep-BUG-2026-08-21T122441.json` — 3 matches, 1 fixed (this bug), 2 verified not affected.
+**Evidence:** `npm test` 178/178 pass; `npx tsc --noEmit` clean; `npm run check:ci` green; behavioral proof on rebased branch — minimal repro (`mcp` + `bevy-debugger-mcp`) exits 0 in ~3s and full extension set `pi -p` exits 0 in ~5s (both previously hung past timeout).
+**Commits:** `fix(mcp): dispose providers on unregister` (mrqoszrl), `fix(bevy-debugger-mcp): dispose provider on session shutdown` (nrwlwsuu) — PR favilo/pi-extensions#9

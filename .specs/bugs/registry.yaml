@@ -14,4 +14,16 @@ bugs:
     scope: mcp-extension-lifecycle
     summary: MCP provider child processes never disposed; pi -p hangs on exit (bevy-debugger-mcp stdio child keeps event loop alive)
     file: .specs/bugs/BUG-2026-08-21T122441-mcp-provider-dispose-hang.md
-    status: diagnosed
+    status: fixed
+    files_changed:
+      - extensions/mcp/registry.ts
+      - extensions/mcp/registry.test.ts
+      - extensions/mcp/lifecycle.test.ts
+      - extensions/mcp/README.md
+      - examples/bevy-debugger-mcp/index.ts
+      - examples/bevy-debugger-mcp/index.test.ts
+      - package.json
+    approach: Add optional dispose() to the McpToolProvider contract, called on unregister/shutdown; wire the bevy example's stop handle to session_shutdown
+    risk_level: low
+    commit_message: fix(mcp): dispose providers on unregister
+    pull_request: https://github.com/favilo/pi-extensions/pull/9
