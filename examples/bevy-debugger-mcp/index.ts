@@ -100,5 +100,6 @@ export function registerBevyDebuggerProvider(pi: ExtensionAPI, options: BevyDebu
 }
 
 export default function bevyDebuggerMcpExtension(pi: ExtensionAPI, options: BevyDebuggerProviderOptions = {}): void {
-  registerBevyDebuggerProvider(pi, options);
+  const stop = registerBevyDebuggerProvider(pi, options);
+  if (stop) pi.on("session_shutdown", stop);
 }
