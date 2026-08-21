@@ -13,6 +13,8 @@ export type McpToolProvider = {
   tools: McpProviderTool[];
   registerTools?(register: (tool: McpProviderTool) => void): void;
   getStatusSections(): Promise<McpProviderStatusSection[]> | McpProviderStatusSection[];
+  /** Release provider resources (e.g. spawned MCP server processes). Called on unregister. */
+  dispose?(): void;
 };
 
 export type McpRegistryStatusSection = McpProviderStatusSection & {
@@ -73,6 +75,7 @@ export class McpProviderRegistry {
     }
     this.providerToolNames.delete(provider.id);
     this.providers.delete(provider.id);
+    provider.dispose?.();
     return toolNames;
   }
 
