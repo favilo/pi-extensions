@@ -3,6 +3,86 @@ import type { SkillRecord } from "./catalog.ts";
 
 export type SanitizerOutcome = "replaced" | "absent" | "ambiguous";
 
+export type AvailabilityOptions = {
+  summaries: Array<{ name: string; description: string }>;
+  suppressedTools: string[];
+  skillNames: string[];
+};
+
+const MAX_NAME_LENGTH = 80;
+const MAX_DESCRIPTION_LENGTH = 120;
+const MAX_SUPPRESSED_TOOLS = 50;
+const MAX_SKILL_NAMES = 50;
+
+function escapeXml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&apos;");
+}
+
+function normalizeName(value: string): string {
+  return value
+    .replace(/[\u0000-\u001f\u007f]/g, " ")
+    .trim()
+    .slice(0, MAX_NAME_LENGTH);
+}
+
+function normalizeDescription(value: string): string {
+  return value
+    .replace(/[\u0000-\u001f\u007f]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, MAX_DESCRIPTION_LENGTH);
+}
+
+export function buildAvailabilityPrompt(options: AvailabilityOptions): string {
+  const parts: string[] = [];
+
+  // Summaries: name + short description (truncated with ellipsis)
+  const summaries = [...options.summaries]
+    .filter((s) => normalizeName(s.name))
+    .sort((a, b) => a.name.localeCompare(b.name));
+
+  if (summaries.length > 0) {
+    const summaryLine = summaries
+      .map((s) => {
+        const name = escapeXml(normalizeName(s.name));
+        const desc = escapeXml(normalizeDescription(s.description));
+        return desc ? `${name}(${desc}…)` : name;
+      })
+      .join(", ");
+    parts.push(`Tools: ${summaryLine}`);
+  }
+
+  // Suppressed: just names, comma-separated
+  const suppressed = [...options.suppressedTools]
+    .map(normalizeName)
+    .filter(Boolean)
+    .sort((a, b) => a.localeCompare(b))
+    .slice(0, MAX_SUPPRESSED_TOOLS);
+
+  if (suppressed.length > 0) {
+    parts.push(`Suppressed: ${suppressed.map(escapeXml).join(", ")}`);
+  }
+
+  // Skills: just names, comma-separated
+  const skills = [...options.skillNames]
+    .map(normalizeName)
+    .filter(Boolean)
+    .sort((a, b) => a.localeCompare(b))
+    .slice(0, MAX_SKILL_NAMES);
+
+  if (skills.length > 0) {
+    parts.push(`Skills: ${skills.map(escapeXml).join(", ")}`);
+  }
+
+  if (parts.length === 0) return "";
+  return "\n" + parts.join("; ") + "\n";
+}
+
 export type PromptSanitizeResult = {
   systemPrompt: string;
   outcome: SanitizerOutcome;

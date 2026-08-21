@@ -101,7 +101,7 @@ Unknown child tools, denied actions, prompt cancellation, unavailable UI, child 
 Runnable subagents use AgentSession, all child capabilities cross tool-permissions, default-ask and deny-list behavior are covered, and child agents receive actionable results.
 
 ## 21. Implementation and UAT handoff
-- Child sessions expose only `subagent-tool-request`; parent-side tool definitions remain authoritative.
+- Child sessions expose only `subagent-tool-request`; parent-side tool definitions remain authoritative. The bridge requires an `input` object whose fields are passed directly, never a JSON-encoded string.
 - Parent validates bridged input against the published TypeBox schema before permission evaluation or execution.
 - Child sessions use an extension-free `DefaultResourceLoader` to prevent duplicate permission hooks.
 - Published built-in-renderer and MCP definitions are available through `extensions/tool-registry/`.

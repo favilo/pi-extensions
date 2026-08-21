@@ -1,0 +1,38 @@
+story_id: e06s05
+verified_at: null
+verifier: verify-work
+status: in_progress
+vcs:
+  kind: jj
+  bookmark: e06-observable-background-subagents
+phases:
+  task_verification:
+    passed: null
+  terminal_verdict:
+    passed: null
+  security:
+    passed: true
+    report: ".specs/security/epics/e06/THREAT_MODEL.md"
+    note: "Threat model verdict is PASS; live TUI reverification remains mandatory."
+  manual:
+    passed: true
+    confirmed_by_user: true
+    steps:
+      - step: "Launch a large-result child and use the foreground while it runs"
+        expected: "Launch returns a stable ID immediately and the foreground remains responsive."
+        actual: "Child 6561c3cf-7b47-4aae-afa3-3253a9dcc3ab returned a running handle immediately; a foreground jj status completed; user confirmed responsiveness."
+        passed: true
+      - step: "Retrieve the completed large result and toggle Ctrl+O"
+        expected: "Collapsed output stays bounded; expansion is pretty, syntax-colored JSON with explicit truncation and responsive rendering."
+        actual: "User confirmed good formatting, responsive expansion/collapse, and presentationTruncated: true."
+        passed: true
+      - step: "Reload while a long-running child is active"
+        expected: "Reload cancels and disposes the child; the replacement session cannot retrieve or observe orphan work."
+        actual: "After approving child 2d8be18b-3c7a-4ee0-82a7-33506c65b8f4 to run sleep 120, /reload made its lookup return found: false/status: unknown and no sleep 120 process remained."
+        passed: true
+      - step: "Exercise overlapping main-agent and child permission prompts in both arrival orders"
+        expected: "One FIFO prompt is visible at a time; each immutable request requires an independent decision and settles only its own action."
+        actual: "Child-first: prompt attribution was visibly Subagent 82c15f4a-2f40-42e9-a2a6-d9ba165febda → bash; denying it prevented child-first-denied-uat while the separate allowed main prompt printed main-second-allowed-uat. Main-first: the child prompt arrived while the main command was still being presented; denying the main prompt prevented main-first-denied-uat, then independently allowing Subagent 63024283-2882-421c-8523-b5b763760475 → bash printed child-second-allowed-uat. The user explicitly accepted this observed overlap and called the UAT done."
+        passed: true
+  gaps:
+    closed: null

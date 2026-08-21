@@ -1,0 +1,136 @@
+story_id: e06s05
+title: Run observable subagents in the background
+status: failing
+bcps: 5
+delta: ADDED
+spec: e06s05-background-subagent-results.md
+tdd_policy: >-
+  Before each RED run, add the smallest compilable public stub. Record behavioral RED and GREEN implementation in separate Jujutsu changes; missing modules, exports, imports, or functions are invalid RED evidence.
+tasks:
+  - id: 1
+    description: >-
+      Define the parent-session registry contract with generated collision-resistant child IDs, cross-registry isolation, queued/running/waiting-for-permission states, one immutable terminal transition, and temporary rejection of a second active child until e06s06.
+    verify: node --test extensions/subagent/background-session.test.ts
+    status: passing
+    risk: P0
+    security: high
+    security_verification: >-
+      No new security findings in affected paths; prove unguessable session-scoped lookup, terminal sealing, stale-ID rejection, and one prompt-capable active child.
+    tdd:
+      red: A compilable inert registry returns a behavioral mismatch for identity, isolation, admission, and terminal-state contracts.
+      green: The focused registry contract tests pass without weakening the shared permission boundary.
+    allure:
+      severity: critical
+      categories: ["Background lifecycle", "Registry isolation", "Security Review"]
+
+  - id: 2
+    description: >-
+      Adapt published AgentSession assistant and tool events into child-tagged monotonic events with deterministic per-event, event-count, and total UTF-8 byte limits, explicit truncation, partial-update coalescing, and late-event rejection.
+    verify: node --test extensions/subagent/background-events.test.ts
+    status: passing
+    risk: P0
+    security: medium
+    security_verification: >-
+      No new security findings in affected paths; prove ordered bounds, explicit truncation, terminal late-event rejection, and no raw-event persistence or diagnostic logging.
+    tdd:
+      red: A compilable no-op normalizer fails on published assistant text, tool call, partial update, tool result, sequence, and bound assertions.
+      green: The normalized event adapter passes deterministic ordering and memory-bound tests.
+    allure:
+      severity: critical
+      categories: ["Event normalization", "Resource bounds", "Security Review"]
+
+  - id: 3
+    description: >-
+      Install child ID, registry ownership, independent cancellation, permission boundary, cwd, and event subscription before starting prompt work; then return the launch handle without awaiting child completion.
+    verify: node --test extensions/subagent/background-lifecycle.test.ts
+    status: passing
+    risk: P0
+    security: high
+    security_verification: >-
+      No new security findings in affected paths; prove launch cannot detach from authorization, retains no invocation signal or stale context authority, and every child tool request uses the shared bridge.
+    tdd:
+      red: A compilable launch coordinator that still waits for prompt settlement fails the foreground-responsiveness and installed-before-return contracts.
+      green: Launch returns while controlled child work remains pending and retains all lifecycle authorities.
+    allure:
+      severity: critical
+      categories: ["Foreground responsiveness", "Authorization", "Security Review"]
+
+  - id: 4
+    description: >-
+      Register subagent_result as the sole explicit lookup operation, returning current structured status without fabricated output for active children and atomic stable bounded snapshots for terminal children. Render collapsed tool rows as a summary only; render Ctrl+O-expanded structured details as syntax-highlighted, pretty, valid JSON presentation snapshots bounded to 20 events, 2 KiB event payloads, 8 KiB output, and 64 KiB total, with explicit presentation truncation.
+    verify: node --test extensions/subagent/background-session.test.ts extensions/subagent/result-renderer.test.ts extensions/subagent/index.test.ts
+    status: passing
+    risk: P0
+    security: high
+    security_verification: >-
+      No new security findings in affected paths; prove generic unknown-ID handling, cross-registry nondisclosure, stable repeated retrieval, no automatic child-output injection, collapsed-output non-disclosure, expanded display bounds, and explicit presentation truncation.
+    tdd:
+      red: A compilable result tool stub fails active, terminal, repeated, unknown, and foreign-registry retrieval assertions.
+      green: Explicit result retrieval passes without reading arbitrary session files or filesystem paths.
+    allure:
+      severity: critical
+      categories: ["Result contract", "Context isolation", "Security Review"]
+
+  - id: 5
+    description: >-
+      Queue a fixed subagent_finished custom message containing only generated child ID and enumerated terminal status with deliverAs steer and triggerTurn true, so active work is steered and an idle parent starts a new turn; retain it until exact main-stream acknowledgement and retry unacknowledged late steering after parent settlement.
+    verify: node --test extensions/subagent/background-lifecycle.test.ts extensions/subagent/completion-delivery.test.ts
+    status: passing
+    risk: P0
+    security: high
+    security_verification: >-
+      No new security findings in affected paths; prove child names, output, errors, tool text, and provider content never enter the signal, acknowledgement requires exact fixed identity and content, and shutdown clears pending delivery without waking the parent.
+    tdd:
+      red: A compilable dispatcher stub fails exact payload, initial steering, post-settlement retry, and acknowledgement assertions.
+      green: Completion produces one fixed signal per terminal child, retries only while unacknowledged, and suppresses shutdown wakeups.
+    allure:
+      severity: critical
+      categories: ["Parent notification", "Prompt injection", "Security Review"]
+
+  - id: 6
+    description: >-
+      Close the registry idempotently on parent abort and session shutdown for quit, reload, new, resume, and fork by rejecting launches, denying pending work, aborting children, unsubscribing, bounding cleanup, disposing sessions, and invalidating stale callbacks.
+    verify: node --test extensions/subagent/background-lifecycle.test.ts
+    status: passing
+    risk: P0
+    security: high
+    security_verification: >-
+      No new security findings in affected paths; prove every shutdown reason cleans up once, prompt cancellation fails closed, generation-stale callbacks are no-ops, and no child remains authorized after closure.
+    tdd:
+      red: A compilable close stub fails abort, unsubscribe, timeout, disposal, and stale-callback assertions.
+      green: All shutdown paths settle within the configured cleanup bound and leave no active child work.
+    allure:
+      severity: critical
+      categories: ["Cleanup", "Cancellation", "Security Review"]
+
+  - id: 7
+    description: >-
+      Preserve the single durable Pi SessionManager store and existing schema validation, cwd-aware policy evaluation, main-window prompt, fail-closed cancellation/missing-UI behavior, exactly-once execution, audit attribution, and package behavior.
+    verify: node --test extensions/subagent/agent-session.test.ts extensions/subagent/index.test.ts extensions/subagent/missing-ui.test.ts extensions/subagent/permission-boundary.test.ts extensions/subagent/working-directory.test.ts extensions/tool-permissions/permission-boundary.test.ts && npm run check
+    status: passing
+    risk: P0
+    security: high
+    security_verification: >-
+      No new security findings in affected paths; prove validate/evaluate/prompt/execute/audit sequencing exactly once, child/request/cwd attribution, fail-closed UI loss, and absence of raw child events from audit/debug logs or parent context.
+    tdd:
+      red: New focused regression assertions fail behaviorally against the smallest compilable background integration stub.
+      green: Focused permission tests and the complete package check pass with no second durable transcript store.
+    allure:
+      severity: critical
+      categories: ["Permission boundary", "Persistence", "Regression", "Security Review"]
+
+  - id: 8
+    description: >-
+      Serialize main-agent and child permission presentation through one parent-session-ID-keyed FIFO queue shared across extension module graphs whose immutable request identity binds actor, tool, cwd, and safe input identity; visibly attribute child prompts; cancel, prompt-error, and shutdown paths settle only the exact request fail-closed; apply the same cwd-aware automatic and configured allow/deny model to child requests as main requests.
+    verify: node --test extensions/tool-permissions/prompt-queue.test.ts extensions/subagent/missing-ui.test.ts extensions/subagent/permission-boundary.test.ts
+    status: passing
+    risk: P0
+    security: high
+    security_verification: >-
+      Prove main-to-child and child-to-main FIFO ordering, cross-module-graph sharing with cross-parent-session isolation, independent decisions, immutable identity, visible child attribution, exact queued/active cancellation, prompt-error and shutdown denial, no double settlement, in-cwd read/search automatic allow, allow-list allow, deny-list precedence, and .aiignore denial.
+    tdd:
+      red: A compilable public queue contract and current direct prompt presentation fail behavioral overlap and child policy-parity assertions.
+      green: One session-owned shared prompt queue and one shared cwd-aware permission resolver pass focused and package verification without weakening fail-closed behavior.
+    allure:
+      severity: critical
+      categories: ["Permission queue", "Policy parity", "Concurrency", "Security Review"]

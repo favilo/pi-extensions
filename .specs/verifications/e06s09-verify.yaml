@@ -1,0 +1,40 @@
+story_id: e06s09
+verified_at: "2026-08-18T14:35:00Z"
+verifier: verify-work
+status: passing
+vcs:
+  kind: jj
+  bookmark: e06-observable-background-subagents
+phases:
+  task_verification:
+    passed: true
+    tasks: 3
+  typecheck:
+    passed: true
+    command: "npm run typecheck"
+  tests:
+    passed: true
+    command: "node --test extensions/subagent/tool-request-renderer.test.ts extensions/subagent/index.test.ts"
+  terminal_verdict:
+    command: "node --test extensions/subagent/tool-request-renderer.test.ts extensions/subagent/index.test.ts"
+    exit_code: 0
+    captured_at: "2026-08-18T14:35:00Z"
+    note: "Single run — 8 passing tests across tool-request-renderer and subagent index"
+  security:
+    passed: true
+    report: ".specs/security/epics/e06/THREAT_MODEL.md"
+    note: "Pretty-printing TUI tool calls maintains width-safety and secret redaction."
+  manual:
+    passed: true
+    confirmed_by_user: true
+    steps:
+      - step: "Render subagent-tool-request with multiline bash command"
+        expected: "Command is displayed with actual line breaks instead of literal \\n strings in JSON."
+        actual: "Verified renderSubagentToolRequestCall renders multiline bash commands cleanly with formatted line breaks and syntax styling."
+        passed: true
+      - step: "Render subagent-tool-request with file/custom tool arguments"
+        expected: "Tool arguments are formatted per line and bounded by terminal width."
+        actual: "Verified formatted argument rendering per line with wrapTextWithAnsi width bounds."
+        passed: true
+  gaps:
+    closed: true

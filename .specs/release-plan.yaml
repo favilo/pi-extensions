@@ -48,9 +48,9 @@ epics:
     title: Permission-enforced runnable subagents
     capsule_dir: epics/e06-permission-enforced-subagents
     wsjf: 6.0
-    bcps: 10
+    bcps: 29
     note: >-
-      Provisional WSJF = 6.0. Explore AgentSession runtime options, then run subagents through the existing permission boundary with cwd-aware policy resolution and safe missing-UI behavior.
+      Original provisional WSJF = 6.0. E06 extends the completed permission-enforced runtime with observable background execution, switchable live transcripts, and explicit full-context export. The e06s08 increment scores 5.0 = (business value 7 + time criticality 5 + risk reduction 8) / job size 4; explicit user priority places its planning before the blocking e06s05 security repair and its implementation after that repair.
   - id: e07
     title: Bash subcommand permission evaluation
     capsule_dir: epics/e07-bash-subcommand-permissions

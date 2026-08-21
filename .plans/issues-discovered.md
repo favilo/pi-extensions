@@ -18,3 +18,5 @@ Add newly discovered issues as unchecked numbered items. Once an issue has an ep
 
 5. [x] The `<Tab>` steering editor would be nice if it also supported Vim mode, like the normal prompt editor, rather than only accepting a single line without advanced editing capabilities.
    - **Migrated to:** `e10s01` and `e10s02` — Spike editor reuse, then support configured Vim editing in permission steering.
+
+6. [ ] The `edit` and `write` prompts currently crop the output to a certain number of lines. I don't like that. I would rather review _all_ of the lines, and then accept or deny based on the whole diff.

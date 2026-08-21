@@ -1,22 +1,31 @@
 import { statSync, realpathSync } from "node:fs";
 import { isAbsolute, relative, resolve, sep } from "node:path";
-import { createAgentSession, DefaultResourceLoader, getAgentDir, SessionManager, type ToolDefinition } from "@earendil-works/pi-coding-agent";
+import { createAgentSession, DefaultResourceLoader, getAgentDir, ModelRuntime, SessionManager, type AgentSessionEvent, type ToolDefinition } from "@earendil-works/pi-coding-agent";
 import { executeToolRequest, type ToolExecutionResult, type ToolPermissionBoundary, type ToolRequest } from "../tool-permissions/permission-boundary.ts";
 
 export type SubagentSession = {
   sessionId: string;
   cwd?: string;
+  sessionManager?: SessionManager;
   prompt(text: string): Promise<void>;
   getLastAssistantText?(): string | undefined;
   getActiveToolNames?(): string[];
   abort?(): Promise<void> | void;
+  subscribe?: (listener: (event: AgentSessionEvent) => void) => () => void;
   dispose(): void;
+};
+
+export type ObservableSubagentSession = SubagentSession & {
+  abort(): Promise<void> | void;
+  subscribe(listener: (event: AgentSessionEvent) => void): () => void;
 };
 
 export type CreateSubagentSession = (options: { cwd: string }) => Promise<SubagentSession>;
 export type SubagentSessionOptions = {
   customTools?: ToolDefinition[];
   sessionManager?: SessionManager;
+  modelRuntime?: ModelRuntime;
+  model?: unknown;
 };
 
 export type SubagentSessionRunOptions = {
@@ -91,21 +100,27 @@ export function validateNestingDepth(depth: number, maximum: number): void {
   if (depth >= maximum) throw new Error(`Exceeded maximum nesting depth of ${maximum}.`);
 }
 
-export async function createSubagentSession(cwd: string, options: SubagentSessionOptions = {}): Promise<SubagentSession> {
+export async function createSubagentSession(cwd: string, options: SubagentSessionOptions = {}): Promise<ObservableSubagentSession> {
+  const sessionManager = options.sessionManager ?? SessionManager.inMemory(cwd);
   const { session } = await createAgentSession({
     cwd,
     noTools: "all",
     tools: options.customTools?.map((tool) => tool.name) ?? [],
     customTools: options.customTools ?? [],
     resourceLoader: new DefaultResourceLoader({ cwd, agentDir: getAgentDir(), noExtensions: true }),
-    sessionManager: options.sessionManager ?? SessionManager.inMemory(cwd),
+    ...(options.modelRuntime ? { modelRuntime: options.modelRuntime } : {}),
+    ...(options.model ? { model: options.model as never } : {}),
+    sessionManager,
   });
   return {
     sessionId: session.sessionId,
     cwd,
+    sessionManager,
     prompt: (text) => session.prompt(text),
     getLastAssistantText: () => session.getLastAssistantText(),
     getActiveToolNames: () => session.getActiveToolNames(),
+    abort: () => session.abort(),
+    subscribe: (listener) => session.subscribe(listener),
     dispose: () => session.dispose(),
   };
 }

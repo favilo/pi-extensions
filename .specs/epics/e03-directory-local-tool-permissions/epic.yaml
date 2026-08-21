@@ -7,7 +7,7 @@ stories:
   - id: e03s01
     title: Apply trusted hierarchical project permission policy
     bcps: 5
-    status: todo
+    status: passing
     delta: ADDED
     spec: e03s01-hierarchical-project-policy.md
     tasks: e03s01-tasks.yaml
@@ -21,7 +21,7 @@ stories:
   - id: e03s03
     title: Edit project or user permission policy explicitly
     bcps: 2
-    status: todo
+    status: passing
     delta: MODIFIED
     spec: e03s03-scoped-permissions-editor.md
     tasks: e03s03-tasks.yaml

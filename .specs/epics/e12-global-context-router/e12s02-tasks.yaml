@@ -1,0 +1,104 @@
+story_id: e12s02
+title: Expose the full tool and skill landscape while keeping every tool callable
+status: passing
+bcps: 9
+delta: ADDED
+spec: e12s02-tool-skill-availability.md
+tdd_policy: >-
+  Before each RED run, add the smallest compilable public stub. Record behavioral RED and GREEN implementation in separate Jujutsu changes; missing modules, exports, imports, or functions are invalid RED evidence.
+tasks:
+  - id: 1
+    description: >-
+      Add a pure availability-section projector: non-MCP tool summaries plus compressed XML suppressed-tool and skill-name lists, with bounds, deterministic ordering, escaping, and no schema/body/path/secret disclosure.
+    verify: node --test extensions/context-router/prompt.test.ts
+    status: passing
+    risk: P0
+    security: high
+    security_verification: >-
+      Prove bounded results contain no tool parameters, raw source path, skill body, raw policy, tool input, token, credential-shaped value, or control-character injection; prove ordering is deterministic and lists are bounded.
+    tdd:
+      red: A compilable availability projector returning raw or unbounded metadata fails redaction, bounds, deterministic ordering, and disclosure-negative assertions.
+      green: The projector returns only normalized name + bounded description for non-MCP tools, and compressed XML name lists for suppressed tools and skills, without inspecting schemas or emitting paths.
+    allure:
+      severity: critical
+      categories: ["Prompt integrity", "Information disclosure", "Deterministic ordering"]
+
+  - id: 2
+    description: >-
+      Define MCP identification and project suppressed tools accordingly; prove MCP tools never enter the summary list. Codex/async tools register through the router registry.
+    verify: node --test extensions/context-router/catalog.test.ts
+    status: passing
+    risk: P0
+    security: high
+    security_verification: >-
+      Prove MCP tools are excluded from non-MCP summaries, appear only in suppressed-tool lists, and async/prompt-direct tools appear exactly once without duplication or omission.
+    tdd:
+      red: A compilable catalog stub fails to distinguish MCP from non-MCP tools, or leaks MCP tools into summaries, or misses async-registered tools.
+      green: The catalog distinguishes tool categories correctly, includes all registered non-MCP tools in summaries, and lists MCP tools only as suppressed names.
+    allure:
+      severity: critical
+      categories: ["MCP handling", "Async registration", "Catalog routing"]
+
+  - id: 3
+    description: >-
+      Integrate the availability section into before_agent_start while preserving e12s01 sanitizer behavior and prompt integrity; every pre-existing byte is preserved.
+    verify: node --test extensions/context-router/index.test.ts
+    status: passing
+    risk: P0
+    security: high
+    security_verification: >-
+      Prove the new sections are appended only, the sanitizer still replaces exactly one canonical skills stanza, zero/multiple matches remain fail-safe, and no prompt corruption occurs from malformed XML.
+    tdd:
+      red: A compilable before_agent_start stub fails to append availability sections, corrupts the prompt, or breaks the sanitizer's exact-one replacement guarantee.
+      green: The handler appends bounded sections deterministically, preserves all pre-existing bytes, and the sanitizer behavior is unchanged.
+    allure:
+      severity: critical
+      categories: ["System prompt", "Prompt integrity", "Skill discovery"]
+
+  - id: 4
+    description: >-
+      Make every non-MCP tool callable when not active (lazy activation, DQ1); prove subagent_result is callable from the start without a finder round-trip.
+    verify: node --test extensions/context-router/index.test.ts
+    status: passing
+    risk: P0
+    security: high
+    security_verification: >-
+      Prove a registered non-MCP tool that is not in the active set can be called directly, the call is accepted and executed, and lazy activation does not bypass permission evaluation.
+    tdd:
+      red: A compilable callability stub that makes non-active tools uncallable fails the direct-call assertion for subagent_result and other non-MCP tools.
+      green: The router intercepts calls to registered-but-inactive non-MCP tools, activates them lazily, and executes the call without requiring a prior find_tools selection.
+    allure:
+      severity: critical
+      categories: ["Dynamic tool loading", "Lazy activation", "Callability preservation"]
+
+  - id: 5
+    description: >-
+      Handle async-registered and prompt-direct tools (Codex, DQ3) so they appear exactly once in the correct section at the next turn boundary.
+    verify: node --test extensions/context-router/integration.test.ts
+    status: passing
+    risk: P0
+    security: high
+    security_verification: >-
+      Prove Codex/async tools are visible in the router's landscape after registration, appear exactly once (not duplicated or missed), and the prompt-direct registration path is fixed to flow through the router registry.
+    tdd:
+      red: A compilable integration stub fails to detect async-registered tools, duplicates them, or misses prompt-direct tools in the landscape.
+      green: The router detects and deduplicates async/prompt-direct tools, includes them in the correct prompt section, and the Codex extension registers through the router registry.
+    allure:
+      severity: critical
+      categories: ["Async registration", "Prompt-direct tools", "Integration"]
+
+  - id: 6
+    description: >-
+      Update count-only diagnostics, docs, and run full regressions including plan-consistency gate.
+    verify: npm run check && "$BIGPOWERS_ROOT/scripts/lib/plan-consistency-check.sh" .specs/epics/e12-global-context-router
+    status: passing
+    risk: P1
+    security: high
+    security_verification: >-
+      Prove diagnostics expose only summarized/suppressed/active counts and byte deltas; no schema/body/policy/input/credential value is rendered; and plan consistency passes.
+    tdd:
+      red: Focused integration tests fail against missing availability counts, non-final package order, catalog-detail diagnostics, or absent router registration.
+      green: Diagnostics include availability counts, attribution is current, package integration and all planning checks pass without a runtime dependency.
+    allure:
+      severity: high
+      categories: ["Diagnostics", "Package integration", "Regression"]

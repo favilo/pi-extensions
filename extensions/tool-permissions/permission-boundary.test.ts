@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
+import { mkdirSync, mkdtempSync, symlinkSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import test from "node:test";
-import { createToolPermissionBoundary } from "./index.ts";
+import { stringify as stringifyToml } from "smol-toml";
+import { createToolPermissionBoundary, resolvePermissionDecisionForRequest } from "./index.ts";
 import { executeToolRequest, type ToolPermissionBoundary, type ToolRequest } from "./permission-boundary.ts";
 
 function request(overrides: Partial<ToolRequest> = {}): ToolRequest {
@@ -159,6 +163,58 @@ test("audits the decision and preserves actor, cwd, and steering context", async
       reason: "Permission denied.",
     },
   ]);
+});
+
+test("does not auto-allow an in-project read symlink that resolves outside the child cwd", async () => {
+  const root = mkdtempSync(join(tmpdir(), "pi-permission-symlink-read-"));
+  const cwd = join(root, "project");
+  const outside = join(root, "outside");
+  mkdirSync(cwd);
+  mkdirSync(outside);
+  writeFileSync(join(outside, "secret.txt"), "secret", "utf8");
+  symlinkSync(outside, join(cwd, "escape"), process.platform === "win32" ? "junction" : "dir");
+  let executed = false;
+  const toolRequest = request({ cwd, input: { path: "escape/secret.txt" } });
+  const options = {
+    userPermissionsPath: join(root, "missing-permissions.toml"),
+    trustResolver: () => null,
+  };
+  const boundary: ToolPermissionBoundary = {
+    evaluate: async (received) => resolvePermissionDecisionForRequest(received, options),
+    execute: async () => { executed = true; },
+  };
+
+  const result = await executeToolRequest(toolRequest, boundary);
+
+  assert.equal(result.status, "denied");
+  assert.equal(executed, false);
+});
+
+test("executes an allowed nonexistent write through the same canonical parent used by policy", async () => {
+  const root = mkdtempSync(join(tmpdir(), "pi-permission-symlink-write-"));
+  const cwd = join(root, "project");
+  const outside = join(root, "outside");
+  const policy = join(root, "permissions.toml");
+  mkdirSync(cwd);
+  mkdirSync(outside);
+  symlinkSync(outside, join(cwd, "escape"), process.platform === "win32" ? "junction" : "dir");
+  writeFileSync(policy, stringifyToml({
+    permissions: { write: { allow: [{}], deny: [] } },
+  }), "utf8");
+  let executedPath: unknown;
+  const toolRequest = request({ toolName: "write", cwd, input: { path: "escape/new.txt", content: "safe" } });
+  const options = { userPermissionsPath: policy, trustResolver: () => null };
+  const boundary: ToolPermissionBoundary = {
+    evaluate: async (received) => resolvePermissionDecisionForRequest(received, options),
+    execute: async (received) => {
+      executedPath = (received.input as { path?: unknown }).path;
+    },
+  };
+
+  const result = await executeToolRequest(toolRequest, boundary);
+
+  assert.equal(result.status, "allowed");
+  assert.equal(executedPath, join(outside, "new.txt"));
 });
 
 test("adapts default policy resolution and audit for a child request cwd", async () => {

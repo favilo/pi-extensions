@@ -1,87 +1,142 @@
-# Threat Model — e06 Permission-enforced runnable subagents
+# Threat Model — e06 Permission-enforced observable background subagents
 
 ## Scope
 
-This threat model covers the planned `AgentSession` spike and the follow-on runtime stories. The current change is exploratory; no production subagent runtime is being added in this step.
+This threat model covers the existing permission-enforced child runtime and the e06s05–e06s07 increment: parent-session-owned background execution, normalized `AgentSessionEvent` buffering, explicit status/result retrieval, minimal completion signals, switchable read-only transcript panels, selected child account/model runtimes, and main-window permission prompts.
 
 In scope:
 
-- Constructing and disposing child `AgentSession` instances.
-- Parent-to-child context, task, progress, cancellation, and failure propagation.
-- Child working-directory selection and inheritance.
-- Child tool-call interception by the existing `tool-permissions` boundary.
-- Nested-agent behavior and unavailable interactive UI.
+- Constructing, subscribing to, cancelling, and disposing child `AgentSession` instances.
+- Parent-owned task IDs, state transitions, event buffers, results, and completion notifications.
+- Child working-directory and permission-policy resolution.
+- Child tool-call interception through the existing `tool-permissions` boundary.
+- Concurrent children, serialized permission prompts, panel identity, focus, and shutdown/reload behavior.
+- Read-only account-switcher selection, child-local OAuth provider overrides, and selected-account credential refresh persistence.
 
 Out of scope:
 
+- Interactive steering from child panels.
+- Resuming active children after process exit or reload.
+- External transcript-analysis APIs.
+- Private provider reasoning not published by Pi.
 - Bash subcommand parsing (e07).
-- A production subagent tool implementation (e06s02+).
-- Changes that bypass the existing permission hook.
+- Raw environment-backed, API-key, custom-provider, and Antigravity account adapters; e06s07 rejects them until a child-local provider contract is specified.
 
 ## Assets and trust boundaries
 
 | Asset | Boundary / concern |
 |---|---|
-| User files and repository contents | Child tools must remain subject to the same scoped permission policy; cwd must not silently widen access. |
-| Permission policy files | Child execution must not edit or replace policy files without an explicit permitted operation. |
-| Provider credentials and model context | Child sessions must not expose credentials through inherited prompts, logs, or tool output. |
-| Parent session/UI | Child failure, cancellation, and permission requests must not leave orphan work or fail open when UI is absent. |
-| Audit records | Decisions and denials must remain attributable to the child operation and effective cwd. |
+| User files, repositories, and credentials | A background child remains untrusted model output; every capability request must cross the same scoped permission boundary as foreground work. |
+| User approval | A decision for one main-agent or child tool request must never authorize another queued request or actor. |
+| Parent foreground session | Child completion and event streaming must not mutate parent model context unexpectedly, trigger unsolicited turns, or make the foreground unusable. |
+| Child task registry | IDs, state, cancellation controllers, buffers, and results must remain scoped to one live parent extension instance. |
+| Child transcript | Assistant text, tool arguments, tool results, paths, and permission details may contain secrets and must not leak into audit/debug logs or unrelated sessions. |
+| UI identity and focus | The visible child, requesting child, and permission decision recipient must remain unambiguous during concurrent updates and panel switches. |
+| Child session storage | Pi may persist child messages through a file-backed `SessionManager`; event buffering must not silently create a second durable secret-bearing store. |
+| Account selection and OAuth credentials | A child must receive the approved account only; parent process environment, parent runtime, other account records, and prompt/result/audit surfaces must not receive credentials. |
 
-## Abuse cases and mitigations
+## Abuse cases and required mitigations
 
-### Authorization bypass — HIGH if introduced
+### Account/model selection mismatch or credential cross-contamination — HIGH — CWE-863 / CWE-362
 
-A child session could invoke tools through an SDK path that does not emit the extension hook, bypassing the existing permission boundary.
+A broad delegation allow, stale one-shot override, duplicated resolver, or process-wide environment mutation could approve one account/model while launching another, change the parent account, or expose one account’s OAuth credential to another child.
 
-**Required mitigation:** The spike must explicitly prove hook coverage for child tool calls. Production work must fail closed unless every child tool call is intercepted and evaluated through `resolveToolPermissionDecision` / the existing permission handler.
+**Required mitigation:** Use one shared read-only account-switcher resolver for launch approval and construction. The resolver returns a redacted immutable descriptor; credential values never enter prompts, logs, results, or parent context. Explicit and env-derived selection always requires the existing parent-session FIFO approval even under broad allow rules; configured deny wins and no-UI selection fails closed. Install OAuth only into a child-local provider/runtime override. Consume one-shot selection only after approved successful construction. Serialize refresh persistence and update only the descriptor’s selected account record. Reject unsupported environment/API-key/custom-provider adapters rather than mutating `process.env`.
 
-### Working-directory escape — HIGH if introduced
+### Authorization bypass in detached execution — HIGH — CWE-863 / CWE-284
 
-A child may inherit the process cwd, select an arbitrary cwd, or resolve policy from a parent directory, causing repository or user-file access outside the intended scope.
+Returning from the launch tool before child completion could detach the child from the invocation-scoped boundary, signal, cwd, or parent context. A background child might then execute after the authorizing session has ended or use a direct SDK/process path.
 
-**Required mitigation:** Carry an explicit child cwd; resolve policy from that cwd; apply the existing trust and repository-boundary rules; reject ambiguous or missing cwd rather than falling back to a broader directory.
+**Required mitigation:** Keep the existing single `tool-permissions` bridge as the child's only tool surface. Build the boundary, validated tool catalog, effective cwd, and parent-owned cancellation controller before launch returns. Never retain an invocation signal or stale `ExtensionContext` as the background lifecycle authority. Reject requests after registry shutdown and prove no direct SDK, process, shell, or MCP path bypasses the bridge.
 
-### Nested-agent recursion / resource exhaustion — MEDIUM
+### Permission decision cross-wiring — HIGH — CWE-362 / CWE-863
 
-A child may create further agents without a depth or cancellation boundary, causing runaway model/tool activity or leaked sessions.
+Main-agent and child requests can overlap while focus changes. Overlapping dialogs or an unkeyed resolver may deliver one user's decision to multiple requests or to the wrong actor; limiting child concurrency does not prevent this main-versus-child race.
 
-**Required mitigation:** Measure nested behavior in the spike. Production contract must define a bounded nesting policy, cancellation propagation, and deterministic disposal in `finally` blocks.
+**Required mitigation:** Assign immutable request IDs bound to actor identity, tool name, safe input identity, and cwd. Present every main and child permission dialog through one FIFO parent-session-owned queue and resolve only the matching waiter. Active or queued cancellation resolves that exact request fail-closed; prompt errors and shutdown deny/cancel every still-pending request exactly once. Keep the temporary one-active-child admission limit until e06s06 separately expands child concurrency.
 
-### Cancellation and orphan process — MEDIUM
+### Missing UI or hidden permission prompt — HIGH — CWE-754 / CWE-863
 
-Cancellation may stop the parent turn while leaving a child session, child tool, or external process running.
+A background child may request permission while no TUI exists, another custom component owns focus, or a child panel obscures the parent. Treating prompt failure as approval would bypass policy.
 
-**Required mitigation:** Verify cancellation and disposal independently; require idempotent cleanup and tests that assert no live child remains after cancellation or failure.
+**Required mitigation:** Preserve current fail-closed behavior: only explicit allow rules execute without UI; every unmatched request denies when the prompt cannot be displayed. Child panels must yield to the existing main-window permission UI and visibly identify the requesting child. Prompt presentation failure, cancellation, or shutdown denies the request.
 
-### Missing UI fail-open — HIGH if introduced
+### Orphan child or stale callback after shutdown — HIGH — CWE-672 / CWE-404
 
-A child permission request may be unable to display the main UI and accidentally proceed.
+A launch tool can return while promises, model streams, tool calls, event listeners, and completion callbacks remain active. Reload may create a new extension instance while stale callbacks write into old or new state.
 
-**Required mitigation:** Reuse the existing no-UI behavior: allow only an explicit matching policy rule; otherwise deny and audit. Never treat unavailable UI as approval.
+**Required mitigation:** Own children under a session-scoped registry with an idempotent closing state. On abort, reload, new/resume/fork, or shutdown: reject new work, deny pending permissions, abort every child, unsubscribe listeners, await or bound cleanup, dispose sessions, then discard registry state. Completion callbacks capture a generation token and become no-ops after closure.
 
-### Prompt/context and credential leakage — MEDIUM
+### Completion-signal prompt injection or unsolicited execution — HIGH — CWE-74
 
-Inherited parent context may include secrets or unrelated private content, and child output may be returned to a broader audience.
+A model-authored child name or output embedded in `subagent_finished` could inject instructions into parent context. Completion intentionally steers active work or starts an idle parent turn, so any child-authored content in the signal could cause unexpected tools to run.
 
-**Required mitigation:** Inventory inherited context in the spike. Production contract must define the minimum context passed to children, redact credentials from diagnostics, and avoid persisting raw prompts/tool results in audit logs.
+**Required mitigation:** Use generated or strictly validated child IDs and a fixed structured signal containing only ID plus enumerated terminal status. Never include child output, errors, tool text, or user-provided names in the context signal. Deliver the fixed signal through the steering queue and trigger an idle parent turn. Retain it only until the main message stream acknowledges the exact ID, status, and fixed content; retry after parent settlement when late steering was not consumed, and clear pending delivery during session shutdown. Full output remains behind explicit result retrieval.
 
-### Audit attribution loss — LOW/MEDIUM
+### Cross-session or cross-child result disclosure — HIGH — CWE-639
 
-Child decisions may be logged as parent operations, weakening reviewability and incident response.
+Guessable IDs or global registries could let a model retrieve another parent session's child transcript/result, including secret-bearing tool output.
 
-**Required mitigation:** Preserve tool, decision, cwd, and child-operation identity in audit entries without recording secret-bearing inputs.
+**Required mitigation:** Scope lookups to the current parent registry and use collision-resistant generated IDs independent of display names. Status/result APIs return a generic unknown-ID result outside that registry. Never search arbitrary session files or accept filesystem paths as child IDs. Clear access on session replacement.
+
+### Event-order and terminal-state race — MEDIUM — CWE-362
+
+Streaming events can arrive while cancellation, completion, truncation, result retrieval, or panel disposal occurs. Late events could change a terminal state, appear under another child, or produce incomplete authoritative results.
+
+**Required mitigation:** Serialize state transitions per child, allow one immutable terminal transition, tag every normalized event with child ID and monotonic sequence, unsubscribe before disposal, and ignore late events after terminal sealing. Snapshot status/results atomically for retrieval and rendering.
+
+### Transcript and diagnostic secret leakage — MEDIUM — CWE-532
+
+Child assistant text, tool inputs/results, environment values, permission details, and errors may contain credentials or private content. Buffering, debug logs, audit records, completion signals, and future external analysis multiply exposure.
+
+**Required mitigation:** Keep the MVP event buffer session-scoped and bounded. Do not copy raw events into permission audit/debug logs, parent context, completion signals, or custom persistent entries. Mark truncation explicitly. If Pi's child `SessionManager` persists messages, document that single store and its path/lifetime; do not add another durable transcript store until a separate retention, access, and redaction design is approved.
+
+### Subagent result export destination mutation and disclosure — HIGH — CWE-73 / CWE-532
+
+An explicit `subagent_result({ id, full_context, overwrite? })` call persists a full versioned transcript file. A model could attempt path traversal, directory creation outside authorized bounds, overwriting symlinks or device files, or flooding model context with the exported file contents.
+
+**Required mitigation:** Resolve export destinations canonically against the parent session cwd. Validate that the parent directory exists and canonicalize the target before evaluation. Map export requests directly to the shared write-class permission policy so configured allow/deny rules apply, and unmatched requests trigger the parent FIFO permission prompt showing the canonical path and explicit overwrite intent. Enforce atomic streaming publication through a restrictive destination-local temporary file (`0600` mode on POSIX systems). Default `overwrite` to `false` and permit replacement only on regular files while rejecting symlinks, directories, and non-regular targets. Return only compact export metadata (ID, path, bytes written, status, completeness, schema version) to model context and details; never inject the serialized transcript into parent model context or result rendering.
+
+### Memory, model, and rendering exhaustion — MEDIUM — CWE-400
+
+A model can emit unbounded text/tool updates or launch many children, consuming provider quota, memory, CPU, and terminal rendering time after the foreground tool already returned.
+
+**Required mitigation:** Set limits for active children, queued launches, event count, UTF-8 bytes, individual event size, completed-result retention, and cleanup time. Coalesce high-frequency partial updates and truncate deterministically. Keep `subagent_result` collapsed rows output-free; its explicit Ctrl+O JSON view must use a valid presentation snapshot capped at 20 events, 2 KiB per event payload, 8 KiB output, and 64 KiB total, with `presentationTruncated` when content is omitted or represented by a preview. Render only the visible panel viewport. Surface limit failures as terminal child states.
+
+### UI spoofing, attribution loss, or focus capture — MEDIUM — CWE-451
+
+ANSI/control characters or ambiguous names could make child output resemble parent prompts, hide status, or capture keys. A panel could retain focus after closure and prevent foreground control.
+
+**Required mitigation:** Sanitize display strings and use generated IDs plus clearly themed, fixed headers. Never render child content as trusted UI chrome. Use Pi/TUI width-safe components and explicit overlay focus handles. `Escape`, panel completion, disposal, and shortcut cycling must restore the prior editor deterministically. Do not override an existing `Ctrl+Tab` registration silently.
+
+### Cancellation/result ambiguity — MEDIUM — CWE-754
+
+A cancelled or failed child could expose partial output as a successful result, or retrieval while running could fabricate completion.
+
+**Required mitigation:** Return structured enumerated status separately from optional bounded output. Retrieval before a terminal state reports current status only. Failure and cancellation remain distinct; neither is represented as completed. Repeated retrieval is read-only and stable.
 
 ## Security review result
 
-No new production vulnerability is present in the current working-tree plan because e06 runtime code is not yet implemented. The spike is security-gated: any evidence that `AgentSession` tool calls bypass the extension boundary is a blocking finding for production stories.
+The implemented e06s05 runtime keeps child execution behind `tool-permissions`, validates published schemas, constrains cwd, and owns cleanup under the parent session. Manual UAT exposed a main-versus-child prompt displacement that orphaned the child's prompt promise. The repair routes every main and child prompt through one session-owned FIFO queue, hashes rather than retains raw input identity, makes settlement idempotent, propagates active cancellation, closes pending work on session shutdown, and applies the shared normalized cwd-aware resolver to child requests. Focused tests cover both arrival orders, independent decisions, queued and active cancellation, prompt errors, shutdown, late results, `.aiignore`, and configured allow/deny precedence. No raw input was added to queue identity, audit output, or completion messages.
 
-**Verdict:** PASS for the exploratory spike only, with the HIGH-risk mitigations above required before e06s02–e06s04 implementation.
+**Verdict:** PASS with no unresolved HIGH-confidence finding in the changed permission paths. Live TUI reverification remains mandatory because unit tests cannot prove Pi's concrete focus restoration behavior. The temporary one-active-child admission limit remains until e06s06 separately expands child concurrency.
 
 ## Verification obligations
 
-- Prove child tool interception and record the result.
-- Prove explicit cwd and policy resolution behavior.
-- Prove cancellation and disposal leave no live child session.
-- Prove missing UI denies without an allow rule.
-- Keep the spike disposable and isolated; do not add a bypass or production execution path.
+- Prove launch returns before child completion while the foreground remains usable.
+- Prove explicit, one-shot, and inherited selected runtimes resolve identically for the prompt and child construction; broad allow rules cannot suppress that prompt, deny rules win, and no UI fails closed.
+- Prove selected `openai-codex` OAuth credentials are installed only into the child runtime, refresh only the selected account record, and never mutate the parent runtime or process environment.
+- Prove one-shot overrides survive denial/cancellation/construction failure and are consumed exactly once after successful construction.
+- Prove every background tool request still crosses schema validation, cwd-aware policy evaluation, permission prompting, execution, and audit exactly once.
+- Prove e06s05 rejects a second prompt-capable active child until keyed prompt serialization exists.
+- Prove request IDs prevent concurrent permission decisions from crossing main/child actor identity, tool, cwd, or safe input identity in both arrival orders.
+- Prove child requests receive the same cwd-aware automatic allow, configured allow, configured deny, and `.aiignore` outcomes as equivalent main requests.
+- Prove missing/hidden UI, prompt cancellation, queue cancellation, and shutdown all deny rather than allow.
+- Prove reload, session replacement, abort, and exit unsubscribe and dispose every child with no late state mutation.
+- Prove generated child IDs cannot retrieve another parent registry's status, events, or result.
+- Prove `subagent_finished` contains only generated ID and enumerated status, steers active work or triggers an idle parent turn, retries only while exact delivery remains unacknowledged, and is suppressed during session shutdown.
+- Prove ordered bounded buffers, truncation, terminal sealing, stable repeated retrieval, and late-event rejection.
+- Prove raw child events are absent from audit/debug logs, completion signals, and parent context before explicit retrieval.
+- Prove transcript content is sanitized, width-bounded, viewport-limited, and cannot imitate trusted panel headers.
+- Prove `subagent_result` custom rendering keeps collapsed rows free of child output, honors Pi's explicit expanded state, and limits expanded JSON to a valid, clearly marked presentation snapshot.
+- Prove `Ctrl+Tab`, `Escape`, child completion, prompt display, and panel disposal restore the correct focus without swallowing permission input.

@@ -1,10 +1,10 @@
 active_flow: build_epic
-active_epic_id: e12
-active_story_id: e12s01
-active_story: e12s01
+active_epic_id: e06
+active_story_id: e06s09
+active_story: e06s09
 active_bug_id: null
 git:
-  bookmark: e12-context-router
+  bookmark: e06-observable-background-subagents
   parent_bookmark: main
 planning:
   e12:
@@ -21,19 +21,22 @@ planning:
     constraints:
       - "Do not modify the e06 repair flow or child-private bridge catalog."
 handoff:
-  last_step_completed: Completed e12s01 Global Context Router implementation with 5 passing TDD tasks and clean verification.
+  last_step_completed: e06s09 was added to format subagent-tool-request calls and multiline bash commands.
   open_decisions: []
   required_reading:
-    - .specs/epics/e12-global-context-router/e12s01-context-router.md
-    - .specs/epics/e12-global-context-router/e12s01-tasks.yaml
-    - .specs/security/epics/e12/THREAT_MODEL.md
-  next_skill: verify-work
-  context: e12s01 Global Context Router implementation is complete. All 5 tasks are passing.
+    - .specs/epics/e06-permission-enforced-subagents/e06s09-pretty-print-tool-requests.md
+    - .specs/epics/e06-permission-enforced-subagents/e06s09-tasks.yaml
+    - .specs/security/epics/e06/THREAT_MODEL.md
+  next_skill: develop-tdd
+  context: Phase Verify. e06s06 (Switch between live subagent transcript panels) implementation committed and verified — 160 tests passing, check:ci exit 0. e06s05 security blockers are resolved. e06s07 and e06s08 already passing. Still in e06 testing/verification.
   blocker: null
   deferred_work:
-    - "Resume e06s05 security repairs after e12s01 verification."
-    - "Resume e07s01 after e12s01 verification."
-  verified_at: '2026-08-17T14:30:00-07:00'
+    - "Consolidate safeStringify and JSON formatting helpers into a shared utility module"
+    - "Persist completed and active child sessions for later external analysis"
+    - "Add interactive child steering after the read-only transcript slice"
+    - "Build e03 directory-local tool permissions after the higher-WSJF e04 fix"
+    - "Add real Pi process integration tests after unit contracts are established"
+  verified_at: '2026-08-18T19:24:58Z'
 release:
   pr: https://github.com/favilo/pi-extensions/pull/3
   merged_commit: 70d47f101b7e74b847c50265bbfe8097d409da68
@@ -41,9 +44,9 @@ release:
   ci_verified: false
   ci_note: No GitHub Actions workflows are configured
 epic_cycle:
-  step: 3
-  current_step: 3
-  story_bcps: 6
+  step: 4
+  current_step: 4
+  story_bcps: 5
   security_review: pass
   plan_consistency: pass
 metrics:
@@ -53,9 +56,9 @@ metrics:
       total_seconds: 1434.0
       avg_seconds: 1434.0
     survey-context:
-      calls: 7
-      total_seconds: 5590.0
-      avg_seconds: 798.5714285714286
+      calls: 9
+      total_seconds: 6329.0
+      avg_seconds: 703.2222222222222
     verify-work:
       calls: 5
       total_seconds: 5191.0
@@ -69,4 +72,12 @@ metrics:
       total_seconds: 6554.0
       avg_seconds: 3277.0
       _start: '2026-08-10T23:36:43Z'
-  story_start: '2026-08-10T21:34:19Z'
+    plan-work:
+      calls: 1
+      total_seconds: 578.0
+      avg_seconds: 578.0
+    configurable-root-test:
+      calls: 2
+      total_seconds: 2.0
+      avg_seconds: 1.0
+  story_start: '2026-08-11T17:40:59-07:00'

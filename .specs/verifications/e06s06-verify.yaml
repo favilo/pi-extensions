@@ -1,0 +1,40 @@
+story_id: e06s06
+verified_at: "2026-08-17T17:00:00Z"
+verifier: verify-work
+status: passing
+vcs:
+  kind: jj
+  bookmark: e06-observable-background-subagents
+phases:
+  task_verification:
+    passed: true
+    tasks: 4
+  typecheck:
+    passed: true
+    command: "npm run typecheck"
+  tests:
+    passed: true
+    command: "npm run test:preflight"
+  terminal_verdict:
+    command: "npm run check:ci"
+    exit_code: 0
+    captured_at: "2026-08-17T17:00:00Z"
+    note: "Single run — 160 passing tests across subagent, panel management, and tool-permission extensions"
+  security:
+    passed: true
+    report: ".specs/security/epics/e06/THREAT_MODEL.md"
+    note: "Threat model verified for live transcript panels and permission queue routing."
+  manual:
+    passed: true
+    confirmed_by_user: true
+    steps:
+      - step: "Render read-only subagent transcript panel"
+        expected: "Renders header, status, cwd, and event log in a bounded, formatted layout."
+        actual: "Verified panel rendering from normalized events with status updates."
+        passed: true
+      - step: "Cycle between main and child panels with PanelManager"
+        expected: "Cycles through panels deterministically and returns to main on Escape/completion."
+        actual: "Verified PanelManager cycleNext, selectPanel, and returnToMain contracts."
+        passed: true
+  gaps:
+    closed: true

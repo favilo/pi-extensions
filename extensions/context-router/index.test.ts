@@ -15,13 +15,15 @@ type RegisteredTool = {
 };
 
 type ToolInfo = { name: string; description?: string; sourceInfo?: { source?: string }; parameters?: unknown };
-type Handler = () => void | Promise<void>;
+type Handler = (event?: unknown) => void | Promise<unknown>;
 
 function routerHarness(initial: ToolInfo[]) {
   const tools = new Map<string, RegisteredTool>();
   const handlers = new Map<string, Handler[]>();
   const allTools = [...initial];
   let activeTools = initial.map(({ name }) => name);
+  let lastSystemPrompt = "SYSTEM PROMPT";
+  let lastBeforeAgentResult: { systemPrompt?: string } | undefined;
   const pi = {
     on(event: string, handler: Handler) {
       handlers.set(event, [...(handlers.get(event) ?? []), handler]);
@@ -52,9 +54,20 @@ function routerHarness(initial: ToolInfo[]) {
       if (index !== -1) allTools.splice(index, 1);
     },
     finder: () => tools.get("find_tools"),
-    async emit(event: string) {
-      for (const handler of handlers.get(event) ?? []) await handler();
+    async emit(event: string, eventData?: unknown) {
+      for (const handler of handlers.get(event) ?? []) {
+        const result = await handler(eventData);
+        if (event === "before_agent_start" && result && typeof result === "object") {
+          lastBeforeAgentResult = result as { systemPrompt?: string };
+          if ((result as { systemPrompt?: string }).systemPrompt) {
+            lastSystemPrompt = (result as { systemPrompt: string }).systemPrompt;
+          }
+        }
+      }
     },
+    systemPrompt: () => lastSystemPrompt,
+    beforeAgentResult: () => lastBeforeAgentResult,
+    toolCallHandlers: () => handlers.get("tool_call") ?? [],
   };
 }
 
@@ -98,4 +111,62 @@ test("router establishes and maintains only the baseline plus deliberate selecte
   assert.deepEqual(harness.activeTools(), [
     "read", "bash", "edit", "write", "grep", "find", "ls", "subagent", "find_tools", "find_skills",
   ]);
+});
+
+test("before_agent_start appends availability section preserving existing prompt", async () => {
+  const harness = routerHarness([
+    { name: "read", description: "Read files", sourceInfo: { source: "builtin" } },
+    { name: "bash", description: "Run commands", sourceInfo: { source: "builtin" } },
+    { name: "subagent", description: "Launch a child", sourceInfo: { source: "extension" } },
+    { name: "subagent_result", description: "Read a child result", sourceInfo: { source: "extension" } },
+    { name: "mcp__deploy", description: "Deploy a service", sourceInfo: { source: "mcp" } },
+  ]);
+
+  const skills = [
+    { name: "deploy", description: "Deploy skill", filePath: "/skills/deploy/SKILL.md" },
+  ];
+
+  await harness.emit("session_start");
+  await harness.emit("before_agent_start", {
+    systemPrompt: "EXISTING PROMPT",
+    systemPromptOptions: { skills },
+  });
+
+  const result = harness.beforeAgentResult();
+  const prompt = result?.systemPrompt ?? "";
+  assert.ok(prompt.startsWith("EXISTING PROMPT"), "must preserve existing prompt");
+  assert.match(prompt, /Tools:/);
+  assert.match(prompt, /subagent_result/);
+  // mcp__deploy should NOT appear in the summary list, only in suppressed
+  const suppressedStart = prompt.indexOf("Suppressed:");
+  const summarySection = suppressedStart > 0 ? prompt.slice(0, suppressedStart) : prompt;
+  assert.doesNotMatch(summarySection, /mcp__deploy/, "MCP tool must not appear in summary section");
+  assert.match(prompt, /Suppressed:/);
+  assert.match(prompt, /mcp__deploy/);
+  assert.match(prompt, /Skills:/);
+  assert.match(prompt, /deploy/);
+});
+
+test("tool_call lazily activates registered but inactive non-MCP tools", async () => {
+  const harness = routerHarness([
+    { name: "read", description: "Read files", sourceInfo: { source: "builtin" } },
+    { name: "subagent_result", description: "Read a child result", sourceInfo: { source: "extension" } },
+  ]);
+
+  await harness.emit("session_start");
+  assert.ok(!harness.activeTools().includes("subagent_result"));
+
+  const handlers = harness.toolCallHandlers();
+  assert.ok(handlers.length > 0, "must have tool_call handler");
+
+  let activated = false;
+  for (const handler of handlers) {
+    const event = { toolName: "subagent_result", toolCallId: "tc-1", input: {} };
+    const result = await handler(event);
+    if (!result || (result as { block?: boolean }).block !== true) {
+      activated = true;
+    }
+  }
+
+  assert.ok(activated || harness.activeTools().includes("subagent_result"), "must activate subagent_result");
 });
