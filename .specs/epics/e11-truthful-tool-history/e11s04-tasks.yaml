@@ -1,0 +1,27 @@
+story_id: e11s04
+title: Show tool-call reasons in permission prompts and history
+status: todo
+bcps: 4
+delta: MODIFIED
+spec: e11s04-tool-call-reasons.md
+tasks:
+  - id: 1
+    description: Add behavioral contracts that a tool call carrying a reason shows it in the permission prompt and in history, and that reasonless calls render unchanged.
+    verify: node --test extensions/tool-permissions/reason-display.test.ts
+    status: todo
+    risk: P1
+  - id: 2
+    description: Establish the reason channel (existing tool-call field or an optional reason parameter on tool schemas) and thread it to the permission and rendering layers.
+    verify: node --test extensions/tool-permissions/reason-display.test.ts
+    status: todo
+    risk: P1
+  - id: 3
+    description: Render the reason in built-in-tool-renderer history entries, matching the agent-facing value shown at decision time.
+    verify: node --test extensions/built-in-tool-renderer/result.test.ts
+    status: todo
+    risk: P1
+  - id: 4
+    description: Verify the complete extension suite and plan consistency.
+    verify: npm run check:ci
+    status: todo
+    risk: P1

@@ -1,0 +1,22 @@
+story_id: e13s01
+title: Review complete edit and write diffs before approval
+status: todo
+bcps: 3
+delta: MODIFIED
+spec: e13s01-complete-edit-write-diff-review.md
+tasks:
+  - id: 1
+    description: Add behavioral contracts that edit and write permission review renders the complete diff with no cropping, including diffs beyond the previous line limit.
+    verify: node --test extensions/tool-permissions/diff-review.test.ts
+    status: todo
+    risk: P1
+  - id: 2
+    description: Implement full-diff rendering in the permission review flow while preserving accept/deny behavior and short-diff rendering.
+    verify: node --test extensions/tool-permissions/diff-review.test.ts
+    status: todo
+    risk: P1
+  - id: 3
+    description: Verify the complete extension suite and plan consistency.
+    verify: npm run check:ci
+    status: todo
+    risk: P1
