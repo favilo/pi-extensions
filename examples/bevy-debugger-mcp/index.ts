@@ -81,8 +81,8 @@ export function createBevyDebuggerProvider(options: BevyDebuggerProviderOptions 
   return provider;
 }
 
-export function registerBevyDebuggerProvider(pi: ExtensionAPI): (() => void) | undefined {
-  const provider = createBevyDebuggerProvider();
+export function registerBevyDebuggerProvider(pi: ExtensionAPI, options: BevyDebuggerProviderOptions = {}): (() => void) | undefined {
+  const provider = createBevyDebuggerProvider(options);
   if (!provider) return undefined;
   let active = true;
   const announce = () => {
@@ -99,6 +99,6 @@ export function registerBevyDebuggerProvider(pi: ExtensionAPI): (() => void) | u
   };
 }
 
-export default function bevyDebuggerMcpExtension(pi: ExtensionAPI): void {
-  registerBevyDebuggerProvider(pi);
+export default function bevyDebuggerMcpExtension(pi: ExtensionAPI, options: BevyDebuggerProviderOptions = {}): void {
+  registerBevyDebuggerProvider(pi, options);
 }
