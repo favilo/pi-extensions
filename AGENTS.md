@@ -27,6 +27,11 @@ Before running a command, verify that any scripts/*.sh path belongs to the
 project or to Bigpowers. If it belongs to Bigpowers, rewrite it using the
 required absolute-path form.
 
+## Version control
+
+- `main` is protected: never push directly to it. Land every change through a
+  `favilo/`-prefixed Jujutsu bookmark and a GitHub pull request.
+
 ## TDD
 
 RED results must prove a behavioral contract failure. `module_not_found`, missing exports, missing functions, import errors, and other harness/setup failures are not valid RED results. Before running the RED test, create the smallest stub implementation with the required public module and function names; the test must then fail because the stub returns the wrong behavior or violates the contract. Keep test-only RED and implementation GREEN in separate Jujutsu changes.

@@ -1,0 +1,32 @@
+story_id: e14s01
+title: Add ast-grep structural search tool extension
+status: todo
+bcps: 4
+delta: ADDED
+spec: e14s01-ast-grep-tool-extension.md
+tasks:
+  - id: 1
+    description: Add behavioral contracts for the ast-grep tool (pattern search results, $PATH-gated registration with a warning when the program is missing, bounded output).
+    verify: node --test extensions/ast-grep/index.test.ts
+    status: todo
+    risk: P1
+  - id: 2
+    description: Implement the ast-grep tool extension with $PATH detection, missing-program warning, and bounded results.
+    verify: node --test extensions/ast-grep/index.test.ts
+    status: todo
+    risk: P1
+  - id: 3
+    description: Integrate ast-grep into the tool-permissions path policy with read/grep/find/ls parity (implicit working-directory allowance, configurable path rules).
+    verify: node --test extensions/tool-permissions/ast-grep-permission.test.ts
+    status: todo
+    risk: P1
+  - id: 4
+    description: Render ast-grep calls and results in built-in-tool-renderer consistent with grep output.
+    verify: node --test extensions/built-in-tool-renderer/result.test.ts
+    status: todo
+    risk: P2
+  - id: 5
+    description: Verify the complete extension suite and plan consistency.
+    verify: npm run check:ci
+    status: todo
+    risk: P1

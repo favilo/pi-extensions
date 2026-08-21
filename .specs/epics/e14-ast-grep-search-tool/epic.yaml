@@ -1,0 +1,13 @@
+id: e14
+title: ast-grep structural search tool
+wsjf: 0.0
+total_bcps: 4
+status: planned
+stories:
+  - id: e14s01
+    title: Add ast-grep structural search tool extension
+    bcps: 4
+    status: todo
+    delta: ADDED
+    spec: e14s01-ast-grep-tool-extension.md
+    tasks: e14s01-tasks.yaml

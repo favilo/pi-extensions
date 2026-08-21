@@ -19,6 +19,11 @@ Add newly discovered issues as unchecked numbered items. Once an issue has an ep
 5. [x] The `<Tab>` steering editor would be nice if it also supported Vim mode, like the normal prompt editor, rather than only accepting a single line without advanced editing capabilities.
    - **Migrated to:** `e10s01` and `e10s02` — Spike editor reuse, then support configured Vim editing in permission steering.
 
-6. [ ] The `edit` and `write` prompts currently crop the output to a certain number of lines. I don't like that. I would rather review _all_ of the lines, and then accept or deny based on the whole diff.
+6. [x] The `edit` and `write` prompts currently crop the output to a certain number of lines. I don't like that. I would rather review _all_ of the lines, and then accept or deny based on the whole diff.
+   - **Migrated to:** `e13s01` — Review complete edit and write diffs before approval.
 
-7. [ ] Let's add an `ast-grep` tool as an extension, so we can have the agents search code much more quickly. The ast-grep skill will probably need to be used by the agent. It can use the same permissions as `read`, `grep`, `ls` and `find` that we have already for current working directory and subdirectories.
+7. [x] Let's add an `ast-grep` tool as an extension, so we can have the agents search code much more quickly. The ast-grep skill will probably need to be used by the agent. It can use the same permissions as `read`, `grep`, `ls` and `find` that we have already for current working directory and subdirectories.
+   - **Migrated to:** `e14s01` — Add ast-grep structural search tool extension.
+
+8. [x] I need the tool rendering to have the `reason` behind the tool use displayed both in history, and in the permission prompt. If that isn't available, I'd like the tool calls to have a `reason` field that is passed to the permission prompt, so the user can see why the agent is requesting the tool. This is especially important for tools like `edit` and `bash`, where the agent may be requesting an edit for a specific reason, and the user needs to understand that reason in order to make an informed decision about whether to allow or deny the request.
+   - **Migrated to:** `e11s04` — Show tool-call reasons in permission prompts and history.

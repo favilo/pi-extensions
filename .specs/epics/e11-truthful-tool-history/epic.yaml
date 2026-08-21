@@ -5,7 +5,7 @@ renamed_from:
   source_revision: "main@origin"
 title: Truthful built-in tool outcomes and history
 wsjf: 0.0
-total_bcps: 8
+total_bcps: 12
 status: planned
 stories:
   - id: e11s01
@@ -29,3 +29,10 @@ stories:
     delta: MODIFIED
     spec: e11s03-complete-bash-history.md
     tasks: e11s03-tasks.yaml
+  - id: e11s04
+    title: Show tool-call reasons in permission prompts and history
+    bcps: 4
+    status: todo
+    delta: MODIFIED
+    spec: e11s04-tool-call-reasons.md
+    tasks: e11s04-tasks.yaml

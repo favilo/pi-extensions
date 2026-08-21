@@ -1,0 +1,13 @@
+id: e13
+title: Complete edit and write diffs in permission review
+wsjf: 0.0
+total_bcps: 3
+status: planned
+stories:
+  - id: e13s01
+    title: Review complete edit and write diffs before approval
+    bcps: 3
+    status: todo
+    delta: MODIFIED
+    spec: e13s01-complete-edit-write-diff-review.md
+    tasks: e13s01-tasks.yaml

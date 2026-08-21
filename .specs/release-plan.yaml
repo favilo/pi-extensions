@@ -20,9 +20,9 @@ epics:
     title: Truthful built-in tool outcomes and history
     capsule_dir: epics/e11-truthful-tool-history
     wsjf: 0.0
-    bcps: 8
+    bcps: 12
     note: >-
-      Unscored backlog epic migrated from .plans/issues-discovered.md. Make edit failures and denials canonical agent-facing outcomes, then render those same outcomes faithfully; also expose complete Bash commands and retained output in expanded history.
+      Unscored backlog epic migrated from .plans/issues-discovered.md. Make edit failures and denials canonical agent-facing outcomes, then render those same outcomes faithfully; also expose complete Bash commands and retained output in expanded history, and surface agent-supplied tool-call reasons in permission prompts and history.
   - id: e09
     title: Invocation-bound permission steering
     capsule_dir: epics/e09-invocation-bound-steering
@@ -79,6 +79,20 @@ epics:
     bcps: 8
     note: >-
       WSJF = (business value 10 + time criticality 10 + risk reduction 7) / job size 5 = 5.4. User priority: smaller models are unusable without a bounded initial tool and skill context. The router has urgent value, while its moderate security benefit and five-task implementation size keep it behind only higher-cost-of-delay work.
+  - id: e13
+    title: Complete edit and write diffs in permission review
+    capsule_dir: epics/e13-full-diff-permission-review
+    wsjf: 0.0
+    bcps: 3
+    note: >-
+      Unscored backlog epic migrated from .plans/issues-discovered.md. Present the complete pending change in edit/write permission prompts so approval decisions are based on the whole diff, not a cropped preview.
+  - id: e14
+    title: ast-grep structural search tool
+    capsule_dir: epics/e14-ast-grep-search-tool
+    wsjf: 0.0
+    bcps: 4
+    note: >-
+      Unscored backlog epic migrated from .plans/issues-discovered.md. Give agents syntax-aware code search via an ast-grep tool extension with read-parity permissions for the working directory, pairing with the existing user-level ast-grep skill.
 bugs:
   total: 1
   fixed: 0
