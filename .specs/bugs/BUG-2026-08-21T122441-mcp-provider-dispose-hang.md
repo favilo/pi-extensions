@@ -73,11 +73,12 @@ future providers (e.g. codex-mcp-style stdio clients) implement it.
 
 ## Acceptance Criteria
 
-- [ ] Registry calls `dispose()` (when defined) on provider unregister/shutdown
-- [ ] Bevy example extension invokes its stop handle on session shutdown
-- [ ] `pi -p` with mcp + bevy-debugger-mcp exits cleanly (<10s)
-- [ ] All new tests pass
-- [ ] Existing tests still pass (`npm run test`)
+- [x] Registry calls `dispose()` (when defined) on provider unregister/shutdown
+- [x] Bevy example extension invokes its stop handle on session shutdown
+- [x] `pi -p` with mcp + bevy-debugger-mcp exits cleanly (<10s) — verified: 4s (was 20s+ hang)
+- [x] All new tests pass
+- [x] Existing tests still pass (`npm run test`) — 178/178
+- [x] Full extension set `pi -p` exits cleanly — verified: 5s (was 40s+ hang)
 
 ## Resolution
 
