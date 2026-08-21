@@ -7,3 +7,11 @@ bugs:
     summary: Windows preflight fails on POSIX-only fixtures and symlink-dependent audit rotation
     file: .specs/bugs/BUG-2026-08-13T231226-windows-preflight-portability.md
     status: fixed
+  - bug_id: BUG-2026-08-21T122441
+    date: '2026-08-21'
+    severity: medium
+    priority: high
+    scope: mcp-extension-lifecycle
+    summary: MCP provider child processes never disposed; pi -p hangs on exit (bevy-debugger-mcp stdio child keeps event loop alive)
+    file: .specs/bugs/BUG-2026-08-21T122441-mcp-provider-dispose-hang.md
+    status: diagnosed

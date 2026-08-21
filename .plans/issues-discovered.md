@@ -20,3 +20,5 @@ Add newly discovered issues as unchecked numbered items. Once an issue has an ep
    - **Migrated to:** `e10s01` and `e10s02` — Spike editor reuse, then support configured Vim editing in permission steering.
 
 6. [ ] The `edit` and `write` prompts currently crop the output to a certain number of lines. I don't like that. I would rather review _all_ of the lines, and then accept or deny based on the whole diff.
+
+7. [ ] Let's add an `ast-grep` tool as an extension, so we can have the agents search code much more quickly. The ast-grep skill will probably need to be used by the agent. It can use the same permissions as `read`, `grep`, `ls` and `find` that we have already for current working directory and subdirectories.
