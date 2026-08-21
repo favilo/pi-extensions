@@ -1,0 +1,26 @@
+{
+  "bug_id": "BUG-2026-08-21T122441",
+  "defect_class": "Extension code acquires an OS resource (child process, socket, timer) whose lifetime outlives the operation that created it, without a session_shutdown disposal path. The lingering handle keeps the Node event loop alive, so non-interactive `pi -p` hangs on exit and interactive sessions leak orphaned processes.",
+  "grep_pattern": "spawn\\(|setInterval\\(|spawnSync|execFile\\( (excluding *.test.ts)",
+  "match_count": 3,
+  "sweep_scope": "extensions/**/*.ts, examples/**/*.ts",
+  "matches": [
+    {
+      "file": "extensions/mcp/stdio-client.ts",
+      "disposition": "fixed",
+      "notes": "The reported bug. StdioMcpClient spawns the MCP server child; disposal now flows through the McpToolProvider.dispose() contract, called by the registry on unregister/unregisterAll/session_shutdown. Locked by dispose tests in extensions/mcp/registry.test.ts and lifecycle.test.ts."
+    },
+    {
+      "file": "extensions/jj-status/index.ts",
+      "disposition": "not_affected",
+      "notes": "spawnSync('jj', ...) is synchronous and waits for completion; no lingering handle. Extension also has a session_shutdown handler."
+    },
+    {
+      "file": "extensions/tool-permissions/index.ts",
+      "disposition": "not_affected",
+      "notes": "spawn(editor, ..., { stdio: 'inherit' }) is awaited via child 'close' event inside launchExternalEditor; the parent intentionally blocks until the editor exits. No handle outlives the operation."
+    }
+  ],
+  "additional_coverage": "All 8 extensions/examples holding long-lived state register session_shutdown handlers (verified by grep for session_shutdown over the same scope). The reusable StdioMcpClient's disposal contract is documented in extensions/mcp/README.md with an explicit pi -p hang warning.",
+  "notes": "verify-generalize-sweep.sh invoked with explicit artifact path since this repo uses .specs/ instead of specs/."
+}

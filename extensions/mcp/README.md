@@ -49,6 +49,7 @@ type McpToolProvider = {
   tools: ToolDefinition<any, any, any>[];
   registerTools?(register: (tool: ToolDefinition<any, any, any>) => void): void;
   getStatusSections(): McpStatusSection[] | Promise<McpStatusSection[]>;
+  dispose?(): void;
 };
 
 type McpStatusSection = {
@@ -62,6 +63,7 @@ type McpStatusSection = {
 - `tools` contains tools known when the provider registers.
 - `registerTools` is optional and supports tools discovered asynchronously after registration.
 - `getStatusSections` returns provider-owned, display-safe status.
+- `dispose` is optional and releases provider resources (e.g. spawned stdio MCP server processes). The registry calls it when the provider is unregistered, including during `session_shutdown`. A provider that holds processes, sockets, or timers must implement it — otherwise non-interactive (`pi -p`) runs hang on exit.
 
 Prefer static `tools` unless discovery is genuinely asynchronous. The mock example uses the simpler static form.
 
