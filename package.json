@@ -4,6 +4,9 @@
   "license": "MIT",
   "private": true,
   "type": "module",
+  "exports": {
+    "./*": "./*"
+  },
   "description": "Personal extensions for the Pi coding agent",
   "keywords": [
     "pi-package"
