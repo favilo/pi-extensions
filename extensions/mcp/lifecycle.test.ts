@@ -78,6 +78,24 @@ test("repeated registry availability does not duplicate provider tools", () => {
   assert.deepEqual(testHarness.registered, ["mcp__lifecycle__ping"]);
 });
 
+test("session shutdown disposes registered providers", () => {
+  const testHarness = harness();
+  mcpExtension(testHarness.pi);
+  let disposed = 0;
+  const disposable: McpToolProvider = {
+    ...provider,
+    id: "disposable",
+    dispose() {
+      disposed++;
+    },
+  };
+  registerMcpProvider(testHarness.pi, disposable);
+
+  for (const handler of testHarness.lifecycle.get("session_shutdown") ?? []) handler();
+
+  assert.equal(disposed, 1);
+});
+
 test("provider removal deactivates its tools", () => {
   const testHarness = harness();
   mcpExtension(testHarness.pi);
