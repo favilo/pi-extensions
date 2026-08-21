@@ -58,6 +58,40 @@ test("multiple MCP providers contribute tools and named status sections", async 
   ]);
 });
 
+test("unregistering a provider disposes its resources exactly once", () => {
+  let disposed = 0;
+  const disposable: McpToolProvider = {
+    ...provider("alpha", "mcp__alpha__ping", "Alpha"),
+    dispose() {
+      disposed++;
+    },
+  };
+  const registry = new McpProviderRegistry(() => {});
+  registry.register(disposable);
+
+  registry.unregister(disposable);
+  registry.unregister(disposable);
+
+  assert.equal(disposed, 1);
+});
+
+test("unregisterAll disposes every registered provider", () => {
+  const disposed: string[] = [];
+  const registry = new McpProviderRegistry(() => {});
+  for (const id of ["alpha", "beta"]) {
+    registry.register({
+      ...provider(id, `mcp__${id}__ping`, id),
+      dispose() {
+        disposed.push(id);
+      },
+    });
+  }
+
+  registry.unregisterAll();
+
+  assert.deepEqual(disposed.sort(), ["alpha", "beta"]);
+});
+
 test("status collection for 100 synchronous providers completes within 50 ms", async () => {
   const registry = new McpProviderRegistry(() => {});
   for (let index = 0; index < 100; index += 1) {
