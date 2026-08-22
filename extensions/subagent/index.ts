@@ -23,6 +23,7 @@ import {
   createBackgroundSessionController,
   type BackgroundResult,
   type BackgroundSessionController,
+  type CreateManagedSubagentSession,
 } from "./background-lifecycle.ts";
 import { createCompletionSignalDispatcher } from "./completion-delivery.ts";
 import { subagentResultDisplay } from "./result-renderer.ts";
@@ -41,7 +42,15 @@ const subagentParameters = {
   required: ["task"],
   additionalProperties: false,
 } as never;
-type SubagentParameters = { task: string; agent?: string; cwd?: string; account?: string; model?: string };
+type SubagentParameters = {
+  task: string;
+  agent?: string;
+  cwd?: string;
+  account?: string;
+  model?: string;
+  /** Test-only seam: not in the tool schema (additionalProperties: false), so agents cannot inject it. */
+  createSession?: CreateManagedSubagentSession;
+};
 
 const subagentResultParameters = {
   type: "object",
@@ -161,7 +170,7 @@ async function executeParentTool(
     parentContext: `${parentContext.getSystemPrompt()}\n\nYou are a background subagent. Child tool policy: you have only the subagent-tool-request tool. For every file, shell, search, MCP, or other tool action, call it with the exact toolName and an input object. Put arguments directly in that object (for example, input: {"command":"pwd"}), never as a JSON-encoded string. Do not attempt to call tools directly, and do not ask the main agent to repeat or duplicate your requested action. Tool permission UI and activity are attributed to your generated subagent ID.\n\nAvailable parent tools and input schemas:\n${JSON.stringify(toolCatalog)}`,
     task: params.task,
     invocationSignal,
-    createSession: async ({ childId, cwd: childCwd, signal }) => {
+    createSession: params.createSession ?? (async ({ childId, cwd: childCwd, signal }) => {
       const boundary = createToolPermissionBoundary({
         validate: (request) => {
           const tool = tools[request.toolName as keyof typeof tools];
@@ -196,7 +205,7 @@ async function executeParentTool(
       );
       logSubagentDebug("child-session-created", { childId, cwd: childCwd, activeTools: session.getActiveToolNames?.() });
       return session;
-    },
+    }),
   });
 
   panelManager.registerChildPanel(launched.id, cwd);
