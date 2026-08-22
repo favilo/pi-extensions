@@ -532,8 +532,12 @@ async function presentScrollablePermission(
 
     const finishWithSteering = (result: PermissionResult, steering: string): void => {
       // Denials carry the steering text inside the invocation-bound block
-      // reason (see deniedResult); only allows need a floating steer message.
-      if (result.allowed) pi.sendUserMessage(steering, { deliverAs: "steer" });
+      // reason (see deniedResult); only allows need a floating steer message,
+      // and it must name the exact invocation it steers.
+      if (result.allowed) {
+        const target = allowPattern ? `${allowPattern.toolName} ${compact(String(allowPattern.subject))}` : "tool call";
+        pi.sendUserMessage(`Steering for ${target}: ${steering}`, { deliverAs: "steer" });
+      }
       done({ ...result, steering });
     };
 
