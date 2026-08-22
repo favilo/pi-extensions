@@ -110,6 +110,7 @@ test("allow-with-steering annotates the invocation-bound tool result", async () 
     );
     const text = JSON.stringify(annotated);
     assert.match(text, /only this once/, "the tool result must carry the steering text");
+    assert.match(text, /<user-steering/, "the annotation must be marked as not part of the tool output");
 
     const untouched = harness.toolResult(
       { toolCallId: "call_unrelated", content: [{ type: "text", text: "exit code: 0" }] },

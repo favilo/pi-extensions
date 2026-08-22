@@ -112,6 +112,9 @@ function getUserPermissionsPath(): string {
 }
 const auditLogger = createAuditLogger();
 
+/** Steering text captured at allow+steer decision time, keyed by toolCallId, annotated onto the invocation-bound tool result. */
+const pendingSteering = new Map<string, string>();
+
 type PermissionEditorTarget = { scope: "user" | "local"; path: string } | { error: string };
 
 export function resolvePermissionEditorTarget(
@@ -483,7 +486,7 @@ async function presentScrollablePermission(
   allowPattern: AllowPatternOption | undefined,
   stickyHeader: string | undefined,
   signal: AbortSignal,
-  invocationLabel: string,
+  toolCallId: string | undefined,
 ): Promise<PermissionResult> {
   if (ctx.mode !== "tui" || !ctx.ui.custom) {
     const bodyWithHeader = stickyHeader ? `${stickyHeader}\n\n${body}` : body;
@@ -535,11 +538,9 @@ async function presentScrollablePermission(
 
     const finishWithSteering = (result: PermissionResult, steering: string): void => {
       // Denials carry the steering text inside the invocation-bound block
-      // reason (see deniedResult); only allows need a floating steer message,
-      // and it must name the exact invocation it steers.
-      if (result.allowed) {
-        pi.sendUserMessage(`Steering for ${invocationLabel}: ${steering}`, { deliverAs: "steer" });
-      }
+      // reason (see deniedResult). Allows annotate the invocation-bound tool
+      // result (see the tool_result handler) — no floating steer messages.
+      if (result.allowed && toolCallId) pendingSteering.set(toolCallId, steering);
       done({ ...result, steering });
     };
 
@@ -697,7 +698,6 @@ async function askScrollablePermission(
   stickyHeader?: string,
 ): Promise<PermissionResult> {
   const identity = createPermissionPromptIdentity(request);
-  const invocationLabel = request.toolCallId ? `${request.toolName} call ${request.toolCallId}` : request.toolName;
   logSubagentDebug("permission-queue-enqueue", { identity });
   return permissionPromptQueueFor(permissionParentSessionId(ctx)).enqueue({
     identity,
@@ -706,7 +706,7 @@ async function askScrollablePermission(
     present: async (signal) => {
       logSubagentDebug("permission-queue-present", { identity });
       try {
-        const result = await presentScrollablePermission(pi, ctx, title, body, allowPattern, stickyHeader, signal, invocationLabel);
+        const result = await presentScrollablePermission(pi, ctx, title, body, allowPattern, stickyHeader, signal, request.toolCallId);
         logSubagentDebug("permission-queue-settle", { identity, decision: result.decision });
         return result;
       } catch (error) {
@@ -1190,7 +1190,22 @@ export default function toolPermissionPolicy(pi: ExtensionAPI) {
   });
 
   pi.on("session_shutdown", (_event, ctx) => {
+    pendingSteering.clear();
     closePermissionPromptQueue(permissionParentSessionId(ctx));
+  });
+
+  pi.on("tool_result", (event) => {
+    const steering = pendingSteering.get(event.toolCallId);
+    if (!steering) return undefined;
+    pendingSteering.delete(event.toolCallId);
+    return {
+      content: [
+        ...event.content,
+        // Providers may join text blocks into one string, so the marker text
+        // itself must signal this is not part of the tool's own output.
+        { type: "text", text: `\n\n<user-steering source="permission-prompt">\n${steering}\n</user-steering>` },
+      ],
+    };
   });
 
   pi.on("tool_call", async (event, extensionContext) => {
