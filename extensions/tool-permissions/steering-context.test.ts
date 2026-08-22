@@ -10,8 +10,11 @@ type ToolCallHandler = (event: { toolName: string; toolCallId?: string; input: R
 
 type PromptComponent = { handleInput(data: string): void; render(width: number): string[] };
 
+type ToolResultHandler = (event: { toolCallId: string; content: Array<{ type: string; text?: string }> }, ctx: unknown) => unknown;
+
 type Harness = {
   toolCall: ToolCallHandler;
+  toolResult: ToolResultHandler;
   steerMessages: Array<{ text: string; options: unknown }>;
   prompts: PromptComponent[];
   project: string;
@@ -30,14 +33,14 @@ async function steeringHarness(): Promise<Harness> {
   const previousAgentDir = process.env.PI_CODING_AGENT_DIR;
   process.env.PI_CODING_AGENT_DIR = agentDir;
 
-  const handlers = new Map<string, ToolCallHandler>();
+  const handlers = new Map<string, unknown>();
   const steerMessages: Array<{ text: string; options: unknown }> = [];
   const prompts: PromptComponent[] = [];
   const { default: toolPermissionPolicy } = await import(`./index.ts?steering-context=${encodeURIComponent(agentDir)}`);
   toolPermissionPolicy({
     registerCommand() {},
-    on(event: string, handler: ToolCallHandler) {
-      if (event === "tool_call") handlers.set(event, handler);
+    on(event: string, handler: unknown) {
+      handlers.set(event, handler);
     },
     getAllTools: () => [],
     sendUserMessage(text: string, options: unknown) {
@@ -46,7 +49,8 @@ async function steeringHarness(): Promise<Harness> {
   } as never);
 
   return {
-    toolCall: handlers.get("tool_call")!,
+    toolCall: handlers.get("tool_call") as ToolCallHandler,
+    toolResult: handlers.get("tool_result") as ToolResultHandler,
     steerMessages,
     prompts,
     project,
@@ -85,7 +89,7 @@ const TAB = "\t";
 const CTRL_D = "\x04";
 const CTRL_Y = "\x19";
 
-test("allow-with-steering binds the steer message to the toolCallId", async () => {
+test("allow-with-steering annotates the invocation-bound tool result", async () => {
   const harness = await steeringHarness();
   try {
     const pending = harness.toolCall(
@@ -98,12 +102,20 @@ test("allow-with-steering binds the steer message to the toolCallId", async () =
     for (const key of [TAB, ...typeText("only this once"), CTRL_Y]) harness.prompts[0].handleInput(key);
     await pending;
 
-    assert.equal(harness.steerMessages.length, 1);
-    const message = harness.steerMessages[0].text;
-    assert.match(message, /call_test_123/, "steer message must carry the toolCallId it steers");
-    assert.match(message, /only this once/);
-    assert.doesNotMatch(message, /npm test/, "the invocation summary costs tokens; the id is the binding");
-    assert.deepEqual(harness.steerMessages[0].options, { deliverAs: "steer" });
+    assert.deepEqual(harness.steerMessages, [], "allowed calls annotate the result; no floating steer message");
+
+    const annotated = harness.toolResult(
+      { toolCallId: "call_test_123", content: [{ type: "text", text: "exit code: 0" }] },
+      {},
+    );
+    const text = JSON.stringify(annotated);
+    assert.match(text, /only this once/, "the tool result must carry the steering text");
+
+    const untouched = harness.toolResult(
+      { toolCallId: "call_unrelated", content: [{ type: "text", text: "exit code: 0" }] },
+      {},
+    );
+    assert.equal(untouched, undefined, "unsteered results pass through unmodified");
   } finally {
     harness.cleanup();
   }
