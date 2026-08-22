@@ -171,6 +171,12 @@ function exactPattern(value: string): string {
   return `^${escapeRegExpLiteral(value)}$`;
 }
 
+/** Prompt prefix surfacing the agent-supplied call reason, when present. */
+function reasonPrefix(input: unknown): string {
+  const reason = (input as { reason?: unknown } | undefined)?.reason;
+  return typeof reason === "string" && reason.trim() ? `Reason: ${reason.trim()}\n\n` : "";
+}
+
 /** Blocked result for a user denial; steering text is embedded so the reason stays bound to the exact invocation's result. */
 function deniedResult(base: string, result: PermissionResult): ToolCallEventResult {
   return { block: true, reason: result.steering ? `${base} (reason: ${result.steering})` : base };
@@ -1007,7 +1013,7 @@ async function handleFileEditPermission(toolName: string, input: FileEditInput, 
     ctx,
     { actor: { kind: "main" }, toolName, input: { ...input, path: absolutePath }, cwd: ctx.cwd },
     prompt.title,
-    prompt.body,
+    reasonPrefix(input) + prompt.body,
     { toolName, suggestedRule: { path: exactPattern(absolutePath) }, subject: absolutePath },
     `Path: ${requestedPath || absolutePath}`,
   );
@@ -1039,7 +1045,7 @@ async function handleBashPermission(input: BashInput, ctx: PermissionContext, pi
     ctx,
     { actor: { kind: "main" }, toolName: "bash", input, cwd: ctx.cwd },
     "Allow bash command?",
-    `pi wants to run this shell command.\n\n${compact(command)}\n\nRules are stored under permissions.bash in ${getUserPermissionsPath()}.`,
+    reasonPrefix(input) + `pi wants to run this shell command.\n\n${compact(command)}\n\nRules are stored under permissions.bash in ${getUserPermissionsPath()}.`,
     { toolName: "bash", suggestedRule: { command: exactPattern(command) }, subject: command },
   );
 
