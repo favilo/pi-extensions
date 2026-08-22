@@ -5,14 +5,16 @@ When several tool calls are pending, steering entered from a permission prompt m
 
 ## Requirements
 - Bind steering feedback to a stable tool-call identity.
-- Include the tool name and a safe, complete invocation summary in the agent-facing steering message.
-- For Bash, include the actual command associated with the prompt.
-- Preserve the same identity and summary in denial results and audit metadata.
+- MODIFIED: Invocation identification in the agent-facing steering message.
+  - **Before:** (spec draft) include a safe, complete invocation summary (e.g. the full Bash command) in the steering message.
+  - **After:** the allow-steer message carries the tool name and the pi `toolCallId` (`Steering for <tool> call <id>: <text>`) — cheap, exact, and resolvable by the agent through its own transcript. Inlining the subject was rejected: unbounded token cost.
+- Deny-with-steering embeds the reason in the invocation-bound blocked result (via e11s02's `deniedResult`), which is protocol-bound to the toolCallId.
+- Preserve the same identity in denial results and audit metadata.
 - Prevent parallel prompts from sharing or overwriting steering context.
 
 ## Acceptance criteria
-- Steering for one of two parallel tool calls names only the selected call and its invocation.
-- Bash steering contains the exact command from that permission prompt.
+- Steering for one of two parallel tool calls binds only the selected call's toolCallId.
+- The steer message contains no inlined invocation subject (command/path); the id is the binding.
 - Denial and allow-with-steering paths preserve the same call identity.
 - Sensitive inputs follow existing redaction rules.
 
