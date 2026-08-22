@@ -148,6 +148,30 @@ test("a steered edit result renders the steering annotation", () => {
   assert.match(rendered, /watch the casing/);
 });
 
+test("an expanded bash result renders every non-annotation text part", () => {
+  const renderer = captureTool("bash");
+  const rendered = renderer
+    .renderResult(
+      {
+        content: [
+          { type: "text", text: "exit code: 0\nfirst part" },
+          { type: "text", text: "second part from another extension" },
+          { type: "text", text: '\n\n<user-steering source="permission-prompt">\nonly this once\n</user-steering>' },
+        ],
+      },
+      { expanded: true, isPartial: false },
+      theme,
+      { isError: false },
+    )
+    .render(120)
+    .join("\n");
+
+  assert.match(rendered, /first part/);
+  assert.match(rendered, /second part from another extension/);
+  assert.match(rendered, /only this once/);
+  assert.equal(rendered.match(/only this once/g)?.length, 1, "the annotation renders once, via the steering line");
+});
+
 test("calls without a reason render exactly as before", () => {
   const edit = captureEditRenderer()
     .renderCall!({ path: "/tmp/file.txt", edits: [] }, theme)
