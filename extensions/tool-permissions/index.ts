@@ -171,9 +171,9 @@ function exactPattern(value: string): string {
   return `^${escapeRegExpLiteral(value)}$`;
 }
 
-/** Denial reasons embed steering text so the reason stays bound to the exact invocation's result. */
-function denialReason(base: string, result: PermissionResult): string {
-  return result.steering ? `${base} (reason: ${result.steering})` : base;
+/** Blocked result for a user denial; steering text is embedded so the reason stays bound to the exact invocation's result. */
+function deniedResult(base: string, result: PermissionResult): ToolCallEventResult {
+  return { block: true, reason: result.steering ? `${base} (reason: ${result.steering})` : base };
 }
 
 function permissionResultAudit(result: PermissionResult): Pick<AuditEntry, "pattern" | "scope" | "steering"> {
@@ -526,7 +526,7 @@ async function presentScrollablePermission(
 
     const finishWithSteering = (result: PermissionResult, steering: string): void => {
       // Denials carry the steering text inside the invocation-bound block
-      // reason (see denialReason); only allows need a floating steer message.
+      // reason (see deniedResult); only allows need a floating steer message.
       if (result.allowed) pi.sendUserMessage(steering, { deliverAs: "steer" });
       done({ ...result, steering });
     };
@@ -906,7 +906,7 @@ async function handlePathPermission(toolName: string, input: PathToolInput, ctx:
   );
 
   audit({ tool: toolName, decision: result.decision, cwd: ctx.cwd, path: absolutePath, ...permissionResultAudit(result) });
-  if (!result.allowed) return { block: true, reason: denialReason(`User denied external ${toolName} path.`, result) };
+  if (!result.allowed) return deniedResult(`User denied external ${toolName} path.`, result);
 }
 
 async function handleReadPermission(input: ReadInput, ctx: PermissionContext, pi: ExtensionAPI): Promise<ToolCallEventResult> {
@@ -964,7 +964,7 @@ async function handleSubagentResultExportPermission(input: SubagentResultExportI
   );
 
   audit({ tool: "write", decision: result.decision, cwd: ctx.cwd, path: absolutePath, ...permissionResultAudit(result) });
-  if (!result.allowed) return { block: true, reason: denialReason("User denied write.", result) };
+  if (!result.allowed) return deniedResult("User denied write.", result);
 }
 
 async function handleFileEditPermission(toolName: string, input: FileEditInput, ctx: PermissionContext, pi: ExtensionAPI): Promise<ToolCallEventResult> {
@@ -1013,7 +1013,7 @@ async function handleFileEditPermission(toolName: string, input: FileEditInput, 
   );
 
   audit({ tool: toolName, decision: result.decision, cwd: ctx.cwd, path: absolutePath, ...permissionResultAudit(result) });
-  if (!result.allowed) return { block: true, reason: denialReason(`User denied ${toolName}.`, result) };
+  if (!result.allowed) return deniedResult(`User denied ${toolName}.`, result);
 }
 
 async function handleBashPermission(input: BashInput, ctx: PermissionContext, pi: ExtensionAPI): Promise<ToolCallEventResult> {
@@ -1044,7 +1044,7 @@ async function handleBashPermission(input: BashInput, ctx: PermissionContext, pi
   );
 
   audit({ tool: "bash", decision: result.decision, cwd: ctx.cwd, command, ...permissionResultAudit(result) });
-  if (!result.allowed) return { block: true, reason: denialReason("User denied bash command.", result) };
+  if (!result.allowed) return deniedResult("User denied bash command.", result);
 }
 
 async function handleSubagentPermission(input: SubagentInput, ctx: PermissionContext, pi: ExtensionAPI): Promise<ToolCallEventResult> {
@@ -1104,7 +1104,7 @@ async function handleSubagentPermission(input: SubagentInput, ctx: PermissionCon
   );
 
   audit({ tool: "subagent", decision: result.decision, cwd: ctx.cwd, ...permissionResultAudit(result) });
-  if (!result.allowed) return { block: true, reason: denialReason("User denied subagent delegation.", result) };
+  if (!result.allowed) return deniedResult("User denied subagent delegation.", result);
 }
 
 function isKnownMcpTool(toolName: string, pi: ExtensionAPI): boolean {
@@ -1149,7 +1149,7 @@ async function handleUnknownToolPermission(toolName: string, input: unknown, ctx
   );
 
   audit({ tool: toolName, decision: result.decision, cwd: ctx.cwd, ...permissionResultAudit(result) });
-  if (!result.allowed) return { block: true, reason: `User denied ${toolName}.` };
+  if (!result.allowed) return deniedResult(`User denied ${toolName}.`, result);
 }
 
 export default function toolPermissionPolicy(pi: ExtensionAPI) {
