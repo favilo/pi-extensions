@@ -1,3 +1,4 @@
+import "../test-support/forbid-fetch.ts";
 import assert from "node:assert/strict";
 import test from "node:test";
 import { McpProviderRegistry, type McpToolProvider } from "./registry.ts";

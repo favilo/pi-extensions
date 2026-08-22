@@ -12,7 +12,8 @@
     "pi-package"
   ],
   "scripts": {
-    "check": "npm run typecheck && npm run test:preflight",
+    "check": "npm run typecheck && npm run test:preflight && npm run check:test-guard",
+    "check:test-guard": "bash .github/scripts/check-test-guard.sh",
     "check:ci": "npm run check && npm run check:plans && npm run check:portability",
     "check:plans": "bash .github/scripts/check-active-plans.sh",
     "check:portability": "python3 .github/scripts/check-portable-paths.py",

@@ -1,3 +1,4 @@
+import "../test-support/forbid-fetch.ts";
 import assert from "node:assert";
 import { test } from "node:test";
 import { formatSkillsForPrompt } from "@earendil-works/pi-coding-agent";
