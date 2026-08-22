@@ -1,3 +1,4 @@
+import "../test-support/forbid-fetch.ts";
 import assert from "node:assert/strict";
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";

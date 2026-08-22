@@ -1,3 +1,4 @@
+import "../test-support/forbid-fetch.ts";
 import assert from "node:assert/strict";
 import test from "node:test";
 
@@ -100,16 +101,21 @@ test("launching a subagent sets UI status, widget, and registers child panel in 
     },
   };
 
+  let createSessionCalled = false;
   const launchResult = await subagentTool.execute("launch-1", {
     task: "inspect repo",
-    createSession: async () => ({
-      sessionId: "child-mock-1234",
-      prompt: async () => {},
-      subscribe: () => () => {},
-      dispose: () => {},
-    }),
+    createSession: async () => {
+      createSessionCalled = true;
+      return {
+        sessionId: "child-mock-1234",
+        prompt: async () => {},
+        subscribe: () => () => {},
+        dispose: () => {},
+      };
+    },
   }, undefined, undefined, ctx) as { details: { id: string } };
   assert.ok(launchResult.details.id);
+  assert.equal(createSessionCalled, true, "launch must use the injected createSession seam");
 
   assert.match(statuses.get("subagent") ?? "", /Subagent running/);
   assert.equal((widgets.get("subagent") ?? []).length > 0, true);

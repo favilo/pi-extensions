@@ -1,3 +1,4 @@
+import "../test-support/forbid-fetch.ts";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";

@@ -17,25 +17,29 @@ planning:
       time_criticality: 10
       risk_reduction: 7
       job_size: 5
-      rationale: "User priority: smaller models are unusable without a bounded initial tool and skill context."
+      rationale: 'User priority: smaller models are unusable without a bounded initial
+        tool and skill context.'
     constraints:
-      - "Do not modify the e06 repair flow or child-private bridge catalog."
+    - Do not modify the e06 repair flow or child-private bridge catalog.
 handoff:
-  last_step_completed: e06s09 was added to format subagent-tool-request calls and multiline bash commands.
+  last_step_completed: e06s09 was added to format subagent-tool-request calls and
+    multiline bash commands.
   open_decisions: []
   required_reading:
-    - .specs/epics/e06-permission-enforced-subagents/e06s09-pretty-print-tool-requests.md
-    - .specs/epics/e06-permission-enforced-subagents/e06s09-tasks.yaml
-    - .specs/security/epics/e06/THREAT_MODEL.md
+  - .specs/epics/e06-permission-enforced-subagents/e06s09-pretty-print-tool-requests.md
+  - .specs/epics/e06-permission-enforced-subagents/e06s09-tasks.yaml
+  - .specs/security/epics/e06/THREAT_MODEL.md
   next_skill: develop-tdd
-  context: Phase Verify. e06s06 (Switch between live subagent transcript panels) implementation committed and verified — 160 tests passing, check:ci exit 0. e06s05 security blockers are resolved. e06s07 and e06s08 already passing. Still in e06 testing/verification.
+  context: Phase Verify. e06s06 (Switch between live subagent transcript panels) implementation
+    committed and verified — 160 tests passing, check:ci exit 0. e06s05 security blockers
+    are resolved. e06s07 and e06s08 already passing. Still in e06 testing/verification.
   blocker: null
   deferred_work:
-    - "Consolidate safeStringify and JSON formatting helpers into a shared utility module"
-    - "Persist completed and active child sessions for later external analysis"
-    - "Add interactive child steering after the read-only transcript slice"
-    - "Build e03 directory-local tool permissions after the higher-WSJF e04 fix"
-    - "Add real Pi process integration tests after unit contracts are established"
+  - Consolidate safeStringify and JSON formatting helpers into a shared utility module
+  - Persist completed and active child sessions for later external analysis
+  - Add interactive child steering after the read-only transcript slice
+  - Build e03 directory-local tool permissions after the higher-WSJF e04 fix
+  - Add real Pi process integration tests after unit contracts are established
   verified_at: '2026-08-18T19:24:58Z'
 release:
   pr: https://github.com/favilo/pi-extensions/pull/3
@@ -71,7 +75,7 @@ metrics:
       calls: 2
       total_seconds: 6554.0
       avg_seconds: 3277.0
-      _start: '2026-08-10T23:36:43Z'
+      _start: '2026-08-21T21:38:51Z'
     plan-work:
       calls: 1
       total_seconds: 578.0

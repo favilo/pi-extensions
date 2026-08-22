@@ -1,3 +1,4 @@
+import "../test-support/forbid-fetch.ts";
 import assert from "node:assert/strict";
 import { performance } from "node:perf_hooks";
 import test from "node:test";

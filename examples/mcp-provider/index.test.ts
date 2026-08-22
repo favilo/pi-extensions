@@ -1,3 +1,4 @@
+import "../../extensions/test-support/forbid-fetch.ts";
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { ExtensionAPI, ToolDefinition } from "@earendil-works/pi-coding-agent";

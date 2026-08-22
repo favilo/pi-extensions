@@ -1,3 +1,4 @@
+import "../test-support/forbid-fetch.ts";
 import assert from "node:assert";
 import { readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";

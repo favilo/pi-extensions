@@ -1,3 +1,4 @@
+import "../test-support/forbid-fetch.ts";
 import assert from "node:assert/strict";
 import test from "node:test";
 import { resolveJjStatus, type JjRunner } from "./index.ts";
