@@ -6,7 +6,7 @@ import { join } from "node:path";
 import test from "node:test";
 import { stringify as stringifyToml } from "smol-toml";
 
-type ToolCallHandler = (event: { toolName: string; input: Record<string, unknown> }, ctx: unknown) => Promise<unknown>;
+type ToolCallHandler = (event: { toolName: string; toolCallId?: string; input: Record<string, unknown> }, ctx: unknown) => Promise<unknown>;
 
 type PromptComponent = { handleInput(data: string): void; render(width: number): string[] };
 
@@ -85,11 +85,11 @@ const TAB = "\t";
 const CTRL_D = "\x04";
 const CTRL_Y = "\x19";
 
-test("allow-with-steering names the exact invocation in the steer message", async () => {
+test("allow-with-steering binds the steer message to the toolCallId", async () => {
   const harness = await steeringHarness();
   try {
     const pending = harness.toolCall(
-      { toolName: "bash", input: { command: "npm test" } },
+      { toolName: "bash", toolCallId: "call_test_123", input: { command: "npm test" } },
       promptingCtx(harness),
     );
     await new Promise((resolve) => setImmediate(resolve));
@@ -100,8 +100,9 @@ test("allow-with-steering names the exact invocation in the steer message", asyn
 
     assert.equal(harness.steerMessages.length, 1);
     const message = harness.steerMessages[0].text;
-    assert.match(message, /npm test/, "steer message must name the invocation it steers");
+    assert.match(message, /call_test_123/, "steer message must carry the toolCallId it steers");
     assert.match(message, /only this once/);
+    assert.doesNotMatch(message, /npm test/, "the invocation summary costs tokens; the id is the binding");
     assert.deepEqual(harness.steerMessages[0].options, { deliverAs: "steer" });
   } finally {
     harness.cleanup();
