@@ -10,7 +10,11 @@ type RenderedResult = {
 };
 
 type ToolRenderer = {
-  renderCall?(args: Record<string, unknown>, theme: unknown): { render(width: number): string[] };
+  renderCall?(
+    args: Record<string, unknown>,
+    theme: unknown,
+    context?: unknown,
+  ): { render(width: number): string[] };
   renderResult(
     result: RenderedResult,
     options: { expanded: boolean; isPartial: boolean },
@@ -38,13 +42,13 @@ const theme = new Proxy({}, {
 test("collapsed bash result keeps compact summary and truncated call preview", () => {
   const bash = captureTool("bash");
   const longCmd = "echo " + "a".repeat(100);
-  const callText = bash.renderCall!({ command: longCmd }, theme).render(120).join("\n");
+  const callText = bash.renderCall!({ command: longCmd }, theme, { args: { command: longCmd }, isError: false } as never).render(120).join("\n");
   assert.match(callText, /\.\.\./);
-  assert.ok(callText.length < 100);
+  assert.ok(callText.trim().length < 100);
 
   const resultText = bash.renderResult({
     content: [{ type: "text", text: "exit code: 0\nline 1" }],
-  }, { expanded: false, isPartial: false }, theme, { isError: false }).render(120).join("\n");
+  }, { expanded: false, isPartial: false }, theme, { args: { command: longCmd }, isError: false } as never).render(120).join("\n");
 
   assert.match(resultText, /done/);
   assert.doesNotMatch(resultText, /line 1/);
@@ -55,7 +59,7 @@ test("expanded bash result includes full unshortened command before output", () 
   const longCmd = "echo " + "x".repeat(120) + "\nline 2 of command";
   const resultText = bash.renderResult({
     content: [{ type: "text", text: "exit code: 0\noutput line 1" }],
-  }, { expanded: true, isPartial: false }, theme, { isError: false }).render(120).join("\n");
+  }, { expanded: true, isPartial: false }, theme, { args: { command: longCmd }, isError: false } as never).render(120).join("\n");
 
   assert.match(resultText, new RegExp("x".repeat(120)));
   assert.match(resultText, /line 2 of command/);

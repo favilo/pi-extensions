@@ -134,8 +134,11 @@ export default function (pi: ExtensionAPI) {
       return new Text(text, 0, 0);
     },
 
-    renderResult(result, { expanded, isPartial }, theme, _context) {
+    renderResult(result, { expanded, isPartial }, theme, context) {
       if (isPartial) return new Text(theme.fg("warning", "Running..."), 0, 0);
+
+      const errorText = toolErrorText(result, context.isError, "Bash failed");
+      if (errorText) return withSteering(theme.fg("error", errorText), result, theme);
 
       const details = result.details as BashToolDetails | undefined;
       const content = result.content[0];
@@ -150,10 +153,12 @@ export default function (pi: ExtensionAPI) {
       if (details?.truncation?.truncated) text += theme.fg("warning", " [truncated]");
 
       if (expanded) {
+        if (context.args?.command) {
+          text += `\n${theme.fg("toolTitle", "$ ")}${theme.fg("accent", context.args.command)}`;
+        }
         const fullOutput = toolOutputTexts(result).join("\n");
-        const lines = fullOutput.split("\n").slice(0, 20);
+        const lines = fullOutput.split("\n");
         for (const line of lines) text += `\n${theme.fg("dim", line)}`;
-        if (fullOutput.split("\n").length > 20) text += `\n${theme.fg("muted", "... more output")}`;
       }
 
       return withSteering(text, result, theme);

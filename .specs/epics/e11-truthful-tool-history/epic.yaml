@@ -6,7 +6,7 @@ renamed_from:
 title: Truthful built-in tool outcomes and history
 wsjf: 0.0
 total_bcps: 12
-status: planned
+status: completed
 stories:
   - id: e11s01
     title: Return deterministic edit failures to the agent before permission prompts
@@ -25,7 +25,7 @@ stories:
   - id: e11s03
     title: Show complete Bash commands and output in expanded history
     bcps: 3
-    status: todo
+    status: passing
     delta: MODIFIED
     spec: e11s03-complete-bash-history.md
     tasks: e11s03-tasks.yaml
