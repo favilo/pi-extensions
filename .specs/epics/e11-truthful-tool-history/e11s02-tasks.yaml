@@ -1,22 +1,22 @@
 story_id: e11s02
 title: Return denied edit outcomes and reasons to the agent
-status: todo
+status: passing
 bcps: 2
 delta: MODIFIED
 spec: e11s02-edit-denial-rendering.md
 tasks:
   - id: 1
     description: Add contracts for canonical agent-facing denied, failed, and successful edit results and their rendering.
-    verify: node --test extensions/built-in-tool-renderer/edit-result.test.ts
-    status: todo
+    verify: node --test extensions/tool-permissions/edit-denial.test.ts extensions/built-in-tool-renderer/edit-result.test.ts
+    status: passing
     risk: P1
   - id: 2
     description: Return denied edits and any safe user-provided reason to the requesting agent, then render that same result.
-    verify: node --test extensions/built-in-tool-renderer/edit-result.test.ts
-    status: todo
+    verify: node --test extensions/tool-permissions/edit-denial.test.ts extensions/built-in-tool-renderer/edit-result.test.ts
+    status: passing
     risk: P1
   - id: 3
     description: Run complete package checks.
     verify: npm run check
-    status: todo
+    status: passing
     risk: P1
