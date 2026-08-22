@@ -10,6 +10,11 @@ type RenderedResult = {
 };
 
 type EditRenderer = {
+  parameters?: { properties?: Record<string, unknown>; required?: string[] };
+  renderCall?(
+    args: Record<string, unknown>,
+    theme: unknown,
+  ): { render(width: number): string[] };
   renderResult(
     result: RenderedResult,
     options: { expanded: boolean; isPartial: boolean },
@@ -18,16 +23,20 @@ type EditRenderer = {
   ): { render(width: number): string[] };
 };
 
-function captureEditRenderer(): EditRenderer {
+function captureTool(name: string): EditRenderer {
   const tools = new Map<string, EditRenderer>();
   builtInToolRenderer({
     registerTool(tool: { name: string }) {
       tools.set(tool.name, tool as unknown as EditRenderer);
     },
   } as unknown as ExtensionAPI);
-  const edit = tools.get("edit");
-  assert.ok(edit, "expected the edit tool renderer to be registered");
-  return edit;
+  const tool = tools.get(name);
+  assert.ok(tool, `expected the ${name} tool renderer to be registered`);
+  return tool;
+}
+
+function captureEditRenderer(): EditRenderer {
+  return captureTool("edit");
 }
 
 // Identity theme: strip colors/formatting so assertions see plain text.
@@ -69,4 +78,46 @@ test("a successful edit without a diff still renders Applied", () => {
   }, false);
 
   assert.match(rendered, /Applied/);
+});
+
+test("the edit and bash tool schemas admit an optional reason", () => {
+  for (const name of ["edit", "bash", "write"]) {
+    const tool = captureTool(name);
+    assert.ok(tool.parameters?.properties?.reason, `${name} schema must admit a reason`);
+    assert.ok(!tool.parameters?.required?.includes("reason"), `${name} reason must be optional`);
+  }
+});
+
+test("the edit call renders the reason when present", () => {
+  const renderer = captureEditRenderer();
+  const rendered = renderer
+    .renderCall!({ path: "/tmp/file.txt", edits: [], reason: "normalize casing before the rename" }, theme)
+    .render(120)
+    .join("\n");
+
+  assert.match(rendered, /normalize casing before the rename/);
+});
+
+test("the bash call renders the reason when present", () => {
+  const renderer = captureTool("bash");
+  const rendered = renderer
+    .renderCall!({ command: "npm test", reason: "verify the refactor is green" }, theme)
+    .render(120)
+    .join("\n");
+
+  assert.match(rendered, /verify the refactor is green/);
+});
+
+test("calls without a reason render exactly as before", () => {
+  const edit = captureEditRenderer()
+    .renderCall!({ path: "/tmp/file.txt", edits: [] }, theme)
+    .render(120)
+    .join("\n");
+  assert.doesNotMatch(edit, /reason/i);
+
+  const bash = captureTool("bash")
+    .renderCall!({ command: "npm test" }, theme)
+    .render(120)
+    .join("\n");
+  assert.doesNotMatch(bash, /reason/i);
 });
