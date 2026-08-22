@@ -13,6 +13,7 @@ import type {
   GrepToolDetails,
   LsToolDetails,
   ReadToolDetails,
+  Theme,
 } from "@earendil-works/pi-coding-agent";
 import {
   createBashTool,
@@ -25,7 +26,41 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import { Text } from "@earendil-works/pi-tui";
 import { registerPublishedTool } from "../tool-registry/index.ts";
-import { toolErrorText } from "./result.ts";
+import { steeringAnnotation, toolErrorText, toolOutputTexts } from "./result.ts";
+
+const reasonParameterSchema = {
+  type: "string",
+  description: "One sentence on why you are calling this tool; shown to the user in the permission prompt and history.",
+} as const;
+
+/** Admit an optional agent-supplied reason into a built-in tool's parameter schema. */
+function withReasonParameter<T>(parameters: T): T {
+  const schema = parameters as { type?: string; properties?: Record<string, unknown> };
+  if (schema?.type !== "object" || !schema.properties) return parameters;
+  return { ...schema, properties: { ...schema.properties, reason: reasonParameterSchema } } as T;
+}
+
+/** Strip the renderer-owned reason before delegating to the original tool. */
+function withoutReason<T>(params: T): T {
+  if (!params || typeof params !== "object" || !("reason" in params)) return params;
+  const { reason: _reason, ...rest } = params as Record<string, unknown>;
+  return rest as T;
+}
+
+/** History suffix surfacing the agent-supplied call reason, when present. */
+function reasonSuffix(args: Record<string, unknown>, theme: Theme): string {
+  const reason = args.reason;
+  return typeof reason === "string" && reason.trim() ? `\n${theme.fg("dim", `reason: ${reason.trim()}`)}` : "";
+}
+
+type RenderableResult = { content: Array<{ type: string; text?: string }> };
+
+/** Finalize a rendered result, prepending the steering line when the result carries an annotation. */
+function withSteering(text: string, result: RenderableResult, theme: Theme): Text {
+  const steering = steeringAnnotation(result);
+  const leading = steering ? `${theme.fg("warning", `steering: ${steering}`)}\n` : "";
+  return new Text(leading + text, 0, 0);
+}
 
 export default function (pi: ExtensionAPI) {
   const cwd = process.cwd();
@@ -75,7 +110,7 @@ export default function (pi: ExtensionAPI) {
         if (lineCount > 15) text += `\n${theme.fg("muted", `... ${lineCount - 15} more lines`)}`;
       }
 
-      return new Text(text, 0, 0);
+      return withSteering(text, result, theme);
     },
   });
 
@@ -84,10 +119,10 @@ export default function (pi: ExtensionAPI) {
     name: "bash",
     label: "bash",
     description: originalBash.description,
-    parameters: originalBash.parameters,
+    parameters: withReasonParameter(originalBash.parameters),
 
     async execute(toolCallId, params, signal, onUpdate) {
-      return originalBash.execute(toolCallId, params, signal, onUpdate);
+      return originalBash.execute(toolCallId, withoutReason(params), signal, onUpdate);
     },
 
     renderCall(args, theme, _context) {
@@ -95,6 +130,7 @@ export default function (pi: ExtensionAPI) {
       const cmd = args.command.length > 80 ? `${args.command.slice(0, 77)}...` : args.command;
       text += theme.fg("accent", cmd);
       if (args.timeout) text += theme.fg("dim", ` (timeout: ${args.timeout}s)`);
+      text += reasonSuffix(args, theme);
       return new Text(text, 0, 0);
     },
 
@@ -114,12 +150,13 @@ export default function (pi: ExtensionAPI) {
       if (details?.truncation?.truncated) text += theme.fg("warning", " [truncated]");
 
       if (expanded) {
-        const lines = output.split("\n").slice(0, 20);
+        const fullOutput = toolOutputTexts(result).join("\n");
+        const lines = fullOutput.split("\n").slice(0, 20);
         for (const line of lines) text += `\n${theme.fg("dim", line)}`;
-        if (output.split("\n").length > 20) text += `\n${theme.fg("muted", "... more output")}`;
+        if (fullOutput.split("\n").length > 20) text += `\n${theme.fg("muted", "... more output")}`;
       }
 
-      return new Text(text, 0, 0);
+      return withSteering(text, result, theme);
     },
   });
 
@@ -162,7 +199,7 @@ export default function (pi: ExtensionAPI) {
         if (lines.length > 20) text += `\n${theme.fg("muted", `... ${lines.length - 20} more matches`)}`;
       }
 
-      return new Text(text, 0, 0);
+      return withSteering(text, result, theme);
     },
   });
 
@@ -202,7 +239,7 @@ export default function (pi: ExtensionAPI) {
         if (lines.length > 20) text += `\n${theme.fg("muted", `... ${lines.length - 20} more paths`)}`;
       }
 
-      return new Text(text, 0, 0);
+      return withSteering(text, result, theme);
     },
   });
 
@@ -241,7 +278,7 @@ export default function (pi: ExtensionAPI) {
         if (lines.length > 20) text += `\n${theme.fg("muted", `... ${lines.length - 20} more entries`)}`;
       }
 
-      return new Text(text, 0, 0);
+      return withSteering(text, result, theme);
     },
   });
 
@@ -250,16 +287,17 @@ export default function (pi: ExtensionAPI) {
     name: "edit",
     label: "edit",
     description: originalEdit.description,
-    parameters: originalEdit.parameters,
+    parameters: withReasonParameter(originalEdit.parameters),
     renderShell: "self",
 
     async execute(toolCallId, params, signal, onUpdate) {
-      return originalEdit.execute(toolCallId, params, signal, onUpdate);
+      return originalEdit.execute(toolCallId, withoutReason(params), signal, onUpdate);
     },
 
     renderCall(args, theme, _context) {
       let text = theme.fg("toolTitle", theme.bold("edit "));
       text += theme.fg("accent", args.path);
+      text += reasonSuffix(args, theme);
       return new Text(text, 0, 0);
     },
 
@@ -275,7 +313,7 @@ export default function (pi: ExtensionAPI) {
         return new Text(theme.fg("error", content.text.split("\n")[0]), 0, 0);
       }
 
-      if (!details?.diff) return new Text(theme.fg("success", "Applied"), 0, 0);
+      if (!details?.diff) return withSteering(theme.fg("warning", "No diff supplied"), result, theme);
 
       const diffLines = details.diff.split("\n");
       let additions = 0;
@@ -298,7 +336,7 @@ export default function (pi: ExtensionAPI) {
         if (diffLines.length > 30) text += `\n${theme.fg("muted", `... ${diffLines.length - 30} more diff lines`)}`;
       }
 
-      return new Text(text, 0, 0);
+      return withSteering(text, result, theme);
     },
   });
 
@@ -307,10 +345,10 @@ export default function (pi: ExtensionAPI) {
     name: "write",
     label: "write",
     description: originalWrite.description,
-    parameters: originalWrite.parameters,
+    parameters: withReasonParameter(originalWrite.parameters),
 
     async execute(toolCallId, params, signal, onUpdate) {
-      return originalWrite.execute(toolCallId, params, signal, onUpdate);
+      return originalWrite.execute(toolCallId, withoutReason(params), signal, onUpdate);
     },
 
     renderCall(args, theme, _context) {
@@ -318,6 +356,7 @@ export default function (pi: ExtensionAPI) {
       text += theme.fg("accent", args.path);
       const lineCount = args.content.split("\n").length;
       text += theme.fg("dim", ` (${lineCount} lines)`);
+      text += reasonSuffix(args, theme);
       return new Text(text, 0, 0);
     },
 
@@ -327,7 +366,7 @@ export default function (pi: ExtensionAPI) {
       const errorText = toolErrorText(result, context.isError, "Write failed");
       if (errorText) return new Text(theme.fg("error", errorText), 0, 0);
 
-      return new Text(theme.fg("success", "Written"), 0, 0);
+      return withSteering(theme.fg("success", "Written"), result, theme);
     },
   });
 }

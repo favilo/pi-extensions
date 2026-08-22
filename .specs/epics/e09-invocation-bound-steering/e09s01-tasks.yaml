@@ -1,6 +1,6 @@
 story_id: e09s01
 title: Identify the exact tool invocation receiving steering feedback
-status: todo
+status: passing
 bcps: 4
 delta: MODIFIED
 spec: e09s01-command-bound-steering.md
@@ -8,15 +8,16 @@ tasks:
   - id: 1
     description: Add parallel-call contracts proving steering remains attached to the selected tool call and command.
     verify: node --test extensions/tool-permissions/steering-context.test.ts
-    status: todo
+    status: passing
     risk: P1
   - id: 2
     description: Add stable call identity and safe invocation summaries to steering, denial, and audit records.
-    verify: node --test extensions/tool-permissions/steering-context.test.ts
-    status: todo
+    verify: node --test extensions/tool-permissions/steering-context.test.ts extensions/tool-permissions/edit-denial.test.ts
+    status: passing
     risk: P1
+    note: Denial steering is invocation-bound via the embedded blocked result (e11s02); allow-steer messages bind by toolCallId instead of an inlined summary (token-cheap, agent-resolvable through the transcript).
   - id: 3
     description: Run complete package checks.
     verify: npm run check
-    status: todo
+    status: passing
     risk: P1

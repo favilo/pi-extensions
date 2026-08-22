@@ -29,6 +29,8 @@ type ToolCallEventResult = { block: true; reason: string } | undefined;
 
 export type PermissionContext = {
   cwd: string;
+  /** The pi tool-call identity for the invocation currently being authorized. */
+  toolCallId?: string;
   hasUI: boolean;
   mode: string;
   ui: {
@@ -110,6 +112,9 @@ function getUserPermissionsPath(): string {
 }
 const auditLogger = createAuditLogger();
 
+/** Steering text captured at allow+steer decision time, keyed by toolCallId, annotated onto the invocation-bound tool result. */
+const pendingSteering = new Map<string, string>();
+
 type PermissionEditorTarget = { scope: "user" | "local"; path: string } | { error: string };
 
 export function resolvePermissionEditorTarget(
@@ -169,6 +174,17 @@ function escapeRegExpLiteral(value: string): string {
 
 function exactPattern(value: string): string {
   return `^${escapeRegExpLiteral(value)}$`;
+}
+
+/** Prompt prefix surfacing the agent-supplied call reason, when present. */
+function reasonPrefix(input: unknown): string {
+  const reason = (input as { reason?: unknown } | undefined)?.reason;
+  return typeof reason === "string" && reason.trim() ? `Reason: ${reason.trim()}\n\n` : "";
+}
+
+/** Blocked result for a user denial; steering text is embedded so the reason stays bound to the exact invocation's result. */
+function deniedResult(base: string, result: PermissionResult): ToolCallEventResult {
+  return { block: true, reason: result.steering ? `${base} (reason: ${result.steering})` : base };
 }
 
 function permissionResultAudit(result: PermissionResult): Pick<AuditEntry, "pattern" | "scope" | "steering"> {
@@ -470,6 +486,7 @@ async function presentScrollablePermission(
   allowPattern: AllowPatternOption | undefined,
   stickyHeader: string | undefined,
   signal: AbortSignal,
+  toolCallId: string | undefined,
 ): Promise<PermissionResult> {
   if (ctx.mode !== "tui" || !ctx.ui.custom) {
     const bodyWithHeader = stickyHeader ? `${stickyHeader}\n\n${body}` : body;
@@ -520,7 +537,10 @@ async function presentScrollablePermission(
     if (signal.aborted) queueMicrotask(onAbort);
 
     const finishWithSteering = (result: PermissionResult, steering: string): void => {
-      pi.sendUserMessage(steering, { deliverAs: "steer" });
+      // Denials carry the steering text inside the invocation-bound block
+      // reason (see deniedResult). Allows annotate the invocation-bound tool
+      // result (see the tool_result handler) — no floating steer messages.
+      if (result.allowed && toolCallId) pendingSteering.set(toolCallId, steering);
       done({ ...result, steering });
     };
 
@@ -671,7 +691,7 @@ function permissionParentSessionId(ctx: PermissionContext): string {
 async function askScrollablePermission(
   pi: Pick<ExtensionAPI, "sendUserMessage">,
   ctx: PermissionContext,
-  request: Pick<ToolRequest, "actor" | "toolName" | "cwd" | "input">,
+  request: Pick<ToolRequest, "actor" | "toolName" | "cwd" | "input" | "toolCallId">,
   title: string,
   body: string,
   allowPattern?: AllowPatternOption,
@@ -686,7 +706,7 @@ async function askScrollablePermission(
     present: async (signal) => {
       logSubagentDebug("permission-queue-present", { identity });
       try {
-        const result = await presentScrollablePermission(pi, ctx, title, body, allowPattern, stickyHeader, signal);
+        const result = await presentScrollablePermission(pi, ctx, title, body, allowPattern, stickyHeader, signal, request.toolCallId);
         logSubagentDebug("permission-queue-settle", { identity, decision: result.decision });
         return result;
       } catch (error) {
@@ -892,14 +912,14 @@ async function handlePathPermission(toolName: string, input: PathToolInput, ctx:
   const result = await askScrollablePermission(
     pi,
     ctx,
-    { actor: { kind: "main" }, toolName, input: normalizedInput, cwd: ctx.cwd },
+    { actor: { kind: "main" }, toolName, input: normalizedInput, cwd: ctx.cwd, toolCallId: ctx.toolCallId },
     `Allow external ${toolName} path?`,
     `pi wants to use ${toolName} on a path outside the project directory.\n\nProject: ${canonical.cwd}\nPath: ${absolutePath}\n\nRules are stored under permissions.read in ${getUserPermissionsPath()}.`,
     { toolName, suggestedRule: { path: exactPattern(absolutePath) }, subject: absolutePath },
   );
 
   audit({ tool: toolName, decision: result.decision, cwd: ctx.cwd, path: absolutePath, ...permissionResultAudit(result) });
-  if (!result.allowed) return { block: true, reason: `User denied external ${toolName} path.` };
+  if (!result.allowed) return deniedResult(`User denied external ${toolName} path.`, result);
 }
 
 async function handleReadPermission(input: ReadInput, ctx: PermissionContext, pi: ExtensionAPI): Promise<ToolCallEventResult> {
@@ -943,7 +963,7 @@ async function handleSubagentResultExportPermission(input: SubagentResultExportI
   const result = await askScrollablePermission(
     pi,
     ctx,
-    { actor: { kind: "main" }, toolName: "write", input: { path: absolutePath }, cwd: ctx.cwd },
+    { actor: { kind: "main" }, toolName: "write", input: { path: absolutePath }, cwd: ctx.cwd, toolCallId: ctx.toolCallId },
     "Export subagent result?",
     [
       "Export full versioned child context to a local file.",
@@ -957,7 +977,7 @@ async function handleSubagentResultExportPermission(input: SubagentResultExportI
   );
 
   audit({ tool: "write", decision: result.decision, cwd: ctx.cwd, path: absolutePath, ...permissionResultAudit(result) });
-  if (!result.allowed) return { block: true, reason: "User denied write." };
+  if (!result.allowed) return deniedResult("User denied write.", result);
 }
 
 async function handleFileEditPermission(toolName: string, input: FileEditInput, ctx: PermissionContext, pi: ExtensionAPI): Promise<ToolCallEventResult> {
@@ -998,15 +1018,15 @@ async function handleFileEditPermission(toolName: string, input: FileEditInput, 
   const result = await askScrollablePermission(
     pi,
     ctx,
-    { actor: { kind: "main" }, toolName, input: { ...input, path: absolutePath }, cwd: ctx.cwd },
+    { actor: { kind: "main" }, toolName, input: { ...input, path: absolutePath }, cwd: ctx.cwd, toolCallId: ctx.toolCallId },
     prompt.title,
-    prompt.body,
+    reasonPrefix(input) + prompt.body,
     { toolName, suggestedRule: { path: exactPattern(absolutePath) }, subject: absolutePath },
     `Path: ${requestedPath || absolutePath}`,
   );
 
   audit({ tool: toolName, decision: result.decision, cwd: ctx.cwd, path: absolutePath, ...permissionResultAudit(result) });
-  if (!result.allowed) return { block: true, reason: `User denied ${toolName}.` };
+  if (!result.allowed) return deniedResult(`User denied ${toolName}.`, result);
 }
 
 async function handleBashPermission(input: BashInput, ctx: PermissionContext, pi: ExtensionAPI): Promise<ToolCallEventResult> {
@@ -1030,14 +1050,14 @@ async function handleBashPermission(input: BashInput, ctx: PermissionContext, pi
   const result = await askScrollablePermission(
     pi,
     ctx,
-    { actor: { kind: "main" }, toolName: "bash", input, cwd: ctx.cwd },
+    { actor: { kind: "main" }, toolName: "bash", input, cwd: ctx.cwd, toolCallId: ctx.toolCallId },
     "Allow bash command?",
-    `pi wants to run this shell command.\n\n${compact(command)}\n\nRules are stored under permissions.bash in ${getUserPermissionsPath()}.`,
+    reasonPrefix(input) + `pi wants to run this shell command.\n\n${compact(command)}\n\nRules are stored under permissions.bash in ${getUserPermissionsPath()}.`,
     { toolName: "bash", suggestedRule: { command: exactPattern(command) }, subject: command },
   );
 
   audit({ tool: "bash", decision: result.decision, cwd: ctx.cwd, command, ...permissionResultAudit(result) });
-  if (!result.allowed) return { block: true, reason: "User denied bash command." };
+  if (!result.allowed) return deniedResult("User denied bash command.", result);
 }
 
 async function handleSubagentPermission(input: SubagentInput, ctx: PermissionContext, pi: ExtensionAPI): Promise<ToolCallEventResult> {
@@ -1074,7 +1094,7 @@ async function handleSubagentPermission(input: SubagentInput, ctx: PermissionCon
   const result = await askScrollablePermission(
     pi,
     ctx,
-    { actor: { kind: "main" }, toolName: "subagent", input, cwd: ctx.cwd },
+    { actor: { kind: "main" }, toolName: "subagent", input, cwd: ctx.cwd, toolCallId: ctx.toolCallId },
     requiresRuntimeApproval ? "Allow subagent delegation with selected runtime?" : "Allow subagent delegation?",
     [
       "pi wants to delegate work to one or more child agents.",
@@ -1097,7 +1117,7 @@ async function handleSubagentPermission(input: SubagentInput, ctx: PermissionCon
   );
 
   audit({ tool: "subagent", decision: result.decision, cwd: ctx.cwd, ...permissionResultAudit(result) });
-  if (!result.allowed) return { block: true, reason: "User denied subagent delegation." };
+  if (!result.allowed) return deniedResult("User denied subagent delegation.", result);
 }
 
 function isKnownMcpTool(toolName: string, pi: ExtensionAPI): boolean {
@@ -1128,7 +1148,7 @@ async function handleUnknownToolPermission(toolName: string, input: unknown, ctx
   const result = await askScrollablePermission(
     pi,
     ctx,
-    { actor: { kind: "main" }, toolName, input, cwd: ctx.cwd },
+    { actor: { kind: "main" }, toolName, input, cwd: ctx.cwd, toolCallId: ctx.toolCallId },
     `Allow ${toolName}?`,
     [
       knownMcpTool ? "pi wants to call a known MCP tool without a matching permission rule." : "pi wants to call a tool without a specific permission rule.",
@@ -1142,7 +1162,7 @@ async function handleUnknownToolPermission(toolName: string, input: unknown, ctx
   );
 
   audit({ tool: toolName, decision: result.decision, cwd: ctx.cwd, ...permissionResultAudit(result) });
-  if (!result.allowed) return { block: true, reason: `User denied ${toolName}.` };
+  if (!result.allowed) return deniedResult(`User denied ${toolName}.`, result);
 }
 
 export default function toolPermissionPolicy(pi: ExtensionAPI) {
@@ -1170,10 +1190,28 @@ export default function toolPermissionPolicy(pi: ExtensionAPI) {
   });
 
   pi.on("session_shutdown", (_event, ctx) => {
+    pendingSteering.clear();
     closePermissionPromptQueue(permissionParentSessionId(ctx));
   });
 
-  pi.on("tool_call", async (event, ctx) => {
+  pi.on("tool_result", (event) => {
+    const steering = pendingSteering.get(event.toolCallId);
+    if (!steering) return undefined;
+    pendingSteering.delete(event.toolCallId);
+    return {
+      content: [
+        ...event.content,
+        // Providers may join text blocks into one string, so the marker text
+        // itself must signal this is not part of the tool's own output.
+        { type: "text", text: `\n\n<user-steering source="permission-prompt">\n${steering}\n</user-steering>` },
+      ],
+    };
+  });
+
+  pi.on("tool_call", async (event, extensionContext) => {
+    // Bind the pi tool-call identity to this invocation so prompts and
+    // steering messages can reference the exact call.
+    const ctx = { ...extensionContext, toolCallId: event.toolCallId };
     // Child sessions expose this bridge as their only tool. Its payload is
     // authorized by the parent boundary, so the child-side policy must not
     // intercept it as an unknown standalone tool.

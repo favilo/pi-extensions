@@ -5,6 +5,8 @@ export type ToolRequest = {
   toolName: string;
   input: unknown;
   cwd: string;
+  /** The pi tool-call identity, when the request originates from a tool_call event. */
+  toolCallId?: string;
   steering?: string;
 };
 
