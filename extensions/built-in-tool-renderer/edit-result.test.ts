@@ -108,6 +108,46 @@ test("the bash call renders the reason when present", () => {
   assert.match(rendered, /verify the refactor is green/);
 });
 
+test("a steered bash result renders the steering annotation", () => {
+  const renderer = captureTool("bash");
+  const rendered = renderer
+    .renderResult(
+      {
+        content: [
+          { type: "text", text: "exit code: 0" },
+          { type: "text", text: '\n\n<user-steering source="permission-prompt">\nonly this once\n</user-steering>' },
+        ],
+      },
+      { expanded: false, isPartial: false },
+      theme,
+      { isError: false },
+    )
+    .render(120)
+    .join("\n");
+
+  assert.match(rendered, /only this once/);
+});
+
+test("a steered edit result renders the steering annotation", () => {
+  const renderer = captureEditRenderer();
+  const rendered = renderer
+    .renderResult(
+      {
+        content: [
+          { type: "text", text: "Done" },
+          { type: "text", text: '\n\n<user-steering source="permission-prompt">\nwatch the casing\n</user-steering>' },
+        ],
+      },
+      { expanded: false, isPartial: false },
+      theme,
+      { isError: false },
+    )
+    .render(120)
+    .join("\n");
+
+  assert.match(rendered, /watch the casing/);
+});
+
 test("calls without a reason render exactly as before", () => {
   const edit = captureEditRenderer()
     .renderCall!({ path: "/tmp/file.txt", edits: [] }, theme)
