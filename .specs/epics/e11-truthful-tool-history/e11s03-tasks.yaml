@@ -1,6 +1,6 @@
 story_id: e11s03
 title: Show complete Bash commands and output in expanded history
-status: todo
+status: passing
 bcps: 3
 delta: MODIFIED
 spec: e11s03-complete-bash-history.md
@@ -8,15 +8,15 @@ tasks:
   - id: 1
     description: Add rendering contracts for collapsed and expanded long and multiline Bash commands.
     verify: node --test extensions/built-in-tool-renderer/bash-history.test.ts
-    status: todo
+    status: passing
     risk: P2
   - id: 2
     description: Render the full command and all retained output only in expanded history while preserving truncation notices.
     verify: node --test extensions/built-in-tool-renderer/bash-history.test.ts
-    status: todo
+    status: passing
     risk: P2
   - id: 3
     description: Run complete package checks.
-    verify: npm run check
-    status: todo
+    verify: npm run check:ci
+    status: passing
     risk: P2

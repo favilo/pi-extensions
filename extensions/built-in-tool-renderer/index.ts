@@ -125,17 +125,30 @@ export default function (pi: ExtensionAPI) {
       return originalBash.execute(toolCallId, withoutReason(params), signal, onUpdate);
     },
 
-    renderCall(args, theme, _context) {
+    renderCall(args, theme, context) {
       let text = theme.fg("toolTitle", theme.bold("$ "));
-      const cmd = args.command.length > 80 ? `${args.command.slice(0, 77)}...` : args.command;
-      text += theme.fg("accent", cmd);
+      const fullCmd = args.command;
+      const firstLine = fullCmd.split("\n")[0];
+      const isMultiline = fullCmd.includes("\n");
+      let cmdDisplay: string;
+      if (context?.expanded) {
+        cmdDisplay = fullCmd;
+      } else if (isMultiline || firstLine.length > 80) {
+        cmdDisplay = firstLine.length > 77 ? `${firstLine.slice(0, 77)}...` : `${firstLine}...`;
+      } else {
+        cmdDisplay = firstLine;
+      }
+      text += theme.fg("accent", cmdDisplay);
       if (args.timeout) text += theme.fg("dim", ` (timeout: ${args.timeout}s)`);
       text += reasonSuffix(args, theme);
       return new Text(text, 0, 0);
     },
 
-    renderResult(result, { expanded, isPartial }, theme, _context) {
+    renderResult(result, { expanded, isPartial }, theme, context) {
       if (isPartial) return new Text(theme.fg("warning", "Running..."), 0, 0);
+
+      const errorText = toolErrorText(result, context.isError, "Bash failed");
+      if (errorText) return withSteering(theme.fg("error", errorText), result, theme);
 
       const details = result.details as BashToolDetails | undefined;
       const content = result.content[0];
@@ -151,9 +164,8 @@ export default function (pi: ExtensionAPI) {
 
       if (expanded) {
         const fullOutput = toolOutputTexts(result).join("\n");
-        const lines = fullOutput.split("\n").slice(0, 20);
+        const lines = fullOutput.split("\n");
         for (const line of lines) text += `\n${theme.fg("dim", line)}`;
-        if (fullOutput.split("\n").length > 20) text += `\n${theme.fg("muted", "... more output")}`;
       }
 
       return withSteering(text, result, theme);
