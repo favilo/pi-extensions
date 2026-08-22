@@ -108,9 +108,9 @@ test("the bash call renders the reason when present", () => {
   assert.match(rendered, /verify the refactor is green/);
 });
 
-test("a steered bash result renders the steering annotation", () => {
+test("a steered bash result renders the steering annotation at the top", () => {
   const renderer = captureTool("bash");
-  const rendered = renderer
+  const lines = renderer
     .renderResult(
       {
         content: [
@@ -122,10 +122,10 @@ test("a steered bash result renders the steering annotation", () => {
       theme,
       { isError: false },
     )
-    .render(120)
-    .join("\n");
+    .render(120);
 
-  assert.match(rendered, /only this once/);
+  assert.match(lines[0], /steering: only this once/);
+  assert.match(lines[1], /done/);
 });
 
 test("a steered edit result renders the steering annotation", () => {

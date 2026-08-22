@@ -55,10 +55,11 @@ function reasonSuffix(args: Record<string, unknown>, theme: Theme): string {
 
 type RenderableResult = { content: Array<{ type: string; text?: string }> };
 
-/** Finalize a rendered result, appending the steering line when the result carries an annotation. */
+/** Finalize a rendered result, prepending the steering line when the result carries an annotation. */
 function withSteering(text: string, result: RenderableResult, theme: Theme): Text {
   const steering = steeringAnnotation(result);
-  return new Text(text + (steering ? `\n${theme.fg("warning", `steering: ${steering}`)}` : ""), 0, 0);
+  const leading = steering ? `${theme.fg("warning", `steering: ${steering}`)}\n` : "";
+  return new Text(leading + text, 0, 0);
 }
 
 export default function (pi: ExtensionAPI) {
