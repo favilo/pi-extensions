@@ -8,6 +8,7 @@ import { appendFileSync, chmodSync, closeSync, constants as fsConstants, existsS
 import { tmpdir } from "node:os";
 import { basename, dirname, join, relative, resolve } from "node:path";
 import { createAuditLogger } from "./audit.ts";
+import { preflightEdit, type EditPair } from "./edit-preflight.ts";
 import { attachChildRuntimeSelection, resolveChildRuntimeSelection } from "../subagent/account-runtime.ts";
 import {
   parsePermissionRuleJson,
@@ -47,7 +48,13 @@ export type PermissionContext = {
 
 type ReadInput = { path?: unknown };
 type PathToolInput = { path?: unknown };
-type FileEditInput = { path?: unknown };
+type FileEditInput = { path?: unknown; edits?: unknown };
+
+function isEditPair(value: unknown): value is EditPair {
+  if (!value || typeof value !== "object") return false;
+  const edit = value as Record<string, unknown>;
+  return typeof edit.oldText === "string" && typeof edit.newText === "string";
+}
 type BashInput = { command?: unknown };
 type SubagentInput = {
   agent?: unknown;
@@ -963,6 +970,13 @@ async function handleFileEditPermission(toolName: string, input: FileEditInput, 
     const reason = `Blocked ${toolName}: ${error instanceof Error ? error.message : String(error)}`;
     audit({ tool: toolName, decision: "deny_path_resolution", cwd: ctx.cwd, reason });
     return { block: true, reason };
+  }
+  if (toolName === "edit" && Array.isArray(input.edits) && input.edits.every(isEditPair)) {
+    const preflight = await preflightEdit(absolutePath, input.edits);
+    if (!preflight.ok) {
+      audit({ tool: toolName, decision: "deny_preflight", cwd: ctx.cwd, path: absolutePath, reason: preflight.reason });
+      return { block: true, reason: preflight.reason };
+    }
   }
   const decision = configuredDecision(toolName, { ...input, path: absolutePath }, ctx.cwd);
   const configurationResult = await handleConfigurationDiagnostic(decision, ctx, pi);
