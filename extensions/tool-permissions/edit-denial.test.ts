@@ -100,7 +100,7 @@ test("a denied edit without steering blocks with the canonical denial reason", a
   }
 });
 
-test("a denied edit with steering delivers the reason to the agent as a steer message", async () => {
+test("a denied edit with steering embeds the reason in the invocation-bound result", async () => {
   const harness = await denialHarness();
   try {
     const input = { ...VALID_EDIT(), path: join(harness.project, "file.txt") };
@@ -110,10 +110,29 @@ test("a denied edit with steering delivers the reason to the agent as a steer me
       promptingCtx(harness.project, ["\t", ...typeText("do not touch this file"), "\x04"]),
     );
 
-    assert.deepEqual(result, { block: true, reason: "User denied edit." });
-    assert.deepEqual(harness.steerMessages, [
-      { text: "do not touch this file", options: { deliverAs: "steer" } },
-    ]);
+    assert.deepEqual(result, {
+      block: true,
+      reason: "User denied edit. (reason: do not touch this file)",
+    });
+    assert.deepEqual(harness.steerMessages, [], "denial steering belongs in the invocation-bound result, not a floating steer message");
+  } finally {
+    harness.cleanup();
+  }
+});
+
+test("a denied bash command with steering embeds the reason in the result", async () => {
+  const harness = await denialHarness();
+  try {
+    const result = await harness.toolCall(
+      { toolName: "bash", input: { command: "rm -rf build" } },
+      promptingCtx(harness.project, ["\t", ...typeText("never delete the build dir"), "\x04"]),
+    );
+
+    assert.deepEqual(result, {
+      block: true,
+      reason: "User denied bash command. (reason: never delete the build dir)",
+    });
+    assert.deepEqual(harness.steerMessages, []);
   } finally {
     harness.cleanup();
   }
