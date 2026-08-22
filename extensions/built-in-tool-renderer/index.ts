@@ -26,7 +26,7 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import { Text } from "@earendil-works/pi-tui";
 import { registerPublishedTool } from "../tool-registry/index.ts";
-import { toolErrorText } from "./result.ts";
+import { steeringAnnotation, toolErrorText } from "./result.ts";
 
 const reasonParameterSchema = {
   type: "string",
@@ -139,6 +139,9 @@ export default function (pi: ExtensionAPI) {
       text += theme.fg("dim", ` (${lineCount} lines)`);
 
       if (details?.truncation?.truncated) text += theme.fg("warning", " [truncated]");
+
+      const steering = steeringAnnotation(result);
+      if (steering) text += `\n${theme.fg("warning", `steering: ${steering}`)}`;
 
       if (expanded) {
         const lines = output.split("\n").slice(0, 20);
@@ -303,7 +306,10 @@ export default function (pi: ExtensionAPI) {
         return new Text(theme.fg("error", content.text.split("\n")[0]), 0, 0);
       }
 
-      if (!details?.diff) return new Text(theme.fg("success", "Applied"), 0, 0);
+      const editSteering = steeringAnnotation(result);
+      const steeringLine = editSteering ? `\n${theme.fg("warning", `steering: ${editSteering}`)}` : "";
+
+      if (!details?.diff) return new Text(theme.fg("success", "Applied") + steeringLine, 0, 0);
 
       const diffLines = details.diff.split("\n");
       let additions = 0;
@@ -326,7 +332,7 @@ export default function (pi: ExtensionAPI) {
         if (diffLines.length > 30) text += `\n${theme.fg("muted", `... ${diffLines.length - 30} more diff lines`)}`;
       }
 
-      return new Text(text, 0, 0);
+      return new Text(text + steeringLine, 0, 0);
     },
   });
 
@@ -356,7 +362,12 @@ export default function (pi: ExtensionAPI) {
       const errorText = toolErrorText(result, context.isError, "Write failed");
       if (errorText) return new Text(theme.fg("error", errorText), 0, 0);
 
-      return new Text(theme.fg("success", "Written"), 0, 0);
+      const writeSteering = steeringAnnotation(result);
+      return new Text(
+        theme.fg("success", "Written") + (writeSteering ? `\n${theme.fg("warning", `steering: ${writeSteering}`)}` : ""),
+        0,
+        0,
+      );
     },
   });
 }
