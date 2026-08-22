@@ -313,7 +313,7 @@ export default function (pi: ExtensionAPI) {
         return new Text(theme.fg("error", content.text.split("\n")[0]), 0, 0);
       }
 
-      if (!details?.diff) return withSteering(theme.fg("success", "Edited"), result, theme);
+      if (!details?.diff) return withSteering(theme.fg("warning", "No diff supplied"), result, theme);
 
       const diffLines = details.diff.split("\n");
       let additions = 0;

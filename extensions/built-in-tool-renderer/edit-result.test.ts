@@ -58,7 +58,7 @@ test("a failed edit renders its reason, never success text", () => {
   }, true);
 
   assert.match(rendered, /Could not find the exact text/);
-  assert.doesNotMatch(rendered, /Edited/);
+  assert.doesNotMatch(rendered, /No diff supplied/);
 });
 
 test("a blocked edit renders the block reason, never success text", () => {
@@ -68,16 +68,16 @@ test("a blocked edit renders the block reason, never success text", () => {
   }, true);
 
   assert.match(rendered, /User denied edit/);
-  assert.doesNotMatch(rendered, /Edited/);
+  assert.doesNotMatch(rendered, /No diff supplied/);
 });
 
-test("a successful edit without a diff renders Edited", () => {
+test("a successful edit without a diff renders No diff supplied", () => {
   const renderer = captureEditRenderer();
   const rendered = renderEdit(renderer, {
     content: [{ type: "text", text: "Done" }],
   }, false);
 
-  assert.match(rendered, /Edited/);
+  assert.match(rendered, /No diff supplied/);
 });
 
 test("the edit and bash tool schemas admit an optional reason", () => {
