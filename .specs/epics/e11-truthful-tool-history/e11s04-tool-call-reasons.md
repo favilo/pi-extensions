@@ -19,6 +19,12 @@ When an agent requests a tool — especially `edit` or `bash` — the user appro
 - Calls without a reason render unchanged in both the prompt and history.
 - The reason shown in history is the same agent-facing value shown at decision time, not a presentation-only reconstruction.
 
+## Discovery notes (2026-08-21)
+- No reason channel exists for tool calls today: the `tool_call` extension event carries only `{ toolName, toolCallId, input }`.
+- Pi core *does* have the assistant message at decision time — `beforeToolCall` receives `{ assistantMessage, toolCall, args, context }` in the agent loop — but the extension runner drops it when emitting `tool_call`. Extending that event (or a schema-level `reason` parameter) are the two candidate channels.
+- Deny+steer (e11s02) solved the user→agent direction by embedding the reason in the invocation-bound blocked result; the agent→user direction has no equivalent.
+- Chosen channel (2026-08-21): an optional `reason` parameter injected into built-in tool schemas by the extension layer (built-in-tool-renderer already re-registers those tools). Tool-call arguments are protocol-bound to the toolCallId, so no identity plumbing is needed. The wrapper strips `reason` before delegating to the original execute; the permission prompt and history renderer read it from the call args. No pi-core change required.
+
 ## Verification
 - `node --test extensions/tool-permissions/reason-display.test.ts`
 - `node --test extensions/built-in-tool-renderer/result.test.ts`

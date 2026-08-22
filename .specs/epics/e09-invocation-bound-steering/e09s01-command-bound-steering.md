@@ -23,3 +23,10 @@ When several tool calls are pending, steering entered from a permission prompt m
 ## Human added:
 Look into toolCallId, we could possibly use that to identify the exact tool
 invocation without using a lot of tokens
+
+## Progress note (2026-08-21, e11s02)
+Deny+steer is now invocation-bound for free: the steering text is embedded in
+the blocked tool result (`User denied <tool>. (reason: …)`), and a tool result
+is protocol-bound to its toolCallId — no identity tokens spent. Remaining for
+this story: allow-with-steering still travels as a floating steer message, and
+steering text does not yet include a safe invocation summary.
