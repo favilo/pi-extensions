@@ -54,16 +54,18 @@ test("collapsed bash result keeps compact summary and truncated call preview", (
   assert.doesNotMatch(resultText, /line 1/);
 });
 
-test("expanded bash result includes full unshortened command before output", () => {
+test("expanded bash call renders full unshortened multiline command at top", () => {
   const bash = captureTool("bash");
   const longCmd = "echo " + "x".repeat(120) + "\nline 2 of command";
-  const resultText = bash.renderResult({
-    content: [{ type: "text", text: "exit code: 0\noutput line 1" }],
-  }, { expanded: true, isPartial: false }, theme, { args: { command: longCmd }, isError: false } as never).render(120).join("\n");
+  const callText = bash.renderCall!(
+    { command: longCmd },
+    theme,
+    { args: { command: longCmd }, expanded: true, isError: false } as never,
+  ).render(120).join("\n");
 
-  assert.match(resultText, new RegExp("x".repeat(120)));
-  assert.match(resultText, /line 2 of command/);
-  assert.match(resultText, /output line 1/);
+  assert.match(callText, new RegExp("x".repeat(120)));
+  assert.match(callText, /line 2 of command/);
+  assert.doesNotMatch(callText, /\.\.\./);
 });
 
 test("expanded bash result renders all output lines beyond 20 lines", () => {
