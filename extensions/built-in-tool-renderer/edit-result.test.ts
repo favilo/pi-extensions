@@ -172,6 +172,22 @@ test("an expanded bash result renders every non-annotation text part", () => {
   assert.equal(rendered.match(/only this once/g)?.length, 1, "the annotation renders once, via the steering line");
 });
 
+test("read, grep, find, and ls results render steering annotations", () => {
+  const steered = {
+    content: [
+      { type: "text", text: "some output" },
+      { type: "text", text: '\n\n<user-steering source="permission-prompt">\nlook closer at this\n</user-steering>' },
+    ],
+  };
+  for (const name of ["read", "grep", "find", "ls"]) {
+    const rendered = captureTool(name)
+      .renderResult(steered, { expanded: false, isPartial: false }, theme, { isError: false })
+      .render(120)
+      .join("\n");
+    assert.match(rendered, /look closer at this/, `${name} must render the steering annotation`);
+  }
+});
+
 test("calls without a reason render exactly as before", () => {
   const edit = captureEditRenderer()
     .renderCall!({ path: "/tmp/file.txt", edits: [] }, theme)
