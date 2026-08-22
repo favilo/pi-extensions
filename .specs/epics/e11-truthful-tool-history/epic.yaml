@@ -11,14 +11,14 @@ stories:
   - id: e11s01
     title: Return deterministic edit failures to the agent before permission prompts
     bcps: 3
-    status: todo
+    status: passing
     delta: MODIFIED
     spec: e11s01-edit-preflight-failures.md
     tasks: e11s01-tasks.yaml
   - id: e11s02
     title: Return denied edit outcomes and reasons to the agent
     bcps: 2
-    status: todo
+    status: passing
     delta: MODIFIED
     spec: e11s02-edit-denial-rendering.md
     tasks: e11s02-tasks.yaml
@@ -32,7 +32,7 @@ stories:
   - id: e11s04
     title: Show tool-call reasons in permission prompts and history
     bcps: 4
-    status: todo
+    status: passing
     delta: MODIFIED
     spec: e11s04-tool-call-reasons.md
     tasks: e11s04-tasks.yaml
