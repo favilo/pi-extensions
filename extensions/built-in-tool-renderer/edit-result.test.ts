@@ -51,33 +51,33 @@ function renderEdit(renderer: EditRenderer, result: RenderedResult, isError: boo
     .join("\n");
 }
 
-test("a failed edit renders its reason, never Applied", () => {
+test("a failed edit renders its reason, never success text", () => {
   const renderer = captureEditRenderer();
   const rendered = renderEdit(renderer, {
     content: [{ type: "text", text: "Could not find the exact text in /tmp/file.txt. The old text must match exactly including all whitespace and newlines." }],
   }, true);
 
   assert.match(rendered, /Could not find the exact text/);
-  assert.doesNotMatch(rendered, /Applied/);
+  assert.doesNotMatch(rendered, /Edited/);
 });
 
-test("a blocked edit renders the block reason, never Applied", () => {
+test("a blocked edit renders the block reason, never success text", () => {
   const renderer = captureEditRenderer();
   const rendered = renderEdit(renderer, {
     content: [{ type: "text", text: "User denied edit." }],
   }, true);
 
   assert.match(rendered, /User denied edit/);
-  assert.doesNotMatch(rendered, /Applied/);
+  assert.doesNotMatch(rendered, /Edited/);
 });
 
-test("a successful edit without a diff still renders Applied", () => {
+test("a successful edit without a diff renders Edited", () => {
   const renderer = captureEditRenderer();
   const rendered = renderEdit(renderer, {
     content: [{ type: "text", text: "Done" }],
   }, false);
 
-  assert.match(rendered, /Applied/);
+  assert.match(rendered, /Edited/);
 });
 
 test("the edit and bash tool schemas admit an optional reason", () => {

@@ -53,6 +53,14 @@ function reasonSuffix(args: Record<string, unknown>, theme: Theme): string {
   return typeof reason === "string" && reason.trim() ? `\n${theme.fg("dim", `reason: ${reason.trim()}`)}` : "";
 }
 
+type RenderableResult = { content: Array<{ type: string; text?: string }> };
+
+/** Finalize a rendered result, appending the steering line when the result carries an annotation. */
+function withSteering(text: string, result: RenderableResult, theme: Theme): Text {
+  const steering = steeringAnnotation(result);
+  return new Text(text + (steering ? `\n${theme.fg("warning", `steering: ${steering}`)}` : ""), 0, 0);
+}
+
 export default function (pi: ExtensionAPI) {
   const cwd = process.cwd();
 
@@ -101,7 +109,7 @@ export default function (pi: ExtensionAPI) {
         if (lineCount > 15) text += `\n${theme.fg("muted", `... ${lineCount - 15} more lines`)}`;
       }
 
-      return new Text(text, 0, 0);
+      return withSteering(text, result, theme);
     },
   });
 
@@ -140,9 +148,6 @@ export default function (pi: ExtensionAPI) {
 
       if (details?.truncation?.truncated) text += theme.fg("warning", " [truncated]");
 
-      const steering = steeringAnnotation(result);
-      if (steering) text += `\n${theme.fg("warning", `steering: ${steering}`)}`;
-
       if (expanded) {
         const fullOutput = toolOutputTexts(result).join("\n");
         const lines = fullOutput.split("\n").slice(0, 20);
@@ -150,7 +155,7 @@ export default function (pi: ExtensionAPI) {
         if (fullOutput.split("\n").length > 20) text += `\n${theme.fg("muted", "... more output")}`;
       }
 
-      return new Text(text, 0, 0);
+      return withSteering(text, result, theme);
     },
   });
 
@@ -193,7 +198,7 @@ export default function (pi: ExtensionAPI) {
         if (lines.length > 20) text += `\n${theme.fg("muted", `... ${lines.length - 20} more matches`)}`;
       }
 
-      return new Text(text, 0, 0);
+      return withSteering(text, result, theme);
     },
   });
 
@@ -233,7 +238,7 @@ export default function (pi: ExtensionAPI) {
         if (lines.length > 20) text += `\n${theme.fg("muted", `... ${lines.length - 20} more paths`)}`;
       }
 
-      return new Text(text, 0, 0);
+      return withSteering(text, result, theme);
     },
   });
 
@@ -272,7 +277,7 @@ export default function (pi: ExtensionAPI) {
         if (lines.length > 20) text += `\n${theme.fg("muted", `... ${lines.length - 20} more entries`)}`;
       }
 
-      return new Text(text, 0, 0);
+      return withSteering(text, result, theme);
     },
   });
 
@@ -307,10 +312,7 @@ export default function (pi: ExtensionAPI) {
         return new Text(theme.fg("error", content.text.split("\n")[0]), 0, 0);
       }
 
-      const editSteering = steeringAnnotation(result);
-      const steeringLine = editSteering ? `\n${theme.fg("warning", `steering: ${editSteering}`)}` : "";
-
-      if (!details?.diff) return new Text(theme.fg("success", "Applied") + steeringLine, 0, 0);
+      if (!details?.diff) return withSteering(theme.fg("success", "Edited"), result, theme);
 
       const diffLines = details.diff.split("\n");
       let additions = 0;
@@ -333,7 +335,7 @@ export default function (pi: ExtensionAPI) {
         if (diffLines.length > 30) text += `\n${theme.fg("muted", `... ${diffLines.length - 30} more diff lines`)}`;
       }
 
-      return new Text(text + steeringLine, 0, 0);
+      return withSteering(text, result, theme);
     },
   });
 
@@ -363,12 +365,7 @@ export default function (pi: ExtensionAPI) {
       const errorText = toolErrorText(result, context.isError, "Write failed");
       if (errorText) return new Text(theme.fg("error", errorText), 0, 0);
 
-      const writeSteering = steeringAnnotation(result);
-      return new Text(
-        theme.fg("success", "Written") + (writeSteering ? `\n${theme.fg("warning", `steering: ${writeSteering}`)}` : ""),
-        0,
-        0,
-      );
+      return withSteering(theme.fg("success", "Written"), result, theme);
     },
   });
 }
