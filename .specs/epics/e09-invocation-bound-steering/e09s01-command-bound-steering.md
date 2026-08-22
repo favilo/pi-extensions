@@ -19,3 +19,7 @@ When several tool calls are pending, steering entered from a permission prompt m
 ## Verification
 - `node --test extensions/tool-permissions/steering-context.test.ts`
 - `npm run check`
+
+## Human added:
+Look into toolCallId, we could possibly use that to identify the exact tool
+invocation without using a lot of tokens

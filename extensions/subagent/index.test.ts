@@ -100,16 +100,30 @@ test("launching a subagent sets UI status, widget, and registers child panel in 
     },
   };
 
-  const launchResult = await subagentTool.execute("launch-1", {
-    task: "inspect repo",
-    createSession: async () => ({
-      sessionId: "child-mock-1234",
-      prompt: async () => {},
-      subscribe: () => () => {},
-      dispose: () => {},
-    }),
-  }, undefined, undefined, ctx) as { details: { id: string } };
+  let createSessionCalled = false;
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (() => {
+    throw new Error("network access is forbidden in unit tests");
+  }) as typeof fetch;
+  let launchResult: { details: { id: string } };
+  try {
+    launchResult = await subagentTool.execute("launch-1", {
+      task: "inspect repo",
+      createSession: async () => {
+        createSessionCalled = true;
+        return {
+          sessionId: "child-mock-1234",
+          prompt: async () => {},
+          subscribe: () => () => {},
+          dispose: () => {},
+        };
+      },
+    }, undefined, undefined, ctx) as { details: { id: string } };
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
   assert.ok(launchResult.details.id);
+  assert.equal(createSessionCalled, true, "launch must use the injected createSession seam");
 
   assert.match(statuses.get("subagent") ?? "", /Subagent running/);
   assert.equal((widgets.get("subagent") ?? []).length > 0, true);
