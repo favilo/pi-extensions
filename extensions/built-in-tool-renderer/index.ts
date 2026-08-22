@@ -263,8 +263,11 @@ export default function (pi: ExtensionAPI) {
       return new Text(text, 0, 0);
     },
 
-    renderResult(result, { expanded, isPartial }, theme, _context) {
+    renderResult(result, { expanded, isPartial }, theme, context) {
       if (isPartial) return new Text(theme.fg("warning", "Editing..."), 0, 0);
+
+      const errorText = toolErrorText(result, context.isError, "Edit failed");
+      if (errorText) return new Text(theme.fg("error", errorText), 0, 0);
 
       const details = result.details as EditToolDetails | undefined;
       const content = result.content[0];
