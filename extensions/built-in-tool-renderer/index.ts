@@ -26,7 +26,7 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import { Text } from "@earendil-works/pi-tui";
 import { registerPublishedTool } from "../tool-registry/index.ts";
-import { steeringAnnotation, toolErrorText } from "./result.ts";
+import { steeringAnnotation, toolErrorText, toolOutputTexts } from "./result.ts";
 
 const reasonParameterSchema = {
   type: "string",
@@ -144,9 +144,10 @@ export default function (pi: ExtensionAPI) {
       if (steering) text += `\n${theme.fg("warning", `steering: ${steering}`)}`;
 
       if (expanded) {
-        const lines = output.split("\n").slice(0, 20);
+        const fullOutput = toolOutputTexts(result).join("\n");
+        const lines = fullOutput.split("\n").slice(0, 20);
         for (const line of lines) text += `\n${theme.fg("dim", line)}`;
-        if (output.split("\n").length > 20) text += `\n${theme.fg("muted", "... more output")}`;
+        if (fullOutput.split("\n").length > 20) text += `\n${theme.fg("muted", "... more output")}`;
       }
 
       return new Text(text, 0, 0);
