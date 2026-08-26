@@ -1,9 +1,14 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { readFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
 
 export interface ProviderUsageInfo {
   provider: string;
   account?: string;
   plan?: string;
+  email?: string;
+  projectId?: string;
   quotaUsed?: number;
   quotaLimit?: number;
   quotaUnit?: string;
@@ -24,9 +29,36 @@ export interface ProviderUsageAdapter {
   getUsage(provider: string, account?: string): Promise<ProviderUsageResult>;
 }
 
+function getAgentDir(): string {
+  return process.env.PI_CODING_AGENT_DIR || join(homedir(), ".pi", "agent");
+}
+
+function readAuthStore(): Record<string, any> | undefined {
+  try {
+    const authPath = join(getAgentDir(), "auth.json");
+    const content = readFileSync(authPath, "utf8");
+    return JSON.parse(content);
+  } catch {
+    return undefined;
+  }
+}
+
+function parseJwtPayload(token: string): Record<string, any> | undefined {
+  try {
+    const parts = token.split(".");
+    if (parts.length < 2) return undefined;
+    const base64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+    const json = Buffer.from(base64, "base64").toString("utf8");
+    return JSON.parse(json);
+  } catch {
+    return undefined;
+  }
+}
+
 export class DefaultProviderUsageAdapter implements ProviderUsageAdapter {
   async getUsage(provider: string, account?: string): Promise<ProviderUsageResult> {
     const norm = provider.toLowerCase();
+    const authStore = readAuthStore();
 
     // 1. Ollama / Llama.cpp Local Inference Provider
     if (norm === "ollama" || norm === "llama-cpp" || norm === "llama.cpp") {
@@ -65,9 +97,25 @@ export class DefaultProviderUsageAdapter implements ProviderUsageAdapter {
       };
     }
 
-    // 2. OpenAI & OpenAI-Compatible Provider
+    // 2. OpenAI / OpenAI-Codex Provider
     if (norm === "openai" || norm === "openai-compat" || norm === "openai-codex") {
-      const apiKey = process.env.OPENAI_API_KEY;
+      const authData = authStore?.["openai-codex"] ?? authStore?.["openai"];
+      let email: string | undefined;
+      let plan: string | undefined;
+      let name: string | undefined;
+
+      if (authData?.access) {
+        const payload = parseJwtPayload(authData.access);
+        if (payload) {
+          const profile = payload["https://api.openai.com/profile"];
+          const auth = payload["https://api.openai.com/auth"];
+          email = profile?.email ?? payload.email;
+          name = profile?.name ?? payload.name;
+          plan = auth?.chatgpt_plan_type ?? payload.plan;
+        }
+      }
+
+      const apiKey = process.env.OPENAI_API_KEY ?? authData?.access;
       const baseUrl = process.env.OPENAI_BASE_URL || "https://api.openai.com/v1";
 
       if (apiKey) {
@@ -89,21 +137,22 @@ export class DefaultProviderUsageAdapter implements ProviderUsageAdapter {
             supported: true,
             usage: {
               provider,
-              account: account ?? "default",
-              plan: apiKey.startsWith("sk-proj-") ? "Project API Key" : "API Key",
+              account: account && account !== "default" ? account : (email ? `${name ? `${name} <${email}>` : email}` : "default"),
+              email,
+              plan: plan ? `ChatGPT ${plan.charAt(0).toUpperCase() + plan.slice(1)}` : (apiKey.startsWith("sk-proj-") ? "Project API Key" : "API Key"),
               rateLimitRequestsPerMin: reqLimit ? Number.parseInt(reqLimit, 10) : undefined,
               rateLimitTokensPerMin: tokenLimit ? Number.parseInt(tokenLimit, 10) : undefined,
               quotaUsed: reqLimit && reqRemaining ? Number.parseInt(reqLimit, 10) - Number.parseInt(reqRemaining, 10) : undefined,
               quotaLimit: reqLimit ? Number.parseInt(reqLimit, 10) : undefined,
               resetTime: resetReq ?? undefined,
-              rawSummary: res.ok ? "API key verified. Active OpenAI session." : `API returned status ${res.status}`,
+              rawSummary: res.ok ? "API access verified. Active session." : `API returned status ${res.status}`,
             },
           };
         } catch (error) {
           return {
             supported: true,
             error: `Failed to connect to OpenAI endpoint: ${error instanceof Error ? error.message : String(error)}`,
-            usage: { provider, account },
+            usage: { provider, account, email, plan },
           };
         }
       }
@@ -112,15 +161,38 @@ export class DefaultProviderUsageAdapter implements ProviderUsageAdapter {
         supported: true,
         usage: {
           provider,
-          account: account ?? "default",
-          rawSummary: "Active OpenAI provider session. (Set OPENAI_API_KEY for live rate-limit telemetry).",
+          account: account ?? email ?? "default",
+          email,
+          plan: plan ? `ChatGPT ${plan.charAt(0).toUpperCase() + plan.slice(1)}` : undefined,
+          rawSummary: "Active OpenAI provider session.",
         },
       };
     }
 
-    // 3. Anthropic Provider
+    // 3. Antigravity Provider
+    if (norm === "antigravity") {
+      const authData = authStore?.["antigravity"];
+      const email = authData?.email;
+      const projectId = authData?.projectId;
+
+      return {
+        supported: true,
+        usage: {
+          provider: "antigravity",
+          account: account && account !== "default" ? account : (email ?? "default"),
+          email,
+          projectId,
+          plan: "Google DeepMind / Antigravity Enterprise",
+          rawSummary: `Active OAuth session${projectId ? ` (Project: ${projectId})` : ""}.`,
+        },
+      };
+    }
+
+    // 4. Anthropic Provider
     if (norm === "anthropic") {
-      const apiKey = process.env.ANTHROPIC_API_KEY;
+      const authData = authStore?.["anthropic"];
+      const apiKey = process.env.ANTHROPIC_API_KEY ?? authData?.access;
+
       if (apiKey) {
         try {
           const controller = new AbortController();
@@ -144,13 +216,13 @@ export class DefaultProviderUsageAdapter implements ProviderUsageAdapter {
             usage: {
               provider,
               account: account ?? "default",
-              plan: "Anthropic API Key",
+              plan: authData?.type === "oauth" ? "Anthropic OAuth" : "Anthropic API Key",
               rateLimitRequestsPerMin: reqLimit ? Number.parseInt(reqLimit, 10) : undefined,
               rateLimitTokensPerMin: tokenLimit ? Number.parseInt(tokenLimit, 10) : undefined,
               quotaUsed: reqLimit && reqRemaining ? Number.parseInt(reqLimit, 10) - Number.parseInt(reqRemaining, 10) : undefined,
               quotaLimit: reqLimit ? Number.parseInt(reqLimit, 10) : undefined,
               resetTime: resetTime ?? undefined,
-              rawSummary: res.ok ? "Anthropic API verified. Active session." : `API returned status ${res.status}`,
+              rawSummary: res.ok ? "Anthropic session verified." : `API returned status ${res.status}`,
             },
           };
         } catch (error) {
@@ -167,20 +239,8 @@ export class DefaultProviderUsageAdapter implements ProviderUsageAdapter {
         usage: {
           provider,
           account: account ?? "default",
-          rawSummary: "Active Anthropic provider session. (Set ANTHROPIC_API_KEY for live rate-limit telemetry).",
-        },
-      };
-    }
-
-    // 4. Antigravity Provider
-    if (norm === "antigravity") {
-      return {
-        supported: true,
-        usage: {
-          provider: "antigravity",
-          account: account ?? "default",
-          plan: "Google DeepMind / Antigravity Enterprise",
-          rawSummary: "Active Antigravity session. Account quota managed by corporate account switcher.",
+          plan: authData?.type === "oauth" ? "Anthropic OAuth" : undefined,
+          rawSummary: "Active Anthropic provider session.",
         },
       };
     }
@@ -203,6 +263,8 @@ export function formatUsageSummary(result: ProviderUsageResult, defaultProvider 
     `Account: ${usage.account ?? defaultAccount ?? "default"}`,
   ];
 
+  if (usage.email) lines.push(`Email: ${usage.email}`);
+  if (usage.projectId) lines.push(`Project ID: ${usage.projectId}`);
   if (usage.plan) lines.push(`Plan/Tier: ${usage.plan}`);
   if (usage.quotaUsed !== undefined || usage.quotaLimit !== undefined) {
     const unit = usage.quotaUnit ?? "requests";
