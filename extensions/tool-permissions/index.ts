@@ -558,23 +558,16 @@ async function presentScrollablePermission(
       const continuationPrefix = theme.fg("muted", "… ");
       const contentWidth = Math.max(1, width - 2);
 
-      const termRows = (tui as any)?.terminal?.rows ?? 24;
-      const fixedHeaderLines = 1 + (stickyHeader ? 1 : 0) + (allowPattern ? 1 : 0) + 1;
-      const fixedFooterLines = 1 + (steeringMode ? 2 : 0) + 2;
-      const pageSize = Math.max(4, Math.min(20, termRows - (fixedHeaderLines + fixedFooterLines)));
-
       const wrappedBody = rawLines.flatMap((line) => wrapWithContinuation(line, contentWidth, continuationPrefix));
-      scrollableLineCount = wrappedBody.length;
-
-      const maxOffset = Math.max(0, scrollableLineCount - pageSize);
-      offset = Math.max(0, Math.min(offset, maxOffset));
-      const visible = wrappedBody.slice(offset, offset + pageSize);
-      const position = scrollableLineCount > pageSize ? ` lines ${offset + 1}-${Math.min(offset + pageSize, scrollableLineCount)} of ${scrollableLineCount}` : "";
       const allowHint = allowPattern ? " • Ctrl+A allow+save project • Ctrl+Shift+A allow+save user • Ctrl+E edit pattern" : "";
       const steeringAllowHint = allowPattern ? " • Ctrl+A project-save+steer • Ctrl+Shift+A user-save+steer" : "";
       const navigationHint = steeringMode
-        ? `↑/↓ or j/k scroll • PgUp/PgDn page • Home/End jump • Ctrl+D deny+steer${position}`
-        : `↑/↓ or j/k scroll • PgUp/PgDn page • Home/End jump • Tab steering • Ctrl+D deny • Esc cancel${position}`;
+        ? isVim
+          ? steeringEditor.getMode() === "insert"
+            ? `Esc normal mode • Ctrl+D deny+steer`
+            : `Esc exit steering • i/A insert mode • hjkl navigate • Ctrl+D deny+steer`
+          : `Esc exit steering • Ctrl+D deny+steer`
+        : `Tab steering • Ctrl+D deny • Esc cancel`;
       const approvalHint = steeringMode
         ? `Ctrl+Y allow once+steer${steeringAllowHint}`
         : `Ctrl+Y allow once${allowHint}`;
@@ -592,7 +585,7 @@ async function presentScrollablePermission(
         ...(stickyHeader ? wrap(theme.fg("muted", stickyHeader)) : []),
         ...(allowPattern ? wrap(theme.fg("muted", `Rule: ${JSON.stringify(allowPattern.suggestedRule)}`)) : []),
         "",
-        ...visible,
+        ...wrappedBody,
         "",
         ...(steeringMode
           ? [
@@ -606,7 +599,6 @@ async function presentScrollablePermission(
     },
     handleInput(data: string): void {
       steeringEditor.focused = component.focused;
-      const maxOffset = Math.max(0, scrollableLineCount - pageSize);
       const steeringMessage = steeringEditor.getValue().trim();
 
       if (steeringMode) {
@@ -686,12 +678,6 @@ async function presentScrollablePermission(
         done({ allowed: false, decision: "deny" });
         return;
       }
-      if (matchesKey(data, "up") || data === "k") offset = Math.max(0, offset - 1);
-      else if (matchesKey(data, "down") || data === "j") offset = Math.min(maxOffset, offset + 1);
-      else if (matchesKey(data, "pageUp") || data === "b") offset = Math.max(0, offset - pageSize);
-      else if (matchesKey(data, "pageDown") || data === "f" || data === " ") offset = Math.min(maxOffset, offset + pageSize);
-      else if (matchesKey(data, "home") || data === "g") offset = 0;
-      else if (matchesKey(data, "end") || data === "G") offset = maxOffset;
       tui.requestRender();
     },
       invalidate(): void { },
