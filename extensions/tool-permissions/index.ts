@@ -19,6 +19,7 @@ import {
 import { createPersistedTrustResolver, resolveCurrentProjectPolicyPath, resolveScopedPermissionDecision, type ScopedPermissionDecision } from "./scope.ts";
 import type { PermissionDecision, ToolPermissionBoundary, ToolRequest } from "./permission-boundary.ts";
 import { isPermissionPromptCancellation } from "./prompt-input.ts";
+import { SteeringEditor } from "./steering-editor.ts";
 import {
   closePermissionPromptQueue,
   createPermissionPromptIdentity,
@@ -524,8 +525,10 @@ async function presentScrollablePermission(
     }
   };
 
-  return ctx.ui.custom<PermissionResult>((tui, theme: any, _keybindings, finish) => {
+  return ctx.ui.custom<PermissionResult>((tui, theme: any, keybindings: any, finish) => {
     let settled = false;
+    const isVim = process.env.PI_VIM_MODE === "1" || keybindings?.vimMode === true;
+    const steeringEditor = new SteeringEditor({ vimMode: isVim });
     const onAbort = (): void => done({ allowed: false, decision: "cancel" });
     const done = (value: PermissionResult): void => {
       if (settled) return;
@@ -575,8 +578,8 @@ async function presentScrollablePermission(
         "",
         ...(steeringMode
           ? [
-              ...wrap(theme.fg("warning", `Steering: ${steeringText}${component.focused ? CURSOR_MARKER : ""}\x1b[7m \x1b[27m`)),
-              ...wrap(theme.fg("dim", steeringText.trim() ? "choose allow or deny" : "type a message; Esc returns")),
+              ...wrap(theme.fg("warning", `Steering: ${steeringEditor.render(contentWidth)[0]}`)),
+              ...wrap(theme.fg("dim", steeringEditor.getValue().trim() ? "choose allow or deny" : "type a message; Esc returns")),
             ]
           : []),
         ...wrap(theme.fg("dim", navigationHint)),
@@ -584,8 +587,9 @@ async function presentScrollablePermission(
       ];
     },
     handleInput(data: string): void {
+      steeringEditor.focused = component.focused;
       const maxOffset = Math.max(0, scrollableLineCount - pageSize);
-      const steeringMessage = steeringText.trim();
+      const steeringMessage = steeringEditor.getValue().trim();
 
       if (steeringMode) {
         if (matchesKey(data, "ctrl+y")) {
@@ -615,19 +619,16 @@ async function presentScrollablePermission(
           return;
         }
         if (matchesKey(data, "escape")) {
-          steeringMode = false;
+          if (steeringEditor.getMode() === "insert" && isVim) {
+            steeringEditor.handleInput(data);
+          } else {
+            steeringMode = false;
+          }
           tui.requestRender();
           return;
         }
-        if (matchesKey(data, "backspace")) {
-          steeringText = steeringText.slice(0, -1);
-          tui.requestRender();
-          return;
-        }
-        if (isPrintableInput(data)) {
-          steeringText += data;
-          tui.requestRender();
-        }
+        steeringEditor.handleInput(data);
+        tui.requestRender();
         return;
       }
 

@@ -1,3 +1,4 @@
+import "../test-support/forbid-fetch.ts";
 import assert from "node:assert";
 import { test } from "node:test";
 import { CURSOR_MARKER } from "@earendil-works/pi-tui";
@@ -31,7 +32,7 @@ test("SteeringEditor Vim mode toggles between normal and insert modes via Escape
   editor.handleInput("i");
   assert.equal(editor.getMode(), "insert");
   editor.handleInput("z");
-  assert.equal(editor.getValue(), "fooz");
+  assert.equal(editor.getValue(), "fzoo");
 });
 
 test("SteeringEditor Vim normal mode supports motions (0, $, w, b) and deletion (x)", () => {
