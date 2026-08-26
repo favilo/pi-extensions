@@ -1,10 +1,10 @@
-active_flow: null
-active_epic_id: null
-active_story_id: null
-active_story: null
+active_flow: build_epic
+active_epic_id: e15
+active_story_id: e15s01
+active_story: Run permission-enforced Bash commands in the background
 active_bug_id: null
 git:
-  bookmark: favilo/e05-provider-usage
+  bookmark: favilo/e15-background-bash-monitors
   parent_bookmark: main
 planning:
   e11:
@@ -55,15 +55,9 @@ planning:
     constraints:
     - Do not modify the e06 repair flow or child-private bridge catalog.
 handoff:
-  last_step_completed: Initiated epic e05 (story e05s01) on bookmark favilo/e05-provider-usage off main.
+  last_step_completed: Initiated epic e05 (story e05s01) on bookmark favilo/e05-provider-usage
+    off main.
   open_decisions: []
-  required_reading:
-  - .specs/epics/e05-provider-usage/epic.yaml
-  - .specs/epics/e05-provider-usage/e05s01-show-current-provider-usage.md
-  - .specs/epics/e05-provider-usage/e05s01-tasks.yaml
-  next_skill: release-branch
-  context: Epic e05 completed and verified locally with 218 passing unit tests and npm run check:ci green.
-  blocker: null
   required_reading:
   - .specs/epics/e05-provider-usage/epic.yaml
   - .specs/epics/e05-provider-usage/e05s01-show-current-provider-usage.md
@@ -100,9 +94,9 @@ metrics:
       avg_seconds: 1434.0
       _start: '2026-08-26T20:06:32Z'
     survey-context:
-      calls: 9
-      total_seconds: 6329.0
-      avg_seconds: 703.2222222222222
+      calls: 10
+      total_seconds: 6549.0
+      avg_seconds: 654.9
     verify-work:
       calls: 5
       total_seconds: 5191.0
@@ -115,6 +109,7 @@ metrics:
       calls: 6
       total_seconds: 362555.0
       avg_seconds: 60425.833333333336
+      _start: '2026-08-26T23:17:17Z'
     plan-work:
       calls: 2
       total_seconds: 1156.0
@@ -123,4 +118,4 @@ metrics:
       calls: 2
       total_seconds: 2.0
       avg_seconds: 1.0
-  story_start: '2026-08-21T12:00:00Z'
+  story_start: '2026-08-26T23:56:10Z'

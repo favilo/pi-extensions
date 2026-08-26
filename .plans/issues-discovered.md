@@ -29,3 +29,5 @@ Add newly discovered issues as unchecked numbered items. Once an issue has an ep
    - **Migrated to:** `e11s04` — Show tool-call reasons in permission prompts and history.
 
 9. [ ] Add a scratchpad directory that is automatically approved for reads and writes, it is only per session, or possibly per folder that the agent is working in. This would allow the agent to have a place to write temporary files without needing to ask for permission every time. I want the scratchpad to work as a kind of audit log for the agent as well as a place to write temp files easily.
+
+10. [ ] I would like to be able to autoload diffs from the AGENT.md file into the context so that when I've changed something, other agents are able to see the changes and use the new information
