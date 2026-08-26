@@ -55,6 +55,7 @@ export class SteeringEditor implements Component, Focusable {
 
     if (!this.customEditor) {
       this.editor = new Editor(tui as TUI, theme, { paddingX: 0 });
+      this.editor.disableSubmit = true;
       if (options.initialText) {
         this.editor.setText(options.initialText);
       }
@@ -120,14 +121,16 @@ export class SteeringEditor implements Component, Focusable {
   handleInput(data: string): void {
     if (!data) return;
 
+    const inputData = data === "\r" || data === "\r\n" ? "\n" : data;
+
     if (this.customEditor) {
-      this.customEditor.handleInput?.(data);
+      this.customEditor.handleInput?.(inputData);
       return;
     }
 
     if (!this.editor) return;
 
-    if (matchesKey(data, "escape")) {
+    if (matchesKey(inputData, "escape")) {
       if (this.vimMode && this.mode === "insert") {
         this.mode = "normal";
         return;
@@ -135,12 +138,12 @@ export class SteeringEditor implements Component, Focusable {
     }
 
     if (this.mode === "insert" || !this.vimMode) {
-      this.editor.handleInput(data);
+      this.editor.handleInput(inputData);
       return;
     }
 
     // Normal Vim mode navigation and manipulation via Editor calls
-    switch (data) {
+    switch (inputData) {
       case "i":
         this.mode = "insert";
         break;

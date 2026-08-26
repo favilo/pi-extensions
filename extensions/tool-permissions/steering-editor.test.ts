@@ -73,3 +73,10 @@ test("SteeringEditor renders boxed Editor.render output for editor box display",
   assert.ok(lines[1].includes("clean line"));
 });
 
+test("SteeringEditor inserts newline on Enter without clearing buffer", () => {
+  const editor = new SteeringEditor({ vimMode: true, initialText: "line1" });
+  editor.handleInput("\r");
+  editor.handleInput("line2");
+  assert.equal(editor.getValue(), "line1\nline2");
+});
+
