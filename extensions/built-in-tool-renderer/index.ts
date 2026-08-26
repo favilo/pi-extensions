@@ -147,25 +147,35 @@ export default function (pi: ExtensionAPI) {
     renderResult(result, { expanded, isPartial }, theme, context) {
       if (isPartial) return new Text(theme.fg("warning", "Running..."), 0, 0);
 
-      const errorText = toolErrorText(result, context.isError, "Bash failed");
-      if (errorText) return withSteering(theme.fg("error", errorText), result, theme);
-
       const details = result.details as BashToolDetails | undefined;
       const content = result.content[0];
       const output = content?.type === "text" ? content.text : "";
       const exitMatch = output.match(/exit code: (\d+)/);
       const exitCode = exitMatch ? Number.parseInt(exitMatch[1], 10) : null;
-      const lineCount = output.split("\n").filter((line) => line.trim()).length;
 
-      let text = exitCode === 0 || exitCode === null ? theme.fg("success", "done") : theme.fg("error", `exit ${exitCode}`);
-      text += theme.fg("dim", ` (${lineCount} lines)`);
+      const outputLines = toolOutputTexts(result);
+      const fullOutput = outputLines.join("\n");
+      const lines = fullOutput.split("\n");
+      const lineCount = lines.filter((line) => line.trim()).length;
+      const firstLine = lines.find((l) => l.trim()) ?? "";
+
+      let text = "";
+      if (context.isError || (exitCode !== null && exitCode !== 0)) {
+        const statusText = exitCode !== null ? `exit ${exitCode}` : "Bash failed";
+        text += theme.fg("error", statusText);
+      } else {
+        text += theme.fg("success", "done");
+      }
+      if (lineCount > 0) {
+        text += theme.fg("dim", ` (${lineCount} lines)`);
+      }
 
       if (details?.truncation?.truncated) text += theme.fg("warning", " [truncated]");
 
       if (expanded) {
-        const fullOutput = toolOutputTexts(result).join("\n");
-        const lines = fullOutput.split("\n");
-        for (const line of lines) text += `\n${theme.fg("dim", line)}`;
+        for (const line of lines) text += `\n${theme.fg(context.isError ? "error" : "dim", line)}`;
+      } else if (firstLine) {
+        text += `\n${theme.fg(context.isError ? "error" : "dim", firstLine.slice(0, 100))}`;
       }
 
       return withSteering(text, result, theme);

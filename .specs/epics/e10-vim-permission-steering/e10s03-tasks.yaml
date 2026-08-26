@@ -1,0 +1,22 @@
+story_id: e10s03
+title: Refactor permission prompt layout for native scrollback and inline Vim steering editor
+status: passing
+bcps: 3
+delta: ADDED
+spec: e10s03-scrollback-steering-layout.md
+tasks:
+  - id: 1
+    description: Refactor presentScrollablePermission to render full request body for scrollback access and position SteeringEditor above footer hints.
+    verify: node --test extensions/tool-permissions/steering-editor.test.ts extensions/tool-permissions/index.test.ts
+    status: passing
+    risk: P2
+  - id: 2
+    description: Add dynamic navigation hint guidance for Vim insert vs normal mode transitions.
+    verify: node --test extensions/tool-permissions/steering-editor.test.ts
+    status: passing
+    risk: P2
+  - id: 3
+    description: Run complete package checks.
+    verify: npm run check
+    status: passing
+    risk: P2

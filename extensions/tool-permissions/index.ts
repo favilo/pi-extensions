@@ -19,6 +19,7 @@ import {
 import { createPersistedTrustResolver, resolveCurrentProjectPolicyPath, resolveScopedPermissionDecision, type ScopedPermissionDecision } from "./scope.ts";
 import type { PermissionDecision, ToolPermissionBoundary, ToolRequest } from "./permission-boundary.ts";
 import { isPermissionPromptCancellation } from "./prompt-input.ts";
+import { SteeringEditor } from "./steering-editor.ts";
 import {
   closePermissionPromptQueue,
   createPermissionPromptIdentity,
@@ -343,40 +344,52 @@ function applyEditPreview(oldContent: string, edits: Array<{ oldText: string; ne
   return next;
 }
 
-function truncateDiff(diff: string, maxLines = 240): string {
+function truncateDiff(diff: string, maxLines = 10000): string {
   const lines = diff.split("\n");
   if (lines.length <= maxLines) return diff;
   return [...lines.slice(0, maxLines), `… diff truncated, ${lines.length - maxLines} more lines`].join("\n");
 }
 
-function diffPromptBody(path: string, oldContent: string, newContent: string, previewError?: string): string {
+function diffPromptBody(path: string, oldContent: string, newContent: string, previewError?: string): { body: string; lineCount: number } {
   if (previewError) {
-    return `Path: ${path}\n\nDiff preview unavailable: ${previewError}\n\nReview the tool request carefully before allowing it.`;
+    const body = `Path: ${path}\n\nDiff preview unavailable: ${previewError}\n\nReview the tool request carefully before allowing it.`;
+    return { body, lineCount: body.split("\n").length };
   }
 
   if (oldContent === newContent) {
-    return `Path: ${path}\n\nNo content changes detected.`;
+    const body = `Path: ${path}\n\nNo content changes detected.`;
+    return { body, lineCount: body.split("\n").length };
   }
 
   const { diff } = generateDiffString(oldContent, newContent, 3);
-  return `Path: ${path}\n\n${renderDiff(truncateDiff(diff), { filePath: path })}`;
+  const lineCount = diff.split("\n").length;
+  if (lineCount > 1000) {
+    const body = `Path: ${path}\n\n[Diff exceeds 1000 lines (${lineCount} lines). Automatically denied.]`;
+    return { body, lineCount };
+  }
+
+  const body = `Path: ${path}\n\n${renderDiff(truncateDiff(diff, 1000), { filePath: path })}`;
+  return { body, lineCount: body.split("\n").length };
 }
 
-function buildFileEditPrompt(toolName: string, input: unknown, cwd: string): { title: string; body: string } {
+function buildFileEditPrompt(toolName: string, input: unknown, cwd: string): { title: string; body: string; lineCount: number } {
   if (toolName === "write") {
     const { path, content } = input as WriteInput;
     if (typeof path !== "string" || typeof content !== "string") {
-      return { title: "Allow write?", body: `Invalid write arguments.\n\n${compact(input)}` };
+      const body = `Invalid write arguments.\n\n${compact(input)}`;
+      return { title: "Allow write?", body, lineCount: body.split("\n").length };
     }
 
     const absolutePath = resolve(cwd, path);
     const oldContent = readTextIfPresent(absolutePath);
-    return { title: `Allow write to ${path}?`, body: diffPromptBody(path, oldContent, content) };
+    const prompt = diffPromptBody(path, oldContent, content);
+    return { title: `Allow write to ${path}?`, body: prompt.body, lineCount: prompt.lineCount };
   }
 
   const { path, edits } = input as EditInput;
   if (typeof path !== "string" || !Array.isArray(edits)) {
-    return { title: "Allow edit?", body: `Invalid edit arguments.\n\n${compact(input)}` };
+    const body = `Invalid edit arguments.\n\n${compact(input)}`;
+    return { title: "Allow edit?", body, lineCount: body.split("\n").length };
   }
 
   const absolutePath = resolve(cwd, path);
@@ -385,9 +398,11 @@ function buildFileEditPrompt(toolName: string, input: unknown, cwd: string): { t
 
   try {
     const newContent = applyEditPreview(oldContent, normalizedEdits);
-    return { title: `Allow edit to ${path}?`, body: diffPromptBody(path, oldContent, newContent) };
+    const prompt = diffPromptBody(path, oldContent, newContent);
+    return { title: `Allow edit to ${path}?`, body: prompt.body, lineCount: prompt.lineCount };
   } catch (error) {
-    return { title: `Allow edit to ${path}?`, body: diffPromptBody(path, oldContent, oldContent, error instanceof Error ? error.message : String(error)) };
+    const prompt = diffPromptBody(path, oldContent, oldContent, error instanceof Error ? error.message : String(error));
+    return { title: `Allow edit to ${path}?`, body: prompt.body, lineCount: prompt.lineCount };
   }
 }
 
@@ -495,6 +510,15 @@ async function presentScrollablePermission(
   }
 
   const rawLines = body.split("\n");
+  if (rawLines.length > 1000) {
+    const steeringReason = `Tool request content is too large (${rawLines.length} lines, exceeding the 1000 line limit). Please break this request down into smaller incremental steps (e.g. write an initial stub file followed by edit operations, or split into multiple smaller bash commands).`;
+    ctx.ui.notify?.(`Tool request exceeded 1000 lines (${rawLines.length} lines) and was automatically denied.`, "error");
+    return {
+      allowed: false,
+      decision: "deny",
+      steering: steeringReason,
+    };
+  }
   const pageSize = 28;
   let offset = 0;
   let scrollableLineCount = rawLines.length;
@@ -524,8 +548,22 @@ async function presentScrollablePermission(
     }
   };
 
-  return ctx.ui.custom<PermissionResult>((tui, theme: any, _keybindings, finish) => {
+  return ctx.ui.custom<PermissionResult>((tui, theme: any, keybindings: any, finish) => {
     let settled = false;
+    const customFactory = (ctx.ui as any)?.getEditorComponent?.();
+    const isVim =
+      process.env.PI_VIM_MODE === "1" ||
+      Boolean(keybindings?.vimMode) ||
+      (ctx as any).settings?.editorMode === "vim" ||
+      Boolean(process.env.EDITOR?.includes("vim")) ||
+      Boolean(process.env.VISUAL?.includes("vim"));
+    const steeringEditor = new SteeringEditor({
+      tui: tui as any,
+      theme: theme?.editorTheme,
+      keybindings,
+      customEditorFactory: customFactory,
+      vimMode: isVim,
+    });
     const onAbort = (): void => done({ allowed: false, decision: "cancel" });
     const done = (value: PermissionResult): void => {
       if (settled) return;
@@ -549,34 +587,35 @@ async function presentScrollablePermission(
       render(width: number): string[] {
       const continuationPrefix = theme.fg("muted", "… ");
       const contentWidth = Math.max(1, width - 2);
-      const wrappedBody = rawLines.flatMap((line) => wrapWithContinuation(line, contentWidth, continuationPrefix));
-      scrollableLineCount = wrappedBody.length;
 
-      const maxOffset = Math.max(0, scrollableLineCount - pageSize);
-      offset = Math.max(0, Math.min(offset, maxOffset));
-      const visible = wrappedBody.slice(offset, offset + pageSize);
-      const position = scrollableLineCount > pageSize ? ` lines ${offset + 1}-${Math.min(offset + pageSize, scrollableLineCount)} of ${scrollableLineCount}` : "";
+      const wrappedBody = rawLines.flatMap((line) => wrapWithContinuation(line, contentWidth, continuationPrefix));
       const allowHint = allowPattern ? " • Ctrl+A allow+save project • Ctrl+Shift+A allow+save user • Ctrl+E edit pattern" : "";
       const steeringAllowHint = allowPattern ? " • Ctrl+A project-save+steer • Ctrl+Shift+A user-save+steer" : "";
       const navigationHint = steeringMode
-        ? `↑/↓ or j/k scroll • PgUp/PgDn page • Home/End jump • Ctrl+D deny+steer${position}`
-        : `↑/↓ or j/k scroll • PgUp/PgDn page • Home/End jump • Tab steering • Ctrl+D deny • Esc cancel${position}`;
+        ? isVim
+          ? steeringEditor.getMode() === "insert"
+            ? `Esc normal mode • Ctrl+D deny+steer`
+            : `Esc exit steering • i/A insert mode • hjkl navigate • Ctrl+D deny+steer`
+          : `Esc exit steering • Ctrl+D deny+steer`
+        : `Tab steering • Ctrl+D deny • Esc cancel`;
       const approvalHint = steeringMode
         ? `Ctrl+Y allow once+steer${steeringAllowHint}`
         : `Ctrl+Y allow once${allowHint}`;
       const wrap = (text: string): string[] => wrapWithContinuation(text, width, continuationPrefix);
+
+      const steeringBoxLines = steeringEditor.render(contentWidth);
 
       return [
         ...wrap(theme.fg("accent", theme.bold(title))),
         ...(stickyHeader ? wrap(theme.fg("muted", stickyHeader)) : []),
         ...(allowPattern ? wrap(theme.fg("muted", `Rule: ${JSON.stringify(allowPattern.suggestedRule)}`)) : []),
         "",
-        ...visible,
+        ...wrappedBody,
         "",
         ...(steeringMode
           ? [
-              ...wrap(theme.fg("warning", `Steering: ${steeringText}${component.focused ? CURSOR_MARKER : ""}\x1b[7m \x1b[27m`)),
-              ...wrap(theme.fg("dim", steeringText.trim() ? "choose allow or deny" : "type a message; Esc returns")),
+              ...steeringBoxLines,
+              ...wrap(theme.fg("dim", steeringEditor.getValue().trim() ? "choose allow or deny" : "type a message; Esc returns")),
             ]
           : []),
         ...wrap(theme.fg("dim", navigationHint)),
@@ -584,8 +623,8 @@ async function presentScrollablePermission(
       ];
     },
     handleInput(data: string): void {
-      const maxOffset = Math.max(0, scrollableLineCount - pageSize);
-      const steeringMessage = steeringText.trim();
+      steeringEditor.focused = component.focused;
+      const steeringMessage = steeringEditor.getValue().trim();
 
       if (steeringMode) {
         if (matchesKey(data, "ctrl+y")) {
@@ -615,19 +654,16 @@ async function presentScrollablePermission(
           return;
         }
         if (matchesKey(data, "escape")) {
-          steeringMode = false;
+          if (steeringEditor.getMode() === "insert" && isVim) {
+            steeringEditor.handleInput(data);
+          } else {
+            steeringMode = false;
+          }
           tui.requestRender();
           return;
         }
-        if (matchesKey(data, "backspace")) {
-          steeringText = steeringText.slice(0, -1);
-          tui.requestRender();
-          return;
-        }
-        if (isPrintableInput(data)) {
-          steeringText += data;
-          tui.requestRender();
-        }
+        steeringEditor.handleInput(data);
+        tui.requestRender();
         return;
       }
 
@@ -667,12 +703,6 @@ async function presentScrollablePermission(
         done({ allowed: false, decision: "deny" });
         return;
       }
-      if (matchesKey(data, "up") || data === "k") offset = Math.max(0, offset - 1);
-      else if (matchesKey(data, "down") || data === "j") offset = Math.min(maxOffset, offset + 1);
-      else if (matchesKey(data, "pageUp") || data === "b") offset = Math.max(0, offset - pageSize);
-      else if (matchesKey(data, "pageDown") || data === "f" || data === " ") offset = Math.min(maxOffset, offset + pageSize);
-      else if (matchesKey(data, "home") || data === "g") offset = 0;
-      else if (matchesKey(data, "end") || data === "G") offset = maxOffset;
       tui.requestRender();
     },
       invalidate(): void { },
@@ -1015,6 +1045,12 @@ async function handleFileEditPermission(toolName: string, input: FileEditInput, 
   }
 
   const prompt = buildFileEditPrompt(toolName, input, ctx.cwd);
+  if (prompt.lineCount > 1000) {
+    const reason = `Tool request content is too large (${prompt.lineCount} lines, exceeding the 1000 line limit). Please break this request down into smaller incremental steps (e.g. write an initial stub file followed by edit operations, or split into multiple smaller bash commands).`;
+    ctx.ui.notify?.(`Tool request exceeded 1000 lines (${prompt.lineCount} lines) and was automatically denied.`, "error");
+    audit({ tool: toolName, decision: "deny", cwd: ctx.cwd, path: absolutePath, reason });
+    return { block: true, reason };
+  }
   const result = await askScrollablePermission(
     pi,
     ctx,

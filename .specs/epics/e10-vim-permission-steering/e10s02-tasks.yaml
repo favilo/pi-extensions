@@ -1,6 +1,6 @@
 story_id: e10s02
 title: Support configured Vim editing in permission steering
-status: todo
+status: passing
 bcps: 4
 delta: MODIFIED
 spec: e10s02-vim-steering-editor.md
@@ -8,15 +8,15 @@ tasks:
   - id: 1
     description: Add contracts for Vim and non-Vim steering editing, focus, cancellation, and permission shortcuts.
     verify: node --test extensions/tool-permissions/steering-editor.test.ts
-    status: todo
+    status: passing
     risk: P2
   - id: 2
     description: Integrate the supported editor boundary selected by e10s01 and preserve permission-specific actions.
     verify: node --test extensions/tool-permissions/steering-editor.test.ts
-    status: todo
+    status: passing
     risk: P2
   - id: 3
     description: Run complete package checks.
     verify: npm run check
-    status: todo
+    status: passing
     risk: P2
