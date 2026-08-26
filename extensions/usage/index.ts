@@ -33,6 +33,39 @@ function getAgentDir(): string {
   return process.env.PI_CODING_AGENT_DIR || join(homedir(), ".pi", "agent");
 }
 
+function getAccountSwitcherDir(): string {
+  return join(homedir(), ".pi", "account-switcher");
+}
+
+interface AccountConfigEntry {
+  id: string;
+  label?: string;
+  provider: string;
+  model?: string;
+  piAuth?: {
+    provider?: string;
+    entry?: {
+      type?: string;
+      access?: string;
+      refresh?: string;
+      expires?: number;
+      projectId?: string;
+      email?: string;
+    };
+  };
+}
+
+function readAccountSwitcherAccounts(): AccountConfigEntry[] {
+  try {
+    const filePath = join(getAccountSwitcherDir(), "accounts.json");
+    const content = readFileSync(filePath, "utf8");
+    const data = JSON.parse(content);
+    return Array.isArray(data.accounts) ? data.accounts : [];
+  } catch {
+    return [];
+  }
+}
+
 function readAuthStore(): Record<string, any> | undefined {
   try {
     const authPath = join(getAgentDir(), "auth.json");
@@ -58,7 +91,18 @@ function parseJwtPayload(token: string): Record<string, any> | undefined {
 export class DefaultProviderUsageAdapter implements ProviderUsageAdapter {
   async getUsage(provider: string, account?: string): Promise<ProviderUsageResult> {
     const norm = provider.toLowerCase();
+    const accounts = readAccountSwitcherAccounts();
     const authStore = readAuthStore();
+
+    // Look up account in account-switcher accounts.json first
+    let accountEntry = account
+      ? accounts.find((a) => a.id === account || a.label === account)
+      : undefined;
+
+    // Fallback: match by provider if account is default or unlisted
+    if (!accountEntry) {
+      accountEntry = accounts.find((a) => a.provider.toLowerCase() === norm);
+    }
 
     // 1. Ollama / Llama.cpp Local Inference Provider
     if (norm === "ollama" || norm === "llama-cpp" || norm === "llama.cpp") {
@@ -99,24 +143,41 @@ export class DefaultProviderUsageAdapter implements ProviderUsageAdapter {
 
     // 2. OpenAI / OpenAI-Codex Provider
     if (norm === "openai" || norm === "openai-compat" || norm === "openai-codex") {
-      const authData = authStore?.["openai-codex"] ?? authStore?.["openai"];
-      let email: string | undefined;
+      const piAuthEntry = accountEntry?.piAuth?.entry ?? authStore?.["openai-codex"] ?? authStore?.["openai"];
+      let email: string | undefined = accountEntry?.piAuth?.entry?.email;
       let plan: string | undefined;
       let name: string | undefined;
+      let isOAuth = false;
 
-      if (authData?.access) {
-        const payload = parseJwtPayload(authData.access);
+      if (piAuthEntry?.access) {
+        const payload = parseJwtPayload(piAuthEntry.access);
         if (payload) {
+          isOAuth = true;
           const profile = payload["https://api.openai.com/profile"];
           const auth = payload["https://api.openai.com/auth"];
-          email = profile?.email ?? payload.email;
+          email = profile?.email ?? payload.email ?? email;
           name = profile?.name ?? payload.name;
           plan = auth?.chatgpt_plan_type ?? payload.plan;
         }
       }
 
-      const apiKey = process.env.OPENAI_API_KEY ?? authData?.access;
+      const apiKey = process.env.OPENAI_API_KEY ?? (isOAuth ? undefined : piAuthEntry?.access);
       const baseUrl = process.env.OPENAI_BASE_URL || "https://api.openai.com/v1";
+
+      const resolvedAccountName = account && account !== "default" ? account : (accountEntry?.label ?? accountEntry?.id ?? (email ? `${name ? `${name} <${email}>` : email}` : "default"));
+
+      if (isOAuth) {
+        return {
+          supported: true,
+          usage: {
+            provider,
+            account: resolvedAccountName,
+            email,
+            plan: plan ? `ChatGPT ${plan.charAt(0).toUpperCase() + plan.slice(1)}` : "ChatGPT OAuth",
+            rawSummary: `Active ChatGPT OAuth session for ${email ?? resolvedAccountName} (OAuth identity verified).`,
+          },
+        };
+      }
 
       if (apiKey) {
         try {
@@ -137,7 +198,7 @@ export class DefaultProviderUsageAdapter implements ProviderUsageAdapter {
             supported: true,
             usage: {
               provider,
-              account: account && account !== "default" ? account : (email ? `${name ? `${name} <${email}>` : email}` : "default"),
+              account: resolvedAccountName,
               email,
               plan: plan ? `ChatGPT ${plan.charAt(0).toUpperCase() + plan.slice(1)}` : (apiKey.startsWith("sk-proj-") ? "Project API Key" : "API Key"),
               rateLimitRequestsPerMin: reqLimit ? Number.parseInt(reqLimit, 10) : undefined,
@@ -152,7 +213,7 @@ export class DefaultProviderUsageAdapter implements ProviderUsageAdapter {
           return {
             supported: true,
             error: `Failed to connect to OpenAI endpoint: ${error instanceof Error ? error.message : String(error)}`,
-            usage: { provider, account, email, plan },
+            usage: { provider, account: resolvedAccountName, email, plan },
           };
         }
       }
@@ -161,7 +222,7 @@ export class DefaultProviderUsageAdapter implements ProviderUsageAdapter {
         supported: true,
         usage: {
           provider,
-          account: account ?? email ?? "default",
+          account: resolvedAccountName,
           email,
           plan: plan ? `ChatGPT ${plan.charAt(0).toUpperCase() + plan.slice(1)}` : undefined,
           rawSummary: "Active OpenAI provider session.",
@@ -171,27 +232,29 @@ export class DefaultProviderUsageAdapter implements ProviderUsageAdapter {
 
     // 3. Antigravity Provider
     if (norm === "antigravity") {
-      const authData = authStore?.["antigravity"];
-      const email = authData?.email;
-      const projectId = authData?.projectId;
+      const piAuthEntry = accountEntry?.piAuth?.entry ?? authStore?.["antigravity"];
+      const email = piAuthEntry?.email;
+      const projectId = piAuthEntry?.projectId;
+      const resolvedAccountName = account && account !== "default" ? account : (accountEntry?.label ?? accountEntry?.id ?? email ?? "default");
 
       return {
         supported: true,
         usage: {
           provider: "antigravity",
-          account: account && account !== "default" ? account : (email ?? "default"),
+          account: resolvedAccountName,
           email,
           projectId,
           plan: "Google DeepMind / Antigravity Enterprise",
-          rawSummary: `Active OAuth session${projectId ? ` (Project: ${projectId})` : ""}.`,
+          rawSummary: `Active OAuth session for ${email ?? resolvedAccountName}${projectId ? ` (Project: ${projectId})` : ""}.`,
         },
       };
     }
 
     // 4. Anthropic Provider
     if (norm === "anthropic") {
-      const authData = authStore?.["anthropic"];
-      const apiKey = process.env.ANTHROPIC_API_KEY ?? authData?.access;
+      const piAuthEntry = accountEntry?.piAuth?.entry ?? authStore?.["anthropic"];
+      const apiKey = process.env.ANTHROPIC_API_KEY ?? piAuthEntry?.access;
+      const resolvedAccountName = account && account !== "default" ? account : (accountEntry?.label ?? accountEntry?.id ?? "default");
 
       if (apiKey) {
         try {
@@ -215,8 +278,8 @@ export class DefaultProviderUsageAdapter implements ProviderUsageAdapter {
             supported: true,
             usage: {
               provider,
-              account: account ?? "default",
-              plan: authData?.type === "oauth" ? "Anthropic OAuth" : "Anthropic API Key",
+              account: resolvedAccountName,
+              plan: piAuthEntry?.type === "oauth" ? "Anthropic OAuth" : "Anthropic API Key",
               rateLimitRequestsPerMin: reqLimit ? Number.parseInt(reqLimit, 10) : undefined,
               rateLimitTokensPerMin: tokenLimit ? Number.parseInt(tokenLimit, 10) : undefined,
               quotaUsed: reqLimit && reqRemaining ? Number.parseInt(reqLimit, 10) - Number.parseInt(reqRemaining, 10) : undefined,
@@ -229,7 +292,7 @@ export class DefaultProviderUsageAdapter implements ProviderUsageAdapter {
           return {
             supported: true,
             error: `Failed to connect to Anthropic endpoint: ${error instanceof Error ? error.message : String(error)}`,
-            usage: { provider, account },
+            usage: { provider, account: resolvedAccountName },
           };
         }
       }
@@ -238,8 +301,8 @@ export class DefaultProviderUsageAdapter implements ProviderUsageAdapter {
         supported: true,
         usage: {
           provider,
-          account: account ?? "default",
-          plan: authData?.type === "oauth" ? "Anthropic OAuth" : undefined,
+          account: resolvedAccountName,
+          plan: piAuthEntry?.type === "oauth" ? "Anthropic OAuth" : undefined,
           rawSummary: "Active Anthropic provider session.",
         },
       };
