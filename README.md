@@ -62,6 +62,24 @@ Permission rules and audit entries are stored locally and are not part of this r
 
 Run `/permissions` or `/permissions user` in Pi to edit the user rules. Run `/permissions local` to edit the current trusted project's rules. Permission prompts use Ctrl+A to save a project-scoped rule and Ctrl+Shift+A to save a user-scoped rule. When Pi has a persisted trust decision for the current project, trusted `.pi/permissions.toml` files are also discovered from the current directory up to the nearest Git or Jujutsu repository boundary. The nearest matching project rule overrides user policy; missing or unreadable trust data leaves user policy unchanged.
 
+### Multiline steering & Vim keybindings
+
+Permission prompts support Vim modal editing (`[INSERT]` / `[NORMAL]` modes) and custom editor extensions (such as `pi-vim-mode`).
+
+To configure `Enter` to insert newlines in prompts and use explicit shortcuts (such as `Ctrl+Y` or `Ctrl+S`) for submission, add the following to `~/.pi/agent/keybindings.json`:
+
+```json
+{
+  "tui.editor.yank": [],
+  "tui.input.newLine": ["enter", "shift+enter", "ctrl+j"],
+  "tui.input.submit": ["ctrl+s", "ctrl+y"]
+}
+```
+
+- **`Enter`**: Inserts a new line into the prompt editor buffer for multiline steering.
+- **`Ctrl+Y` / `Ctrl+S`**: Submits the prompt or permission steering decision.
+- **`tui.editor.yank`: `[]`**: Unbinds `Ctrl+Y` from default kill-ring yank so it can be used as a submit shortcut.
+
 ## Development
 
 ```bash

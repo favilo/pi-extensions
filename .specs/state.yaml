@@ -81,6 +81,7 @@ metrics:
       calls: 1
       total_seconds: 1434.0
       avg_seconds: 1434.0
+      _start: '2026-08-26T20:06:32Z'
     survey-context:
       calls: 9
       total_seconds: 6329.0
