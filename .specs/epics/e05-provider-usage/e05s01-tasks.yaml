@@ -1,6 +1,6 @@
 story_id: e05s01
 title: Show current provider usage
-status: todo
+status: passing
 bcps: 5
 delta: ADDED
 spec: e05s01-show-current-provider-usage.md
@@ -8,7 +8,7 @@ tasks:
   - id: 1
     description: Add contracts for current provider resolution, active account after /accounts:* switching, usage fields, unsupported providers, and safe provider failures.
     verify: node --test extensions/usage/index.test.ts
-    status: todo
+    status: passing
     risk: P1
     allure:
       severity: high
@@ -19,7 +19,7 @@ tasks:
   - id: 2
     description: Implement the provider-neutral usage adapter and /usage command without duplicating accounts-plugin discovery or changing /accounts:* behavior.
     verify: node --test extensions/usage/index.test.ts
-    status: todo
+    status: passing
     risk: P1
     allure:
       severity: high
@@ -30,7 +30,7 @@ tasks:
   - id: 3
     description: Render and document provider/account identity, quota, reset, cost, rate-limit, unsupported, and safe failure states.
     verify: node --test extensions/usage/documentation.test.ts
-    status: todo
+    status: passing
     risk: P1
     allure:
       severity: high
@@ -41,7 +41,7 @@ tasks:
   - id: 4
     description: Evaluate optional all-account support only when the existing accounts plugin exposes safe enumeration without duplicated discovery, then run package regression and type checks.
     verify: npm run check
-    status: todo
+    status: passing
     risk: P1
     allure:
       severity: high

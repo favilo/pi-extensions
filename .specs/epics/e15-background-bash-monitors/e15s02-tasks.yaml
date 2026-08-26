@@ -1,0 +1,27 @@
+story_id: e15s02
+title: Deliver bounded monitored Bash output to the agent flow
+status: todo
+bcps: 4
+delta: ADDED
+spec: e15s02-live-bash-monitors.md
+tasks:
+  - id: 1
+    description: Add behavioral contracts for line ordering, stdout/stderr attribution, batching, byte and rate bounds, monitor lifecycle, and delivery while the parent is active or idle.
+    verify: node --test extensions/background-bash/monitor.test.ts
+    status: todo
+    risk: P0
+  - id: 2
+    description: Implement opt-in monitor registration and a normalized line-event adapter over running background Bash task output.
+    verify: node --test extensions/background-bash/monitor.test.ts extensions/background-bash/output.test.ts
+    status: todo
+    risk: P0
+  - id: 3
+    description: Deliver safe, bounded monitor batches as clearly attributed custom agent-flow messages, with steering during active work and a triggered turn while idle.
+    verify: node --test extensions/background-bash/monitor-delivery.test.ts
+    status: todo
+    risk: P0
+  - id: 4
+    description: Implement monitor stop, terminal notification, overflow reporting, and shutdown cleanup without output delivery after registry closure.
+    verify: node --test extensions/background-bash/monitor.test.ts extensions/background-bash/monitor-delivery.test.ts && npm run check
+    status: todo
+    risk: P0

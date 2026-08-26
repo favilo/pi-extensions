@@ -50,6 +50,7 @@ For active development, install the local checkout of the same fork instead. The
 | `local-agent-context` | Loads `AGENTS.local.md` and `AGENTS.override.md` into the system prompt. |
 | `mcp` | Registers independent MCP tool providers and reports their status through `/mcp`. |
 | `tool-permissions` | Applies configurable allow and deny rules to tool calls. |
+| `usage` | Displays current provider and account usage information via `/usage`. |
 
 `jj-status` requires `jj` on `PATH` when used in a Jujutsu repository.
 

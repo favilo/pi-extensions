@@ -33,6 +33,7 @@
       "./extensions/mcp/index.ts",
       "./extensions/tool-permissions/index.ts",
       "./extensions/subagent/index.ts",
+      "./extensions/usage/index.ts",
       "./extensions/context-router/index.ts"
     ]
   },

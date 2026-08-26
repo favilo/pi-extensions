@@ -4,7 +4,7 @@ active_story_id: null
 active_story: null
 active_bug_id: null
 git:
-  bookmark: favilo/e10-vim-permission-steering
+  bookmark: favilo/e05-provider-usage
   parent_bookmark: main
 planning:
   e11:
@@ -18,6 +18,17 @@ planning:
       risk_reduction: 8
       job_size: 4
       rationale: Truthful tool outcomes and history complete across e11s01-s04.
+  e05:
+    status: completed
+    story_id: e05s01
+    capsule: .specs/epics/e05-provider-usage
+    wsjf: 4.0
+    scoring:
+      business_value: 5
+      time_criticality: 4
+      risk_reduction: 3
+      job_size: 3
+      rationale: Provider-neutral /usage command complete.
   e10:
     status: completed
     story_id: e10s02
@@ -44,14 +55,20 @@ planning:
     constraints:
     - Do not modify the e06 repair flow or child-private bridge catalog.
 handoff:
-  last_step_completed: Completed e10s03 (prompt layout refactor for scrollback and
-    boxed Vim steering editor) on bookmark favilo/e10-vim-permission-steering.
+  last_step_completed: Initiated epic e05 (story e05s01) on bookmark favilo/e05-provider-usage off main.
   open_decisions: []
   required_reading:
-  - .specs/epics/e10-vim-permission-steering/epic.yaml
-  - .specs/epics/e10-vim-permission-steering/e10s03-scrollback-steering-layout.md
-  - .specs/epics/e10-vim-permission-steering/e10s03-tasks.yaml
-  next_skill: verify-work
+  - .specs/epics/e05-provider-usage/epic.yaml
+  - .specs/epics/e05-provider-usage/e05s01-show-current-provider-usage.md
+  - .specs/epics/e05-provider-usage/e05s01-tasks.yaml
+  next_skill: release-branch
+  context: Epic e05 completed and verified locally with 218 passing unit tests and npm run check:ci green.
+  blocker: null
+  required_reading:
+  - .specs/epics/e05-provider-usage/epic.yaml
+  - .specs/epics/e05-provider-usage/e05s01-show-current-provider-usage.md
+  - .specs/epics/e05-provider-usage/e05s01-tasks.yaml
+  next_skill: develop-tdd
   context: Epic e10 complete across e10s01, e10s02, and e10s03 with 210 passing unit
     tests and npm run check green.
   blocker: null
@@ -95,9 +112,9 @@ metrics:
       total_seconds: 3246.0
       avg_seconds: 1082.0
     develop-tdd:
-      calls: 5
-      total_seconds: 361966.0
-      avg_seconds: 72393.2
+      calls: 6
+      total_seconds: 362555.0
+      avg_seconds: 60425.833333333336
     plan-work:
       calls: 2
       total_seconds: 1156.0
