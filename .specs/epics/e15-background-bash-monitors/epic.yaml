@@ -1,0 +1,20 @@
+id: e15
+title: Background Bash execution with live agent-flow monitors
+wsjf: 0.0
+total_bcps: 8
+status: planned
+stories:
+  - id: e15s01
+    title: Run permission-enforced Bash commands in the background
+    bcps: 4
+    status: todo
+    delta: ADDED
+    spec: e15s01-background-bash-lifecycle.md
+    tasks: e15s01-tasks.yaml
+  - id: e15s02
+    title: Deliver bounded monitored Bash output to the agent flow
+    bcps: 4
+    status: todo
+    delta: ADDED
+    spec: e15s02-live-bash-monitors.md
+    tasks: e15s02-tasks.yaml

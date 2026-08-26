@@ -66,6 +66,29 @@ function readAccountSwitcherAccounts(): AccountConfigEntry[] {
   }
 }
 
+function readAccountSwitcherActiveAccount(provider: string): string | undefined {
+  try {
+    const filePath = join(getAccountSwitcherDir(), "state.json");
+    const content = readFileSync(filePath, "utf8");
+    const data = JSON.parse(content);
+    if (!data || typeof data.sessions !== "object") return undefined;
+
+    const sessions = Object.values(data.sessions) as Array<{
+      activeAccountId?: string;
+      activeModelProvider?: string;
+      lastActive?: string;
+    }>;
+
+    const matching = sessions
+      .filter((s) => s.activeAccountId && (!s.activeModelProvider || s.activeModelProvider.toLowerCase() === provider.toLowerCase()))
+      .sort((a, b) => (b.lastActive ?? "").localeCompare(a.lastActive ?? ""));
+
+    return matching[0]?.activeAccountId;
+  } catch {
+    return undefined;
+  }
+}
+
 function readAuthStore(): Record<string, any> | undefined {
   try {
     const authPath = join(getAgentDir(), "auth.json");
@@ -94,12 +117,15 @@ export class DefaultProviderUsageAdapter implements ProviderUsageAdapter {
     const accounts = readAccountSwitcherAccounts();
     const authStore = readAuthStore();
 
-    // Look up account in account-switcher accounts.json first
-    let accountEntry = account
-      ? accounts.find((a) => a.id === account || a.label === account)
+    // Determine active account ID: explicit parameter > state.json active account > undefined
+    const activeAccountId = (account && account !== "default") ? account : readAccountSwitcherActiveAccount(norm);
+
+    // Look up account in account-switcher accounts.json
+    let accountEntry = activeAccountId
+      ? accounts.find((a) => a.id === activeAccountId || a.label === activeAccountId)
       : undefined;
 
-    // Fallback: match by provider if account is default or unlisted
+    // Fallback: match by provider if account is unlisted
     if (!accountEntry) {
       accountEntry = accounts.find((a) => a.provider.toLowerCase() === norm);
     }
@@ -120,7 +146,7 @@ export class DefaultProviderUsageAdapter implements ProviderUsageAdapter {
             supported: true,
             usage: {
               provider,
-              account: account ?? "local",
+              account: accountEntry?.label ?? activeAccountId ?? account ?? "local",
               plan: "Local / Self-hosted",
               rawSummary: `Local Ollama server active (${modelCount} models installed). Unlimited local inference.`,
             },
@@ -134,7 +160,7 @@ export class DefaultProviderUsageAdapter implements ProviderUsageAdapter {
         supported: true,
         usage: {
           provider,
-          account: account ?? "local",
+          account: accountEntry?.label ?? activeAccountId ?? account ?? "local",
           plan: "Local / Self-hosted",
           rawSummary: "Unlimited local inference (no remote quota limits applied).",
         },
@@ -164,7 +190,7 @@ export class DefaultProviderUsageAdapter implements ProviderUsageAdapter {
       const apiKey = process.env.OPENAI_API_KEY ?? (isOAuth ? undefined : piAuthEntry?.access);
       const baseUrl = process.env.OPENAI_BASE_URL || "https://api.openai.com/v1";
 
-      const resolvedAccountName = account && account !== "default" ? account : (accountEntry?.label ?? accountEntry?.id ?? (email ? `${name ? `${name} <${email}>` : email}` : "default"));
+      const resolvedAccountName = accountEntry?.label ?? accountEntry?.id ?? activeAccountId ?? (email ? `${name ? `${name} <${email}>` : email}` : "default");
 
       if (isOAuth) {
         return {
@@ -235,7 +261,7 @@ export class DefaultProviderUsageAdapter implements ProviderUsageAdapter {
       const piAuthEntry = accountEntry?.piAuth?.entry ?? authStore?.["antigravity"];
       const email = piAuthEntry?.email;
       const projectId = piAuthEntry?.projectId;
-      const resolvedAccountName = account && account !== "default" ? account : (accountEntry?.label ?? accountEntry?.id ?? email ?? "default");
+      const resolvedAccountName = accountEntry?.label ?? accountEntry?.id ?? activeAccountId ?? email ?? "default";
 
       return {
         supported: true,
@@ -254,7 +280,7 @@ export class DefaultProviderUsageAdapter implements ProviderUsageAdapter {
     if (norm === "anthropic") {
       const piAuthEntry = accountEntry?.piAuth?.entry ?? authStore?.["anthropic"];
       const apiKey = process.env.ANTHROPIC_API_KEY ?? piAuthEntry?.access;
-      const resolvedAccountName = account && account !== "default" ? account : (accountEntry?.label ?? accountEntry?.id ?? "default");
+      const resolvedAccountName = accountEntry?.label ?? accountEntry?.id ?? activeAccountId ?? "default";
 
       if (apiKey) {
         try {

@@ -93,6 +93,13 @@ epics:
     bcps: 4
     note: >-
       Unscored backlog epic migrated from .plans/issues-discovered.md. Give agents syntax-aware code search via an ast-grep tool extension with read-parity permissions for the working directory, pairing with the existing user-level ast-grep skill.
+  - id: e15
+    title: Background Bash execution with live agent-flow monitors
+    capsule_dir: epics/e15-background-bash-monitors
+    wsjf: 0.0
+    bcps: 8
+    note: >-
+      Unscored backlog epic. Let an authorized Bash command run as a parent-session-owned cancellable task and, when explicitly monitored, safely inject its bounded, attributed output lines into the agent flow as steering or an idle-triggered turn.
 bugs:
   total: 1
   fixed: 0
