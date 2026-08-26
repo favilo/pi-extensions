@@ -30,10 +30,13 @@ export class SteeringEditor {
   private mode: SteeringEditorMode = "insert";
 
   constructor(options: SteeringEditorOptions = {}) {
-    const tui: TUI = options.tui ?? ({ requestRender: () => {}, terminal: { rows: 24, cols: 80 } } as any);
+    const tui: any = options.tui ?? { requestRender: () => {} };
+    if (!tui.terminal) {
+      tui.terminal = { rows: 24, cols: 80 };
+    }
     const theme: EditorTheme = options.theme ?? defaultTheme;
 
-    this.editor = new Editor(tui, theme, { paddingX: 0 });
+    this.editor = new Editor(tui as TUI, theme, { paddingX: 0 });
     this.vimMode = options.vimMode ?? false;
     this.mode = this.vimMode ? "insert" : "insert";
 
@@ -132,12 +135,13 @@ export class SteeringEditor {
   }
 
   render(width: number): string[] {
-    const lines = this.editor.render(width);
+    const modeLabel = this.vimMode ? (this.mode === "normal" ? " [NORMAL]" : " [INSERT]") : "";
+    const effectiveWidth = Math.max(1, width - modeLabel.length);
+    const lines = this.editor.render(effectiveWidth);
     if (!this.vimMode) {
       return lines;
     }
 
-    const modeLabel = this.mode === "normal" ? " [NORMAL]" : " [INSERT]";
     if (lines.length === 0) {
       return [modeLabel.trim()];
     }

@@ -557,6 +557,12 @@ async function presentScrollablePermission(
       render(width: number): string[] {
       const continuationPrefix = theme.fg("muted", "… ");
       const contentWidth = Math.max(1, width - 2);
+
+      const termRows = (tui as any)?.terminal?.rows ?? 24;
+      const fixedHeaderLines = 1 + (stickyHeader ? 1 : 0) + (allowPattern ? 1 : 0) + 1;
+      const fixedFooterLines = 1 + (steeringMode ? 2 : 0) + 2;
+      const pageSize = Math.max(4, Math.min(20, termRows - (fixedHeaderLines + fixedFooterLines)));
+
       const wrappedBody = rawLines.flatMap((line) => wrapWithContinuation(line, contentWidth, continuationPrefix));
       scrollableLineCount = wrappedBody.length;
 
@@ -574,6 +580,13 @@ async function presentScrollablePermission(
         : `Ctrl+Y allow once${allowHint}`;
       const wrap = (text: string): string[] => wrapWithContinuation(text, width, continuationPrefix);
 
+      const steeringPrefixStr = "Steering: ";
+      const steeringPrefixLen = visibleWidth(steeringPrefixStr);
+      const editorWidth = Math.max(1, contentWidth - steeringPrefixLen);
+      const editorLines = steeringEditor.render(editorWidth);
+      const steeringLineContent = editorLines[0] ?? "";
+      const formattedSteeringLine = `${theme.fg("warning", steeringPrefixStr)}${steeringLineContent}`;
+
       return [
         ...wrap(theme.fg("accent", theme.bold(title))),
         ...(stickyHeader ? wrap(theme.fg("muted", stickyHeader)) : []),
@@ -583,7 +596,7 @@ async function presentScrollablePermission(
         "",
         ...(steeringMode
           ? [
-              ...wrap(theme.fg("warning", `Steering: ${steeringEditor.render(contentWidth)[0]}`)),
+              formattedSteeringLine,
               ...wrap(theme.fg("dim", steeringEditor.getValue().trim() ? "choose allow or deny" : "type a message; Esc returns")),
             ]
           : []),
