@@ -137,19 +137,21 @@ export class SteeringEditor {
   render(width: number): string[] {
     const modeLabel = this.vimMode ? (this.mode === "normal" ? " [NORMAL]" : " [INSERT]") : "";
     const effectiveWidth = Math.max(1, width - modeLabel.length);
-    const lines = this.editor.render(effectiveWidth);
-    if (!this.vimMode) {
-      return lines;
+    const rawLines = this.editor.render(effectiveWidth);
+
+    // Editor.render() includes top border (line 0) and bottom border (last line).
+    // Extract the actual content lines between the borders.
+    let contentLines =
+      rawLines.length > 2 ? rawLines.slice(1, -1) : rawLines.length === 1 ? rawLines : [];
+    if (contentLines.length === 0) {
+      contentLines = [""];
     }
 
-    if (lines.length === 0) {
-      return [modeLabel.trim()];
+    if (modeLabel) {
+      const lastIdx = contentLines.length - 1;
+      contentLines[lastIdx] = contentLines[lastIdx] + modeLabel;
     }
-
-    // Append mode indicator to bottom line of rendered editor
-    const lastIdx = lines.length - 1;
-    lines[lastIdx] = lines[lastIdx] + modeLabel;
-    return lines;
+    return contentLines;
   }
 
   invalidate(): void {
