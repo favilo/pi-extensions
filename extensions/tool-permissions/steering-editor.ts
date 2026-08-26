@@ -1,10 +1,14 @@
-import { Editor, type EditorTheme, type TUI, matchesKey } from "@earendil-works/pi-tui";
+import { Editor, type Component, type EditorTheme, type Focusable, type TUI, matchesKey } from "@earendil-works/pi-tui";
 
 export type SteeringEditorMode = "normal" | "insert";
+
+export type CustomEditorFactory = (tui: TUI, theme: any, keybindings: any) => Component;
 
 export interface SteeringEditorOptions {
   tui?: TUI;
   theme?: EditorTheme;
+  keybindings?: unknown;
+  customEditorFactory?: CustomEditorFactory;
   vimMode?: boolean;
   initialText?: string;
 }
@@ -21,11 +25,13 @@ const defaultTheme: EditorTheme = {
 };
 
 /**
- * SteeringEditor embeds the official Pi TUI Editor component UI node
- * while providing modal Vim keybindings and permission prompt integration.
+ * SteeringEditor embeds the registered custom editor (e.g. pi-vim-mode plugin)
+ * via ctx.ui.getEditorComponent() if available, or falls back to the official
+ * Pi TUI Editor component.
  */
-export class SteeringEditor {
-  private editor: Editor;
+export class SteeringEditor implements Component, Focusable {
+  private editor?: Editor;
+  private customEditor?: Component;
   private vimMode: boolean = false;
   private mode: SteeringEditorMode = "insert";
 
@@ -36,21 +42,42 @@ export class SteeringEditor {
     }
     const theme: EditorTheme = options.theme ?? defaultTheme;
 
-    this.editor = new Editor(tui as TUI, theme, { paddingX: 0 });
+    if (options.customEditorFactory) {
+      try {
+        const customComp = options.customEditorFactory(tui as TUI, theme, options.keybindings);
+        if (customComp) {
+          this.customEditor = customComp;
+        }
+      } catch {
+        // Fallback to built-in Editor if factory fails
+      }
+    }
+
+    if (!this.customEditor) {
+      this.editor = new Editor(tui as TUI, theme, { paddingX: 0 });
+      if (options.initialText) {
+        this.editor.setText(options.initialText);
+      }
+    }
+
     this.vimMode = options.vimMode ?? false;
     this.mode = this.vimMode ? "insert" : "insert";
-
-    if (options.initialText) {
-      this.editor.setText(options.initialText);
-    }
   }
 
   get focused(): boolean {
-    return this.editor.focused;
+    if (this.customEditor && "focused" in this.customEditor) {
+      return Boolean((this.customEditor as any).focused);
+    }
+    return this.editor?.focused ?? false;
   }
 
   set focused(value: boolean) {
-    this.editor.focused = value;
+    if (this.customEditor && "focused" in this.customEditor) {
+      (this.customEditor as any).focused = value;
+    }
+    if (this.editor) {
+      this.editor.focused = value;
+    }
   }
 
   setVimMode(enabled: boolean): void {
@@ -61,19 +88,44 @@ export class SteeringEditor {
   }
 
   getMode(): SteeringEditorMode {
+    if (this.customEditor && "mode" in this.customEditor) {
+      return (this.customEditor as any).mode;
+    }
     return this.mode;
   }
 
   getValue(): string {
-    return this.editor.getExpandedText();
+    if (this.customEditor) {
+      if (typeof (this.customEditor as any).getExpandedText === "function") {
+        return (this.customEditor as any).getExpandedText();
+      }
+      if (typeof (this.customEditor as any).getValue === "function") {
+        return (this.customEditor as any).getValue();
+      }
+      if (typeof (this.customEditor as any).getText === "function") {
+        return (this.customEditor as any).getText();
+      }
+    }
+    return this.editor?.getExpandedText() ?? "";
   }
 
   setValue(text: string): void {
-    this.editor.setText(text);
+    if (this.customEditor && typeof (this.customEditor as any).setText === "function") {
+      (this.customEditor as any).setText(text);
+      return;
+    }
+    this.editor?.setText(text);
   }
 
   handleInput(data: string): void {
     if (!data) return;
+
+    if (this.customEditor) {
+      this.customEditor.handleInput?.(data);
+      return;
+    }
+
+    if (!this.editor) return;
 
     if (matchesKey(data, "escape")) {
       if (this.vimMode && this.mode === "insert") {
@@ -126,7 +178,6 @@ export class SteeringEditor {
         this.editor.handleInput("\x1b[3~"); // Forward delete
         break;
       default:
-        // Pass modifier keys / paste buffers through to Editor
         if (data.length > 1 || data.charCodeAt(0) < 32) {
           this.editor.handleInput(data);
         }
@@ -135,26 +186,31 @@ export class SteeringEditor {
   }
 
   render(width: number): string[] {
+    if (this.customEditor) {
+      return this.customEditor.render(width);
+    }
+
+    if (!this.editor) return [""];
+
     const modeLabel = this.vimMode ? (this.mode === "normal" ? " [NORMAL]" : " [INSERT]") : "";
     const effectiveWidth = Math.max(1, width - modeLabel.length);
-    const rawLines = this.editor.render(effectiveWidth);
-
-    // Editor.render() includes top border (line 0) and bottom border (last line).
-    // Extract the actual content lines between the borders.
-    let contentLines =
-      rawLines.length > 2 ? rawLines.slice(1, -1) : rawLines.length === 1 ? rawLines : [];
-    if (contentLines.length === 0) {
-      contentLines = [""];
+    const lines = this.editor.render(effectiveWidth);
+    if (!this.vimMode) {
+      return lines;
     }
 
-    if (modeLabel) {
-      const lastIdx = contentLines.length - 1;
-      contentLines[lastIdx] = contentLines[lastIdx] + modeLabel;
+    if (lines.length === 0) {
+      return [modeLabel.trim()];
     }
-    return contentLines;
+
+    // Append mode indicator to the line above bottom border
+    const contentIdx = lines.length > 2 ? lines.length - 2 : lines.length - 1;
+    lines[contentIdx] = lines[contentIdx] + modeLabel;
+    return lines;
   }
 
   invalidate(): void {
-    this.editor.invalidate();
+    this.customEditor?.invalidate?.();
+    this.editor?.invalidate();
   }
 }

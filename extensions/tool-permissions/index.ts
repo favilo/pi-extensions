@@ -527,13 +527,20 @@ async function presentScrollablePermission(
 
   return ctx.ui.custom<PermissionResult>((tui, theme: any, keybindings: any, finish) => {
     let settled = false;
+    const customFactory = (ctx.ui as any)?.getEditorComponent?.();
     const isVim =
       process.env.PI_VIM_MODE === "1" ||
       Boolean(keybindings?.vimMode) ||
       (ctx as any).settings?.editorMode === "vim" ||
       Boolean(process.env.EDITOR?.includes("vim")) ||
       Boolean(process.env.VISUAL?.includes("vim"));
-    const steeringEditor = new SteeringEditor({ tui: tui as any, vimMode: isVim });
+    const steeringEditor = new SteeringEditor({
+      tui: tui as any,
+      theme: theme?.editorTheme,
+      keybindings,
+      customEditorFactory: customFactory,
+      vimMode: isVim,
+    });
     const onAbort = (): void => done({ allowed: false, decision: "cancel" });
     const done = (value: PermissionResult): void => {
       if (settled) return;
@@ -573,12 +580,7 @@ async function presentScrollablePermission(
         : `Ctrl+Y allow once${allowHint}`;
       const wrap = (text: string): string[] => wrapWithContinuation(text, width, continuationPrefix);
 
-      const steeringPrefixStr = "Steering: ";
-      const steeringPrefixLen = visibleWidth(steeringPrefixStr);
-      const editorWidth = Math.max(1, contentWidth - steeringPrefixLen);
-      const editorLines = steeringEditor.render(editorWidth);
-      const steeringLineContent = editorLines[0] ?? "";
-      const formattedSteeringLine = `${theme.fg("warning", steeringPrefixStr)}${steeringLineContent}`;
+      const steeringBoxLines = steeringEditor.render(contentWidth);
 
       return [
         ...wrap(theme.fg("accent", theme.bold(title))),
@@ -589,7 +591,7 @@ async function presentScrollablePermission(
         "",
         ...(steeringMode
           ? [
-              formattedSteeringLine,
+              ...steeringBoxLines,
               ...wrap(theme.fg("dim", steeringEditor.getValue().trim() ? "choose allow or deny" : "type a message; Esc returns")),
             ]
           : []),

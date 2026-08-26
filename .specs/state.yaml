@@ -44,14 +44,14 @@ planning:
     constraints:
     - Do not modify the e06 repair flow or child-private bridge catalog.
 handoff:
-  last_step_completed: Completed epic e10 (Vim-capable permission steering editor) including e10s01 spike and e10s02 implementation on bookmark favilo/e10-vim-permission-steering.
+  last_step_completed: Completed e10s03 (prompt layout refactor for scrollback and boxed Vim steering editor) on bookmark favilo/e10-vim-permission-steering.
   open_decisions: []
   required_reading:
   - .specs/epics/e10-vim-permission-steering/epic.yaml
-  - .specs/epics/e10-vim-permission-steering/SPIKE-editor-integration.md
-  - .specs/epics/e10-vim-permission-steering/e10s02-vim-steering-editor.md
+  - .specs/epics/e10-vim-permission-steering/e10s03-scrollback-steering-layout.md
+  - .specs/epics/e10-vim-permission-steering/e10s03-tasks.yaml
   next_skill: verify-work
-  context: Epic e10 completed and verified locally with 215 passing unit tests and npm run check green.
+  context: Epic e10 complete across e10s01, e10s02, and e10s03 with 210 passing unit tests and npm run check green.
   blocker: null
   deferred_work:
   - Consolidate safeStringify and JSON formatting helpers into a shared utility module

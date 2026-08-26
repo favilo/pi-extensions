@@ -65,3 +65,11 @@ test("SteeringEditor renders mode indicator and cursor marker when focused", () 
   assert.ok(linesNormal.some((l) => l.includes("[NORMAL]")));
 });
 
+test("SteeringEditor renders boxed Editor.render output for editor box display", () => {
+  const editor = new SteeringEditor({ vimMode: true, initialText: "clean line" });
+  const lines = editor.render(80);
+  assert.equal(lines.length, 3);
+  assert.match(lines[0], /^─+$/);
+  assert.ok(lines[1].includes("clean line"));
+});
+
