@@ -1,7 +1,7 @@
-active_flow: build_epic
-active_epic_id: e10
-active_story_id: e10s02
-active_story: Support configured Vim editing in permission steering
+active_flow: null
+active_epic_id: null
+active_story_id: null
+active_story: null
 active_bug_id: null
 git:
   bookmark: favilo/e10-vim-permission-steering
@@ -18,6 +18,17 @@ planning:
       risk_reduction: 8
       job_size: 4
       rationale: Truthful tool outcomes and history complete across e11s01-s04.
+  e10:
+    status: completed
+    story_id: e10s02
+    capsule: .specs/epics/e10-vim-permission-steering
+    wsjf: 0.0
+    scoring:
+      business_value: 6
+      time_criticality: 6
+      risk_reduction: 5
+      job_size: 4
+      rationale: Vim editing model for permission steering prompt complete.
   e12:
     status: completed
     story_id: e12s01
@@ -33,15 +44,14 @@ planning:
     constraints:
     - Do not modify the e06 repair flow or child-private bridge catalog.
 handoff:
-  last_step_completed: Completed e10s01 spike on bookmark favilo/e10-vim-permission-steering.
+  last_step_completed: Completed epic e10 (Vim-capable permission steering editor) including e10s01 spike and e10s02 implementation on bookmark favilo/e10-vim-permission-steering.
   open_decisions: []
   required_reading:
+  - .specs/epics/e10-vim-permission-steering/epic.yaml
   - .specs/epics/e10-vim-permission-steering/SPIKE-editor-integration.md
   - .specs/epics/e10-vim-permission-steering/e10s02-vim-steering-editor.md
-  - .specs/epics/e10-vim-permission-steering/e10s02-tasks.yaml
-  next_skill: develop-tdd
-  context: Completed e10s01 spike on bookmark favilo/e10-vim-permission-steering.
-    Ready to begin e10s02 Vim permission steering editor implementation.
+  next_skill: verify-work
+  context: Epic e10 completed and verified locally with 215 passing unit tests and npm run check green.
   blocker: null
   deferred_work:
   - Consolidate safeStringify and JSON formatting helpers into a shared utility module
@@ -82,10 +92,9 @@ metrics:
       total_seconds: 3246.0
       avg_seconds: 1082.0
     develop-tdd:
-      calls: 4
-      total_seconds: 360193.0
-      avg_seconds: 90048.25
-      _start: '2026-08-26T00:45:15Z'
+      calls: 5
+      total_seconds: 361966.0
+      avg_seconds: 72393.2
     plan-work:
       calls: 2
       total_seconds: 1156.0

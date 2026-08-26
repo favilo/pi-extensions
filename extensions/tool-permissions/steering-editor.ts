@@ -1,24 +1,53 @@
-import { CURSOR_MARKER, matchesKey, truncateToWidth } from "@earendil-works/pi-tui";
+import { Editor, type EditorTheme, type TUI, matchesKey } from "@earendil-works/pi-tui";
 
 export type SteeringEditorMode = "normal" | "insert";
 
 export interface SteeringEditorOptions {
+  tui?: TUI;
+  theme?: EditorTheme;
   vimMode?: boolean;
   initialText?: string;
 }
 
+const defaultTheme: EditorTheme = {
+  borderColor: (s: string) => s,
+  selectList: {
+    selectedPrefix: (s: string) => s,
+    selectedText: (s: string) => s,
+    description: (s: string) => s,
+    scrollInfo: (s: string) => s,
+    noMatch: (s: string) => s,
+  },
+};
+
+/**
+ * SteeringEditor embeds the official Pi TUI Editor component UI node
+ * while providing modal Vim keybindings and permission prompt integration.
+ */
 export class SteeringEditor {
-  focused: boolean = false;
+  private editor: Editor;
   private vimMode: boolean = false;
   private mode: SteeringEditorMode = "insert";
-  private text: string = "";
-  private cursorPos: number = 0;
 
   constructor(options: SteeringEditorOptions = {}) {
+    const tui: TUI = options.tui ?? ({ requestRender: () => {}, terminal: { rows: 24, cols: 80 } } as any);
+    const theme: EditorTheme = options.theme ?? defaultTheme;
+
+    this.editor = new Editor(tui, theme, { paddingX: 0 });
     this.vimMode = options.vimMode ?? false;
-    this.text = options.initialText ?? "";
-    this.cursorPos = this.text.length;
     this.mode = this.vimMode ? "insert" : "insert";
+
+    if (options.initialText) {
+      this.editor.setText(options.initialText);
+    }
+  }
+
+  get focused(): boolean {
+    return this.editor.focused;
+  }
+
+  set focused(value: boolean) {
+    this.editor.focused = value;
   }
 
   setVimMode(enabled: boolean): void {
@@ -33,12 +62,11 @@ export class SteeringEditor {
   }
 
   getValue(): string {
-    return this.text;
+    return this.editor.getExpandedText();
   }
 
   setValue(text: string): void {
-    this.text = text;
-    this.cursorPos = Math.min(this.cursorPos, this.text.length);
+    this.editor.setText(text);
   }
 
   handleInput(data: string): void {
@@ -47,126 +75,80 @@ export class SteeringEditor {
     if (matchesKey(data, "escape")) {
       if (this.vimMode && this.mode === "insert") {
         this.mode = "normal";
-        if (this.text.length > 0) {
-          this.cursorPos = Math.min(this.cursorPos, this.text.length - 1);
-        }
+        return;
       }
+    }
+
+    if (this.mode === "insert" || !this.vimMode) {
+      this.editor.handleInput(data);
       return;
     }
 
-    if (this.mode === "insert") {
-      if (data === "\x7f" || data === "\x08" || matchesKey(data, "backspace")) {
-        if (this.cursorPos > 0) {
-          this.text = this.text.slice(0, this.cursorPos - 1) + this.text.slice(this.cursorPos);
-          this.cursorPos--;
+    // Normal Vim mode navigation and manipulation via Editor calls
+    switch (data) {
+      case "i":
+        this.mode = "insert";
+        break;
+      case "a":
+        this.editor.handleInput("\x1b[C"); // Right
+        this.mode = "insert";
+        break;
+      case "I":
+        this.editor.handleInput("\x1b[H"); // Home / Line start
+        this.mode = "insert";
+        break;
+      case "A":
+        this.editor.handleInput("\x1b[F"); // End / Line end
+        this.mode = "insert";
+        break;
+      case "h":
+        this.editor.handleInput("\x1b[D"); // Left
+        break;
+      case "l":
+        this.editor.handleInput("\x1b[C"); // Right
+        break;
+      case "j":
+        this.editor.handleInput("\x1b[B"); // Down
+        break;
+      case "k":
+        this.editor.handleInput("\x1b[A"); // Up
+        break;
+      case "0":
+        this.editor.handleInput("\x1b[H"); // Home
+        break;
+      case "$":
+        this.editor.handleInput("\x1b[F"); // End
+        break;
+      case "x":
+        this.editor.handleInput("\x1b[3~"); // Forward delete
+        break;
+      default:
+        // Pass modifier keys / paste buffers through to Editor
+        if (data.length > 1 || data.charCodeAt(0) < 32) {
+          this.editor.handleInput(data);
         }
-        return;
-      }
-      if (matchesKey(data, "left")) {
-        this.cursorPos = Math.max(0, this.cursorPos - 1);
-        return;
-      }
-      if (matchesKey(data, "right")) {
-        this.cursorPos = Math.min(this.text.length, this.cursorPos + 1);
-        return;
-      }
-      if (matchesKey(data, "home")) {
-        this.cursorPos = 0;
-        return;
-      }
-      if (matchesKey(data, "end")) {
-        this.cursorPos = this.text.length;
-        return;
-      }
-      if (data.length === 1 && data.charCodeAt(0) >= 32) {
-        this.text = this.text.slice(0, this.cursorPos) + data + this.text.slice(this.cursorPos);
-        this.cursorPos++;
-        return;
-      }
-    } else if (this.vimMode && this.mode === "normal") {
-      switch (data) {
-        case "i":
-          this.mode = "insert";
-          break;
-        case "a":
-          this.mode = "insert";
-          this.cursorPos = Math.min(this.text.length, this.cursorPos + 1);
-          break;
-        case "I":
-          this.mode = "insert";
-          this.cursorPos = 0;
-          break;
-        case "A":
-          this.mode = "insert";
-          this.cursorPos = this.text.length;
-          break;
-        case "h":
-          this.cursorPos = Math.max(0, this.cursorPos - 1);
-          break;
-        case "l":
-          if (this.text.length > 0) {
-            this.cursorPos = Math.min(this.text.length - 1, this.cursorPos + 1);
-          }
-          break;
-        case "0":
-          this.cursorPos = 0;
-          break;
-        case "$":
-          if (this.text.length > 0) {
-            this.cursorPos = this.text.length - 1;
-          }
-          break;
-        case "w": {
-          const match = /\s\S/.exec(this.text.slice(this.cursorPos));
-          if (match) {
-            this.cursorPos += match.index + 1;
-          } else {
-            this.cursorPos = Math.max(0, this.text.length - 1);
-          }
-          break;
-        }
-        case "b": {
-          const before = this.text.slice(0, this.cursorPos);
-          const rev = before.split("").reverse().join("");
-          const match = /\S\s/.exec(rev);
-          if (match) {
-            this.cursorPos = before.length - (match.index + 1);
-          } else {
-            this.cursorPos = 0;
-          }
-          break;
-        }
-        case "x":
-          if (this.text.length > 0 && this.cursorPos < this.text.length) {
-            this.text = this.text.slice(0, this.cursorPos) + this.text.slice(this.cursorPos + 1);
-            if (this.cursorPos >= this.text.length && this.text.length > 0) {
-              this.cursorPos = this.text.length - 1;
-            }
-          }
-          break;
-      }
+        break;
     }
   }
 
   render(width: number): string[] {
-    const modeLabel = this.vimMode ? (this.mode === "normal" ? " [NORMAL]" : " [INSERT]") : "";
-    const effectiveWidth = Math.max(1, width - modeLabel.length);
-
-    let content = "";
-    if (this.focused) {
-      const before = this.text.slice(0, this.cursorPos);
-      const atChar = this.text[this.cursorPos] ?? " ";
-      const after = this.text.slice(this.cursorPos + 1);
-      content = `${before}${CURSOR_MARKER}\x1b[7m${atChar}\x1b[27m${after}`;
-    } else {
-      content = this.text;
+    const lines = this.editor.render(width);
+    if (!this.vimMode) {
+      return lines;
     }
 
-    const line = truncateToWidth(content, effectiveWidth) + modeLabel;
-    return [line];
+    const modeLabel = this.mode === "normal" ? " [NORMAL]" : " [INSERT]";
+    if (lines.length === 0) {
+      return [modeLabel.trim()];
+    }
+
+    // Append mode indicator to bottom line of rendered editor
+    const lastIdx = lines.length - 1;
+    lines[lastIdx] = lines[lastIdx] + modeLabel;
+    return lines;
   }
 
   invalidate(): void {
-    // Cache invalidation
+    this.editor.invalidate();
   }
 }

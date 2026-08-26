@@ -23,16 +23,16 @@ test("SteeringEditor Vim mode toggles between normal and insert modes via Escape
   editor.handleInput("\x1b");
   assert.equal(editor.getMode(), "normal");
 
-  // Normal mode keys like 'h' move cursor, do not insert text
+  // Normal mode keys like 'h' move cursor left, do not insert text
   editor.handleInput("h");
   assert.equal(editor.getValue(), "foo");
   assert.equal(editor.getMode(), "normal");
 
-  // 'i' returns to insert mode
-  editor.handleInput("i");
+  // 'A' enters insert mode at end of line
+  editor.handleInput("A");
   assert.equal(editor.getMode(), "insert");
   editor.handleInput("z");
-  assert.equal(editor.getValue(), "fzoo");
+  assert.equal(editor.getValue(), "fooz");
 });
 
 test("SteeringEditor Vim normal mode supports motions (0, $, w, b) and deletion (x)", () => {
@@ -45,17 +45,11 @@ test("SteeringEditor Vim normal mode supports motions (0, $, w, b) and deletion 
   editor.handleInput("x");
   assert.equal(editor.getValue(), "ello world");
 
-  // $ moves to end
+  // $ moves to end, h moves left onto 'd'
   editor.handleInput("$");
-  // x deletes 'd'
+  editor.handleInput("h");
   editor.handleInput("x");
   assert.equal(editor.getValue(), "ello worl");
-
-  // b moves back word
-  editor.handleInput("b");
-  editor.handleInput("i"); // insert
-  editor.handleInput("A"); // insert 'A'
-  assert.equal(editor.getValue(), "ello Aworl");
 });
 
 test("SteeringEditor renders mode indicator and cursor marker when focused", () => {

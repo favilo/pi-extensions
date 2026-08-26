@@ -527,8 +527,13 @@ async function presentScrollablePermission(
 
   return ctx.ui.custom<PermissionResult>((tui, theme: any, keybindings: any, finish) => {
     let settled = false;
-    const isVim = process.env.PI_VIM_MODE === "1" || keybindings?.vimMode === true;
-    const steeringEditor = new SteeringEditor({ vimMode: isVim });
+    const isVim =
+      process.env.PI_VIM_MODE === "1" ||
+      Boolean(keybindings?.vimMode) ||
+      (ctx as any).settings?.editorMode === "vim" ||
+      Boolean(process.env.EDITOR?.includes("vim")) ||
+      Boolean(process.env.VISUAL?.includes("vim"));
+    const steeringEditor = new SteeringEditor({ tui: tui as any, vimMode: isVim });
     const onAbort = (): void => done({ allowed: false, decision: "cancel" });
     const done = (value: PermissionResult): void => {
       if (settled) return;
