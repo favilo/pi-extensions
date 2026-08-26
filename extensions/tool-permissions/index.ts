@@ -344,40 +344,52 @@ function applyEditPreview(oldContent: string, edits: Array<{ oldText: string; ne
   return next;
 }
 
-function truncateDiff(diff: string, maxLines = 240): string {
+function truncateDiff(diff: string, maxLines = 10000): string {
   const lines = diff.split("\n");
   if (lines.length <= maxLines) return diff;
   return [...lines.slice(0, maxLines), `… diff truncated, ${lines.length - maxLines} more lines`].join("\n");
 }
 
-function diffPromptBody(path: string, oldContent: string, newContent: string, previewError?: string): string {
+function diffPromptBody(path: string, oldContent: string, newContent: string, previewError?: string): { body: string; lineCount: number } {
   if (previewError) {
-    return `Path: ${path}\n\nDiff preview unavailable: ${previewError}\n\nReview the tool request carefully before allowing it.`;
+    const body = `Path: ${path}\n\nDiff preview unavailable: ${previewError}\n\nReview the tool request carefully before allowing it.`;
+    return { body, lineCount: body.split("\n").length };
   }
 
   if (oldContent === newContent) {
-    return `Path: ${path}\n\nNo content changes detected.`;
+    const body = `Path: ${path}\n\nNo content changes detected.`;
+    return { body, lineCount: body.split("\n").length };
   }
 
   const { diff } = generateDiffString(oldContent, newContent, 3);
-  return `Path: ${path}\n\n${renderDiff(truncateDiff(diff), { filePath: path })}`;
+  const lineCount = diff.split("\n").length;
+  if (lineCount > 1000) {
+    const body = `Path: ${path}\n\n[Diff exceeds 1000 lines (${lineCount} lines). Automatically denied.]`;
+    return { body, lineCount };
+  }
+
+  const body = `Path: ${path}\n\n${renderDiff(truncateDiff(diff, 1000), { filePath: path })}`;
+  return { body, lineCount: body.split("\n").length };
 }
 
-function buildFileEditPrompt(toolName: string, input: unknown, cwd: string): { title: string; body: string } {
+function buildFileEditPrompt(toolName: string, input: unknown, cwd: string): { title: string; body: string; lineCount: number } {
   if (toolName === "write") {
     const { path, content } = input as WriteInput;
     if (typeof path !== "string" || typeof content !== "string") {
-      return { title: "Allow write?", body: `Invalid write arguments.\n\n${compact(input)}` };
+      const body = `Invalid write arguments.\n\n${compact(input)}`;
+      return { title: "Allow write?", body, lineCount: body.split("\n").length };
     }
 
     const absolutePath = resolve(cwd, path);
     const oldContent = readTextIfPresent(absolutePath);
-    return { title: `Allow write to ${path}?`, body: diffPromptBody(path, oldContent, content) };
+    const prompt = diffPromptBody(path, oldContent, content);
+    return { title: `Allow write to ${path}?`, body: prompt.body, lineCount: prompt.lineCount };
   }
 
   const { path, edits } = input as EditInput;
   if (typeof path !== "string" || !Array.isArray(edits)) {
-    return { title: "Allow edit?", body: `Invalid edit arguments.\n\n${compact(input)}` };
+    const body = `Invalid edit arguments.\n\n${compact(input)}`;
+    return { title: "Allow edit?", body, lineCount: body.split("\n").length };
   }
 
   const absolutePath = resolve(cwd, path);
@@ -386,9 +398,11 @@ function buildFileEditPrompt(toolName: string, input: unknown, cwd: string): { t
 
   try {
     const newContent = applyEditPreview(oldContent, normalizedEdits);
-    return { title: `Allow edit to ${path}?`, body: diffPromptBody(path, oldContent, newContent) };
+    const prompt = diffPromptBody(path, oldContent, newContent);
+    return { title: `Allow edit to ${path}?`, body: prompt.body, lineCount: prompt.lineCount };
   } catch (error) {
-    return { title: `Allow edit to ${path}?`, body: diffPromptBody(path, oldContent, oldContent, error instanceof Error ? error.message : String(error)) };
+    const prompt = diffPromptBody(path, oldContent, oldContent, error instanceof Error ? error.message : String(error));
+    return { title: `Allow edit to ${path}?`, body: prompt.body, lineCount: prompt.lineCount };
   }
 }
 
@@ -496,6 +510,15 @@ async function presentScrollablePermission(
   }
 
   const rawLines = body.split("\n");
+  if (rawLines.length > 1000) {
+    const steeringReason = `Tool request content is too large (${rawLines.length} lines, exceeding the 1000 line limit). Please break this request down into smaller incremental steps (e.g. write an initial stub file followed by edit operations, or split into multiple smaller bash commands).`;
+    ctx.ui.notify?.(`Tool request exceeded 1000 lines (${rawLines.length} lines) and was automatically denied.`, "error");
+    return {
+      allowed: false,
+      decision: "deny",
+      steering: steeringReason,
+    };
+  }
   const pageSize = 28;
   let offset = 0;
   let scrollableLineCount = rawLines.length;
@@ -1022,6 +1045,12 @@ async function handleFileEditPermission(toolName: string, input: FileEditInput, 
   }
 
   const prompt = buildFileEditPrompt(toolName, input, ctx.cwd);
+  if (prompt.lineCount > 1000) {
+    const reason = `Tool request content is too large (${prompt.lineCount} lines, exceeding the 1000 line limit). Please break this request down into smaller incremental steps (e.g. write an initial stub file followed by edit operations, or split into multiple smaller bash commands).`;
+    ctx.ui.notify?.(`Tool request exceeded 1000 lines (${prompt.lineCount} lines) and was automatically denied.`, "error");
+    audit({ tool: toolName, decision: "deny", cwd: ctx.cwd, path: absolutePath, reason });
+    return { block: true, reason };
+  }
   const result = await askScrollablePermission(
     pi,
     ctx,

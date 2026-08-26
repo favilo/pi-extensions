@@ -524,3 +524,48 @@ test("find_tools and find_skills policy evaluation matches generic custom-tool b
     else process.env.PI_CODING_AGENT_DIR = previousAgentDir;
   }
 });
+
+test("tool requests exceeding 1000 lines are automatically denied with instructions to break into smaller steps", async () => {
+  const agentDir = mkdtempSync(join(tmpdir(), "pi-permissions-huge-body-"));
+  writeFileSync(join(agentDir, "permissions.toml"), stringifyToml({ permissions: {} }));
+  const project = mkdtempSync(join(tmpdir(), "pi-project-huge-body-"));
+  const previousAgentDir = process.env.PI_CODING_AGENT_DIR;
+  process.env.PI_CODING_AGENT_DIR = agentDir;
+
+  try {
+    const handlers = new Map<string, (event: { toolName: string; input: Record<string, unknown> }, ctx: unknown) => Promise<unknown>>();
+    const { default: permissionPolicy } = await import(`./index.ts?huge-body=${encodeURIComponent(agentDir)}`);
+    permissionPolicy({
+      registerCommand() {},
+      on(event: string, handler: (event: { toolName: string; input: Record<string, unknown> }, ctx: unknown) => Promise<unknown>) {
+        if (event === "tool_call") handlers.set(event, handler);
+      },
+      getAllTools: () => [],
+    } as never);
+
+    const hugeContent = Array.from({ length: 1005 }, (_, i) => `line ${i}`).join("\n");
+    let notifiedMessage = "";
+    const result = await handlers.get("tool_call")!(
+      { toolName: "write", input: { path: "huge.txt", content: hugeContent } },
+      {
+        cwd: project,
+        hasUI: true,
+        mode: "tui",
+        sessionId: "huge-body-session",
+        ui: {
+          notify(msg: string) { notifiedMessage = msg; },
+          custom() { throw new Error("Should not show UI prompt for >1000 lines request"); },
+        },
+      },
+    );
+
+    assert.equal(result && typeof result === "object" && "block" in result, true);
+    assert.match((result as any).reason, /exceeding the 1000 line limit/i);
+    assert.match(notifiedMessage, /exceeded 1000 lines/i);
+  } finally {
+    if (previousAgentDir === undefined) delete process.env.PI_CODING_AGENT_DIR;
+    else process.env.PI_CODING_AGENT_DIR = previousAgentDir;
+    rmSync(agentDir, { recursive: true, force: true });
+    rmSync(project, { recursive: true, force: true });
+  }
+});
