@@ -160,11 +160,11 @@ export default function (pi: ExtensionAPI) {
       const firstLine = lines.find((l) => l.trim()) ?? "";
 
       let text = "";
-      if (context.isError) {
-        const errorText = toolErrorText(result, true, "Bash failed");
-        text += theme.fg("error", errorText || "Bash failed");
+      if (context.isError || (exitCode !== null && exitCode !== 0)) {
+        const statusText = exitCode !== null ? `exit ${exitCode}` : "Bash failed";
+        text += theme.fg("error", statusText);
       } else {
-        text += exitCode === 0 || exitCode === null ? theme.fg("success", "done") : theme.fg("error", `exit ${exitCode}`);
+        text += theme.fg("success", "done");
       }
       if (lineCount > 0) {
         text += theme.fg("dim", ` (${lineCount} lines)`);
