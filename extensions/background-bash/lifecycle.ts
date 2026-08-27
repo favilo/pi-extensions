@@ -44,7 +44,11 @@ export function createBackgroundBashController(options: { spawn: BackgroundBashS
       options.spawn({
         command,
         cwd,
-        onExit: () => {},
+        onExit: ({ code }) => {
+          if (task.terminal) return;
+          task.status = code === 0 ? "completed" : "failed";
+          task.terminal = true;
+        },
       });
       return { ...task };
     },
