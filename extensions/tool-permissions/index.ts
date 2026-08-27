@@ -1219,11 +1219,16 @@ async function handleUnknownToolPermission(toolName: string, input: unknown, ctx
 
 export default function toolPermissionPolicy(pi: ExtensionAPI) {
   if (typeof (pi as Partial<ExtensionAPI>).registerEntryRenderer === "function") {
-    pi.registerEntryRenderer<PermissionPreview>("permission-preview", (entry, _options, theme) => {
+    pi.registerEntryRenderer<PermissionPreview>("permission-preview", (entry, options, theme) => {
       const preview = entry.data;
       if (!preview || typeof preview.title !== "string" || typeof preview.body !== "string") return undefined;
       const header = theme.fg("accent", theme.bold(preview.title));
       const stickyHeader = typeof preview.stickyHeader === "string" ? `\n${theme.fg("muted", preview.stickyHeader)}` : "";
+      if (!options.expanded) {
+        const lineCount = preview.body.split("\n").length;
+        const summary = `\n\n${theme.fg("dim", `${lineCount} lines — Ctrl+O to expand`)}`;
+        return new Text(`${header}${stickyHeader}${summary}`, 0, 0);
+      }
       return new Text(`${header}${stickyHeader}\n\n${preview.body}`, 0, 0);
     });
   }
