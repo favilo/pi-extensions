@@ -46,11 +46,11 @@ test("records a stable terminal outcome after the owned command exits", () => {
   const launched = controller.launch({ command: "printf done", cwd: "/workspace" });
   exit?.({ code: 0, signal: null });
 
-  assert.deepEqual(controller.status(launched.id), {
-    ...launched,
-    status: "completed",
-    terminal: true,
-  });
+  const completed = controller.status(launched.id);
+  assert.equal(completed?.status, "completed");
+  assert.equal(completed?.terminal, true);
+  assert.equal(completed?.exitCode, 0);
+  assert.equal(completed?.output?.stdout.text, "");
 });
 
 test("cancellation terminates the owned process and seals its terminal status", () => {
@@ -64,14 +64,17 @@ test("cancellation terminates the owned process and seals its terminal status", 
   });
 
   const launched = controller.launch({ command: "sleep 60", cwd: "/workspace" });
-  assert.deepEqual(controller.cancel(launched.id), { ...launched, status: "cancelled", terminal: true });
+  const cancelled = controller.cancel(launched.id);
+  assert.equal(cancelled?.status, "cancelled");
+  assert.equal(cancelled?.terminal, true);
+  assert.equal(cancelled?.output?.stdout.text, "");
   assert.equal(terminateCalls, 1);
 
   exit?.({ code: 0, signal: null });
   assert.equal(controller.status(launched.id)?.status, "cancelled");
 
   assert.equal(controller.cancel("unknown-task"), undefined);
-  assert.deepEqual(controller.cancel(launched.id), { ...launched, status: "cancelled", terminal: true });
+  assert.equal(controller.cancel(launched.id)?.status, "cancelled");
   assert.equal(terminateCalls, 1);
 });
 
@@ -158,7 +161,9 @@ test("closing the parent registry cancels active work once and rejects new launc
   controller.close();
   controller.close();
 
-  assert.deepEqual(controller.status(launched.id), { ...launched, status: "cancelled", terminal: true });
+  const closed = controller.status(launched.id);
+  assert.equal(closed?.status, "cancelled");
+  assert.equal(closed?.terminal, true);
   assert.equal(terminateCalls, 1);
   assert.throws(() => controller.launch({ command: "printf stale", cwd: "/workspace" }), /closed/i);
 });

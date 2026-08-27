@@ -1,7 +1,7 @@
 import { getShellConfig } from "@earendil-works/pi-coding-agent";
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import type { BackgroundBashOutput } from "./output.ts";
+import { createOutputCapture, type BackgroundBashOutput } from "./output.ts";
 
 export type BackgroundBashStatus = "queued" | "running" | "completed" | "failed" | "cancelled" | "timed_out";
 
@@ -36,7 +36,7 @@ export type BackgroundBashController = {
 
 /** Spawns commands through Pi's configured shell, owning the detached process tree. */
 export function createNodeBashSpawn(): BackgroundBashSpawn {
-  return ({ command, cwd, onExit }) => {
+  return ({ command, cwd, onOutput, onExit }) => {
     const shellConfig = getShellConfig();
     const commandFromStdin = shellConfig.commandTransport === "stdin";
     const child = spawn(
@@ -53,6 +53,10 @@ export function createNodeBashSpawn(): BackgroundBashSpawn {
       child.stdin?.on("error", () => {});
       child.stdin?.end(command);
     }
+    child.stdout?.setEncoding("utf8");
+    child.stderr?.setEncoding("utf8");
+    child.stdout?.on("data", (chunk: string) => onOutput?.("stdout", chunk));
+    child.stderr?.on("data", (chunk: string) => onOutput?.("stderr", chunk));
     child.on("error", () => onExit({ code: null, signal: null }));
     child.on("close", (code, signal) => onExit({ code, signal }));
     return {
@@ -75,6 +79,7 @@ export function createNodeBashSpawn(): BackgroundBashSpawn {
 export function createBackgroundBashController(options: { spawn: BackgroundBashSpawn }): BackgroundBashController {
   const tasks = new Map<string, BackgroundBashTask>();
   const processes = new Map<string, BackgroundBashProcess>();
+  const outputs = new Map<string, ReturnType<typeof createOutputCapture>>();
   let closed = false;
 
   return {
@@ -88,13 +93,19 @@ export function createBackgroundBashController(options: { spawn: BackgroundBashS
         terminal: false,
       };
       tasks.set(task.id, task);
+      const output = createOutputCapture();
+      outputs.set(task.id, output);
       const process = options.spawn({
         command,
         cwd,
-        onExit: ({ code }) => {
+        onOutput: (stream, chunk) => output.append(stream, chunk),
+        onExit: ({ code, signal }) => {
           if (task.terminal) return;
           task.status = code === 0 ? "completed" : "failed";
           task.terminal = true;
+          task.exitCode = code;
+          task.signal = signal;
+          task.output = output.snapshot();
           processes.delete(task.id);
         },
       });
@@ -111,6 +122,7 @@ export function createBackgroundBashController(options: { spawn: BackgroundBashS
       processes.get(id)?.terminate();
       task.status = "cancelled";
       task.terminal = true;
+      task.output = outputs.get(id)?.snapshot();
       processes.delete(id);
       return { ...task };
     },
@@ -122,6 +134,7 @@ export function createBackgroundBashController(options: { spawn: BackgroundBashS
         processes.get(id)?.terminate();
         task.status = "cancelled";
         task.terminal = true;
+        task.output = outputs.get(id)?.snapshot();
         processes.delete(id);
       }
     },
