@@ -64,3 +64,20 @@ test("cancellation terminates the owned process and seals its terminal status", 
   assert.deepEqual(controller.cancel(launched.id), { ...launched, status: "cancelled", terminal: true });
   assert.equal(terminateCalls, 1);
 });
+
+test("closing the parent registry cancels active work once and rejects new launches", () => {
+  let terminateCalls = 0;
+  const controller = createBackgroundBashController({
+    spawn() {
+      return { terminate() { terminateCalls++; } };
+    },
+  });
+
+  const launched = controller.launch({ command: "sleep 60", cwd: "/workspace" });
+  controller.close();
+  controller.close();
+
+  assert.deepEqual(controller.status(launched.id), { ...launched, status: "cancelled", terminal: true });
+  assert.equal(terminateCalls, 1);
+  assert.throws(() => controller.launch({ command: "printf stale", cwd: "/workspace" }), /closed/i);
+});
