@@ -1,6 +1,7 @@
 import { getShellConfig } from "@earendil-works/pi-coding-agent";
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
+import type { BackgroundBashOutput } from "./output.ts";
 
 export type BackgroundBashStatus = "queued" | "running" | "completed" | "failed" | "cancelled" | "timed_out";
 
@@ -10,6 +11,9 @@ export type BackgroundBashTask = {
   cwd: string;
   status: BackgroundBashStatus;
   terminal: boolean;
+  exitCode?: number | null;
+  signal?: NodeJS.Signals | null;
+  output?: BackgroundBashOutput;
 };
 
 export type BackgroundBashProcess = {
@@ -19,6 +23,7 @@ export type BackgroundBashProcess = {
 export type BackgroundBashSpawn = (options: {
   command: string;
   cwd: string;
+  onOutput?: (stream: "stdout" | "stderr", chunk: string) => void;
   onExit: (outcome: { code: number | null; signal: NodeJS.Signals | null }) => void;
 }) => BackgroundBashProcess;
 
