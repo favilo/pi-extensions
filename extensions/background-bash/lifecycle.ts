@@ -31,9 +31,11 @@ export type BackgroundBashController = {
 export function createBackgroundBashController(options: { spawn: BackgroundBashSpawn }): BackgroundBashController {
   const tasks = new Map<string, BackgroundBashTask>();
   const processes = new Map<string, BackgroundBashProcess>();
+  let closed = false;
 
   return {
     launch({ command, cwd }) {
+      if (closed) throw new Error("Background Bash registry is closed.");
       const task: BackgroundBashTask = {
         id: `bash-${randomUUID()}`,
         command,
@@ -68,6 +70,16 @@ export function createBackgroundBashController(options: { spawn: BackgroundBashS
       processes.delete(id);
       return { ...task };
     },
-    close() {},
+    close() {
+      if (closed) return;
+      closed = true;
+      for (const [id, task] of tasks) {
+        if (task.terminal) continue;
+        processes.get(id)?.terminate();
+        task.status = "cancelled";
+        task.terminal = true;
+        processes.delete(id);
+      }
+    },
   };
 }

@@ -334,6 +334,43 @@ export class DefaultProviderUsageAdapter implements ProviderUsageAdapter {
       };
     }
 
+    // 5. FreeToken Local Engine Provider
+    if (norm === "freetoken") {
+      try {
+        const host = process.env.FREETOKEN_HOST || "http://127.0.0.1:1919";
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 2000);
+        const res = await fetch(`${host.replace(/\/$/, "")}/v1/models`, { signal: controller.signal });
+        clearTimeout(timeout);
+
+        if (res.ok) {
+          const data = (await res.json()) as { data?: Array<{ id: string }> };
+          const models = data.data?.map((m) => m.id).join(", ") ?? "Active";
+          return {
+            supported: true,
+            usage: {
+              provider: "freetoken",
+              account: accountEntry?.label ?? activeAccountId ?? account ?? "local",
+              plan: "FreeToken Edge MoE (AMD ROCm)",
+              rawSummary: `FreeToken engine active on port 1919 (${models}). Unlimited local MoE inference.`,
+            },
+          };
+        }
+      } catch {
+        // Fallback when server is starting
+      }
+
+      return {
+        supported: true,
+        usage: {
+          provider: "freetoken",
+          account: accountEntry?.label ?? activeAccountId ?? account ?? "local",
+          plan: "FreeToken Edge MoE (AMD ROCm)",
+          rawSummary: "FreeToken local server endpoint configured at http://127.0.0.1:1919/v1.",
+        },
+      };
+    }
+
     return { supported: false, reason: `Usage information is unsupported for provider "${provider}".` };
   }
 }
