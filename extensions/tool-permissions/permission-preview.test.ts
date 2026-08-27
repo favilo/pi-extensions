@@ -6,7 +6,8 @@ import { join } from "node:path";
 import test from "node:test";
 import { stringify as stringifyToml } from "smol-toml";
 
-type ToolCallHandler = (event: { toolName: string; input: Record<string, unknown>; toolCallId: string }, ctx: unknown) => Promise<unknown>;
+type ToolCallHandler = (event: { toolName?: string; input?: Record<string, unknown>; toolCallId: string }, ctx: unknown) => Promise<unknown>;
+type ToolResultHandler = (event: { toolCallId: string; content: Array<{ type: string; text?: string }>; isError?: boolean }, ctx: unknown) => unknown;
 type PromptComponent = { render(width: number): string[]; handleInput(data: string): void };
 
 test("renders a permission preview as a non-context history entry while keeping the live prompt compact", async () => {
@@ -31,8 +32,8 @@ test("renders a permission preview as a non-context history entry while keeping 
       appendEntry(customType: string, data: unknown) {
         entries.push({ customType, data });
       },
-      on(event: string, handler: ToolCallHandler) {
-        if (event === "tool_call") handlers.set(event, handler);
+      on(event: string, handler: ToolCallHandler | ToolResultHandler) {
+        if (event === "tool_call" || event === "tool_result") handlers.set(event, handler as ToolCallHandler);
       },
       getAllTools: () => [],
     } as never);
@@ -80,6 +81,14 @@ test("renders a permission preview as a non-context history entry while keeping 
 
     component.handleInput("\x04");
     await pending;
+
+    const toolResult = handlers.get("tool_result") as unknown as ToolResultHandler | undefined;
+    toolResult?.({ toolCallId: "preview-call", content: [{ type: "text", text: "ok" }] }, {});
+    assert.equal(entries.length, 2, "the reviewed preview is re-appended after the tool result so it stays visible below the output");
+    assert.deepEqual(entries[1], entries[0]);
+
+    toolResult?.({ toolCallId: "unprompted-call", content: [{ type: "text", text: "ok" }] }, {});
+    assert.equal(entries.length, 2, "unprompted calls never gain permission previews");
   } finally {
     if (previousAgentDir === undefined) delete process.env.PI_CODING_AGENT_DIR;
     else process.env.PI_CODING_AGENT_DIR = previousAgentDir;
