@@ -42,3 +42,25 @@ test("records a stable terminal outcome after the owned command exits", () => {
     terminal: true,
   });
 });
+
+test("cancellation terminates the owned process and seals its terminal status", () => {
+  let terminateCalls = 0;
+  let exit: ((outcome: { code: number | null; signal: NodeJS.Signals | null }) => void) | undefined;
+  const controller = createBackgroundBashController({
+    spawn({ onExit }) {
+      exit = onExit;
+      return { terminate() { terminateCalls++; } };
+    },
+  });
+
+  const launched = controller.launch({ command: "sleep 60", cwd: "/workspace" });
+  assert.deepEqual(controller.cancel(launched.id), { ...launched, status: "cancelled", terminal: true });
+  assert.equal(terminateCalls, 1);
+
+  exit?.({ code: 0, signal: null });
+  assert.equal(controller.status(launched.id)?.status, "cancelled");
+
+  assert.equal(controller.cancel("unknown-task"), undefined);
+  assert.deepEqual(controller.cancel(launched.id), { ...launched, status: "cancelled", terminal: true });
+  assert.equal(terminateCalls, 1);
+});
