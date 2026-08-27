@@ -27,6 +27,14 @@ export type BackgroundBashController = {
   close(): void;
 };
 
+/** Spawns commands through Pi's configured shell. Stub: settles immediately without executing. */
+export function createNodeBashSpawn(): BackgroundBashSpawn {
+  return ({ onExit }) => {
+    onExit({ code: 0, signal: null });
+    return { terminate() {} };
+  };
+}
+
 /** Session-scoped authority for background Bash task lifecycle. */
 export function createBackgroundBashController(options: { spawn: BackgroundBashSpawn }): BackgroundBashController {
   const tasks = new Map<string, BackgroundBashTask>();
