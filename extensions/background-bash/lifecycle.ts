@@ -1,3 +1,5 @@
+import { getShellConfig } from "@earendil-works/pi-coding-agent";
+import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 
 export type BackgroundBashStatus = "queued" | "running" | "completed" | "failed" | "cancelled" | "timed_out";
@@ -27,11 +29,40 @@ export type BackgroundBashController = {
   close(): void;
 };
 
-/** Spawns commands through Pi's configured shell. Stub: settles immediately without executing. */
+/** Spawns commands through Pi's configured shell, owning the detached process tree. */
 export function createNodeBashSpawn(): BackgroundBashSpawn {
-  return ({ onExit }) => {
-    onExit({ code: 0, signal: null });
-    return { terminate() {} };
+  return ({ command, cwd, onExit }) => {
+    const shellConfig = getShellConfig();
+    const commandFromStdin = shellConfig.commandTransport === "stdin";
+    const child = spawn(
+      shellConfig.shell,
+      commandFromStdin ? shellConfig.args : [...shellConfig.args, command],
+      {
+        cwd,
+        detached: process.platform !== "win32",
+        stdio: [commandFromStdin ? "pipe" : "ignore", "pipe", "pipe"],
+        windowsHide: true,
+      },
+    );
+    if (commandFromStdin) {
+      child.stdin?.on("error", () => {});
+      child.stdin?.end(command);
+    }
+    child.on("error", () => onExit({ code: null, signal: null }));
+    child.on("close", (code, signal) => onExit({ code, signal }));
+    return {
+      terminate() {
+        if (process.platform !== "win32" && child.pid) {
+          try {
+            process.kill(-child.pid, "SIGTERM");
+            return;
+          } catch {
+            // Fall back to terminating the shell process alone.
+          }
+        }
+        child.kill("SIGTERM");
+      },
+    };
   };
 }
 
