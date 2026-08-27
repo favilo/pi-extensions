@@ -1,7 +1,14 @@
 import "../test-support/forbid-fetch.ts";
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createBackgroundBashController } from "./lifecycle.ts";
+import { createBackgroundBashController, createNodeBashSpawn } from "./lifecycle.ts";
+
+async function waitForTerminal(controller: ReturnType<typeof createBackgroundBashController>, id: string, timeoutMs = 5_000): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (!controller.status(id)?.terminal && Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+}
 
 test("launch installs a running owned task and returns before its command settles", () => {
   let spawned = false;
@@ -63,6 +70,16 @@ test("cancellation terminates the owned process and seals its terminal status", 
   assert.equal(controller.cancel("unknown-task"), undefined);
   assert.deepEqual(controller.cancel(launched.id), { ...launched, status: "cancelled", terminal: true });
   assert.equal(terminateCalls, 1);
+});
+
+test("runs commands through the configured shell and reports their exit outcome", async () => {
+  const controller = createBackgroundBashController({ spawn: createNodeBashSpawn() });
+  const launched = controller.launch({ command: "exit 3", cwd: "/tmp" });
+  assert.equal(launched.status, "running", "launch returns before the command settles");
+
+  await waitForTerminal(controller, launched.id);
+  assert.equal(controller.status(launched.id)?.status, "failed", "a non-zero shell exit fails the task");
+  controller.close();
 });
 
 test("closing the parent registry cancels active work once and rejects new launches", () => {
