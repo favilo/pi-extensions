@@ -70,6 +70,11 @@ test("renders a permission preview as a non-context history entry while keeping 
 
     const renderer = renderers.get("permission-preview");
     assert.ok(renderer);
+    const collapsedText = renderer({ data: entries[0]!.data }, { expanded: false }, { fg: (_color, text) => text, bold: (text) => text })!.render(100).join("\n");
+    const bodyLines = (entries[0]!.data as { body: string }).body.split("\n").length;
+    assert.match(collapsedText, new RegExp(`${bodyLines} lines`, "i"));
+    assert.doesNotMatch(collapsedText, /line-80/);
+
     const previewText = renderer({ data: entries[0]!.data }, { expanded: true }, { fg: (_color, text) => text, bold: (text) => text })!.render(100).join("\n");
     assert.match(previewText, /line-80/);
 
