@@ -125,6 +125,8 @@ const auditLogger = createAuditLogger();
 
 /** Steering text captured at allow+steer decision time, keyed by toolCallId, annotated onto the invocation-bound tool result. */
 const pendingSteering = new Map<string, string>();
+/** Previews published during a prompt; re-appended after the tool result for bottom-of-transcript visibility. */
+const promptedPreviews = new Map<string, PermissionPreview>();
 
 type PermissionEditorTarget = { scope: "user" | "local"; path: string } | { error: string };
 
@@ -535,6 +537,10 @@ async function presentScrollablePermission(
     body,
     ...(stickyHeader ? { stickyHeader } : {}),
   });
+
+  if (publishedPreview && toolCallId) {
+    promptedPreviews.set(toolCallId, { title, body, ...(stickyHeader ? { stickyHeader } : {}) });
+  }
 
   let steeringMode = false;
   let steeringText = "";
@@ -1258,10 +1264,16 @@ export default function toolPermissionPolicy(pi: ExtensionAPI) {
 
   pi.on("session_shutdown", (_event, ctx) => {
     pendingSteering.clear();
+    promptedPreviews.clear();
     closePermissionPromptQueue(permissionParentSessionId(ctx));
   });
 
   pi.on("tool_result", (event) => {
+    const promptPreview = promptedPreviews.get(event.toolCallId);
+    if (promptPreview) {
+      promptedPreviews.delete(event.toolCallId);
+      pi.appendEntry<PermissionPreview>("permission-preview", promptPreview);
+    }
     const steering = pendingSteering.get(event.toolCallId);
     if (!steering) return undefined;
     pendingSteering.delete(event.toolCallId);
