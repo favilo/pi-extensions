@@ -62,21 +62,24 @@ test("renders a permission preview as a non-context history entry while keeping 
     await new Promise((resolve) => setImmediate(resolve));
     assert.equal(entries.length, 1);
     assert.equal(entries[0]!.customType, "permission-preview");
-    assert.deepEqual((entries[0]!.data as { title: string }).title, "Allow bash command?");
-    assert.match((entries[0]!.data as { body: string }).body, /line-80/);
+    const entryData = entries[0]!.data as { title: string; body: string };
+    assert.equal(entryData.title, "Allow bash command?");
+    assert.match(entryData.body, /line-80/);
+    assert.doesNotMatch(entryData.body, /pi wants to run/, "the preview carries content only, not prompt prose");
     assert.ok(component);
     const promptText = component.render(100).join("\n");
-    assert.match(promptText, /review permission preview above/i);
     assert.doesNotMatch(promptText, /line-80/);
 
     const renderer = renderers.get("permission-preview");
     assert.ok(renderer);
     const fakeTheme = { fg: (_color: string, text: string) => text, bold: (text: string) => text };
-    const bodyLines = (entries[0]!.data as { body: string }).body.split("\n").length;
+    const bodyLines = entryData.body.split("\n").length;
     const previewComponent = renderer({ data: entries[0]!.data }, { expanded: false }, fakeTheme)!;
 
-    // While the permission prompt waits, the reviewed entry ignores the collapsed state.
-    assert.match(previewComponent.render(100).join("\n"), /line-80/);
+    // While the prompt waits, the review render shows the content without repeating prompt chrome.
+    const reviewText = previewComponent.render(100).join("\n");
+    assert.match(reviewText, /line-80/);
+    assert.doesNotMatch(reviewText, /Allow bash command\?/, "the review render omits the title already shown in the prompt frame");
 
     // Ctrl+O (app.tools.expand) toggles the reviewed entry while the prompt owns input.
     component.handleInput("\x0f");
@@ -89,19 +92,19 @@ test("renders a permission preview as a non-context history entry while keeping 
     component.handleInput("\x04");
     await pending;
 
-    // Once permission is decided, the entry respects the collapsed state again.
+    // After the decision, the recorded entry shows its title and respects the collapsed state.
     const collapsedAfterDecision = previewComponent.render(100).join("\n");
     assert.doesNotMatch(collapsedAfterDecision, /line-80/);
+    assert.match(collapsedAfterDecision, /Allow bash command\?/);
     assert.match(collapsedAfterDecision, new RegExp(`${bodyLines} lines`, "i"));
-    assert.match(renderer({ data: entries[0]!.data }, { expanded: true }, fakeTheme)!.render(100).join("\n"), /line-80/);
+    const expandedAfterDecision = renderer({ data: entries[0]!.data }, { expanded: true }, fakeTheme)!.render(100).join("\n");
+    assert.match(expandedAfterDecision, /Allow bash command\?/);
+    assert.match(expandedAfterDecision, /line-80/);
 
     const toolResult = handlers.get("tool_result") as unknown as ToolResultHandler | undefined;
     toolResult?.({ toolCallId: "preview-call", content: [{ type: "text", text: "ok" }] }, {});
     assert.equal(entries.length, 2, "the reviewed preview is re-appended after the tool result so it stays visible below the output");
     assert.deepEqual(entries[1], entries[0]);
-
-    // The post-result copy is not awaiting review, so it honors the collapsed state.
-    assert.doesNotMatch(renderer({ data: entries[1]!.data }, { expanded: false }, fakeTheme)!.render(100).join("\n"), /line-80/);
 
     toolResult?.({ toolCallId: "unprompted-call", content: [{ type: "text", text: "ok" }] }, {});
     assert.equal(entries.length, 2, "unprompted calls never gain permission previews");
