@@ -1,6 +1,6 @@
 // story: e03s01
 import { CONFIG_DIR_NAME, generateDiffString, getAgentDir, isToolCallEventType, renderDiff, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { CURSOR_MARKER, matchesKey, visibleWidth, wrapTextWithAnsi, type Component, type Focusable } from "@earendil-works/pi-tui";
+import { CURSOR_MARKER, matchesKey, Text, visibleWidth, wrapTextWithAnsi, type Component, type Focusable } from "@earendil-works/pi-tui";
 import ignore from "ignore";
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -95,6 +95,16 @@ type AuditEntry = {
   scope?: "project" | "user";
   reason?: string;
   steering?: string;
+};
+
+type PermissionPreview = {
+  title: string;
+  body: string;
+  stickyHeader?: string;
+};
+
+type PermissionPreviewPublisher = {
+  appendEntry?: ExtensionAPI["appendEntry"];
 };
 
 type AllowPatternOption = {
@@ -494,7 +504,7 @@ async function editPermissionsInExternalEditor(ctx: PermissionContext, target: {
 }
 
 async function presentScrollablePermission(
-  pi: Pick<ExtensionAPI, "sendUserMessage">,
+  pi: PermissionPreviewPublisher,
   ctx: PermissionContext,
   title: string,
   body: string,
@@ -519,9 +529,13 @@ async function presentScrollablePermission(
       steering: steeringReason,
     };
   }
-  const pageSize = 28;
-  let offset = 0;
-  let scrollableLineCount = rawLines.length;
+  const publishedPreview = typeof pi.appendEntry === "function";
+  pi.appendEntry?.<PermissionPreview>("permission-preview", {
+    title,
+    body,
+    ...(stickyHeader ? { stickyHeader } : {}),
+  });
+
   let steeringMode = false;
   let steeringText = "";
   const projectPath = allowPattern
@@ -588,7 +602,7 @@ async function presentScrollablePermission(
       const continuationPrefix = theme.fg("muted", "… ");
       const contentWidth = Math.max(1, width - 2);
 
-      const wrappedBody = rawLines.flatMap((line) => wrapWithContinuation(line, contentWidth, continuationPrefix));
+      const wrappedBody = publishedPreview ? [] : rawLines.flatMap((line) => wrapWithContinuation(line, contentWidth, continuationPrefix));
       const allowHint = allowPattern ? " • Ctrl+A allow+save project • Ctrl+Shift+A allow+save user • Ctrl+E edit pattern" : "";
       const steeringAllowHint = allowPattern ? " • Ctrl+A project-save+steer • Ctrl+Shift+A user-save+steer" : "";
       const navigationHint = steeringMode
@@ -608,9 +622,11 @@ async function presentScrollablePermission(
       return [
         ...wrap(theme.fg("accent", theme.bold(title))),
         ...(stickyHeader ? wrap(theme.fg("muted", stickyHeader)) : []),
-        ...(allowPattern ? wrap(theme.fg("muted", `Rule: ${JSON.stringify(allowPattern.suggestedRule)}`)) : []),
+        ...(allowPattern ? wrap(theme.fg("muted", "Rule: save the reviewed exact match.")) : []),
         "",
-        ...wrappedBody,
+        ...(publishedPreview
+          ? wrap(theme.fg("muted", "Review permission preview above in terminal scrollback."))
+          : wrappedBody),
         "",
         ...(steeringMode
           ? [
@@ -719,7 +735,7 @@ function permissionParentSessionId(ctx: PermissionContext): string {
 }
 
 async function askScrollablePermission(
-  pi: Pick<ExtensionAPI, "sendUserMessage">,
+  pi: PermissionPreviewPublisher,
   ctx: PermissionContext,
   request: Pick<ToolRequest, "actor" | "toolName" | "cwd" | "input" | "toolCallId">,
   title: string,
@@ -748,7 +764,7 @@ async function askScrollablePermission(
 }
 
 export async function promptToolPermissionRequest(
-  pi: Pick<ExtensionAPI, "sendUserMessage">,
+  pi: Pick<ExtensionAPI, "sendUserMessage"> & PermissionPreviewPublisher,
   ctx: PermissionContext,
   request: ToolRequest,
 ): Promise<"allow" | "deny" | "cancel"> {
@@ -1202,6 +1218,16 @@ async function handleUnknownToolPermission(toolName: string, input: unknown, ctx
 }
 
 export default function toolPermissionPolicy(pi: ExtensionAPI) {
+  if (typeof (pi as Partial<ExtensionAPI>).registerEntryRenderer === "function") {
+    pi.registerEntryRenderer<PermissionPreview>("permission-preview", (entry, _options, theme) => {
+      const preview = entry.data;
+      if (!preview || typeof preview.title !== "string" || typeof preview.body !== "string") return undefined;
+      const header = theme.fg("accent", theme.bold(preview.title));
+      const stickyHeader = typeof preview.stickyHeader === "string" ? `\n${theme.fg("muted", preview.stickyHeader)}` : "";
+      return new Text(`${header}${stickyHeader}\n\n${preview.body}`, 0, 0);
+    });
+  }
+
   pi.on("session_start", (_event, ctx) => {
     if (process.env.PI_SUBAGENT_DEBUG === "1" && ctx.hasUI) {
       ctx.ui.notify(`Subagent debug log: ${subagentDebugPath()}`, "info");
