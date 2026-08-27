@@ -30,6 +30,7 @@ export type BackgroundBashController = {
 /** Session-scoped authority for background Bash task lifecycle. */
 export function createBackgroundBashController(options: { spawn: BackgroundBashSpawn }): BackgroundBashController {
   const tasks = new Map<string, BackgroundBashTask>();
+  const processes = new Map<string, BackgroundBashProcess>();
 
   return {
     launch({ command, cwd }) {
@@ -41,23 +42,31 @@ export function createBackgroundBashController(options: { spawn: BackgroundBashS
         terminal: false,
       };
       tasks.set(task.id, task);
-      options.spawn({
+      const process = options.spawn({
         command,
         cwd,
         onExit: ({ code }) => {
           if (task.terminal) return;
           task.status = code === 0 ? "completed" : "failed";
           task.terminal = true;
+          processes.delete(task.id);
         },
       });
+      processes.set(task.id, process);
       return { ...task };
     },
     status(id) {
       const task = tasks.get(id);
       return task ? { ...task } : undefined;
     },
-    cancel() {
-      return undefined;
+    cancel(id) {
+      const task = tasks.get(id);
+      if (!task || task.terminal) return task ? { ...task } : undefined;
+      processes.get(id)?.terminate();
+      task.status = "cancelled";
+      task.terminal = true;
+      processes.delete(id);
+      return { ...task };
     },
     close() {},
   };
