@@ -23,3 +23,22 @@ test("launch installs a running owned task and returns before its command settle
   assert.equal(launched.terminal, false);
   assert.deepEqual(controller.status(launched.id), launched);
 });
+
+test("records a stable terminal outcome after the owned command exits", () => {
+  let exit: ((outcome: { code: number | null; signal: NodeJS.Signals | null }) => void) | undefined;
+  const controller = createBackgroundBashController({
+    spawn({ onExit }) {
+      exit = onExit;
+      return { terminate() {} };
+    },
+  });
+
+  const launched = controller.launch({ command: "printf done", cwd: "/workspace" });
+  exit?.({ code: 0, signal: null });
+
+  assert.deepEqual(controller.status(launched.id), {
+    ...launched,
+    status: "completed",
+    terminal: true,
+  });
+});
