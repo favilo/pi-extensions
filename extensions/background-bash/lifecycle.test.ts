@@ -107,6 +107,45 @@ test("cancellation terminates the entire process tree", async (t) => {
   }
 });
 
+test("terminal status exposes bounded attributed output and the exit outcome", () => {
+  let emit: ((stream: "stdout" | "stderr", chunk: string) => void) | undefined;
+  let exit: ((outcome: { code: number | null; signal: NodeJS.Signals | null }) => void) | undefined;
+  const controller = createBackgroundBashController({
+    spawn({ onOutput, onExit }) {
+      emit = onOutput;
+      exit = onExit;
+      return { terminate() {} };
+    },
+  });
+
+  const launched = controller.launch({ command: "run", cwd: "/workspace" });
+  emit?.("stdout", "hello\n");
+  emit?.("stderr", "oops\n");
+
+  const running = controller.status(launched.id);
+  assert.equal(running?.status, "running");
+  assert.equal(running && "output" in running, false, "status exposes no output before the task settles");
+
+  exit?.({ code: 3, signal: null });
+  const settled = controller.status(launched.id);
+  assert.equal(settled?.status, "failed");
+  assert.equal(settled?.exitCode, 3);
+  assert.equal(settled?.output?.stdout.text, "hello\n");
+  assert.equal(settled?.output?.stderr.text, "oops\n");
+});
+
+test("captures real command output through the configured shell", async () => {
+  const controller = createBackgroundBashController({ spawn: createNodeBashSpawn() });
+  const launched = controller.launch({ command: "printf 'out-line\\n'; printf 'err-line\\n' >&2", cwd: "/tmp" });
+
+  await waitForTerminal(controller, launched.id);
+  const settled = controller.status(launched.id);
+  assert.equal(settled?.status, "completed");
+  assert.equal(settled?.output?.stdout.text, "out-line\n");
+  assert.equal(settled?.output?.stderr.text, "err-line\n");
+  controller.close();
+});
+
 test("closing the parent registry cancels active work once and rejects new launches", () => {
   let terminateCalls = 0;
   const controller = createBackgroundBashController({
