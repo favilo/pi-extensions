@@ -101,6 +101,7 @@ type PermissionPreview = {
   title: string;
   body: string;
   stickyHeader?: string;
+  toolCallId?: string;
 };
 
 type PermissionPreviewPublisher = {
@@ -127,6 +128,10 @@ const auditLogger = createAuditLogger();
 const pendingSteering = new Map<string, string>();
 /** Previews published during a prompt; re-appended after the tool result for bottom-of-transcript visibility. */
 const promptedPreviews = new Map<string, PermissionPreview>();
+/** Tool calls whose permission prompt is still waiting; their preview entries ignore the collapsed state. */
+const pendingPreviewReviews = new Set<string>();
+/** Explicit Ctrl+O expansion toggles made while a review prompt is open. Cleared when the prompt settles. */
+const previewReviewOverrides = new Map<string, boolean>();
 
 type PermissionEditorTarget = { scope: "user" | "local"; path: string } | { error: string };
 
@@ -532,14 +537,17 @@ async function presentScrollablePermission(
     };
   }
   const publishedPreview = typeof pi.appendEntry === "function";
-  pi.appendEntry?.<PermissionPreview>("permission-preview", {
+  const preview: PermissionPreview = {
     title,
     body,
     ...(stickyHeader ? { stickyHeader } : {}),
-  });
+    ...(toolCallId ? { toolCallId } : {}),
+  };
+  pi.appendEntry?.<PermissionPreview>("permission-preview", preview);
 
   if (publishedPreview && toolCallId) {
-    promptedPreviews.set(toolCallId, { title, body, ...(stickyHeader ? { stickyHeader } : {}) });
+    promptedPreviews.set(toolCallId, preview);
+    pendingPreviewReviews.add(toolCallId);
   }
 
   let steeringMode = false;
@@ -589,6 +597,10 @@ async function presentScrollablePermission(
       if (settled) return;
       settled = true;
       signal.removeEventListener("abort", onAbort);
+      if (toolCallId) {
+        pendingPreviewReviews.delete(toolCallId);
+        previewReviewOverrides.delete(toolCallId);
+      }
       finish(value);
     };
     signal.addEventListener("abort", onAbort, { once: true });
@@ -645,6 +657,16 @@ async function presentScrollablePermission(
       ];
     },
     handleInput(data: string): void {
+      // While the review is pending, honor the app-level expand toggle for the preview entry.
+      const expandKey = typeof keybindings?.matches === "function"
+        ? Boolean(keybindings.matches(data, "app.tools.expand"))
+        : matchesKey(data, "ctrl+o");
+      if (expandKey && toolCallId && pendingPreviewReviews.has(toolCallId)) {
+        const current = previewReviewOverrides.get(toolCallId) ?? true;
+        previewReviewOverrides.set(toolCallId, !current);
+        tui.requestRender();
+        return;
+      }
       steeringEditor.focused = component.focused;
       const steeringMessage = steeringEditor.getValue().trim();
 
@@ -1228,14 +1250,22 @@ export default function toolPermissionPolicy(pi: ExtensionAPI) {
     pi.registerEntryRenderer<PermissionPreview>("permission-preview", (entry, options, theme) => {
       const preview = entry.data;
       if (!preview || typeof preview.title !== "string" || typeof preview.body !== "string") return undefined;
-      const header = theme.fg("accent", theme.bold(preview.title));
-      const stickyHeader = typeof preview.stickyHeader === "string" ? `\n${theme.fg("muted", preview.stickyHeader)}` : "";
-      if (!options.expanded) {
-        const lineCount = preview.body.split("\n").length;
-        const summary = `\n\n${theme.fg("dim", `${lineCount} lines — Ctrl+O to expand`)}`;
-        return new Text(`${header}${stickyHeader}${summary}`, 0, 0);
-      }
-      return new Text(`${header}${stickyHeader}\n\n${preview.body}`, 0, 0);
+      const capturedExpanded = options.expanded;
+      return {
+        render(width: number): string[] {
+          const id = typeof preview.toolCallId === "string" ? preview.toolCallId : undefined;
+          const override = id ? previewReviewOverrides.get(id) : undefined;
+          const pending = id !== undefined && pendingPreviewReviews.has(id);
+          const expanded = override ?? (pending ? true : capturedExpanded);
+          const header = theme.fg("accent", theme.bold(preview.title));
+          const stickyHeader = typeof preview.stickyHeader === "string" ? `\n${theme.fg("muted", preview.stickyHeader)}` : "";
+          const content = expanded
+            ? `${header}${stickyHeader}\n\n${preview.body}`
+            : `${header}${stickyHeader}\n\n${theme.fg("dim", `${preview.body.split("\n").length} lines — Ctrl+O to expand`)}`;
+          return new Text(content, 0, 0).render(width);
+        },
+        invalidate(): void {},
+      };
     });
   }
 
@@ -1265,6 +1295,8 @@ export default function toolPermissionPolicy(pi: ExtensionAPI) {
   pi.on("session_shutdown", (_event, ctx) => {
     pendingSteering.clear();
     promptedPreviews.clear();
+    pendingPreviewReviews.clear();
+    previewReviewOverrides.clear();
     closePermissionPromptQueue(permissionParentSessionId(ctx));
   });
 
