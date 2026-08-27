@@ -149,6 +149,25 @@ test("captures real command output through the configured shell", async () => {
   controller.close();
 });
 
+test("a timed-out launch terminates the process tree and reports timed_out", async () => {
+  let terminateCalls = 0;
+  const controller = createBackgroundBashController({
+    spawn() {
+      return { terminate() { terminateCalls++; } };
+    },
+  });
+
+  const launched = controller.launch({ command: "sleep 60", cwd: "/workspace", timeoutSeconds: 0.05 });
+  assert.equal(launched.status, "running");
+
+  await new Promise((resolve) => setTimeout(resolve, 250));
+  const settled = controller.status(launched.id);
+  assert.equal(settled?.status, "timed_out");
+  assert.equal(settled?.terminal, true);
+  assert.equal(settled?.output?.stdout.text, "");
+  assert.equal(terminateCalls, 1);
+});
+
 test("closing the parent registry cancels active work once and rejects new launches", () => {
   let terminateCalls = 0;
   const controller = createBackgroundBashController({
