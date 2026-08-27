@@ -71,21 +71,37 @@ test("renders a permission preview as a non-context history entry while keeping 
 
     const renderer = renderers.get("permission-preview");
     assert.ok(renderer);
-    const collapsedText = renderer({ data: entries[0]!.data }, { expanded: false }, { fg: (_color, text) => text, bold: (text) => text })!.render(100).join("\n");
+    const fakeTheme = { fg: (_color: string, text: string) => text, bold: (text: string) => text };
     const bodyLines = (entries[0]!.data as { body: string }).body.split("\n").length;
-    assert.match(collapsedText, new RegExp(`${bodyLines} lines`, "i"));
-    assert.doesNotMatch(collapsedText, /line-80/);
+    const previewComponent = renderer({ data: entries[0]!.data }, { expanded: false }, fakeTheme)!;
 
-    const previewText = renderer({ data: entries[0]!.data }, { expanded: true }, { fg: (_color, text) => text, bold: (text) => text })!.render(100).join("\n");
-    assert.match(previewText, /line-80/);
+    // While the permission prompt waits, the reviewed entry ignores the collapsed state.
+    assert.match(previewComponent.render(100).join("\n"), /line-80/);
+
+    // Ctrl+O (app.tools.expand) toggles the reviewed entry while the prompt owns input.
+    component.handleInput("\x0f");
+    const collapsedDuringReview = previewComponent.render(100).join("\n");
+    assert.doesNotMatch(collapsedDuringReview, /line-80/);
+    assert.match(collapsedDuringReview, new RegExp(`${bodyLines} lines`, "i"));
+    component.handleInput("\x0f");
+    assert.match(previewComponent.render(100).join("\n"), /line-80/);
 
     component.handleInput("\x04");
     await pending;
+
+    // Once permission is decided, the entry respects the collapsed state again.
+    const collapsedAfterDecision = previewComponent.render(100).join("\n");
+    assert.doesNotMatch(collapsedAfterDecision, /line-80/);
+    assert.match(collapsedAfterDecision, new RegExp(`${bodyLines} lines`, "i"));
+    assert.match(renderer({ data: entries[0]!.data }, { expanded: true }, fakeTheme)!.render(100).join("\n"), /line-80/);
 
     const toolResult = handlers.get("tool_result") as unknown as ToolResultHandler | undefined;
     toolResult?.({ toolCallId: "preview-call", content: [{ type: "text", text: "ok" }] }, {});
     assert.equal(entries.length, 2, "the reviewed preview is re-appended after the tool result so it stays visible below the output");
     assert.deepEqual(entries[1], entries[0]);
+
+    // The post-result copy is not awaiting review, so it honors the collapsed state.
+    assert.doesNotMatch(renderer({ data: entries[1]!.data }, { expanded: false }, fakeTheme)!.render(100).join("\n"), /line-80/);
 
     toolResult?.({ toolCallId: "unprompted-call", content: [{ type: "text", text: "ok" }] }, {});
     assert.equal(entries.length, 2, "unprompted calls never gain permission previews");
