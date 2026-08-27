@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 export type BackgroundBashStatus = "queued" | "running" | "completed" | "failed" | "cancelled" | "timed_out";
 
 export type BackgroundBashTask = {
@@ -26,21 +28,29 @@ export type BackgroundBashController = {
 };
 
 /** Session-scoped authority for background Bash task lifecycle. */
-export function createBackgroundBashController(_options: { spawn: BackgroundBashSpawn }): BackgroundBashController {
-  const task: BackgroundBashTask = {
-    id: "bash-stub",
-    command: "",
-    cwd: "",
-    status: "completed",
-    terminal: true,
-  };
+export function createBackgroundBashController(options: { spawn: BackgroundBashSpawn }): BackgroundBashController {
+  const tasks = new Map<string, BackgroundBashTask>();
 
   return {
-    launch() {
+    launch({ command, cwd }) {
+      const task: BackgroundBashTask = {
+        id: `bash-${randomUUID()}`,
+        command,
+        cwd,
+        status: "running",
+        terminal: false,
+      };
+      tasks.set(task.id, task);
+      options.spawn({
+        command,
+        cwd,
+        onExit: () => {},
+      });
       return { ...task };
     },
-    status() {
-      return undefined;
+    status(id) {
+      const task = tasks.get(id);
+      return task ? { ...task } : undefined;
     },
     cancel() {
       return undefined;
