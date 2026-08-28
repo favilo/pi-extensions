@@ -39,8 +39,10 @@ function applySessionToolSet(pi: ExtensionAPI, selected: Set<string>): void {
   for (const name of retainedSelections) selected.add(name);
 
   pi.setActiveTools([
-    ...BASELINE_TOOLS.filter((name) => registered.has(name)),
-    ...retainedSelections,
+    ...new Set([
+      ...BASELINE_TOOLS.filter((name) => registered.has(name)),
+      ...retainedSelections,
+    ]),
   ]);
 }
 

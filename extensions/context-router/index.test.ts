@@ -98,6 +98,10 @@ test("router establishes and maintains only the baseline plus deliberate selecte
 
   const finder = harness.finder();
   assert.ok(finder?.execute);
+  await finder.execute("find-background", { query: "background Bash", select: ["bash_task"] }, new AbortController().signal, undefined, {});
+  await harness.emit("turn_start");
+  assert.equal(harness.activeTools().filter((name) => name === "bash_task").length, 1);
+
   const result = await finder.execute("find-deploy", { query: "deploy", select: ["mcp__deploy"] }, new AbortController().signal, undefined, {});
   assert.deepEqual(result.details, { matches: ["mcp__deploy"], added: ["mcp__deploy"] });
   assert.ok(harness.activeTools().includes("mcp__deploy"));

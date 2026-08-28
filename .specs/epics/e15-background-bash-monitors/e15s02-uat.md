@@ -32,11 +32,13 @@ You can also run:
 
 Ask:
 
-> Run this command in the background with monitoring enabled:
->
-> `for i in 1 2 3; do echo "change-$i"; sleep 1; done`
->
-> Use `background: true` and `monitor: true`.
+```
+Run this command in the background with monitoring enabled:
+
+`for i in 1 2 3; do echo "change-$i"; sleep 1; done`
+
+Use `background: true` and `monitor: true`.
+```
 
 Expected launch row:
 
@@ -51,9 +53,11 @@ Verify that the task ID is returned immediately, the agent wakes for each comple
 
 Ask:
 
-> Run this in the background without monitoring:
->
-> `for i in 1 2 3; do echo "silent-$i"; sleep 1; done`
+```
+Run this in the background without monitoring:
+
+`for i in 1 2 3; do echo "silent-$i"; sleep 1; done`
+```
 
 Verify that the task starts immediately but produces no live output wakeups.
 
@@ -91,9 +95,11 @@ Expected call:
 
 Ask:
 
-> Run this in the background with monitoring enabled:
->
-> `for i in 1 2; do echo "error-$i" >&2; sleep 1; done`
+```
+Run this in the background with monitoring enabled:
+
+`for i in 1 2; do echo "error-$i" >&2; sleep 1; done`
+```
 
 Verify notifications identify `stderr`.
 
