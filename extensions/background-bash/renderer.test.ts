@@ -79,6 +79,29 @@ test("bash_task call renders the task ID and action", () => {
   assert.match(text, /cancel/i);
 });
 
+test("bash_task list and output results render useful summaries", () => {
+  const listed = renderBashTaskResult({
+    tasks: [{ id: "bash-abc", command: "watch", cwd: "/w", status: "running", terminal: false }],
+  }, { expanded: false }, theme).render(120).join("\n");
+  assert.match(listed, /bash-abc/);
+  assert.match(listed, /running/);
+  assert.doesNotMatch(listed, /undefined/);
+
+  const output = renderBashTaskResult({
+    found: true,
+    id: "bash-abc",
+    output: { stdout: { lines: ["one", "two"], offset: 1, limit: 2, nextOffset: 3, totalLines: 3 } },
+  }, { expanded: false }, theme).render(120).join("\n");
+  assert.match(output, /stdout/);
+  assert.match(output, /one/);
+  assert.doesNotMatch(output, /undefined/);
+});
+
+test("bash_task list calls omit an empty task ID", () => {
+  const text = renderBashTaskCall({ action: "list" }, theme).render(120).join("\n");
+  assert.equal(text, "bash_task list");
+});
+
 test("bash_task result shows task status and not-found for unknown IDs", () => {
   const found = renderBashTaskResult(
     { id: "bash-abc", command: "x", cwd: "/w", status: "completed", terminal: true, exitCode: 0, startedAt: 0, finishedAt: 0 },
