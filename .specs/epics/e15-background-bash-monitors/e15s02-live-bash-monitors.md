@@ -30,7 +30,7 @@ While a background command runs, agents need to react to returned text as it arr
 
 ## Automated verification
 - `node --test extensions/background-bash/monitor.test.ts`
-- `node --test extensions/background-bash/monitor-delivery.test.ts`
+- `node --test extensions/background-bash/permission-boundary.test.ts`
 - `node --test extensions/background-bash/output.test.ts`
 - `npm run check`
 
