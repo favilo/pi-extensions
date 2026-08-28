@@ -35,7 +35,7 @@ export type BackgroundBashSpawn = (options: {
 }) => BackgroundBashProcess;
 
 export type BackgroundBashController = {
-  launch(options: { command: string; cwd: string; timeoutSeconds?: number; signal?: AbortSignal; outputDir?: string; monitor?: boolean; onMonitorEvent?: (event: BackgroundBashMonitorEvent) => void }): BackgroundBashTask;
+  launch(options: { command: string; cwd: string; timeoutSeconds?: number; signal?: AbortSignal; outputDir?: string; monitor?: boolean; onMonitorEvent?: (event: BackgroundBashMonitorEvent, taskId: string) => void }): BackgroundBashTask;
   status(id: string): BackgroundBashTask | undefined;
   cancel(id: string): BackgroundBashTask | undefined;
   close(): void;
@@ -131,7 +131,7 @@ export function createBackgroundBashController(options: { spawn: BackgroundBashS
         task.stdoutPath = join(outputDir, `${task.id}-stdout.log`);
         task.stderrPath = join(outputDir, `${task.id}-stderr.log`);
       }
-      if (monitor) monitors.set(task.id, createBackgroundBashMonitor(onMonitorEvent ?? (() => {})));
+      if (monitor) monitors.set(task.id, createBackgroundBashMonitor((event) => onMonitorEvent?.(event, task.id)));
       const process = options.spawn({
         command,
         cwd,

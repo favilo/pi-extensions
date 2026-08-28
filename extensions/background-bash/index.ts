@@ -76,8 +76,7 @@ export function registerBackgroundBash(pi: ExtensionAPI, options: RegisterBackgr
       const sessionId = (ctx as { sessionId?: string; sessionManager?: { getSessionId(): string } })?.sessionId
         ?? (ctx as { sessionManager?: { getSessionId(): string } })?.sessionManager?.getSessionId();
       const outputDir = sessionId ? join(tmpdir(), "pi-bg-bash", sessionId) : undefined;
-      let task: BackgroundBashTask | undefined;
-      task = controller.launch({
+      const task = controller.launch({
         command: input.command,
         cwd,
         ...(typeof input.timeout === "number" ? { timeoutSeconds: input.timeout } : {}),
@@ -86,13 +85,13 @@ export function registerBackgroundBash(pi: ExtensionAPI, options: RegisterBackgr
         ...(input.monitor === true
           ? {
               monitor: true,
-              onMonitorEvent: (event: { stream: "stdout" | "stderr"; sequence: number; line: string }) => {
+              onMonitorEvent: (event: { stream: "stdout" | "stderr"; sequence: number; line: string }, taskId: string) => {
                 pi.sendMessage({
                   customType: "background_bash_monitor",
-                  content: `task ${task?.id ?? "unknown"} ${event.stream} [${event.sequence}..${event.sequence}]: ${event.line}`,
+                  content: `task ${taskId} ${event.stream} [${event.sequence}..${event.sequence}]: ${event.line}`,
                   display: true,
                   details: {
-                    taskId: task?.id ?? "unknown",
+                    taskId,
                     stream: event.stream,
                     fromSequence: event.sequence,
                     toSequence: event.sequence,
