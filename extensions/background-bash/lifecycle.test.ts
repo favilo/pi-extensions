@@ -168,6 +168,46 @@ test("a timed-out launch terminates the process tree and reports timed_out", asy
   assert.equal(terminateCalls, 1);
 });
 
+test("parent abort terminates the owned process tree and invalidates late callbacks", () => {
+  let terminateCalls = 0;
+  let exit: ((outcome: { code: number | null; signal: NodeJS.Signals | null }) => void) | undefined;
+  const invocation = new AbortController();
+  const controller = createBackgroundBashController({
+    spawn({ onExit }) {
+      exit = onExit;
+      return { terminate() { terminateCalls++; } };
+    },
+  });
+
+  const launched = controller.launch({ command: "sleep 60", cwd: "/workspace", signal: invocation.signal });
+  assert.equal(launched.status, "running");
+
+  invocation.abort();
+  assert.equal(controller.status(launched.id)?.status, "cancelled");
+  assert.equal(terminateCalls, 1);
+
+  exit?.({ code: 0, signal: null });
+  assert.equal(controller.status(launched.id)?.status, "cancelled", "a late exit must not resurrect an aborted task");
+});
+
+test("a launch with an already-aborted parent signal is rejected before spawning", () => {
+  let spawned = false;
+  const controller = createBackgroundBashController({
+    spawn() {
+      spawned = true;
+      return { terminate() {} };
+    },
+  });
+  const invocation = new AbortController();
+  invocation.abort();
+
+  assert.throws(
+    () => controller.launch({ command: "sleep 60", cwd: "/workspace", signal: invocation.signal }),
+    /cancelled|aborted/i,
+  );
+  assert.equal(spawned, false, "no process may launch after the parent abort");
+});
+
 test("closing the parent registry cancels active work once and rejects new launches", () => {
   let terminateCalls = 0;
   const controller = createBackgroundBashController({
