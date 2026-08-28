@@ -102,3 +102,66 @@ test("an invalid background request fails without launching a process", async ()
     cleanup();
   }
 });
+
+test("lookup returns running status by task ID", async () => {
+  const { tools, cleanup } = harness(() => ({ terminate() {} }));
+  try {
+    const bash = tools.get("bash")!;
+    const launchResult = await bash.execute("c1", { command: "sleep 60", background: true }, new AbortController().signal, undefined, { cwd: "/w" });
+    const taskId = (launchResult.details as { id: string }).id;
+
+    const bashTask = tools.get("bash_task")!;
+    const statusResult = await bashTask.execute("c2", { id: taskId }, new AbortController().signal, undefined, { cwd: "/w" });
+    assert.equal((statusResult.details as { id: string }).id, taskId);
+    assert.equal((statusResult.details as { status: string }).status, "running");
+  } finally {
+    cleanup();
+  }
+});
+
+test("cancel terminates an active task by ID", async () => {
+  let terminateCalls = 0;
+  const { tools, cleanup } = harness(() => ({ terminate() { terminateCalls++; } }));
+  try {
+    const bash = tools.get("bash")!;
+    const launchResult = await bash.execute("c1", { command: "sleep 60", background: true }, new AbortController().signal, undefined, { cwd: "/w" });
+    const taskId = (launchResult.details as { id: string }).id;
+
+    const bashTask = tools.get("bash_task")!;
+    const cancelResult = await bashTask.execute("c2", { id: taskId, action: "cancel" }, new AbortController().signal, undefined, { cwd: "/w" });
+    assert.equal((cancelResult.details as { status: string }).status, "cancelled");
+    assert.equal(terminateCalls, 1);
+  } finally {
+    cleanup();
+  }
+});
+
+test("unknown task ID returns not found", async () => {
+  const { tools, cleanup } = harness(() => ({ terminate() {} }));
+  try {
+    const bashTask = tools.get("bash_task")!;
+    const result = await bashTask.execute("c1", { id: "unknown" }, new AbortController().signal, undefined, { cwd: "/w" });
+    assert.equal((result.details as { found: boolean }).found, false);
+  } finally {
+    cleanup();
+  }
+});
+
+test("session shutdown cancels active background work and rejects new launches", async () => {
+  let terminateCalls = 0;
+  const { tools, handlers, cleanup } = harness(() => ({ terminate() { terminateCalls++; } }));
+  try {
+    const bash = tools.get("bash")!;
+    await bash.execute("c1", { command: "sleep 60", background: true }, new AbortController().signal, undefined, { cwd: "/w" });
+
+    handlers.get("session_shutdown")?.({ reason: "quit" } as never, {} as never);
+    assert.equal(terminateCalls, 1);
+
+    await assert.rejects(
+      bash.execute("c2", { command: "echo hi", background: true }, new AbortController().signal, undefined, { cwd: "/w" }),
+      /closed/i,
+    );
+  } finally {
+    cleanup();
+  }
+});
