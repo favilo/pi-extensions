@@ -129,7 +129,7 @@ test("monitor delivery reports overflow instead of sending unbounded messages", 
     const bash = tools.get("bash")!;
     await bash.execute("c1", { command: "flood", background: true, monitor: true }, new AbortController().signal, undefined, { cwd: "/w" });
     for (let i = 0; i < 105; i++) emit?.("stdout", `line-${i}\n`);
-    assert.equal(messages.length, 101);
+    assert.equal(messages.length, 21);
     assert.match(String((messages.at(-1) as { message: { content: string } }).message.content), /overflow/i);
   } finally {
     cleanup();
@@ -275,6 +275,23 @@ test("unknown task ID returns not found", async () => {
     const bashTask = tools.get("bash_task")!;
     const result = await bashTask.execute("c1", { id: "unknown" }, new AbortController().signal, undefined, { cwd: "/w" });
     assert.equal((result.details as { found: boolean }).found, false);
+  } finally {
+    cleanup();
+  }
+});
+
+test("session shutdown prevents late monitor messages", async () => {
+  let emit: ((stream: "stdout" | "stderr", chunk: string) => void) | undefined;
+  const { tools, handlers, messages, cleanup } = harness(({ onOutput }) => {
+    emit = onOutput;
+    return { terminate() {} };
+  });
+  try {
+    const bash = tools.get("bash")!;
+    await bash.execute("c1", { command: "watch", background: true, monitor: true }, new AbortController().signal, undefined, { cwd: "/w" });
+    handlers.get("session_shutdown")?.({ reason: "quit" } as never, {} as never);
+    emit?.("stdout", "late\n");
+    assert.equal(messages.length, 0);
   } finally {
     cleanup();
   }
