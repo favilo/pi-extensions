@@ -98,6 +98,27 @@ test("monitor true forwards each completed output change as an attributed agent 
   }
 });
 
+test("monitored task sends one terminal summary after output delivery", async () => {
+  let emit: ((stream: "stdout" | "stderr", chunk: string) => void) | undefined;
+  let exit: ((outcome: { code: number | null; signal: NodeJS.Signals | null }) => void) | undefined;
+  const { tools, messages, cleanup } = harness(({ onOutput, onExit }) => {
+    emit = onOutput;
+    exit = onExit;
+    return { terminate() {} };
+  });
+  try {
+    const bash = tools.get("bash")!;
+    await bash.execute("c1", { command: "echo done", background: true, monitor: true }, new AbortController().signal, undefined, { cwd: "/w" });
+    emit?.("stdout", "done\n");
+    exit?.({ code: 0, signal: null });
+    exit?.({ code: 0, signal: null });
+    assert.equal(messages.length, 2);
+    assert.match(String((messages.at(-1) as { message: { content: string } }).message.content), /completed/);
+  } finally {
+    cleanup();
+  }
+});
+
 test("monitor delivery reports overflow instead of sending unbounded messages", async () => {
   let emit: ((stream: "stdout" | "stderr", chunk: string) => void) | undefined;
   const { tools, messages, cleanup } = harness(({ onOutput }) => {
