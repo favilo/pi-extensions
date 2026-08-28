@@ -174,6 +174,13 @@ export function createBackgroundBashController(options: { spawn: BackgroundBashS
       settleTerminated(id, task, "cancelled");
       return { ...task };
     },
+    stopMonitor(id) {
+      const monitor = monitors.get(id);
+      if (!monitor) return false;
+      monitor.close();
+      monitors.delete(id);
+      return true;
+    },
     close() {
       if (closed) return;
       closed = true;
