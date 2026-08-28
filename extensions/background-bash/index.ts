@@ -1,4 +1,5 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { Type } from "typebox";
 import { getPublishedToolDefinitions, registerPublishedTool } from "../tool-registry/index.ts";
 import { createBackgroundBashController, createNodeBashSpawn, type BackgroundBashSpawn } from "./lifecycle.ts";
 
@@ -53,6 +54,32 @@ export function registerBackgroundBash(pi: ExtensionAPI, options: RegisterBackgr
         content: [{ type: "text" as const, text: `Background task ${task.id} started (status: ${task.status}).` }],
         details: task,
       };
+    },
+  });
+
+  registerPublishedTool(pi, {
+    name: "bash_task",
+    label: "bash_task",
+    description: "Look up or cancel a background Bash task by ID. Use action: \"status\" (default) to retrieve bounded output and exit outcome, or action: \"cancel\" to terminate an active task.",
+    parameters: Type.Object({
+      id: Type.String({ description: "The background task ID returned by a background bash launch." }),
+      action: Type.Optional(Type.String({ description: "\"status\" (default) or \"cancel\"." })),
+    }),
+    async execute(_toolCallId, params, _signal, _onUpdate, _ctx) {
+      const id = params.id;
+      const action = params.action ?? "status";
+      if (action === "cancel") {
+        const cancelled = controller.cancel(id);
+        if (!cancelled) {
+          return { content: [{ type: "text" as const, text: `Task ${id} not found.` }], details: { found: false, id, status: "unknown" } };
+        }
+        return { content: [{ type: "text" as const, text: `Task ${id} cancelled.` }], details: cancelled };
+      }
+      const status = controller.status(id);
+      if (!status) {
+        return { content: [{ type: "text" as const, text: `Task ${id} not found.` }], details: { found: false, id, status: "unknown" } };
+      }
+      return { content: [{ type: "text" as const, text: JSON.stringify(status, null, 2) }], details: status };
     },
   });
 
