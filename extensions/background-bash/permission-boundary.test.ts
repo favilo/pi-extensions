@@ -16,12 +16,16 @@ function harness(spawn: BackgroundBashSpawn) {
   const tools = new Map<string, CapturedTool>();
   const handlers = new Map<string, (...args: never[]) => unknown>();
   const foregroundCalls: unknown[] = [];
+  const messages: Array<{ message: unknown; options: unknown }> = [];
   const pi = {
     registerTool(tool: CapturedTool) {
       tools.set(tool.name, tool);
     },
     on(event: string, handler: (...args: never[]) => unknown) {
       handlers.set(event, handler);
+    },
+    sendMessage(message: unknown, options: unknown) {
+      messages.push({ message, options });
     },
   } as unknown as ExtensionAPI;
 
@@ -41,6 +45,7 @@ function harness(spawn: BackgroundBashSpawn) {
     tools,
     handlers,
     foregroundCalls,
+    messages,
     cleanup: () => unpublishToolDefinition("bash"),
   };
 }
@@ -61,6 +66,33 @@ test("an authorized background launch returns its task ID before the command set
     assert.match(details.id, /^bash-/);
     assert.equal(details.status, "running");
     assert.match(result.content[0]!.text!, /bash-/);
+  } finally {
+    cleanup();
+  }
+});
+
+test("monitor true forwards each completed output change as an attributed agent message", async () => {
+  let emit: ((stream: "stdout" | "stderr", chunk: string) => void) | undefined;
+  const { tools, messages, cleanup } = harness(({ onOutput }) => {
+    emit = onOutput;
+    return { terminate() {} };
+  });
+  try {
+    const bash = tools.get("bash")!;
+    const result = await bash.execute("call-1", { command: "watch", background: true, monitor: true }, new AbortController().signal, undefined, { cwd: "/workspace" });
+    const taskId = (result.details as { id: string }).id;
+    emit?.("stdout", "changed\n");
+
+    assert.equal(messages.length, 1);
+    assert.deepEqual(messages[0], {
+      message: {
+        customType: "background_bash_monitor",
+        content: `task ${taskId} stdout [1..1]: changed`,
+        display: true,
+        details: { taskId, stream: "stdout", fromSequence: 1, toSequence: 1, lines: ["changed"] },
+      },
+      options: { deliverAs: "steer", triggerTurn: true },
+    });
   } finally {
     cleanup();
   }
