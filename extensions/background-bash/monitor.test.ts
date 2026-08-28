@@ -2,6 +2,7 @@ import "../test-support/forbid-fetch.ts";
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createBackgroundBashMonitor, type BackgroundBashMonitorEvent } from "./monitor.ts";
+import { createBackgroundBashController } from "./lifecycle.ts";
 
 test("emits one ordered event for each completed stdout and stderr line", () => {
   const events: BackgroundBashMonitorEvent[] = [];
@@ -17,6 +18,33 @@ test("emits one ordered event for each completed stdout and stderr line", () => 
     { stream: "stdout", sequence: 2, line: "second" },
     { stream: "stderr", sequence: 3, line: "warning" },
   ]);
+});
+
+test("a monitored task forwards completed output changes while an unmonitored task stays silent", () => {
+  const events: BackgroundBashMonitorEvent[] = [];
+  let monitoredEmit: ((stream: "stdout" | "stderr", chunk: string) => void) | undefined;
+  let unmonitoredEmit: ((stream: "stdout" | "stderr", chunk: string) => void) | undefined;
+  const monitored = createBackgroundBashController({
+    spawn({ onOutput }) {
+      monitoredEmit = onOutput;
+      return { terminate() {} };
+    },
+  });
+  const unmonitored = createBackgroundBashController({
+    spawn({ onOutput }) {
+      unmonitoredEmit = onOutput;
+      return { terminate() {} };
+    },
+  });
+
+  monitored.launch({ command: "watch", cwd: "/workspace", monitor: true, onMonitorEvent: (event) => events.push(event) });
+  unmonitored.launch({ command: "quiet", cwd: "/workspace", monitor: false, onMonitorEvent: (event) => events.push(event) });
+  monitoredEmit?.("stdout", "changed\n");
+  unmonitoredEmit?.("stdout", "should stay silent\n");
+
+  assert.deepEqual(events, [{ stream: "stdout", sequence: 1, line: "changed" }]);
+  monitored.close();
+  unmonitored.close();
 });
 
 test("flushes a final partial line and ignores output after close", () => {

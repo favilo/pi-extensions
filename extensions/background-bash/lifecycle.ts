@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import { appendFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { createOutputCapture, type BackgroundBashOutput } from "./output.ts";
+import type { BackgroundBashMonitorEvent } from "./monitor.ts";
 
 export type BackgroundBashStatus = "queued" | "running" | "completed" | "failed" | "cancelled" | "timed_out";
 
@@ -34,7 +35,7 @@ export type BackgroundBashSpawn = (options: {
 }) => BackgroundBashProcess;
 
 export type BackgroundBashController = {
-  launch(options: { command: string; cwd: string; timeoutSeconds?: number; signal?: AbortSignal; outputDir?: string }): BackgroundBashTask;
+  launch(options: { command: string; cwd: string; timeoutSeconds?: number; signal?: AbortSignal; outputDir?: string; monitor?: boolean; onMonitorEvent?: (event: BackgroundBashMonitorEvent) => void }): BackgroundBashTask;
   status(id: string): BackgroundBashTask | undefined;
   cancel(id: string): BackgroundBashTask | undefined;
   close(): void;
