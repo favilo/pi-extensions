@@ -1,6 +1,8 @@
 import { getShellConfig } from "@earendil-works/pi-coding-agent";
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
+import { appendFileSync, mkdirSync } from "node:fs";
+import { join } from "node:path";
 import { createOutputCapture, type BackgroundBashOutput } from "./output.ts";
 
 export type BackgroundBashStatus = "queued" | "running" | "completed" | "failed" | "cancelled" | "timed_out";
@@ -16,6 +18,8 @@ export type BackgroundBashTask = {
   output?: BackgroundBashOutput;
   startedAt?: number;
   finishedAt?: number;
+  stdoutPath?: string;
+  stderrPath?: string;
 };
 
 export type BackgroundBashProcess = {
@@ -30,7 +34,7 @@ export type BackgroundBashSpawn = (options: {
 }) => BackgroundBashProcess;
 
 export type BackgroundBashController = {
-  launch(options: { command: string; cwd: string; timeoutSeconds?: number; signal?: AbortSignal }): BackgroundBashTask;
+  launch(options: { command: string; cwd: string; timeoutSeconds?: number; signal?: AbortSignal; outputDir?: string }): BackgroundBashTask;
   status(id: string): BackgroundBashTask | undefined;
   cancel(id: string): BackgroundBashTask | undefined;
   close(): void;
@@ -104,7 +108,7 @@ export function createBackgroundBashController(options: { spawn: BackgroundBashS
   }
 
   return {
-    launch({ command, cwd, timeoutSeconds, signal }) {
+    launch({ command, cwd, timeoutSeconds, signal, outputDir }) {
       if (closed) throw new Error("Background Bash registry is closed.");
       if (signal?.aborted) throw new Error("Background Bash launch was cancelled by the parent abort signal.");
       const task: BackgroundBashTask = {
@@ -118,10 +122,19 @@ export function createBackgroundBashController(options: { spawn: BackgroundBashS
       tasks.set(task.id, task);
       const output = createOutputCapture();
       outputs.set(task.id, output);
+      if (outputDir) {
+        mkdirSync(outputDir, { recursive: true });
+        task.stdoutPath = join(outputDir, `${task.id}-stdout.log`);
+        task.stderrPath = join(outputDir, `${task.id}-stderr.log`);
+      }
       const process = options.spawn({
         command,
         cwd,
-        onOutput: (stream, chunk) => output.append(stream, chunk),
+        onOutput: (stream, chunk) => {
+          output.append(stream, chunk);
+          if (stream === "stdout" && task.stdoutPath) appendFileSync(task.stdoutPath, chunk);
+          else if (task.stderrPath) appendFileSync(task.stderrPath, chunk);
+        },
         onExit: ({ code, signal }) => {
           settleTerminated(task.id, task, code === 0 ? "completed" : "failed", code, signal);
         },
