@@ -1,12 +1,20 @@
 import "../test-support/forbid-fetch.ts";
 import assert from "node:assert/strict";
 import test from "node:test";
-import { renderBackgroundBashLaunchCall, renderBackgroundBashLaunchResult, renderBashTaskCall, renderBashTaskResult } from "./renderer.ts";
+import { renderBackgroundBashLaunchCall, renderBackgroundBashLaunchResult, renderBashTaskCall, renderBashTaskResult, renderBackgroundBashMonitorMessage } from "./renderer.ts";
 import type { BackgroundBashTask } from "./lifecycle.ts";
 
 const theme = new Proxy({}, {
   get: () => (...args: unknown[]) => String(args[args.length - 1]),
 }) as never;
+
+test("monitor messages retain visible task and stream attribution", () => {
+  const text = renderBackgroundBashMonitorMessage({ content: "task bash-abc stdout [1..1]: changed" }, { expanded: false, outputPad: 0 }, theme).render(120).join("\n");
+  assert.match(text, /background monitor/);
+  assert.match(text, /bash-abc/);
+  assert.match(text, /stdout/);
+  assert.match(text, /changed/);
+});
 
 test("launch call renders a prominent background label above the command", () => {
   const text = renderBackgroundBashLaunchCall({ command: "sleep 60", monitor: true }, theme).render(120).join("\n");

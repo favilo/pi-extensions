@@ -36,6 +36,11 @@ function renderOutput(output: BackgroundBashOutput | undefined, theme: Theme): s
   return [...renderStream("stdout", output.stdout, theme), ...renderStream("stderr", output.stderr, theme)];
 }
 
+/** Render an agent-flow monitor message with persistent attribution. */
+export function renderBackgroundBashMonitorMessage(message: { content: string }, _options: { expanded: boolean; outputPad: number }, theme: Theme): Text {
+  return new Text(theme.fg("accent", "background monitor") + " " + message.content, 0, 0);
+}
+
 /** Compact render for a background bash launch call row. */
 export function renderBackgroundBashLaunchCall(args: { command?: string; monitor?: boolean }, theme: Theme): Text {
   const command = args.command ?? "";
