@@ -98,6 +98,23 @@ test("monitor true forwards each completed output change as an attributed agent 
   }
 });
 
+test("monitor delivery reports overflow instead of sending unbounded messages", async () => {
+  let emit: ((stream: "stdout" | "stderr", chunk: string) => void) | undefined;
+  const { tools, messages, cleanup } = harness(({ onOutput }) => {
+    emit = onOutput;
+    return { terminate() {} };
+  });
+  try {
+    const bash = tools.get("bash")!;
+    await bash.execute("c1", { command: "flood", background: true, monitor: true }, new AbortController().signal, undefined, { cwd: "/w" });
+    for (let i = 0; i < 105; i++) emit?.("stdout", `line-${i}\n`);
+    assert.equal(messages.length, 101);
+    assert.match(String((messages.at(-1) as { message: { content: string } }).message.content), /overflow/i);
+  } finally {
+    cleanup();
+  }
+});
+
 test("bash_task can list tasks and fetch bounded output by offset", async () => {
   let emit: ((stream: "stdout" | "stderr", chunk: string) => void) | undefined;
   const { tools, cleanup } = harness(({ onOutput }) => {

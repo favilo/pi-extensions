@@ -77,6 +77,10 @@ export function registerBackgroundBash(pi: ExtensionAPI, options: RegisterBackgr
       const sessionId = (ctx as { sessionId?: string; sessionManager?: { getSessionId(): string } })?.sessionId
         ?? (ctx as { sessionManager?: { getSessionId(): string } })?.sessionManager?.getSessionId();
       const outputDir = sessionId ? join(tmpdir(), "pi-bg-bash", sessionId) : undefined;
+      let monitorMessages = 0;
+      let monitorBytes = 0;
+      let monitorOmitted = 0;
+      let monitorOverflowNotified = false;
       const task = controller.launch({
         command: input.command,
         cwd,
@@ -87,9 +91,26 @@ export function registerBackgroundBash(pi: ExtensionAPI, options: RegisterBackgr
           ? {
               monitor: true,
               onMonitorEvent: (event: { stream: "stdout" | "stderr"; sequence: number; line: string }, taskId: string) => {
+                const content = `task ${taskId} ${event.stream} [${event.sequence}..${event.sequence}]: ${event.line}`;
+                const bytes = Buffer.byteLength(content, "utf8");
+                if (monitorMessages >= 100 || monitorBytes + bytes > 32 * 1024) {
+                  monitorOmitted++;
+                  if (!monitorOverflowNotified) {
+                    monitorOverflowNotified = true;
+                    pi.sendMessage({
+                      customType: "background_bash_monitor",
+                      content: `task ${taskId} monitor overflow: further output omitted`,
+                      display: true,
+                      details: { taskId, overflow: true, omitted: 1 },
+                    }, { deliverAs: "steer", triggerTurn: true });
+                  }
+                  return;
+                }
+                monitorMessages++;
+                monitorBytes += bytes;
                 pi.sendMessage({
                   customType: "background_bash_monitor",
-                  content: `task ${taskId} ${event.stream} [${event.sequence}..${event.sequence}]: ${event.line}`,
+                  content,
                   display: true,
                   details: {
                     taskId,
@@ -111,6 +132,7 @@ export function registerBackgroundBash(pi: ExtensionAPI, options: RegisterBackgr
                     status: completed.status,
                     exitCode: completed.exitCode,
                     signal: completed.signal,
+                    omitted: monitorOmitted,
                   },
                 }, { deliverAs: "steer", triggerTurn: true });
               },
