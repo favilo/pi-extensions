@@ -16,11 +16,23 @@ const backgroundParameterSchema = {
   description: "Run this command in the background and return a task ID immediately instead of waiting for completion.",
 } as const;
 
+const monitorParameterSchema = {
+  type: "boolean",
+  description: "Wake the agent when monitored background output changes. Requires background: true.",
+} as const;
+
 /** Admit an optional background flag into the published bash tool's parameter schema. */
 function withBackgroundParameter<T>(parameters: T): T {
   const schema = parameters as { type?: string; properties?: Record<string, unknown> };
   if (schema?.type !== "object" || !schema.properties) return parameters;
-  return { ...schema, properties: { ...schema.properties, background: backgroundParameterSchema } } as T;
+  return {
+    ...schema,
+    properties: {
+      ...schema.properties,
+      background: backgroundParameterSchema,
+      monitor: monitorParameterSchema,
+    },
+  } as T;
 }
 
 /** Strip the renderer-owned background flag before delegating to the foreground executor. */
@@ -53,7 +65,7 @@ export function registerBackgroundBash(pi: ExtensionAPI, options: RegisterBackgr
       return bash.renderResult?.(result, options, theme, context) ?? new Text("", 0, 0);
     },
     async execute(toolCallId, params, signal, onUpdate, ctx) {
-      const input = params as { command?: unknown; background?: unknown; timeout?: unknown };
+      const input = params as { command?: unknown; background?: unknown; monitor?: unknown; timeout?: unknown };
       if (input?.background !== true) {
         return bash.execute(toolCallId, withoutBackground(params), signal, onUpdate, ctx);
       }
@@ -64,12 +76,32 @@ export function registerBackgroundBash(pi: ExtensionAPI, options: RegisterBackgr
       const sessionId = (ctx as { sessionId?: string; sessionManager?: { getSessionId(): string } })?.sessionId
         ?? (ctx as { sessionManager?: { getSessionId(): string } })?.sessionManager?.getSessionId();
       const outputDir = sessionId ? join(tmpdir(), "pi-bg-bash", sessionId) : undefined;
-      const task = controller.launch({
+      let task: BackgroundBashTask | undefined;
+      task = controller.launch({
         command: input.command,
         cwd,
         ...(typeof input.timeout === "number" ? { timeoutSeconds: input.timeout } : {}),
         ...(signal ? { signal } : {}),
         ...(outputDir ? { outputDir } : {}),
+        ...(input.monitor === true
+          ? {
+              monitor: true,
+              onMonitorEvent: (event: { stream: "stdout" | "stderr"; sequence: number; line: string }) => {
+                pi.sendMessage({
+                  customType: "background_bash_monitor",
+                  content: `task ${task?.id ?? "unknown"} ${event.stream} [${event.sequence}..${event.sequence}]: ${event.line}`,
+                  display: true,
+                  details: {
+                    taskId: task?.id ?? "unknown",
+                    stream: event.stream,
+                    fromSequence: event.sequence,
+                    toSequence: event.sequence,
+                    lines: [event.line],
+                  },
+                }, { deliverAs: "steer", triggerTurn: true });
+              },
+            }
+          : {}),
       });
       const paths = [
         ...(task.stdoutPath ? [`stdout: ${task.stdoutPath}`] : []),
