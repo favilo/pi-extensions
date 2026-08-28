@@ -166,6 +166,20 @@ test("foreground bash calls keep their existing result shape when background mod
   }
 });
 
+test("monitoring without background mode is rejected explicitly", async () => {
+  const { tools, foregroundCalls, cleanup } = harness(() => ({ terminate() {} }));
+  try {
+    const bash = tools.get("bash")!;
+    await assert.rejects(
+      bash.execute("call-1", { command: "echo hi", monitor: true }, new AbortController().signal, undefined, { cwd: "/workspace" }),
+      /monitor.*background/i,
+    );
+    assert.equal(foregroundCalls.length, 0);
+  } finally {
+    cleanup();
+  }
+});
+
 test("an invalid background request fails without launching a process", async () => {
   let spawned = false;
   const { tools, cleanup } = harness(() => {

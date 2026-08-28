@@ -38,7 +38,7 @@ function withBackgroundParameter<T>(parameters: T): T {
 /** Strip the renderer-owned background flag before delegating to the foreground executor. */
 function withoutBackground<T>(params: T): T {
   if (!params || typeof params !== "object" || !("background" in params)) return params;
-  const { background: _background, ...rest } = params as Record<string, unknown>;
+  const { background: _background, monitor: _monitor, ...rest } = params as Record<string, unknown>;
   return rest as T;
 }
 
@@ -67,6 +67,7 @@ export function registerBackgroundBash(pi: ExtensionAPI, options: RegisterBackgr
     async execute(toolCallId, params, signal, onUpdate, ctx) {
       const input = params as { command?: unknown; background?: unknown; monitor?: unknown; timeout?: unknown };
       if (input?.background !== true) {
+        if (input?.monitor === true) throw new Error("monitor requires background: true.");
         return bash.execute(toolCallId, withoutBackground(params), signal, onUpdate, ctx);
       }
       if (typeof input.command !== "string" || !input.command.trim()) {
