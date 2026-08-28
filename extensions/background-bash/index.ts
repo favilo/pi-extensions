@@ -5,7 +5,7 @@ import { Text } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
 import { getPublishedToolDefinitions, registerPublishedTool } from "../tool-registry/index.ts";
 import { createBackgroundBashController, createNodeBashSpawn, type BackgroundBashSpawn, type BackgroundBashTask } from "./lifecycle.ts";
-import { renderBackgroundBashLaunchCall, renderBackgroundBashLaunchResult, renderBashTaskCall, renderBashTaskResult } from "./renderer.ts";
+import { renderBackgroundBashLaunchCall, renderBackgroundBashLaunchResult, renderBashTaskCall, renderBashTaskResult, renderBackgroundBashMonitorMessage } from "./renderer.ts";
 
 export type RegisterBackgroundBashOptions = {
   spawn?: BackgroundBashSpawn;
@@ -191,6 +191,11 @@ export function registerBackgroundBash(pi: ExtensionAPI, options: RegisterBackgr
       return { content: [{ type: "text" as const, text: JSON.stringify(status, null, 2) }], details: status };
     },
   });
+
+  if (typeof pi.registerMessageRenderer === "function") {
+    pi.registerMessageRenderer("background_bash_monitor", (message, renderOptions, theme) =>
+      renderBackgroundBashMonitorMessage({ content: String(message.content) }, renderOptions, theme));
+  }
 
   if (typeof pi.on === "function") {
     pi.on("session_shutdown", () => {
