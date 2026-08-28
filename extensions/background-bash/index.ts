@@ -99,6 +99,20 @@ export function registerBackgroundBash(pi: ExtensionAPI, options: RegisterBackgr
                   },
                 }, { deliverAs: "steer", triggerTurn: true });
               },
+              onMonitorComplete: (completed: BackgroundBashTask) => {
+                pi.sendMessage({
+                  customType: "background_bash_monitor",
+                  content: `task ${completed.id} completed with status ${completed.status}`,
+                  display: true,
+                  details: {
+                    taskId: completed.id,
+                    terminal: true,
+                    status: completed.status,
+                    exitCode: completed.exitCode,
+                    signal: completed.signal,
+                  },
+                }, { deliverAs: "steer", triggerTurn: true });
+              },
             }
           : {}),
       });

@@ -90,6 +90,7 @@ export function createBackgroundBashController(options: { spawn: BackgroundBashS
   const outputs = new Map<string, ReturnType<typeof createOutputCapture>>();
   const timers = new Map<string, NodeJS.Timeout>();
   const monitors = new Map<string, BackgroundBashMonitor>();
+  const monitorCompletions = new Map<string, (task: BackgroundBashTask) => void>();
   let closed = false;
 
   function clearTimer(id: string): void {
@@ -109,11 +110,14 @@ export function createBackgroundBashController(options: { spawn: BackgroundBashS
     clearTimer(id);
     monitors.get(id)?.close();
     monitors.delete(id);
+    const onComplete = monitorCompletions.get(id);
+    monitorCompletions.delete(id);
+    if (!closed) onComplete?.({ ...task });
     processes.delete(id);
   }
 
   return {
-    launch({ command, cwd, timeoutSeconds, signal, outputDir, monitor, onMonitorEvent }) {
+    launch({ command, cwd, timeoutSeconds, signal, outputDir, monitor, onMonitorEvent, onMonitorComplete }) {
       if (closed) throw new Error("Background Bash registry is closed.");
       if (signal?.aborted) throw new Error("Background Bash launch was cancelled by the parent abort signal.");
       const task: BackgroundBashTask = {
@@ -132,7 +136,10 @@ export function createBackgroundBashController(options: { spawn: BackgroundBashS
         task.stdoutPath = join(outputDir, `${task.id}-stdout.log`);
         task.stderrPath = join(outputDir, `${task.id}-stderr.log`);
       }
-      if (monitor) monitors.set(task.id, createBackgroundBashMonitor((event) => onMonitorEvent?.(event, task.id)));
+      if (monitor) {
+        monitors.set(task.id, createBackgroundBashMonitor((event) => onMonitorEvent?.(event, task.id)));
+        if (onMonitorComplete) monitorCompletions.set(task.id, onMonitorComplete);
+      }
       const process = options.spawn({
         command,
         cwd,
