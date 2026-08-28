@@ -38,6 +38,7 @@ export type BackgroundBashController = {
   launch(options: { command: string; cwd: string; timeoutSeconds?: number; signal?: AbortSignal; outputDir?: string; monitor?: boolean; onMonitorEvent?: (event: BackgroundBashMonitorEvent, taskId: string) => void }): BackgroundBashTask;
   status(id: string): BackgroundBashTask | undefined;
   cancel(id: string): BackgroundBashTask | undefined;
+  stopMonitor(id: string): boolean;
   close(): void;
 };
 
