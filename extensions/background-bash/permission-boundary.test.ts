@@ -98,6 +98,27 @@ test("monitor true forwards each completed output change as an attributed agent 
   }
 });
 
+test("bash_task can list tasks and fetch bounded output by offset", async () => {
+  let emit: ((stream: "stdout" | "stderr", chunk: string) => void) | undefined;
+  const { tools, cleanup } = harness(({ onOutput }) => {
+    emit = onOutput;
+    return { terminate() {} };
+  });
+  try {
+    const bash = tools.get("bash")!;
+    const launchResult = await bash.execute("c1", { command: "watch", background: true }, new AbortController().signal, undefined, { cwd: "/w" });
+    const taskId = (launchResult.details as { id: string }).id;
+    emit?.("stdout", "zero\none\ntwo\n");
+    const bashTask = tools.get("bash_task")!;
+    const listed = await bashTask.execute("c2", { action: "list" }, new AbortController().signal, undefined, { cwd: "/w" });
+    assert.equal((listed.details as { tasks: unknown[] }).tasks.length, 1);
+    const output = await bashTask.execute("c3", { id: taskId, action: "output", stream: "stdout", offset: 1, limit: 1 }, new AbortController().signal, undefined, { cwd: "/w" });
+    assert.deepEqual((output.details as { output: { stdout: { lines: string[] } } }).output.stdout.lines, ["one"]);
+  } finally {
+    cleanup();
+  }
+});
+
 test("stop_monitor disables delivery without cancelling the background task", async () => {
   let emit: ((stream: "stdout" | "stderr", chunk: string) => void) | undefined;
   let terminateCalls = 0;

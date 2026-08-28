@@ -130,10 +130,13 @@ export function registerBackgroundBash(pi: ExtensionAPI, options: RegisterBackgr
   registerPublishedTool(pi, {
     name: "bash_task",
     label: "bash_task",
-    description: "Look up, stop monitoring, or cancel a background Bash task by ID. Use action: \"status\" (default), \"stop_monitor\", or \"cancel\".",
+    description: "Manage background Bash tasks. Use action: \"list\", \"status\", \"output\", \"stop_monitor\", or \"cancel\". Output supports bounded stream, offset, and limit retrieval.",
     parameters: Type.Object({
-      id: Type.String({ description: "The background task ID returned by a background bash launch." }),
-      action: Type.Optional(Type.String({ description: "\"status\" (default), \"stop_monitor\", or \"cancel\"." })),
+      id: Type.Optional(Type.String({ description: "The background task ID returned by a background bash launch; required except for list." })),
+      action: Type.Optional(Type.String({ description: "\"list\", \"status\" (default), \"output\", \"stop_monitor\", or \"cancel\"." })),
+      stream: Type.Optional(Type.String({ description: "For output: stdout or stderr (default: both)." })),
+      offset: Type.Optional(Type.Integer({ description: "For output: zero-based line offset." })),
+      limit: Type.Optional(Type.Integer({ description: "For output: maximum lines to return, capped at 1000." })),
     }),
     renderCall(args, theme) {
       return renderBashTaskCall({ id: args?.id, action: args?.action }, theme);
@@ -144,6 +147,24 @@ export function registerBackgroundBash(pi: ExtensionAPI, options: RegisterBackgr
     async execute(_toolCallId, params, _signal, _onUpdate, _ctx) {
       const id = params.id;
       const action = params.action ?? "status";
+      if (action === "list") {
+        const tasks = controller.list();
+        return { content: [{ type: "text" as const, text: JSON.stringify(tasks, null, 2) }], details: { tasks } };
+      }
+      if (!id) throw new Error(`Action ${action} requires a task ID.`);
+      if (action === "output") {
+        const task = controller.status(id);
+        if (!task) return { content: [{ type: "text" as const, text: `Task ${id} not found.` }], details: { found: false, id, status: "unknown" } };
+        const stream = params.stream === "stdout" || params.stream === "stderr" ? params.stream : undefined;
+        const offset = Math.max(0, params.offset ?? 0);
+        const limit = Math.min(1000, Math.max(1, params.limit ?? 100));
+        const selected = stream ? { [stream]: task.output?.[stream] } : { stdout: task.output?.stdout, stderr: task.output?.stderr };
+        const output = Object.fromEntries(Object.entries(selected).map(([name, value]) => {
+          const lines = value?.text ? value.text.split("\n").filter((line, index, all) => index < all.length - 1 || line.length > 0) : [];
+          return [name, { lines: lines.slice(offset, offset + limit), offset, limit, totalLines: value?.totalLines ?? 0, nextOffset: Math.min(offset + limit, lines.length) }];
+        }));
+        return { content: [{ type: "text" as const, text: JSON.stringify(output, null, 2) }], details: { found: true, id, output } };
+      }
       if (action === "stop_monitor") {
         const status = controller.status(id);
         if (!status) {

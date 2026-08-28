@@ -37,6 +37,7 @@ export type BackgroundBashSpawn = (options: {
 export type BackgroundBashController = {
   launch(options: { command: string; cwd: string; timeoutSeconds?: number; signal?: AbortSignal; outputDir?: string; monitor?: boolean; onMonitorEvent?: (event: BackgroundBashMonitorEvent, taskId: string) => void; onMonitorComplete?: (task: BackgroundBashTask) => void }): BackgroundBashTask;
   status(id: string): BackgroundBashTask | undefined;
+  list(): BackgroundBashTask[];
   cancel(id: string): BackgroundBashTask | undefined;
   stopMonitor(id: string): boolean;
   close(): void;
@@ -97,6 +98,12 @@ export function createBackgroundBashController(options: { spawn: BackgroundBashS
     const timer = timers.get(id);
     if (timer) clearTimeout(timer);
     timers.delete(id);
+  }
+
+  function taskView(id: string, task: BackgroundBashTask): BackgroundBashTask {
+    const output = outputs.get(id)?.snapshot() ?? task.output;
+    const hasOutput = output && (output.stdout.totalBytes > 0 || output.stderr.totalBytes > 0 || output.stdout.truncated || output.stderr.truncated);
+    return { ...task, ...(hasOutput ? { output } : task.output ? { output: task.output } : {}) };
   }
 
   function settleTerminated(id: string, task: BackgroundBashTask, status: BackgroundBashStatus, exitCode?: number | null, signal?: NodeJS.Signals | null): void {
@@ -172,14 +179,17 @@ export function createBackgroundBashController(options: { spawn: BackgroundBashS
     },
     status(id) {
       const task = tasks.get(id);
-      return task ? { ...task } : undefined;
+      return task ? taskView(id, task) : undefined;
+    },
+    list() {
+      return [...tasks].map(([id, task]) => taskView(id, task));
     },
     cancel(id) {
       const task = tasks.get(id);
       if (!task || task.terminal) return task ? { ...task } : undefined;
       processes.get(id)?.terminate();
       settleTerminated(id, task, "cancelled");
-      return { ...task };
+      return taskView(id, task);
     },
     stopMonitor(id) {
       const monitor = monitors.get(id);

@@ -158,7 +158,8 @@ test("terminal status exposes bounded attributed output and the exit outcome", (
 
   const running = controller.status(launched.id);
   assert.equal(running?.status, "running");
-  assert.equal(running && "output" in running, false, "status exposes no output before the task settles");
+  assert.equal(running?.output?.stdout.text, "hello\n");
+  assert.equal(running?.output?.stderr.text, "oops\n");
 
   exit?.({ code: 3, signal: null });
   const settled = controller.status(launched.id);
