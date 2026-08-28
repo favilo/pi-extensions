@@ -37,13 +37,13 @@ function extensionHarness(initialActive: string[]) {
   };
 }
 
-test("session start enables grep, find, and ls once while preserving active tools", () => {
+test("session start enables extra tools once while preserving active tools", () => {
   const harness = extensionHarness(["read", "grep"]);
 
   harness.startSession();
   harness.startSession();
 
-  assert.deepEqual(harness.activeTools(), ["read", "grep", "find", "ls"]);
+  assert.deepEqual(harness.activeTools(), ["read", "grep", "find", "ls", "bash_task"]);
 });
 
 test("tools-debug reports active and configured tool names", async () => {
@@ -63,7 +63,7 @@ test("tools-debug reports active and configured tool names", async () => {
   await handler("", context);
 
   assert.deepEqual(notifications, [
-    { message: "Active: read, grep, find, ls", level: "info" },
+    { message: "Active: read, grep, find, ls, bash_task", level: "info" },
     { message: "All: read, grep, find, ls, custom", level: "info" },
   ]);
 });

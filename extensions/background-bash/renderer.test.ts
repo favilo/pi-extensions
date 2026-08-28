@@ -9,8 +9,9 @@ const theme = new Proxy({}, {
 }) as never;
 
 test("launch call renders a prominent background label above the command", () => {
-  const text = renderBackgroundBashLaunchCall({ command: "sleep 60" }, theme).render(120).join("\n");
+  const text = renderBackgroundBashLaunchCall({ command: "sleep 60", monitor: true }, theme).render(120).join("\n");
   assert.match(text, /background: true/);
+  assert.match(text, /monitor: true/);
   assert.match(text, /\$ sleep 60/);
   const lines = text.split("\n");
   assert.ok(lines.some((l) => /background: true/.test(l) && !/\$/.test(l)), "background: true appears on its own line above the command");

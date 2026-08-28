@@ -1,6 +1,6 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
-const EXTRA_TOOLS = ["grep", "find", "ls"];
+const EXTRA_TOOLS = ["grep", "find", "ls", "bash_task"];
 
 export default function (pi: ExtensionAPI) {
   pi.on("session_start", () => {

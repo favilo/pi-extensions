@@ -37,13 +37,14 @@ function renderOutput(output: BackgroundBashOutput | undefined, theme: Theme): s
 }
 
 /** Compact render for a background bash launch call row. */
-export function renderBackgroundBashLaunchCall(args: { command?: string }, theme: Theme): Text {
+export function renderBackgroundBashLaunchCall(args: { command?: string; monitor?: boolean }, theme: Theme): Text {
   const command = args.command ?? "";
   const firstLine = command.split("\n")[0] ?? "";
   const display = firstLine.length > 77 ? `${firstLine.slice(0, 77)}...` : firstLine;
-  const label = theme.fg("accent", "background: true");
-  const commandLine = `${theme.fg("toolTitle", theme.bold("$ "))}${theme.fg("accent", display)}`;
-  return new Text(`${label}\n${commandLine}`, 0, 0);
+  const labels = [theme.fg("accent", "background: true")];
+  if (args.monitor === true) labels.push(theme.fg("accent", "monitor: true"));
+  const commandLine = `${theme.fg("toolTitle", theme.bold("$ "))}${display}`;
+  return new Text(`${labels.join(" ")}\n${commandLine}`, 0, 0);
 }
 
 /** Compact render for a background bash launch result row. */

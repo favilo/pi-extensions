@@ -57,7 +57,7 @@ export function registerBackgroundBash(pi: ExtensionAPI, options: RegisterBackgr
     parameters: withBackgroundParameter(bash.parameters),
     renderCall(args, theme, context) {
       const a = args as { background?: boolean; command?: string };
-      if (a?.background === true) return renderBackgroundBashLaunchCall({ command: a.command }, theme);
+      if (a?.background === true) return renderBackgroundBashLaunchCall({ command: a.command, monitor: (args as { monitor?: boolean }).monitor }, theme);
       return bash.renderCall?.(args, theme, context) ?? new Text("", 0, 0);
     },
     renderResult(result, options, theme, context) {
