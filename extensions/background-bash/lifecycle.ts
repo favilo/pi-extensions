@@ -28,7 +28,7 @@ export type BackgroundBashSpawn = (options: {
 }) => BackgroundBashProcess;
 
 export type BackgroundBashController = {
-  launch(options: { command: string; cwd: string; timeoutSeconds?: number }): BackgroundBashTask;
+  launch(options: { command: string; cwd: string; timeoutSeconds?: number; signal?: AbortSignal }): BackgroundBashTask;
   status(id: string): BackgroundBashTask | undefined;
   cancel(id: string): BackgroundBashTask | undefined;
   close(): void;
@@ -101,8 +101,9 @@ export function createBackgroundBashController(options: { spawn: BackgroundBashS
   }
 
   return {
-    launch({ command, cwd, timeoutSeconds }) {
+    launch({ command, cwd, timeoutSeconds, signal }) {
       if (closed) throw new Error("Background Bash registry is closed.");
+      if (signal?.aborted) throw new Error("Background Bash launch was cancelled by the parent abort signal.");
       const task: BackgroundBashTask = {
         id: `bash-${randomUUID()}`,
         command,
@@ -122,6 +123,12 @@ export function createBackgroundBashController(options: { spawn: BackgroundBashS
         },
       });
       processes.set(task.id, process);
+      if (signal) {
+        signal.addEventListener("abort", () => {
+          process.terminate();
+          settleTerminated(task.id, task, "cancelled");
+        }, { once: true });
+      }
       if (typeof timeoutSeconds === "number" && timeoutSeconds > 0) {
         const timer = setTimeout(() => {
           process.terminate();
