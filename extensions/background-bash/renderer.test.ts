@@ -8,10 +8,12 @@ const theme = new Proxy({}, {
   get: () => (...args: unknown[]) => String(args[args.length - 1]),
 }) as never;
 
-test("launch call renders the command with a background marker", () => {
+test("launch call renders a prominent background label above the command", () => {
   const text = renderBackgroundBashLaunchCall({ command: "sleep 60" }, theme).render(120).join("\n");
+  assert.match(text, /background: true/);
   assert.match(text, /\$ sleep 60/);
-  assert.match(text, /background/i);
+  const lines = text.split("\n");
+  assert.ok(lines.some((l) => /background: true/.test(l) && !/\$/.test(l)), "background: true appears on its own line above the command");
 });
 
 test("launch result shows task ID, status, and elapsed time", () => {

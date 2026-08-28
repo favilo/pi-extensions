@@ -41,7 +41,9 @@ export function renderBackgroundBashLaunchCall(args: { command?: string }, theme
   const command = args.command ?? "";
   const firstLine = command.split("\n")[0] ?? "";
   const display = firstLine.length > 77 ? `${firstLine.slice(0, 77)}...` : firstLine;
-  return new Text(`${theme.fg("toolTitle", theme.bold("$ "))}${theme.fg("accent", display)} ${theme.fg("dim", "(background)")}`, 0, 0);
+  const label = theme.fg("accent", "background: true");
+  const commandLine = `${theme.fg("toolTitle", theme.bold("$ "))}${theme.fg("accent", display)}`;
+  return new Text(`${label}\n${commandLine}`, 0, 0);
 }
 
 /** Compact render for a background bash launch result row. */
