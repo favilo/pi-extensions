@@ -28,7 +28,7 @@ export type BackgroundBashSpawn = (options: {
 }) => BackgroundBashProcess;
 
 export type BackgroundBashController = {
-  launch(options: { command: string; cwd: string }): BackgroundBashTask;
+  launch(options: { command: string; cwd: string; timeoutSeconds?: number }): BackgroundBashTask;
   status(id: string): BackgroundBashTask | undefined;
   cancel(id: string): BackgroundBashTask | undefined;
   close(): void;
@@ -80,10 +80,28 @@ export function createBackgroundBashController(options: { spawn: BackgroundBashS
   const tasks = new Map<string, BackgroundBashTask>();
   const processes = new Map<string, BackgroundBashProcess>();
   const outputs = new Map<string, ReturnType<typeof createOutputCapture>>();
+  const timers = new Map<string, NodeJS.Timeout>();
   let closed = false;
 
+  function clearTimer(id: string): void {
+    const timer = timers.get(id);
+    if (timer) clearTimeout(timer);
+    timers.delete(id);
+  }
+
+  function settleTerminated(id: string, task: BackgroundBashTask, status: BackgroundBashStatus, exitCode?: number | null, signal?: NodeJS.Signals | null): void {
+    if (task.terminal) return;
+    task.status = status;
+    task.terminal = true;
+    if (exitCode !== undefined) task.exitCode = exitCode;
+    if (signal !== undefined) task.signal = signal;
+    task.output = outputs.get(id)?.snapshot();
+    clearTimer(id);
+    processes.delete(id);
+  }
+
   return {
-    launch({ command, cwd }) {
+    launch({ command, cwd, timeoutSeconds }) {
       if (closed) throw new Error("Background Bash registry is closed.");
       const task: BackgroundBashTask = {
         id: `bash-${randomUUID()}`,
@@ -100,16 +118,18 @@ export function createBackgroundBashController(options: { spawn: BackgroundBashS
         cwd,
         onOutput: (stream, chunk) => output.append(stream, chunk),
         onExit: ({ code, signal }) => {
-          if (task.terminal) return;
-          task.status = code === 0 ? "completed" : "failed";
-          task.terminal = true;
-          task.exitCode = code;
-          task.signal = signal;
-          task.output = output.snapshot();
-          processes.delete(task.id);
+          settleTerminated(task.id, task, code === 0 ? "completed" : "failed", code, signal);
         },
       });
       processes.set(task.id, process);
+      if (typeof timeoutSeconds === "number" && timeoutSeconds > 0) {
+        const timer = setTimeout(() => {
+          process.terminate();
+          settleTerminated(task.id, task, "timed_out");
+        }, timeoutSeconds * 1000);
+        timer.unref?.();
+        timers.set(task.id, timer);
+      }
       return { ...task };
     },
     status(id) {
@@ -120,10 +140,7 @@ export function createBackgroundBashController(options: { spawn: BackgroundBashS
       const task = tasks.get(id);
       if (!task || task.terminal) return task ? { ...task } : undefined;
       processes.get(id)?.terminate();
-      task.status = "cancelled";
-      task.terminal = true;
-      task.output = outputs.get(id)?.snapshot();
-      processes.delete(id);
+      settleTerminated(id, task, "cancelled");
       return { ...task };
     },
     close() {
@@ -132,10 +149,7 @@ export function createBackgroundBashController(options: { spawn: BackgroundBashS
       for (const [id, task] of tasks) {
         if (task.terminal) continue;
         processes.get(id)?.terminate();
-        task.status = "cancelled";
-        task.terminal = true;
-        task.output = outputs.get(id)?.snapshot();
-        processes.delete(id);
+        settleTerminated(id, task, "cancelled");
       }
     },
   };
