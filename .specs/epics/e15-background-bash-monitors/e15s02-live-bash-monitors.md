@@ -5,6 +5,7 @@ While a background command runs, agents need to react to returned text as it arr
 
 ## Requirements
 - ADDED: An agent can opt in a running background Bash task to a monitor. The monitor consumes normalized completed lines from stdout and stderr, preserving per-stream attribution and monotonic sequence order.
+- ADDED: A monitor wakes the agent for each newly completed output change by default: every newline-terminated line (or final EOF-flushed line) is eligible to produce a delivery, including changes from commands such as file watchers. Delivery may combine adjacent changes only when required by configured batching or safety limits, and any omitted changes are reported explicitly.
 - ADDED: Monitor output is delivered as clearly attributed `background_bash_monitor` custom messages that participate in the parent model context. Each message identifies only the generated task ID, stream, sequence range, and bounded line payload; it never impersonates user input or a tool result.
 - ADDED: Delivery uses Pi's steering queue while the parent is active and triggers a turn when the parent is idle. It must not interrupt an in-flight tool call, bypass normal message ordering, or synthesize a user message.
 - ADDED: Messages are line-batched and subject to deterministic per-line, per-batch, total-byte, total-message, and rate limits. Coalescing, dropped lines, invalid UTF-8 replacement, and limit overflow are explicit to the agent.
@@ -20,6 +21,7 @@ While a background command runs, agents need to react to returned text as it arr
 
 ## Acceptance criteria
 - Given a monitored task writes several newline-terminated stdout and stderr lines, the parent receives ordered, stream-attributed bounded batches without polling.
+- Given a monitored task produces distinct completed output changes, each change wakes the agent or is included in the next bounded delivery, with sequence ranges and explicit overflow/coalescing metadata when limits prevent one-message-per-change delivery.
 - Given the parent is active, a monitor batch joins the steering flow before the next model request; given it is idle, the batch starts one new agent turn.
 - Given an output flood, message-rate and byte limits bound context growth and the delivered flow explicitly reports omitted data rather than silently losing it.
 - Given a task exits, is cancelled, or the session ends, monitoring stops and no later output is delivered.
