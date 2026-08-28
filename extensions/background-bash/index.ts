@@ -1,4 +1,6 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { Text } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
 import { getPublishedToolDefinitions, registerPublishedTool } from "../tool-registry/index.ts";
@@ -59,14 +61,22 @@ export function registerBackgroundBash(pi: ExtensionAPI, options: RegisterBackgr
         throw new Error("Background bash requires a non-empty command string.");
       }
       const cwd = (ctx as { cwd?: string } | undefined)?.cwd ?? process.cwd();
+      const sessionId = (ctx as { sessionId?: string; sessionManager?: { getSessionId(): string } })?.sessionId
+        ?? (ctx as { sessionManager?: { getSessionId(): string } })?.sessionManager?.getSessionId();
+      const outputDir = sessionId ? join(tmpdir(), "pi-bg-bash", sessionId) : undefined;
       const task = controller.launch({
         command: input.command,
         cwd,
         ...(typeof input.timeout === "number" ? { timeoutSeconds: input.timeout } : {}),
         ...(signal ? { signal } : {}),
+        ...(outputDir ? { outputDir } : {}),
       });
+      const paths = [
+        ...(task.stdoutPath ? [`stdout: ${task.stdoutPath}`] : []),
+        ...(task.stderrPath ? [`stderr: ${task.stderrPath}`] : []),
+      ];
       return {
-        content: [{ type: "text" as const, text: `Background task ${task.id} started (status: ${task.status}).` }],
+        content: [{ type: "text" as const, text: `Background task ${task.id} started (status: ${task.status}).${paths.length ? `\n${paths.join("\n")}` : ""}` }],
         details: task,
       };
     },
