@@ -116,10 +116,10 @@ export function registerBackgroundBash(pi: ExtensionAPI, options: RegisterBackgr
   registerPublishedTool(pi, {
     name: "bash_task",
     label: "bash_task",
-    description: "Look up or cancel a background Bash task by ID. Use action: \"status\" (default) to retrieve bounded output and exit outcome, or action: \"cancel\" to terminate an active task.",
+    description: "Look up, stop monitoring, or cancel a background Bash task by ID. Use action: \"status\" (default), \"stop_monitor\", or \"cancel\".",
     parameters: Type.Object({
       id: Type.String({ description: "The background task ID returned by a background bash launch." }),
-      action: Type.Optional(Type.String({ description: "\"status\" (default) or \"cancel\"." })),
+      action: Type.Optional(Type.String({ description: "\"status\" (default), \"stop_monitor\", or \"cancel\"." })),
     }),
     renderCall(args, theme) {
       return renderBashTaskCall({ id: args?.id, action: args?.action }, theme);
@@ -130,6 +130,17 @@ export function registerBackgroundBash(pi: ExtensionAPI, options: RegisterBackgr
     async execute(_toolCallId, params, _signal, _onUpdate, _ctx) {
       const id = params.id;
       const action = params.action ?? "status";
+      if (action === "stop_monitor") {
+        const status = controller.status(id);
+        if (!status) {
+          return { content: [{ type: "text" as const, text: `Task ${id} not found.` }], details: { found: false, id, status: "unknown" } };
+        }
+        const stopped = controller.stopMonitor(id);
+        return {
+          content: [{ type: "text" as const, text: stopped ? `Monitor for task ${id} stopped.` : `Task ${id} has no active monitor.` }],
+          details: { ...status, monitor: stopped ? "stopped" : "inactive" },
+        };
+      }
       if (action === "cancel") {
         const cancelled = controller.cancel(id);
         if (!cancelled) {

@@ -98,6 +98,34 @@ test("monitor true forwards each completed output change as an attributed agent 
   }
 });
 
+test("stop_monitor disables delivery without cancelling the background task", async () => {
+  let emit: ((stream: "stdout" | "stderr", chunk: string) => void) | undefined;
+  let terminateCalls = 0;
+  const { tools, messages, cleanup } = harness(({ onOutput }) => {
+    emit = onOutput;
+    return { terminate() { terminateCalls++; } };
+  });
+  try {
+    const bash = tools.get("bash")!;
+    const launchResult = await bash.execute("c1", { command: "watch", background: true, monitor: true }, new AbortController().signal, undefined, { cwd: "/w" });
+    const taskId = (launchResult.details as { id: string }).id;
+    const bashTask = tools.get("bash_task")!;
+    const stopResult = await bashTask.execute("c2", { id: taskId, action: "stop_monitor" }, new AbortController().signal, undefined, { cwd: "/w" });
+
+    emit?.("stdout", "ignored\n");
+    assert.equal(messages.length, 0);
+    assert.equal((stopResult.details as { monitor: string }).monitor, "stopped");
+    assert.equal((controllerStatus(stopResult.details) as string), "running");
+    assert.equal(terminateCalls, 0);
+  } finally {
+    cleanup();
+  }
+});
+
+function controllerStatus(details: unknown): unknown {
+  return (details as { status?: unknown }).status;
+}
+
 test("foreground bash calls keep their existing result shape when background mode is absent", async () => {
   let spawned = false;
   const { tools, foregroundCalls, cleanup } = harness(() => {
