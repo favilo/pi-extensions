@@ -76,6 +76,7 @@ test("router establishes and maintains only the baseline plus deliberate selecte
   const harness = routerHarness([
     { name: "read", description: "Read files", sourceInfo: { source: "builtin" } },
     { name: "bash", description: "Run commands", sourceInfo: { source: "builtin" } },
+    { name: "bash_task", description: "Manage background Bash tasks", sourceInfo: { source: "extension" } },
     { name: "edit", description: "Edit files", sourceInfo: { source: "builtin" } },
     { name: "write", description: "Write files", sourceInfo: { source: "builtin" } },
     { name: "grep", description: "Search text", sourceInfo: { source: "builtin" } },
@@ -88,7 +89,7 @@ test("router establishes and maintains only the baseline plus deliberate selecte
 
   await harness.emit("session_start");
   assert.deepEqual(harness.activeTools(), [
-    "read", "bash", "edit", "write", "grep", "find", "ls", "subagent", "find_tools", "find_skills",
+    "read", "bash", "bash_task", "edit", "write", "grep", "find", "ls", "subagent", "find_tools", "find_skills",
   ]);
 
   harness.addLateTool({ name: "mcp__late", description: "Late provider", sourceInfo: { source: "mcp" } });
@@ -110,7 +111,7 @@ test("router establishes and maintains only the baseline plus deliberate selecte
   await harness.emit("session_shutdown");
   await harness.emit("session_start");
   assert.deepEqual(harness.activeTools(), [
-    "read", "bash", "edit", "write", "grep", "find", "ls", "subagent", "find_tools", "find_skills",
+    "read", "bash", "bash_task", "edit", "write", "grep", "find", "ls", "subagent", "find_tools", "find_skills",
   ]);
 });
 
