@@ -14,6 +14,8 @@ export type BackgroundBashTask = {
   exitCode?: number | null;
   signal?: NodeJS.Signals | null;
   output?: BackgroundBashOutput;
+  startedAt?: number;
+  finishedAt?: number;
 };
 
 export type BackgroundBashProcess = {
@@ -96,6 +98,7 @@ export function createBackgroundBashController(options: { spawn: BackgroundBashS
     if (exitCode !== undefined) task.exitCode = exitCode;
     if (signal !== undefined) task.signal = signal;
     task.output = outputs.get(id)?.snapshot();
+    task.finishedAt = Date.now();
     clearTimer(id);
     processes.delete(id);
   }
@@ -110,6 +113,7 @@ export function createBackgroundBashController(options: { spawn: BackgroundBashS
         cwd,
         status: "running",
         terminal: false,
+        startedAt: Date.now(),
       };
       tasks.set(task.id, task);
       const output = createOutputCapture();
