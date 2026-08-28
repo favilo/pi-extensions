@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import { appendFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { createOutputCapture, type BackgroundBashOutput } from "./output.ts";
-import type { BackgroundBashMonitorEvent } from "./monitor.ts";
+import { createBackgroundBashMonitor, type BackgroundBashMonitor, type BackgroundBashMonitorEvent } from "./monitor.ts";
 
 export type BackgroundBashStatus = "queued" | "running" | "completed" | "failed" | "cancelled" | "timed_out";
 
@@ -88,6 +88,7 @@ export function createBackgroundBashController(options: { spawn: BackgroundBashS
   const processes = new Map<string, BackgroundBashProcess>();
   const outputs = new Map<string, ReturnType<typeof createOutputCapture>>();
   const timers = new Map<string, NodeJS.Timeout>();
+  const monitors = new Map<string, BackgroundBashMonitor>();
   let closed = false;
 
   function clearTimer(id: string): void {
@@ -105,11 +106,13 @@ export function createBackgroundBashController(options: { spawn: BackgroundBashS
     task.output = outputs.get(id)?.snapshot();
     task.finishedAt = Date.now();
     clearTimer(id);
+    monitors.get(id)?.close();
+    monitors.delete(id);
     processes.delete(id);
   }
 
   return {
-    launch({ command, cwd, timeoutSeconds, signal, outputDir }) {
+    launch({ command, cwd, timeoutSeconds, signal, outputDir, monitor, onMonitorEvent }) {
       if (closed) throw new Error("Background Bash registry is closed.");
       if (signal?.aborted) throw new Error("Background Bash launch was cancelled by the parent abort signal.");
       const task: BackgroundBashTask = {
@@ -128,11 +131,13 @@ export function createBackgroundBashController(options: { spawn: BackgroundBashS
         task.stdoutPath = join(outputDir, `${task.id}-stdout.log`);
         task.stderrPath = join(outputDir, `${task.id}-stderr.log`);
       }
+      if (monitor) monitors.set(task.id, createBackgroundBashMonitor(onMonitorEvent ?? (() => {})));
       const process = options.spawn({
         command,
         cwd,
         onOutput: (stream, chunk) => {
           output.append(stream, chunk);
+          monitors.get(task.id)?.append(stream, chunk);
           if (stream === "stdout" && task.stdoutPath) appendFileSync(task.stdoutPath, chunk);
           else if (task.stderrPath) appendFileSync(task.stderrPath, chunk);
         },
