@@ -47,6 +47,31 @@ test("a monitored task forwards completed output changes while an unmonitored ta
   unmonitored.close();
 });
 
+test("a monitored task emits one terminal completion callback after final output is flushed", () => {
+  const completions: Array<{ id: string; status: string }> = [];
+  let emit: ((stream: "stdout" | "stderr", chunk: string) => void) | undefined;
+  let exit: ((outcome: { code: number | null; signal: NodeJS.Signals | null }) => void) | undefined;
+  const controller = createBackgroundBashController({
+    spawn({ onOutput, onExit }) {
+      emit = onOutput;
+      exit = onExit;
+      return { terminate() {} };
+    },
+  });
+  const task = controller.launch({
+    command: "watch",
+    cwd: "/workspace",
+    monitor: true,
+    onMonitorComplete: (completed) => completions.push({ id: completed.id, status: completed.status }),
+  });
+
+  emit?.("stdout", "last change");
+  exit?.({ code: 0, signal: null });
+
+  assert.deepEqual(completions, [{ id: task.id, status: "completed" }]);
+  controller.close();
+});
+
 test("stopping a task monitor suppresses later output events without cancelling the task", () => {
   const events: BackgroundBashMonitorEvent[] = [];
   let emit: ((stream: "stdout" | "stderr", chunk: string) => void) | undefined;

@@ -128,12 +128,12 @@ test("cancellation terminates the entire process tree", async (t) => {
   const marker = join(dir, "grandchild-survived");
   try {
     const controller = createBackgroundBashController({ spawn: createNodeBashSpawn() });
-    const launched = controller.launch({ command: `(sleep 1; touch '${marker}') & wait`, cwd: dir });
+    const launched = controller.launch({ command: `(sleep 0.2; touch '${marker}') & wait`, cwd: dir });
 
     controller.cancel(launched.id);
     assert.equal(controller.status(launched.id)?.status, "cancelled");
 
-    await new Promise((resolve) => setTimeout(resolve, 1500));
+    await new Promise((resolve) => setTimeout(resolve, 400));
     assert.equal(existsSync(marker), false, "the detached grandchild must not outlive cancellation");
     controller.close();
   } finally {
