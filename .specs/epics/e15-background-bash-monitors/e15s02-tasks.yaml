@@ -11,12 +11,12 @@ tasks:
     status: todo
     risk: P0
   - id: 2
-    description: Implement opt-in monitor registration and a normalized line-event adapter over running background Bash task output, preserving one eligible notification event for each completed output change.
+    description: Implement monitor registration only for background Bash calls with explicit `monitor: true`, plus a normalized line-event adapter preserving one eligible notification event for each completed output change; omitted or false monitor values remain silent.
     verify: node --test extensions/background-bash/monitor.test.ts extensions/background-bash/output.test.ts
     status: todo
     risk: P0
   - id: 3
-    description: Deliver safe, bounded monitor batches as clearly attributed custom agent-flow messages, waking the agent for each completed output change when possible, with steering during active work and a triggered turn while idle.
+    description: Deliver safe, bounded monitor batches as clearly attributed custom agent-flow messages for `monitor: true` tasks, waking the agent for each completed output change when possible, with steering during active work and a triggered turn while idle.
     verify: node --test extensions/background-bash/monitor-delivery.test.ts
     status: todo
     risk: P0
