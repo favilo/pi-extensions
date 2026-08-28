@@ -9,10 +9,10 @@ import type { BackgroundBashSpawn } from "./lifecycle.ts";
 type ToolResultLike = { content: Array<{ type: string; text?: string }>; details?: unknown; isError?: boolean };
 type CapturedTool = {
   name: string;
-  execute(toolCallId: string, params: Record<string, unknown>, signal: AbortSignal, onUpdate?: unknown, ctx?: { cwd: string }): Promise<ToolResultLike>;
+  execute(toolCallId: string, params: Record<string, unknown>, signal: AbortSignal, onUpdate?: unknown, ctx?: { cwd: string; isIdle?: () => boolean }): Promise<ToolResultLike>;
 };
 
-function harness(spawn: BackgroundBashSpawn) {
+function harness(spawn: BackgroundBashSpawn, idle = true) {
   const tools = new Map<string, CapturedTool>();
   const handlers = new Map<string, (...args: never[]) => unknown>();
   const foregroundCalls: unknown[] = [];
@@ -26,6 +26,9 @@ function harness(spawn: BackgroundBashSpawn) {
     },
     sendMessage(message: unknown, options: unknown) {
       messages.push({ message, options });
+    },
+    isIdle() {
+      return idle;
     },
   } as unknown as ExtensionAPI;
 
@@ -93,6 +96,22 @@ test("monitor true forwards each completed output change as an attributed agent 
       },
       options: { deliverAs: "steer", triggerTurn: true },
     });
+  } finally {
+    cleanup();
+  }
+});
+
+test("active sessions receive monitor messages as steering without triggering a turn", async () => {
+  let emit: ((stream: "stdout" | "stderr", chunk: string) => void) | undefined;
+  const { tools, messages, cleanup } = harness(({ onOutput }) => {
+    emit = onOutput;
+    return { terminate() {} };
+  }, false);
+  try {
+    const bash = tools.get("bash")!;
+    await bash.execute("c1", { command: "watch", background: true, monitor: true }, new AbortController().signal, undefined, { cwd: "/w", isIdle: () => false });
+    emit?.("stdout", "active\n");
+    assert.deepEqual(messages[0]?.options, { deliverAs: "steer", triggerTurn: false });
   } finally {
     cleanup();
   }

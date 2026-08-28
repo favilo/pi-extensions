@@ -42,6 +42,11 @@ function withoutBackground<T>(params: T): T {
   return rest as T;
 }
 
+function monitorDeliveryOptions(ctx: unknown): { deliverAs: "steer"; triggerTurn: boolean } {
+  const isIdle = (ctx as { isIdle?: () => boolean } | undefined)?.isIdle;
+  return { deliverAs: "steer", triggerTurn: typeof isIdle !== "function" ? true : isIdle() };
+}
+
 /** Registers background-mode Bash launch plus task lookup/cancel tooling. */
 export function registerBackgroundBash(pi: ExtensionAPI, options: RegisterBackgroundBashOptions = {}): void {
   const controller = createBackgroundBashController({ spawn: options.spawn ?? createNodeBashSpawn() });
@@ -109,7 +114,7 @@ export function registerBackgroundBash(pi: ExtensionAPI, options: RegisterBackgr
                       content: `task ${taskId} monitor overflow: further output omitted`,
                       display: true,
                       details: { taskId, overflow: true, omitted: 1 },
-                    }, { deliverAs: "steer", triggerTurn: true });
+                    }, monitorDeliveryOptions(ctx));
                   }
                   return;
                 }
@@ -127,7 +132,7 @@ export function registerBackgroundBash(pi: ExtensionAPI, options: RegisterBackgr
                     toSequence: event.sequence,
                     lines: [event.line],
                   },
-                }, { deliverAs: "steer", triggerTurn: true });
+                }, monitorDeliveryOptions(ctx));
               },
               onMonitorComplete: (completed: BackgroundBashTask) => {
                 pi.sendMessage({
@@ -142,7 +147,7 @@ export function registerBackgroundBash(pi: ExtensionAPI, options: RegisterBackgr
                     signal: completed.signal,
                     omitted: monitorOmitted,
                   },
-                }, { deliverAs: "steer", triggerTurn: true });
+                }, monitorDeliveryOptions(ctx));
               },
             }
           : {}),
