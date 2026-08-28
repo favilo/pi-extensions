@@ -1,6 +1,6 @@
 import "../test-support/forbid-fetch.ts";
 import assert from "node:assert/strict";
-import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -54,6 +54,34 @@ test("records a stable terminal outcome after the owned command exits", () => {
   assert.equal(completed?.output?.stdout.text, "");
   assert.equal(typeof completed?.finishedAt, "number", "terminal status records a finish timestamp");
   assert.ok(completed!.finishedAt! >= launched.startedAt!);
+});
+
+test("writes stdout and stderr to temp files when an output directory is provided", () => {
+  let emit: ((stream: "stdout" | "stderr", chunk: string) => void) | undefined;
+  let exit: ((outcome: { code: number | null; signal: NodeJS.Signals | null }) => void) | undefined;
+  const dir = mkdtempSync(join(tmpdir(), "bg-bash-out-"));
+  try {
+    const controller = createBackgroundBashController({
+      spawn({ onOutput, onExit }) {
+        emit = onOutput;
+        exit = onExit;
+        return { terminate() {} };
+    },
+    });
+    const launched = controller.launch({ command: "run", cwd: "/workspace", outputDir: dir });
+    emit?.("stdout", "hello\n");
+    emit?.("stderr", "world\n");
+    exit?.({ code: 0, signal: null });
+
+    const settled = controller.status(launched.id);
+    assert.ok(settled?.stdoutPath, "terminal status includes a stdout file path");
+    assert.ok(settled?.stderrPath, "terminal status includes a stderr file path");
+    assert.equal(readFileSync(settled!.stdoutPath!, "utf8"), "hello\n");
+    assert.equal(readFileSync(settled!.stderrPath!, "utf8"), "world\n");
+    controller.close();
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 test("cancellation terminates the owned process and seals its terminal status", () => {
