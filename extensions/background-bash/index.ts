@@ -1,7 +1,9 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { Text } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
 import { getPublishedToolDefinitions, registerPublishedTool } from "../tool-registry/index.ts";
-import { createBackgroundBashController, createNodeBashSpawn, type BackgroundBashSpawn } from "./lifecycle.ts";
+import { createBackgroundBashController, createNodeBashSpawn, type BackgroundBashSpawn, type BackgroundBashTask } from "./lifecycle.ts";
+import { renderBackgroundBashLaunchCall, renderBackgroundBashLaunchResult, renderBashTaskCall, renderBashTaskResult } from "./renderer.ts";
 
 export type RegisterBackgroundBashOptions = {
   spawn?: BackgroundBashSpawn;
@@ -32,9 +34,22 @@ export function registerBackgroundBash(pi: ExtensionAPI, options: RegisterBackgr
   const bash = getPublishedToolDefinitions().find((tool) => tool.name === "bash");
   if (!bash) throw new Error("registerBackgroundBash requires the published bash tool definition.");
 
+  function isBackgroundTaskDetails(details: unknown): details is BackgroundBashTask {
+    return typeof details === "object" && details !== null && "status" in details && "id" in details && "command" in details;
+  }
+
   registerPublishedTool(pi, {
     ...bash,
     parameters: withBackgroundParameter(bash.parameters),
+    renderCall(args, theme, context) {
+      const a = args as { background?: boolean; command?: string };
+      if (a?.background === true) return renderBackgroundBashLaunchCall({ command: a.command }, theme);
+      return bash.renderCall?.(args, theme, context) ?? new Text("", 0, 0);
+    },
+    renderResult(result, options, theme, context) {
+      if (isBackgroundTaskDetails(result.details)) return renderBackgroundBashLaunchResult(result.details, options, theme);
+      return bash.renderResult?.(result, options, theme, context) ?? new Text("", 0, 0);
+    },
     async execute(toolCallId, params, signal, onUpdate, ctx) {
       const input = params as { command?: unknown; background?: unknown; timeout?: unknown };
       if (input?.background !== true) {
@@ -65,6 +80,12 @@ export function registerBackgroundBash(pi: ExtensionAPI, options: RegisterBackgr
       id: Type.String({ description: "The background task ID returned by a background bash launch." }),
       action: Type.Optional(Type.String({ description: "\"status\" (default) or \"cancel\"." })),
     }),
+    renderCall(args, theme) {
+      return renderBashTaskCall({ id: args?.id, action: args?.action }, theme);
+    },
+    renderResult(result, options, theme) {
+      return renderBashTaskResult(result.details as never, options, theme);
+    },
     async execute(_toolCallId, params, _signal, _onUpdate, _ctx) {
       const id = params.id;
       const action = params.action ?? "status";
@@ -83,7 +104,9 @@ export function registerBackgroundBash(pi: ExtensionAPI, options: RegisterBackgr
     },
   });
 
-  pi.on("session_shutdown", () => {
-    controller.close();
-  });
+  if (typeof pi.on === "function") {
+    pi.on("session_shutdown", () => {
+      controller.close();
+    });
+  }
 }
