@@ -63,15 +63,39 @@ export function renderBackgroundBashLaunchResult(details: BackgroundBashTask, op
   return new Text(text, 0, 0);
 }
 
+type TaskOutputDetails = {
+  found: true;
+  id: string;
+  output: Record<string, { lines: string[]; offset: number; limit: number; nextOffset: number; totalLines: number }>;
+};
+
+type TaskListDetails = { tasks: BackgroundBashTask[] };
+
 /** Compact render for a bash_task lookup or cancel call row. */
 export function renderBashTaskCall(args: { id?: string; action?: string }, theme: Theme): Text {
-  const id = args.id ?? "";
+  const id = args.id;
   const action = args.action ?? "status";
-  return new Text(`${theme.fg("toolTitle", theme.bold("bash_task "))}${theme.fg("accent", id)} ${theme.fg("dim", action)}`, 0, 0);
+  const target = id ? ` ${theme.fg("accent", id)}` : "";
+  return new Text(`${theme.fg("toolTitle", theme.bold("bash_task"))}${target} ${theme.fg("dim", action)}`, 0, 0);
 }
 
-/** Compact render for a bash_task lookup or cancel result row. */
-export function renderBashTaskResult(details: BackgroundBashTask | { found: false; id: string; status: string }, options: { expanded: boolean }, theme: Theme): Text {
+/** Compact render for a bash_task lookup, list, output, or cancel result row. */
+export function renderBashTaskResult(
+  details: BackgroundBashTask | { found: false; id: string; status: string } | TaskOutputDetails | TaskListDetails,
+  options: { expanded: boolean },
+  theme: Theme,
+): Text {
+  if ("tasks" in details) {
+    const rows = details.tasks.map((task) => `${theme.fg(statusColor(task.status), task.status)}${theme.fg("dim", ` ${task.id}`)}`);
+    return new Text(`${theme.fg("accent", `tasks (${details.tasks.length})`)}${rows.length ? `\n${rows.join("\n")}` : ""}`, 0, 0);
+  }
+  if ("output" in details && "found" in details && details.found === true) {
+    const rows = Object.entries(details.output).flatMap(([stream, value]) => [
+      theme.fg("dim", `${stream} [${value.offset}..${value.nextOffset}):`),
+      ...value.lines.map((line) => theme.fg("dim", line)),
+    ]);
+    return new Text(`${theme.fg("accent", `output ${details.id}`)}${rows.length ? `\n${rows.join("\n")}` : ""}`, 0, 0);
+  }
   if ("found" in details && details.found === false) {
     return new Text(theme.fg("error", `Task ${details.id} not found.`), 0, 0);
   }

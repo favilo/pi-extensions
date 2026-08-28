@@ -99,7 +99,7 @@ test("bash_task list and output results render useful summaries", () => {
 
 test("bash_task list calls omit an empty task ID", () => {
   const text = renderBashTaskCall({ action: "list" }, theme).render(120).join("\n");
-  assert.equal(text, "bash_task list");
+  assert.equal(text.trimEnd(), "bash_task list");
 });
 
 test("bash_task result shows task status and not-found for unknown IDs", () => {
