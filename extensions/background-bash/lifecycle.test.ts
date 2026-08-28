@@ -44,6 +44,7 @@ test("records a stable terminal outcome after the owned command exits", () => {
   });
 
   const launched = controller.launch({ command: "printf done", cwd: "/workspace" });
+  assert.equal(typeof launched.startedAt, "number", "launch records a start timestamp");
   exit?.({ code: 0, signal: null });
 
   const completed = controller.status(launched.id);
@@ -51,6 +52,8 @@ test("records a stable terminal outcome after the owned command exits", () => {
   assert.equal(completed?.terminal, true);
   assert.equal(completed?.exitCode, 0);
   assert.equal(completed?.output?.stdout.text, "");
+  assert.equal(typeof completed?.finishedAt, "number", "terminal status records a finish timestamp");
+  assert.ok(completed!.finishedAt! >= launched.startedAt!);
 });
 
 test("cancellation terminates the owned process and seals its terminal status", () => {
