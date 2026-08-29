@@ -1,7 +1,7 @@
 import "../test-support/forbid-fetch.ts";
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { parseBashCommand } from "./bash-parser-spike.ts";
+import { parseBashCommand } from "./bash-parser.ts";
 
 test("parses a single simple command into one subcommand", () => {
   const result = parseBashCommand("jj status");
