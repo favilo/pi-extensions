@@ -26,6 +26,7 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import { Text } from "@earendil-works/pi-tui";
 import { registerPublishedTool } from "../tool-registry/index.ts";
+import { registerBackgroundBash } from "../background-bash/index.ts";
 import { steeringAnnotation, toolErrorText, toolOutputTexts } from "./result.ts";
 
 const reasonParameterSchema = {
@@ -391,4 +392,6 @@ export default function (pi: ExtensionAPI) {
       return withSteering(theme.fg("success", "Written"), result, theme);
     },
   });
+
+  registerBackgroundBash(pi);
 }

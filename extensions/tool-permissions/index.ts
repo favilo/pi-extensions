@@ -1,6 +1,6 @@
 // story: e03s01
 import { CONFIG_DIR_NAME, generateDiffString, getAgentDir, isToolCallEventType, renderDiff, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { CURSOR_MARKER, matchesKey, visibleWidth, wrapTextWithAnsi, type Component, type Focusable } from "@earendil-works/pi-tui";
+import { CURSOR_MARKER, matchesKey, Text, visibleWidth, wrapTextWithAnsi, type Component, type Focusable } from "@earendil-works/pi-tui";
 import ignore from "ignore";
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -97,6 +97,17 @@ type AuditEntry = {
   steering?: string;
 };
 
+type PermissionPreview = {
+  title: string;
+  body: string;
+  stickyHeader?: string;
+  toolCallId?: string;
+};
+
+type PermissionPreviewPublisher = {
+  appendEntry?: ExtensionAPI["appendEntry"];
+};
+
 type AllowPatternOption = {
   toolName: string;
   suggestedRule: PermissionRule;
@@ -115,6 +126,12 @@ const auditLogger = createAuditLogger();
 
 /** Steering text captured at allow+steer decision time, keyed by toolCallId, annotated onto the invocation-bound tool result. */
 const pendingSteering = new Map<string, string>();
+/** Previews published during a prompt; re-appended after the tool result for bottom-of-transcript visibility. */
+const promptedPreviews = new Map<string, PermissionPreview>();
+/** Tool calls whose permission prompt is still waiting; their preview entries ignore the collapsed state. */
+const pendingPreviewReviews = new Set<string>();
+/** Explicit Ctrl+O expansion toggles made while a review prompt is open. Cleared when the prompt settles. */
+const previewReviewOverrides = new Map<string, boolean>();
 
 type PermissionEditorTarget = { scope: "user" | "local"; path: string } | { error: string };
 
@@ -350,46 +367,47 @@ function truncateDiff(diff: string, maxLines = 10000): string {
   return [...lines.slice(0, maxLines), `… diff truncated, ${lines.length - maxLines} more lines`].join("\n");
 }
 
-function diffPromptBody(path: string, oldContent: string, newContent: string, previewError?: string): { body: string; lineCount: number } {
+function diffPromptBody(path: string, oldContent: string, newContent: string, previewError?: string): { body: string; preview: string; lineCount: number } {
   if (previewError) {
     const body = `Path: ${path}\n\nDiff preview unavailable: ${previewError}\n\nReview the tool request carefully before allowing it.`;
-    return { body, lineCount: body.split("\n").length };
+    return { body, preview: body, lineCount: body.split("\n").length };
   }
 
   if (oldContent === newContent) {
     const body = `Path: ${path}\n\nNo content changes detected.`;
-    return { body, lineCount: body.split("\n").length };
+    return { body, preview: body, lineCount: body.split("\n").length };
   }
 
   const { diff } = generateDiffString(oldContent, newContent, 3);
   const lineCount = diff.split("\n").length;
   if (lineCount > 1000) {
     const body = `Path: ${path}\n\n[Diff exceeds 1000 lines (${lineCount} lines). Automatically denied.]`;
-    return { body, lineCount };
+    return { body, preview: body, lineCount };
   }
 
-  const body = `Path: ${path}\n\n${renderDiff(truncateDiff(diff, 1000), { filePath: path })}`;
-  return { body, lineCount: body.split("\n").length };
+  const preview = renderDiff(truncateDiff(diff, 1000), { filePath: path });
+  const body = `Path: ${path}\n\n${preview}`;
+  return { body, preview, lineCount: body.split("\n").length };
 }
 
-function buildFileEditPrompt(toolName: string, input: unknown, cwd: string): { title: string; body: string; lineCount: number } {
+function buildFileEditPrompt(toolName: string, input: unknown, cwd: string): { title: string; body: string; preview: string; lineCount: number } {
   if (toolName === "write") {
     const { path, content } = input as WriteInput;
     if (typeof path !== "string" || typeof content !== "string") {
       const body = `Invalid write arguments.\n\n${compact(input)}`;
-      return { title: "Allow write?", body, lineCount: body.split("\n").length };
+      return { title: "Allow write?", body, preview: body, lineCount: body.split("\n").length };
     }
 
     const absolutePath = resolve(cwd, path);
     const oldContent = readTextIfPresent(absolutePath);
     const prompt = diffPromptBody(path, oldContent, content);
-    return { title: `Allow write to ${path}?`, body: prompt.body, lineCount: prompt.lineCount };
+    return { title: `Allow write to ${path}?`, body: prompt.body, preview: prompt.preview, lineCount: prompt.lineCount };
   }
 
   const { path, edits } = input as EditInput;
   if (typeof path !== "string" || !Array.isArray(edits)) {
     const body = `Invalid edit arguments.\n\n${compact(input)}`;
-    return { title: "Allow edit?", body, lineCount: body.split("\n").length };
+    return { title: "Allow edit?", body, preview: body, lineCount: body.split("\n").length };
   }
 
   const absolutePath = resolve(cwd, path);
@@ -399,10 +417,10 @@ function buildFileEditPrompt(toolName: string, input: unknown, cwd: string): { t
   try {
     const newContent = applyEditPreview(oldContent, normalizedEdits);
     const prompt = diffPromptBody(path, oldContent, newContent);
-    return { title: `Allow edit to ${path}?`, body: prompt.body, lineCount: prompt.lineCount };
+    return { title: `Allow edit to ${path}?`, body: prompt.body, preview: prompt.preview, lineCount: prompt.lineCount };
   } catch (error) {
     const prompt = diffPromptBody(path, oldContent, oldContent, error instanceof Error ? error.message : String(error));
-    return { title: `Allow edit to ${path}?`, body: prompt.body, lineCount: prompt.lineCount };
+    return { title: `Allow edit to ${path}?`, body: prompt.body, preview: prompt.preview, lineCount: prompt.lineCount };
   }
 }
 
@@ -494,7 +512,7 @@ async function editPermissionsInExternalEditor(ctx: PermissionContext, target: {
 }
 
 async function presentScrollablePermission(
-  pi: Pick<ExtensionAPI, "sendUserMessage">,
+  pi: PermissionPreviewPublisher,
   ctx: PermissionContext,
   title: string,
   body: string,
@@ -502,6 +520,7 @@ async function presentScrollablePermission(
   stickyHeader: string | undefined,
   signal: AbortSignal,
   toolCallId: string | undefined,
+  previewText?: string,
 ): Promise<PermissionResult> {
   if (ctx.mode !== "tui" || !ctx.ui.custom) {
     const bodyWithHeader = stickyHeader ? `${stickyHeader}\n\n${body}` : body;
@@ -519,9 +538,20 @@ async function presentScrollablePermission(
       steering: steeringReason,
     };
   }
-  const pageSize = 28;
-  let offset = 0;
-  let scrollableLineCount = rawLines.length;
+  const publishedPreview = typeof pi.appendEntry === "function";
+  const preview: PermissionPreview = {
+    title,
+    body: previewText ?? body,
+    ...(stickyHeader ? { stickyHeader } : {}),
+    ...(toolCallId ? { toolCallId } : {}),
+  };
+  pi.appendEntry?.<PermissionPreview>("permission-preview", preview);
+
+  if (publishedPreview && toolCallId) {
+    promptedPreviews.set(toolCallId, preview);
+    pendingPreviewReviews.add(toolCallId);
+  }
+
   let steeringMode = false;
   let steeringText = "";
   const projectPath = allowPattern
@@ -569,6 +599,10 @@ async function presentScrollablePermission(
       if (settled) return;
       settled = true;
       signal.removeEventListener("abort", onAbort);
+      if (toolCallId) {
+        pendingPreviewReviews.delete(toolCallId);
+        previewReviewOverrides.delete(toolCallId);
+      }
       finish(value);
     };
     signal.addEventListener("abort", onAbort, { once: true });
@@ -588,7 +622,7 @@ async function presentScrollablePermission(
       const continuationPrefix = theme.fg("muted", "… ");
       const contentWidth = Math.max(1, width - 2);
 
-      const wrappedBody = rawLines.flatMap((line) => wrapWithContinuation(line, contentWidth, continuationPrefix));
+      const wrappedBody = publishedPreview ? [] : rawLines.flatMap((line) => wrapWithContinuation(line, contentWidth, continuationPrefix));
       const allowHint = allowPattern ? " • Ctrl+A allow+save project • Ctrl+Shift+A allow+save user • Ctrl+E edit pattern" : "";
       const steeringAllowHint = allowPattern ? " • Ctrl+A project-save+steer • Ctrl+Shift+A user-save+steer" : "";
       const navigationHint = steeringMode
@@ -608,9 +642,11 @@ async function presentScrollablePermission(
       return [
         ...wrap(theme.fg("accent", theme.bold(title))),
         ...(stickyHeader ? wrap(theme.fg("muted", stickyHeader)) : []),
-        ...(allowPattern ? wrap(theme.fg("muted", `Rule: ${JSON.stringify(allowPattern.suggestedRule)}`)) : []),
+        ...(allowPattern ? wrap(theme.fg("muted", "Rule: save the reviewed exact match.")) : []),
         "",
-        ...wrappedBody,
+        ...(publishedPreview
+          ? wrap(theme.fg("muted", "Review permission preview above in terminal scrollback."))
+          : wrappedBody),
         "",
         ...(steeringMode
           ? [
@@ -623,6 +659,16 @@ async function presentScrollablePermission(
       ];
     },
     handleInput(data: string): void {
+      // While the review is pending, honor the app-level expand toggle for the preview entry.
+      const expandKey = typeof keybindings?.matches === "function"
+        ? Boolean(keybindings.matches(data, "app.tools.expand"))
+        : matchesKey(data, "ctrl+o");
+      if (expandKey && toolCallId && pendingPreviewReviews.has(toolCallId)) {
+        const current = previewReviewOverrides.get(toolCallId) ?? true;
+        previewReviewOverrides.set(toolCallId, !current);
+        tui.requestRender();
+        return;
+      }
       steeringEditor.focused = component.focused;
       const steeringMessage = steeringEditor.getValue().trim();
 
@@ -719,13 +765,14 @@ function permissionParentSessionId(ctx: PermissionContext): string {
 }
 
 async function askScrollablePermission(
-  pi: Pick<ExtensionAPI, "sendUserMessage">,
+  pi: PermissionPreviewPublisher,
   ctx: PermissionContext,
   request: Pick<ToolRequest, "actor" | "toolName" | "cwd" | "input" | "toolCallId">,
   title: string,
   body: string,
   allowPattern?: AllowPatternOption,
   stickyHeader?: string,
+  previewText?: string,
 ): Promise<PermissionResult> {
   const identity = createPermissionPromptIdentity(request);
   logSubagentDebug("permission-queue-enqueue", { identity });
@@ -736,7 +783,7 @@ async function askScrollablePermission(
     present: async (signal) => {
       logSubagentDebug("permission-queue-present", { identity });
       try {
-        const result = await presentScrollablePermission(pi, ctx, title, body, allowPattern, stickyHeader, signal, request.toolCallId);
+        const result = await presentScrollablePermission(pi, ctx, title, body, allowPattern, stickyHeader, signal, request.toolCallId, previewText);
         logSubagentDebug("permission-queue-settle", { identity, decision: result.decision });
         return result;
       } catch (error) {
@@ -748,7 +795,7 @@ async function askScrollablePermission(
 }
 
 export async function promptToolPermissionRequest(
-  pi: Pick<ExtensionAPI, "sendUserMessage">,
+  pi: Pick<ExtensionAPI, "sendUserMessage"> & PermissionPreviewPublisher,
   ctx: PermissionContext,
   request: ToolRequest,
 ): Promise<"allow" | "deny" | "cancel"> {
@@ -1059,6 +1106,7 @@ async function handleFileEditPermission(toolName: string, input: FileEditInput, 
     reasonPrefix(input) + prompt.body,
     { toolName, suggestedRule: { path: exactPattern(absolutePath) }, subject: absolutePath },
     `Path: ${requestedPath || absolutePath}`,
+    prompt.preview,
   );
 
   audit({ tool: toolName, decision: result.decision, cwd: ctx.cwd, path: absolutePath, ...permissionResultAudit(result) });
@@ -1090,6 +1138,8 @@ async function handleBashPermission(input: BashInput, ctx: PermissionContext, pi
     "Allow bash command?",
     reasonPrefix(input) + `pi wants to run this shell command.\n\n${compact(command)}\n\nRules are stored under permissions.bash in ${getUserPermissionsPath()}.`,
     { toolName: "bash", suggestedRule: { command: exactPattern(command) }, subject: command },
+    undefined,
+    compact(command),
   );
 
   audit({ tool: "bash", decision: result.decision, cwd: ctx.cwd, command, ...permissionResultAudit(result) });
@@ -1202,6 +1252,33 @@ async function handleUnknownToolPermission(toolName: string, input: unknown, ctx
 }
 
 export default function toolPermissionPolicy(pi: ExtensionAPI) {
+  if (typeof (pi as Partial<ExtensionAPI>).registerEntryRenderer === "function") {
+    pi.registerEntryRenderer<PermissionPreview>("permission-preview", (entry, options, theme) => {
+      const preview = entry.data;
+      if (!preview || typeof preview.title !== "string" || typeof preview.body !== "string") return undefined;
+      const capturedExpanded = options.expanded;
+      return {
+        render(width: number): string[] {
+          const id = typeof preview.toolCallId === "string" ? preview.toolCallId : undefined;
+          const override = id ? previewReviewOverrides.get(id) : undefined;
+          const pending = id !== undefined && pendingPreviewReviews.has(id);
+          const expanded = override ?? (pending ? true : capturedExpanded);
+          const header = theme.fg("accent", theme.bold(preview.title));
+          const stickyHeader = typeof preview.stickyHeader === "string" ? `\n${theme.fg("muted", preview.stickyHeader)}` : "";
+          if (pending && expanded) {
+            // Review phase: the prompt frame below already carries title, path, and hints.
+            return new Text(preview.body, 0, 0).render(width);
+          }
+          const content = expanded
+            ? `${header}${stickyHeader}\n\n${preview.body}`
+            : `${header}${stickyHeader}\n\n${theme.fg("dim", `${preview.body.split("\n").length} lines — Ctrl+O to expand`)}`;
+          return new Text(content, 0, 0).render(width);
+        },
+        invalidate(): void {},
+      };
+    });
+  }
+
   pi.on("session_start", (_event, ctx) => {
     if (process.env.PI_SUBAGENT_DEBUG === "1" && ctx.hasUI) {
       ctx.ui.notify(`Subagent debug log: ${subagentDebugPath()}`, "info");
@@ -1227,10 +1304,18 @@ export default function toolPermissionPolicy(pi: ExtensionAPI) {
 
   pi.on("session_shutdown", (_event, ctx) => {
     pendingSteering.clear();
+    promptedPreviews.clear();
+    pendingPreviewReviews.clear();
+    previewReviewOverrides.clear();
     closePermissionPromptQueue(permissionParentSessionId(ctx));
   });
 
   pi.on("tool_result", (event) => {
+    const promptPreview = promptedPreviews.get(event.toolCallId);
+    if (promptPreview) {
+      promptedPreviews.delete(event.toolCallId);
+      pi.appendEntry<PermissionPreview>("permission-preview", promptPreview);
+    }
     const steering = pendingSteering.get(event.toolCallId);
     if (!steering) return undefined;
     pendingSteering.delete(event.toolCallId);

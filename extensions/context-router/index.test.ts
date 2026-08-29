@@ -76,6 +76,7 @@ test("router establishes and maintains only the baseline plus deliberate selecte
   const harness = routerHarness([
     { name: "read", description: "Read files", sourceInfo: { source: "builtin" } },
     { name: "bash", description: "Run commands", sourceInfo: { source: "builtin" } },
+    { name: "bash_task", description: "Manage background Bash tasks", sourceInfo: { source: "extension" } },
     { name: "edit", description: "Edit files", sourceInfo: { source: "builtin" } },
     { name: "write", description: "Write files", sourceInfo: { source: "builtin" } },
     { name: "grep", description: "Search text", sourceInfo: { source: "builtin" } },
@@ -88,7 +89,7 @@ test("router establishes and maintains only the baseline plus deliberate selecte
 
   await harness.emit("session_start");
   assert.deepEqual(harness.activeTools(), [
-    "read", "bash", "edit", "write", "grep", "find", "ls", "subagent", "find_tools", "find_skills",
+    "read", "bash", "bash_task", "edit", "write", "grep", "find", "ls", "subagent", "find_tools", "find_skills",
   ]);
 
   harness.addLateTool({ name: "mcp__late", description: "Late provider", sourceInfo: { source: "mcp" } });
@@ -97,6 +98,10 @@ test("router establishes and maintains only the baseline plus deliberate selecte
 
   const finder = harness.finder();
   assert.ok(finder?.execute);
+  await finder.execute("find-background", { query: "background Bash", select: ["bash_task"] }, new AbortController().signal, undefined, {});
+  await harness.emit("turn_start");
+  assert.equal(harness.activeTools().filter((name) => name === "bash_task").length, 1);
+
   const result = await finder.execute("find-deploy", { query: "deploy", select: ["mcp__deploy"] }, new AbortController().signal, undefined, {});
   assert.deepEqual(result.details, { matches: ["mcp__deploy"], added: ["mcp__deploy"] });
   assert.ok(harness.activeTools().includes("mcp__deploy"));
@@ -110,7 +115,7 @@ test("router establishes and maintains only the baseline plus deliberate selecte
   await harness.emit("session_shutdown");
   await harness.emit("session_start");
   assert.deepEqual(harness.activeTools(), [
-    "read", "bash", "edit", "write", "grep", "find", "ls", "subagent", "find_tools", "find_skills",
+    "read", "bash", "bash_task", "edit", "write", "grep", "find", "ls", "subagent", "find_tools", "find_skills",
   ]);
 });
 

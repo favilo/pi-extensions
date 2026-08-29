@@ -1,6 +1,6 @@
 story_id: e15s01
 title: Run permission-enforced Bash commands in the background
-status: todo
+status: passing
 bcps: 4
 delta: ADDED
 spec: e15s01-background-bash-lifecycle.md
@@ -8,20 +8,20 @@ tasks:
   - id: 1
     description: Add behavioral contracts for launch, stable task IDs, immediate foreground return, status/result lookup, cancellation, and cleanup.
     verify: node --test extensions/background-bash/lifecycle.test.ts
-    status: todo
+    status: passing
     risk: P0
   - id: 2
     description: Implement a parent-session-owned background Bash registry and a permission-enforced launch path that returns before process settlement.
     verify: node --test extensions/background-bash/lifecycle.test.ts
-    status: todo
+    status: passing
     risk: P0
   - id: 3
     description: Implement bounded stdout/stderr capture, explicit status/result retrieval, process-tree cancellation, and cleanup on abort, reload, session replacement, and exit.
     verify: node --test extensions/background-bash/lifecycle.test.ts extensions/background-bash/output.test.ts
-    status: todo
+    status: passing
     risk: P0
   - id: 4
     description: Verify permission parity, renderer behavior, and the complete package suite.
     verify: node --test extensions/background-bash/permission-boundary.test.ts extensions/background-bash/renderer.test.ts && npm run check
-    status: todo
+    status: passing
     risk: P0

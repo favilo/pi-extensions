@@ -12,6 +12,7 @@ import { buildAvailabilityPrompt, sanitizeSkillsPrompt, type SanitizerOutcome } 
 const BASELINE_TOOLS = [
   "read",
   "bash",
+  "bash_task",
   "edit",
   "write",
   "grep",
@@ -38,8 +39,10 @@ function applySessionToolSet(pi: ExtensionAPI, selected: Set<string>): void {
   for (const name of retainedSelections) selected.add(name);
 
   pi.setActiveTools([
-    ...BASELINE_TOOLS.filter((name) => registered.has(name)),
-    ...retainedSelections,
+    ...new Set([
+      ...BASELINE_TOOLS.filter((name) => registered.has(name)),
+      ...retainedSelections,
+    ]),
   ]);
 }
 
@@ -105,7 +108,7 @@ export default function contextRouter(pi: ExtensionAPI): void {
   pi.registerTool({
     name: "find_tools",
     label: "Find tools",
-    description: "Find registered parent tools by capability.",
+    description: "Find registered parent tools by capability. Use select to activate matching tools for the current session.",
     parameters: Type.Object({
       query: Type.String({ minLength: 1, maxLength: 160 }),
       select: Type.Optional(Type.Array(Type.String({ maxLength: 80 }), { maxItems: 8 })),
@@ -139,7 +142,7 @@ export default function contextRouter(pi: ExtensionAPI): void {
   pi.registerTool({
     name: "find_skills",
     label: "Find skills",
-    description: "Find loaded skills by capability.",
+    description: "Find loaded skills by capability. Use read to inspect a skill; use find_tools to discover and activate tools.",
     parameters: Type.Object({ query: Type.String({ minLength: 1, maxLength: 160 }) }),
     async execute(_toolCallId, input: FindSkillsInput) {
       const matches = projectSkillCatalog(cachedSkills, input.query);
