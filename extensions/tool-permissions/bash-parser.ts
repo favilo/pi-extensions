@@ -5,7 +5,7 @@
 // substitution, loops, functions, conditionals) is marked unsupported —
 // fail-closed — so the permission boundary never auto-allows uncertain syntax.
 
-import { parse, type ParsedScript, type Node, type Command, type Word } from "unbash";
+import { parse, type ParsedScript, type Node, type Command, type Word, type WordPart } from "unbash";
 
 export type ParsedSubcommand = {
   /** Normalized text for permission rule matching (e.g., "jj status") */
@@ -29,14 +29,23 @@ const UNSUPPORTED_TYPES = new Set([
   "ArithmeticCommand",
 ]);
 
-/** Convert a Word to its display string (uses .text which preserves original quoting). */
-function wordText(word: Word): string {
-  return word.text;
-}
-
 /** Convert a Word to its evaluated value (unquoted). */
 function wordValue(word: Word): string {
   return word.value;
+}
+
+/** Word part types that execute or expand dynamically — fail-closed. */
+const UNSUPPORTED_PART_TYPES = new Set([
+  "CommandExpansion",
+  "ProcessSubstitution",
+  "ArithmeticExpansion",
+  "ParameterExpansion",
+]);
+
+/** Check whether a word contains any dynamic expansion parts. */
+function hasUnsupportedParts(word: Word): boolean {
+  if (!word.parts) return false;
+  return word.parts.some((part: WordPart) => UNSUPPORTED_PART_TYPES.has(part.type));
 }
 
 /** Extract subcommands from a single Command node. */
@@ -84,6 +93,16 @@ function extractSubcommands(
     }
 
     case "Command": {
+      // Fail closed if any word (name or args) contains dynamic expansion.
+      const allWords = [node.name, ...node.suffix].filter((w): w is Word => w !== undefined);
+      const unsafeWord = allWords.find(hasUnsupportedParts);
+      if (unsafeWord) {
+        return {
+          ok: false,
+          detail: `unsupported syntax: dynamic expansion in word "${unsafeWord.text}"`,
+        };
+      }
+
       // Check for bash -c 'payload' — recursively parse the payload.
       if (node.name && wordValue(node.name) === "bash") {
         const dashC = node.suffix.find((w) => wordValue(w) === "-c");

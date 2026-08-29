@@ -7,7 +7,7 @@ stories:
   - id: e07s01
     title: Spike Bash parsing and subcommand permission contracts
     bcps: 3
-    status: todo
+    status: passing
     delta: ADDED
     spec: e07s01-bash-parser-spike.md
     tasks: e07s01-tasks.yaml

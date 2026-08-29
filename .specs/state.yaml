@@ -1,7 +1,7 @@
 active_flow: build_epic
 active_epic_id: e07
-active_story_id: e07s01
-active_story: Spike Bash parsing and subcommand permission contracts
+active_story_id: e07s02
+active_story: Allowlist individual Bash subcommands and deny whole commands safely
 active_bug_id: null
 git:
   bookmark: favilo/e07-bash-subcommand-permissions
@@ -55,17 +55,13 @@ planning:
     constraints:
     - Do not modify the e06 repair flow or child-private bridge catalog.
 handoff:
-  last_step_completed: Surveyed project state; e07 epic selected for work. All prior epics
-    (e05, e06, e09, e10, e11, e12, e15) are complete and merged to main.
+  last_step_completed: Completed e07s01 parser spike; starting e07s02 subcommand decision boundary.
   open_decisions: []
   required_reading:
-  - .specs/epics/e07-bash-subcommand-permissions/epic.yaml
-  - .specs/epics/e07-bash-subcommand-permissions/e07s01-bash-parser-spike.md
-  - .specs/epics/e07-bash-subcommand-permissions/e07s01-tasks.yaml
-  next_skill: kickoff-branch
-  context: Starting e07 (Bash subcommand permission evaluation) from e07s01. On main
-    with clean working copy. All stories todo. Need to create feature bookmark and
-    begin TDD spike.
+  - .specs/epics/e07-bash-subcommand-permissions/e07s02-subcommand-decision-boundary.md
+  - .specs/epics/e07-bash-subcommand-permissions/e07s02-tasks.yaml
+  next_skill: develop-tdd
+  context: Starting e07s02. e07s01 completed unbash parser integration. Now implementing subcommand decision boundary where each parsed subcommand is evaluated against policy rules atomically.
   blocker: null
   deferred_work:
   - Consolidate safeStringify and JSON formatting helpers into a shared utility module
@@ -95,10 +91,9 @@ metrics:
       avg_seconds: 1434.0
       _start: '2026-08-26T20:06:32Z'
     survey-context:
-      calls: 10
-      total_seconds: 6549.0
-      avg_seconds: 654.9
-      _start: '2026-08-27T18:14:15Z'
+      calls: 11
+      total_seconds: 7608.0
+      avg_seconds: 691.6363636363636
     verify-work:
       calls: 5
       total_seconds: 5191.0
