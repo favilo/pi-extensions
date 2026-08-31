@@ -135,17 +135,41 @@ test("fails closed (deny) when command contains unsupported syntax or parse erro
   }
 });
 
-test("deny rules take precedence over allow rules for subcommands", () => {
+test("returns detailed reason identifying denied subcommand for agent error reporting", () => {
   const { tmpDir, userPermissionsPath } = createPolicyDir({
     bash: {
-      allow: [{ command: "^jj " }],
-      deny: [{ command: "^jj diff --no-pager$" }],
+      allow: [{ command: "^jj status$" }],
+      deny: [{ command: "^rm " }],
     },
   });
   try {
-    const result = evaluateBashSubcommands("jj status && jj diff --no-pager", tmpDir, { userPermissionsPath });
+    const result = evaluateBashSubcommands("jj status && rm -rf /tmp/test", tmpDir, { userPermissionsPath });
     assert.equal(result.decision, "deny");
-    assert.equal(result.deniedSubcommand?.normalized, "jj diff --no-pager");
+    assert.equal(result.deniedSubcommand?.normalized, "rm -rf /tmp/test");
+    assert.match(result.reason ?? "", /subcommand "rm -rf \/tmp\/test" matches a configured deny rule/);
+  } finally {
+    rmSync(tmpDir, { recursive: true, force: true });
+  }
+});
+
+test("audits each evaluated subcommand when audit option is supplied", () => {
+  const { tmpDir, userPermissionsPath } = createPolicyDir({
+    bash: {
+      allow: [{ command: "^jj status$" }],
+      deny: [{ command: "^rm " }],
+    },
+  });
+  const audited: Array<Record<string, unknown>> = [];
+  try {
+    const result = evaluateBashSubcommands("jj status && rm -rf /", tmpDir, {
+      userPermissionsPath,
+      audit: (entry) => audited.push(entry),
+    });
+    assert.equal(result.decision, "deny");
+    assert.ok(audited.length >= 2, "must audit subcommands and aggregate decision");
+    const subAudit = audited.find((e) => e.subcommand === "rm -rf /");
+    assert.ok(subAudit);
+    assert.equal(subAudit.decision, "deny");
   } finally {
     rmSync(tmpDir, { recursive: true, force: true });
   }
