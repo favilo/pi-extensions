@@ -92,6 +92,7 @@ type AuditEntry = {
   cwd: string;
   path?: string;
   command?: string;
+  subcommand?: string;
   pattern?: string;
   scope?: "project" | "user";
   reason?: string;
@@ -1120,7 +1121,13 @@ async function handleFileEditPermission(toolName: string, input: FileEditInput, 
 
 async function handleBashPermission(input: BashInput, ctx: PermissionContext, pi: ExtensionAPI): Promise<ToolCallEventResult> {
   const command = typeof input.command === "string" ? input.command : "";
-  const subcommandEval = evaluateBashSubcommands(command, ctx.cwd);
+  const subcommandEval = evaluateBashSubcommands(command, ctx.cwd, {
+    audit: (entry) => {
+      if (typeof entry.decision === "string") {
+        audit({ tool: "bash", cwd: ctx.cwd, ...entry, decision: entry.decision });
+      }
+    },
+  });
   const decision = configuredDecision("bash", input, ctx.cwd);
   const configurationResult = await handleConfigurationDiagnostic(decision, ctx, pi);
   if (configurationResult === "allow_once") return;

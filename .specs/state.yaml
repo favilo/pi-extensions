@@ -1,12 +1,23 @@
 active_flow: build_epic
 active_epic_id: e07
-active_story_id: e07s03
-active_story: Audit Bash components and report denied subcommands to agents
+active_story_id: e07s04
+active_story: Interactive subcommand selection and granular pattern saving
 active_bug_id: null
 git:
   bookmark: favilo/e07-bash-subcommand-permissions
   parent_bookmark: main
 planning:
+  e07:
+    status: in_progress
+    story_id: e07s04
+    capsule: .specs/epics/e07-bash-subcommand-permissions
+    wsjf: 5.5
+    scoring:
+      business_value: 9
+      time_criticality: 8
+      risk_reduction: 8
+      job_size: 4
+      rationale: e07s01-s03 passing. e07s04 (granular subcommand saving UI) and e07s05 (command substitution parsing) added.
   e11:
     status: completed
     story_id: e11s04
@@ -55,13 +66,13 @@ planning:
     constraints:
     - Do not modify the e06 repair flow or child-private bridge catalog.
 handoff:
-  last_step_completed: Completed e07s02 subcommand decision boundary. Starting e07s03 subcommand audit and denials.
+  last_step_completed: Completed e07s03. Planned e07s04 (granular subcommand saving) and e07s05 (command substitution parsing). Starting e07s04.
   open_decisions: []
   required_reading:
-  - .specs/epics/e07-bash-subcommand-permissions/e07s03-subcommand-audit-and-denials.md
-  - .specs/epics/e07-bash-subcommand-permissions/e07s03-tasks.yaml
+  - .specs/epics/e07-bash-subcommand-permissions/e07s04-granular-subcommand-saving.md
+  - .specs/epics/e07-bash-subcommand-permissions/e07s04-tasks.yaml
   next_skill: develop-tdd
-  context: Starting e07s03. Adding per-subcommand audit records, aggregate command audit, denied subcommand agent-facing details, and non-blocking audit context.
+  context: Starting e07s04 for interactive subcommand selection mode and granular pattern saving in permission prompts.
   blocker: null
   deferred_work:
   - Consolidate safeStringify and JSON formatting helpers into a shared utility module

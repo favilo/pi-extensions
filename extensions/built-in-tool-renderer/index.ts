@@ -14,6 +14,7 @@ import type {
   LsToolDetails,
   ReadToolDetails,
   Theme,
+  WriteToolDetails,
 } from "@earendil-works/pi-coding-agent";
 import {
   createBashTool,
@@ -63,7 +64,7 @@ function withSteering(text: string, result: RenderableResult, theme: Theme): Tex
   return new Text(leading + text, 0, 0);
 }
 
-export default function (pi: ExtensionAPI) {
+export default function(pi: ExtensionAPI) {
   const cwd = process.cwd();
 
   const originalRead = createReadTool(cwd);
@@ -383,11 +384,22 @@ export default function (pi: ExtensionAPI) {
       return new Text(text, 0, 0);
     },
 
-    renderResult(result, { isPartial }, theme, context) {
+    renderResult(result, { expanded, isPartial }, theme, context) {
       if (isPartial) return new Text(theme.fg("warning", "Writing..."), 0, 0);
 
       const errorText = toolErrorText(result, context.isError, "Write failed");
       if (errorText) return new Text(theme.fg("error", errorText), 0, 0);
+
+      const details = result.details as WriteToolDetails | undefined;
+      const lines = details.linesWritten ?? 0;
+      if (expanded) {
+        for (const line of diffLines.slice(0, 30)) {
+          if (line.startsWith("+") && !line.startsWith("+++")) text += `\n${theme.fg("success", line)}`;
+          else if (line.startsWith("-") && !line.startsWith("---")) text += `\n${theme.fg("error", line)}`;
+          else text += `\n${theme.fg("dim", line)}`;
+        }
+        if (diffLines.length > 30) text += `\n${theme.fg("muted", `... ${diffLines.length - 30} more diff lines`)}`;
+      }
 
       return withSteering(theme.fg("success", "Written"), result, theme);
     },

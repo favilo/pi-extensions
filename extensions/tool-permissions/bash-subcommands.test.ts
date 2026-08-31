@@ -119,16 +119,16 @@ test("defaults to ask if any subcommand has no matching allow or deny rule", () 
   }
 });
 
-test("fails closed (deny) when command contains unsupported syntax or parse error", () => {
+test("fails asking (ask) when command contains unsupported syntax or parse error", () => {
   const { tmpDir, userPermissionsPath } = createPolicyDir({
     bash: {
-      allow: [{ command: ".*" }],
+      allow: [],
       deny: [],
     },
   });
   try {
     const result = evaluateBashSubcommands("jj status && $(whoami)", tmpDir, { userPermissionsPath });
-    assert.equal(result.decision, "deny");
+    assert.equal(result.decision, "ask");
     assert.match(result.reason ?? "", /unsupported/i);
   } finally {
     rmSync(tmpDir, { recursive: true, force: true });

@@ -9,42 +9,68 @@ export type SubcommandDecisionResult = {
   source?: string;
 };
 
+export type EvaluateSubcommandOptions = Parameters<typeof resolveToolPermissionDecision>[3] & {
+  audit?: (entry: Record<string, unknown>) => void;
+};
+
 /**
  * Evaluates individual Bash subcommands against permission policy rules.
  *
  * Each subcommand extracted from the command string is evaluated independently
  * against the tool permission policy for "bash".
  * - If any subcommand or raw command matches a deny rule, the entire command is denied atomically.
- * - If any subcommand is unsupported or unparseable, the command is denied (fail-closed).
+ * - If any subcommand is unsupported or unparseable, the command falls back to "ask" (fail-asking) unless a deny rule matches.
  * - If all subcommands are allowed (or raw command matches an allow rule), the command is allowed.
  * - Otherwise (if any subcommand requires user approval), the decision is "ask".
  */
 export function evaluateBashSubcommands(
   command: string,
   cwd: string,
-  options?: Parameters<typeof resolveToolPermissionDecision>[3],
+  options?: EvaluateSubcommandOptions,
 ): SubcommandDecisionResult {
-  const parseResult = parseBashCommand(command);
-  if (!parseResult.ok) {
-    return {
-      decision: "deny",
-      subcommands: [],
-      reason: `Blocked bash command: ${parseResult.detail}`,
-    };
-  }
+  const safeAudit = (entry: Record<string, unknown>) => {
+    if (!options?.audit) return;
+    try {
+      options.audit(entry);
+    } catch {
+      // Non-blocking audit failure handling
+    }
+  };
 
   const rawDecision = resolveToolPermissionDecision("bash", { command }, cwd, options);
   if (rawDecision.decision === "deny") {
+    const reason = "Blocked bash command: arguments match a configured deny rule.";
+    safeAudit({ tool: "bash", command, decision: "deny", cwd, reason, source: rawDecision.source });
     return {
       decision: "deny",
-      subcommands: parseResult.subcommands,
-      reason: "Blocked bash command: arguments match a configured deny rule.",
+      subcommands: [],
+      reason,
       source: rawDecision.source,
+    };
+  }
+
+  const parseResult = parseBashCommand(command);
+  if (!parseResult.ok) {
+    if (rawDecision.decision === "allow") {
+      safeAudit({ tool: "bash", command, decision: "allow", cwd, source: rawDecision.source });
+      return {
+        decision: "allow",
+        subcommands: [],
+        source: rawDecision.source,
+      };
+    }
+    const reason = `Bash command contains unsupported syntax (${parseResult.detail}) and requires explicit permission.`;
+    safeAudit({ tool: "bash", command, decision: "ask", cwd, reason });
+    return {
+      decision: "ask",
+      subcommands: [],
+      reason,
     };
   }
 
   const subcommands = parseResult.subcommands;
   if (subcommands.length === 0) {
+    safeAudit({ tool: "bash", command, decision: rawDecision.decision, cwd, source: rawDecision.source });
     return {
       decision: rawDecision.decision,
       subcommands: [],
@@ -57,12 +83,31 @@ export function evaluateBashSubcommands(
 
   for (const sub of subcommands) {
     const decision = resolveToolPermissionDecision("bash", { command: sub.normalized }, cwd, options);
+    safeAudit({
+      tool: "bash",
+      command,
+      subcommand: sub.normalized,
+      decision: decision.decision,
+      cwd,
+      ...(sub.span ? { span: sub.span } : {}),
+      ...(decision.source ? { source: decision.source } : {}),
+    });
+
     if (decision.decision === "deny") {
+      const reason = `Blocked bash command: subcommand "${sub.normalized}" matches a configured deny rule.`;
+      safeAudit({
+        tool: "bash",
+        command,
+        decision: "deny",
+        deniedSubcommand: sub.normalized,
+        cwd,
+        reason,
+      });
       return {
         decision: "deny",
         subcommands,
         deniedSubcommand: sub,
-        reason: `Blocked bash command: subcommand "${sub.normalized}" matches a configured deny rule.`,
+        reason,
         source: decision.source,
       };
     }
@@ -73,24 +118,20 @@ export function evaluateBashSubcommands(
     }
   }
 
-  if (!hasAsk) {
-    return {
-      decision: "allow",
-      subcommands,
-      source: allowedSource,
-    };
-  }
+  const finalDecision: "allow" | "ask" = !hasAsk || rawDecision.decision === "allow" ? "allow" : "ask";
+  const finalSource = finalDecision === "allow" ? (allowedSource ?? rawDecision.source) : undefined;
 
-  if (rawDecision.decision === "allow") {
-    return {
-      decision: "allow",
-      subcommands,
-      source: rawDecision.source,
-    };
-  }
+  safeAudit({
+    tool: "bash",
+    command,
+    decision: finalDecision,
+    cwd,
+    ...(finalSource ? { source: finalSource } : {}),
+  });
 
   return {
-    decision: "ask",
+    decision: finalDecision,
     subcommands,
+    source: finalSource,
   };
 }
