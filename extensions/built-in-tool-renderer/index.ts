@@ -14,7 +14,6 @@ import type {
   LsToolDetails,
   ReadToolDetails,
   Theme,
-  WriteToolDetails,
 } from "@earendil-works/pi-coding-agent";
 import {
   createBashTool,
@@ -372,13 +371,21 @@ export default function(pi: ExtensionAPI) {
     parameters: withReasonParameter(originalWrite.parameters),
 
     async execute(toolCallId, params, signal, onUpdate) {
-      return originalWrite.execute(toolCallId, withoutReason(params), signal, onUpdate);
+      const cleanParams = withoutReason(params);
+      const res = await originalWrite.execute(toolCallId, cleanParams, signal, onUpdate);
+      if (cleanParams && typeof cleanParams.content === "string") {
+        return {
+          ...res,
+          details: { content: cleanParams.content, linesWritten: cleanParams.content.split("\n").length },
+        };
+      }
+      return res;
     },
 
     renderCall(args, theme, _context) {
       let text = theme.fg("toolTitle", theme.bold("write "));
       text += theme.fg("accent", args.path);
-      const lineCount = args.content.split("\n").length;
+      const lineCount = typeof args.content === "string" ? args.content.split("\n").length : 0;
       text += theme.fg("dim", ` (${lineCount} lines)`);
       text += reasonSuffix(args, theme);
       return new Text(text, 0, 0);
@@ -390,18 +397,21 @@ export default function(pi: ExtensionAPI) {
       const errorText = toolErrorText(result, context.isError, "Write failed");
       if (errorText) return new Text(theme.fg("error", errorText), 0, 0);
 
-      const details = result.details as WriteToolDetails | undefined;
-      const lines = details.linesWritten ?? 0;
+      const details = result.details as { content?: string; linesWritten?: number } | undefined;
+      const content = details?.content ?? "";
+      const diffLines = content ? content.split("\n") : [];
+      const linesCount = details?.linesWritten ?? diffLines.length;
+
+      let text = theme.fg("success", `+${linesCount}`);
+
       if (expanded) {
         for (const line of diffLines.slice(0, 30)) {
-          if (line.startsWith("+") && !line.startsWith("+++")) text += `\n${theme.fg("success", line)}`;
-          else if (line.startsWith("-") && !line.startsWith("---")) text += `\n${theme.fg("error", line)}`;
-          else text += `\n${theme.fg("dim", line)}`;
+          text += `\n${theme.fg("success", `+${line}`)}`;
         }
-        if (diffLines.length > 30) text += `\n${theme.fg("muted", `... ${diffLines.length - 30} more diff lines`)}`;
+        if (diffLines.length > 30) text += `\n${theme.fg("muted", `... ${diffLines.length - 30} more written lines`)}`;
       }
 
-      return withSteering(theme.fg("success", "Written"), result, theme);
+      return withSteering(text, result, theme);
     },
   });
 
