@@ -14,7 +14,7 @@ stories:
   - id: e07s02
     title: Allowlist individual Bash subcommands and deny whole commands safely
     bcps: 4
-    status: todo
+    status: passing
     delta: ADDED
     spec: e07s02-subcommand-decision-boundary.md
     tasks: e07s02-tasks.yaml

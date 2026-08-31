@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync, writeFileSync, rmSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
+import { stringify as stringifyToml } from "smol-toml";
 import { evaluateBashSubcommands } from "./bash-subcommands.ts";
 
 function createPolicyDir(policyObj: unknown): { tmpDir: string; userPermissionsPath: string } {
@@ -12,18 +13,7 @@ function createPolicyDir(policyObj: unknown): { tmpDir: string; userPermissionsP
   mkdirSync(configDir, { recursive: true });
   const userPermissionsPath = join(configDir, "permissions.toml");
   
-  let tomlContent = "";
-  if (typeof policyObj === "object" && policyObj !== null && "bash" in policyObj) {
-    const bash = (policyObj as any).bash;
-    tomlContent += "[permissions.bash]\n";
-    if (Array.isArray(bash.allow)) {
-      tomlContent += `allow = [${bash.allow.map((r: any) => JSON.stringify(r)).join(", ")}]\n`;
-    }
-    if (Array.isArray(bash.deny)) {
-      tomlContent += `deny = [${bash.deny.map((r: any) => JSON.stringify(r)).join(", ")}]\n`;
-    }
-  }
-  writeFileSync(userPermissionsPath, tomlContent);
+  writeFileSync(userPermissionsPath, stringifyToml({ permissions: policyObj as any }));
   return { tmpDir, userPermissionsPath };
 }
 

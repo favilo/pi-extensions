@@ -17,6 +17,7 @@ import {
   type PermissionRule,
 } from "./config.ts";
 import { createPersistedTrustResolver, resolveCurrentProjectPolicyPath, resolveScopedPermissionDecision, type ScopedPermissionDecision } from "./scope.ts";
+import { evaluateBashSubcommands } from "./bash-subcommands.ts";
 import type { PermissionDecision, ToolPermissionBoundary, ToolRequest } from "./permission-boundary.ts";
 import { isPermissionPromptCancellation } from "./prompt-input.ts";
 import { SteeringEditor } from "./steering-editor.ts";
@@ -913,6 +914,10 @@ export function resolvePermissionDecisionForRequest(
   options: PermissionResolverOptions = {},
 ): PermissionDecision {
   const { input, canonicalCwd } = normalizedPermissionInput(request);
+  if (request.toolName === "bash" && typeof input === "object" && input !== null && typeof (input as any).command === "string") {
+    const subcommandEval = evaluateBashSubcommands((input as any).command, request.cwd, options);
+    return subcommandEval.decision;
+  }
   const resolved = resolveToolPermissionDecision(request.toolName, input, request.cwd, options);
   if (resolved.diagnostic) throw new Error(resolved.diagnostic);
   if (resolved.decision === "deny") return "deny";
@@ -1115,14 +1120,19 @@ async function handleFileEditPermission(toolName: string, input: FileEditInput, 
 
 async function handleBashPermission(input: BashInput, ctx: PermissionContext, pi: ExtensionAPI): Promise<ToolCallEventResult> {
   const command = typeof input.command === "string" ? input.command : "";
+  const subcommandEval = evaluateBashSubcommands(command, ctx.cwd);
   const decision = configuredDecision("bash", input, ctx.cwd);
   const configurationResult = await handleConfigurationDiagnostic(decision, ctx, pi);
   if (configurationResult === "allow_once") return;
   if (configurationResult) return configurationResult;
 
-  if (decision.decision === "deny") return configuredDeny("bash", ctx, { command });
-  if (decision.decision === "allow") {
-    audit({ tool: "bash", decision: "allow_pattern", cwd: ctx.cwd, command });
+  if (subcommandEval.decision === "deny") {
+    const reason = subcommandEval.reason || "Blocked bash: arguments match a configured deny rule.";
+    audit({ tool: "bash", decision: "deny_pattern", cwd: ctx.cwd, command, reason });
+    return { block: true, reason };
+  }
+  if (subcommandEval.decision === "allow") {
+    audit({ tool: "bash", decision: "allow_pattern", cwd: ctx.cwd, command, reason: subcommandEval.source });
     return;
   }
   if (!ctx.hasUI) {
@@ -1269,6 +1279,10 @@ export default function toolPermissionPolicy(pi: ExtensionAPI) {
             // Review phase: the prompt frame below already carries title, path, and hints.
             return new Text(preview.body, 0, 0).render(width);
           }
+          if (!pending) {
+            // Once prompt is settled, omit preview rendering so only native tool widget remains in transcript.
+            return [];
+          }
           const content = expanded
             ? `${header}${stickyHeader}\n\n${preview.body}`
             : `${header}${stickyHeader}\n\n${theme.fg("dim", `${preview.body.split("\n").length} lines — Ctrl+O to expand`)}`;
@@ -1311,11 +1325,7 @@ export default function toolPermissionPolicy(pi: ExtensionAPI) {
   });
 
   pi.on("tool_result", (event) => {
-    const promptPreview = promptedPreviews.get(event.toolCallId);
-    if (promptPreview) {
-      promptedPreviews.delete(event.toolCallId);
-      pi.appendEntry<PermissionPreview>("permission-preview", promptPreview);
-    }
+    promptedPreviews.delete(event.toolCallId);
     const steering = pendingSteering.get(event.toolCallId);
     if (!steering) return undefined;
     pendingSteering.delete(event.toolCallId);

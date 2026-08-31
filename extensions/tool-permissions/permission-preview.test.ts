@@ -92,22 +92,16 @@ test("renders a permission preview as a non-context history entry while keeping 
     component.handleInput("\x04");
     await pending;
 
-    // After the decision, the recorded entry shows its title and respects the collapsed state.
-    const collapsedAfterDecision = previewComponent.render(100).join("\n");
-    assert.doesNotMatch(collapsedAfterDecision, /line-80/);
-    assert.match(collapsedAfterDecision, /Allow bash command\?/);
-    assert.match(collapsedAfterDecision, new RegExp(`${bodyLines} lines`, "i"));
-    const expandedAfterDecision = renderer({ data: entries[0]!.data }, { expanded: true }, fakeTheme)!.render(100).join("\n");
-    assert.match(expandedAfterDecision, /Allow bash command\?/);
-    assert.match(expandedAfterDecision, /line-80/);
+    // After the decision, the preview entry collapses to 0 lines so only native tool execution widget remains.
+    const renderedAfterDecision = previewComponent.render(100);
+    assert.equal(renderedAfterDecision.length, 0);
 
     const toolResult = handlers.get("tool_result") as unknown as ToolResultHandler | undefined;
     toolResult?.({ toolCallId: "preview-call", content: [{ type: "text", text: "ok" }] }, {});
-    assert.equal(entries.length, 2, "the reviewed preview is re-appended after the tool result so it stays visible below the output");
-    assert.deepEqual(entries[1], entries[0]);
+    assert.equal(entries.length, 1, "tool result cleans up preview state without appending a duplicate entry");
 
     toolResult?.({ toolCallId: "unprompted-call", content: [{ type: "text", text: "ok" }] }, {});
-    assert.equal(entries.length, 2, "unprompted calls never gain permission previews");
+    assert.equal(entries.length, 1, "unprompted calls never gain permission previews");
   } finally {
     if (previousAgentDir === undefined) delete process.env.PI_CODING_AGENT_DIR;
     else process.env.PI_CODING_AGENT_DIR = previousAgentDir;

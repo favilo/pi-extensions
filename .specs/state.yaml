@@ -1,7 +1,7 @@
 active_flow: build_epic
 active_epic_id: e07
-active_story_id: e07s02
-active_story: Allowlist individual Bash subcommands and deny whole commands safely
+active_story_id: e07s03
+active_story: Audit Bash components and report denied subcommands to agents
 active_bug_id: null
 git:
   bookmark: favilo/e07-bash-subcommand-permissions
@@ -55,13 +55,13 @@ planning:
     constraints:
     - Do not modify the e06 repair flow or child-private bridge catalog.
 handoff:
-  last_step_completed: Completed e07s01 parser spike; starting e07s02 subcommand decision boundary.
+  last_step_completed: Completed e07s02 subcommand decision boundary. Starting e07s03 subcommand audit and denials.
   open_decisions: []
   required_reading:
-  - .specs/epics/e07-bash-subcommand-permissions/e07s02-subcommand-decision-boundary.md
-  - .specs/epics/e07-bash-subcommand-permissions/e07s02-tasks.yaml
+  - .specs/epics/e07-bash-subcommand-permissions/e07s03-subcommand-audit-and-denials.md
+  - .specs/epics/e07-bash-subcommand-permissions/e07s03-tasks.yaml
   next_skill: develop-tdd
-  context: Starting e07s02. e07s01 completed unbash parser integration. Now implementing subcommand decision boundary where each parsed subcommand is evaluated against policy rules atomically.
+  context: Starting e07s03. Adding per-subcommand audit records, aggregate command audit, denied subcommand agent-facing details, and non-blocking audit context.
   blocker: null
   deferred_work:
   - Consolidate safeStringify and JSON formatting helpers into a shared utility module

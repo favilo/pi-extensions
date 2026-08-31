@@ -2,6 +2,8 @@
 
 Personal extensions for the [Pi coding agent](https://pi.dev).
 
+This repository collects small Pi extension experiments and utilities.
+
 ## Install
 
 For active development, install the local checkout. Pi references it directly, so changes become available after `/reload`:
