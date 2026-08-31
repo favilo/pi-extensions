@@ -5,7 +5,7 @@ import { mkdtempSync, writeFileSync, rmSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { stringify as stringifyToml } from "smol-toml";
-import { evaluateBashSubcommands } from "./bash-subcommands.ts";
+import { evaluateBashSubcommands, saveSubcommandAllowRules } from "./bash-subcommands.ts";
 
 function createPolicyDir(policyObj: unknown): { tmpDir: string; userPermissionsPath: string } {
   const tmpDir = mkdtempSync(join(tmpdir(), "bash-subcommands-test-"));
@@ -170,6 +170,24 @@ test("audits each evaluated subcommand when audit option is supplied", () => {
     const subAudit = audited.find((e) => e.subcommand === "rm -rf /");
     assert.ok(subAudit);
     assert.equal(subAudit.decision, "deny");
+  } finally {
+    rmSync(tmpDir, { recursive: true, force: true });
+  }
+});
+
+test("saveSubcommandAllowRules persists individual subcommand allow rules to permissions.toml", () => {
+  const { tmpDir, userPermissionsPath } = createPolicyDir({
+    bash: {
+      allow: [],
+      deny: [],
+    },
+  });
+  try {
+    const success = saveSubcommandAllowRules(userPermissionsPath, ["jj status", "cargo test"]);
+    assert.equal(success, true);
+
+    const result = evaluateBashSubcommands("jj status && cargo test", tmpDir, { userPermissionsPath });
+    assert.equal(result.decision, "allow");
   } finally {
     rmSync(tmpDir, { recursive: true, force: true });
   }

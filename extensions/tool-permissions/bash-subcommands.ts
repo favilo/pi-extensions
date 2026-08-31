@@ -135,3 +135,14 @@ export function evaluateBashSubcommands(
     source: finalSource,
   };
 }
+
+/**
+ * Saves allow rules for individual subcommands to permissions.toml.
+ * Stub implementation for TDD contract test phase.
+ */
+export function saveSubcommandAllowRules(
+  targetPath: string,
+  subcommands: string[],
+): boolean {
+  return false;
+}
