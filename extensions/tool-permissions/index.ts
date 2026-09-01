@@ -17,7 +17,7 @@ import {
   type PermissionRule,
 } from "./config.ts";
 import { createPersistedTrustResolver, resolveCurrentProjectPolicyPath, resolveScopedPermissionDecision, type ScopedPermissionDecision } from "./scope.ts";
-import { evaluateBashSubcommands } from "./bash-subcommands.ts";
+import { evaluateBashSubcommands, saveSubcommandAllowRules } from "./bash-subcommands.ts";
 import type { PermissionDecision, ToolPermissionBoundary, ToolRequest } from "./permission-boundary.ts";
 import { isPermissionPromptCancellation } from "./prompt-input.ts";
 import { SteeringEditor } from "./steering-editor.ts";
@@ -580,8 +580,14 @@ async function presentScrollablePermission(
     }
   };
 
+  const subcommandsToSave = allowPattern?.toolName === "bash" && (previewText || body)
+    ? evaluateBashSubcommands(previewText || body, ctx.cwd).subcommands.map((s) => s.normalized)
+    : [];
+
   return ctx.ui.custom<PermissionResult>((tui, theme: any, keybindings: any, finish) => {
     let settled = false;
+    let subcommandMode = false;
+    const selectedSubcommands = new Set<number>(subcommandsToSave.map((_, i) => i));
     const customFactory = (ctx.ui as any)?.getEditorComponent?.();
     const isVim =
       process.env.PI_VIM_MODE === "1" ||
@@ -625,7 +631,8 @@ async function presentScrollablePermission(
       const contentWidth = Math.max(1, width - 2);
 
       const wrappedBody = publishedPreview ? [] : rawLines.flatMap((line) => wrapWithContinuation(line, contentWidth, continuationPrefix));
-      const allowHint = allowPattern ? " • Ctrl+A allow+save project • Ctrl+Shift+A allow+save user • Ctrl+E edit pattern" : "";
+      const subcommandHint = subcommandsToSave.length > 0 ? " • Ctrl+S subcommands" : "";
+      const allowHint = allowPattern ? ` • Ctrl+A allow+save project • Ctrl+Shift+A allow+save user • Ctrl+E edit pattern${subcommandHint}` : "";
       const steeringAllowHint = allowPattern ? " • Ctrl+A project-save+steer • Ctrl+Shift+A user-save+steer" : "";
       const navigationHint = steeringMode
         ? isVim
@@ -640,6 +647,17 @@ async function presentScrollablePermission(
       const wrap = (text: string): string[] => wrapWithContinuation(text, width, continuationPrefix);
 
       const steeringBoxLines = steeringEditor.render(contentWidth);
+
+      if (subcommandMode) {
+        return [
+          ...wrap(theme.fg("accent", theme.bold("Subcommand Rule Saving Mode:"))),
+          ...subcommandsToSave.flatMap((sub, i) =>
+            wrap(theme.fg(selectedSubcommands.has(i) ? "success" : "dim", `  ${selectedSubcommands.has(i) ? "[x]" : "[ ]"} ${i + 1}. ${sub}`))
+          ),
+          "",
+          ...wrap(theme.fg("dim", `1-${subcommandsToSave.length} toggle • a select all • Ctrl+A save project • Ctrl+Shift+A save user • Esc exit`)),
+        ];
+      }
 
       return [
         ...wrap(theme.fg("accent", theme.bold(title))),
@@ -715,6 +733,49 @@ async function presentScrollablePermission(
         return;
       }
 
+      if (subcommandMode) {
+        if (matchesKey(data, "escape")) {
+          subcommandMode = false;
+          tui.requestRender();
+          return;
+        }
+        if (data === "a" || data === "A") {
+          subcommandsToSave.forEach((_, i) => selectedSubcommands.add(i));
+          tui.requestRender();
+          return;
+        }
+        const digit = parseInt(data, 10);
+        if (!isNaN(digit) && digit >= 1 && digit <= subcommandsToSave.length) {
+          const idx = digit - 1;
+          if (selectedSubcommands.has(idx)) selectedSubcommands.delete(idx);
+          else selectedSubcommands.add(idx);
+          tui.requestRender();
+          return;
+        }
+        if (matchesKey(data, "ctrl+a") || matchesKey(data, "ctrl+shift+a")) {
+          const scope: "project" | "user" = matchesKey(data, "ctrl+shift+a") ? "user" : "project";
+          const target = scope === "project" ? projectPath : getUserPermissionsPath();
+          if (!target) {
+            ctx.ui.notify?.("Project permissions cannot be saved because this directory is not trusted.", "warning");
+            return;
+          }
+          const chosen = subcommandsToSave.filter((_, i) => selectedSubcommands.has(i));
+          if (!chosen.length) {
+            ctx.ui.notify?.("No subcommands selected.", "warning");
+            return;
+          }
+          if (saveSubcommandAllowRules(target, chosen)) {
+            ctx.ui.notify?.(`Saved ${scope} permission rules for ${chosen.length} subcommand(s).`, "info");
+            subcommandMode = false;
+            tui.requestRender();
+          } else {
+            ctx.ui.notify?.(`Could not save subcommand rules to ${target}.`, "error");
+          }
+          return;
+        }
+        return;
+      }
+
       if (isPermissionPromptCancellation(data)) {
         done({ allowed: false, decision: "cancel" });
         return;
@@ -726,6 +787,11 @@ async function presentScrollablePermission(
       }
       if (matchesKey(data, "ctrl+y")) {
         done({ allowed: true, decision: "allow_once" });
+        return;
+      }
+      if (subcommandsToSave.length > 0 && (matchesKey(data, "ctrl+s") || data === "s")) {
+        subcommandMode = true;
+        tui.requestRender();
         return;
       }
       if (allowPattern && matchesKey(data, "ctrl+shift+a")) {

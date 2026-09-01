@@ -1,7 +1,7 @@
 active_flow: build_epic
 active_epic_id: e07
-active_story_id: e07s04
-active_story: Interactive subcommand selection and granular pattern saving
+active_story_id: e07s05
+active_story: Recursive subcommand parsing for command substitutions and subshells
 active_bug_id: null
 git:
   bookmark: favilo/e07-bash-subcommand-permissions
@@ -66,13 +66,13 @@ planning:
     constraints:
     - Do not modify the e06 repair flow or child-private bridge catalog.
 handoff:
-  last_step_completed: Completed e07s03. Planned e07s04 (granular subcommand saving) and e07s05 (command substitution parsing). Starting e07s04.
+  last_step_completed: Completed e07s04 — subcommand selection mode and granular pattern saving implemented. Moving to e07s05.
   open_decisions: []
   required_reading:
-  - .specs/epics/e07-bash-subcommand-permissions/e07s04-granular-subcommand-saving.md
-  - .specs/epics/e07-bash-subcommand-permissions/e07s04-tasks.yaml
+  - .specs/epics/e07-bash-subcommand-permissions/e07s05-command-substitution-parsing.md
+  - .specs/epics/e07-bash-subcommand-permissions/e07s05-tasks.yaml
   next_skill: develop-tdd
-  context: Starting e07s04 for interactive subcommand selection mode and granular pattern saving in permission prompts.
+  context: Completed e07s04. Starting e07s05 for recursive subcommand parsing for command substitutions $(cmd) and subshells.
   blocker: null
   deferred_work:
   - Consolidate safeStringify and JSON formatting helpers into a shared utility module

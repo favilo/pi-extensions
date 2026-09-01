@@ -1,6 +1,6 @@
 story_id: e07s04
 title: Interactive subcommand selection and granular pattern saving
-status: todo
+status: passing
 bcps: 3
 delta: ADDED
 spec: e07s04-granular-subcommand-saving.md
@@ -8,15 +8,15 @@ tasks:
   - id: 1
     description: Add test contracts for subcommand option extraction and granular rule saving from permission prompts.
     verify: node --test extensions/tool-permissions/bash-subcommands.test.ts
-    status: todo
+    status: passing
     risk: P1
   - id: 2
     description: Integrate Ctrl+S subcommand selection mode into prompt UI and save target rules to policy.
     verify: node --test extensions/tool-permissions/bash-subcommands.test.ts
-    status: todo
+    status: passing
     risk: P1
   - id: 3
     description: Run complete package regression and type checks.
     verify: npm run check
-    status: todo
+    status: passing
     risk: P1

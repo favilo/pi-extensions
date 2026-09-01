@@ -1,4 +1,5 @@
 import { parseBashCommand, type ParsedSubcommand } from "./bash-parser.ts";
+import { saveAllowedRule } from "./config.ts";
 import { resolveToolPermissionDecision } from "./index.ts";
 
 export type SubcommandDecisionResult = {
@@ -138,11 +139,19 @@ export function evaluateBashSubcommands(
 
 /**
  * Saves allow rules for individual subcommands to permissions.toml.
- * Stub implementation for TDD contract test phase.
  */
 export function saveSubcommandAllowRules(
   targetPath: string,
   subcommands: string[],
 ): boolean {
-  return false;
+  if (!subcommands.length) return false;
+  try {
+    for (const sub of subcommands) {
+      const pattern = `^${sub.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`;
+      saveAllowedRule(targetPath, "bash", { command: pattern });
+    }
+    return true;
+  } catch {
+    return false;
+  }
 }

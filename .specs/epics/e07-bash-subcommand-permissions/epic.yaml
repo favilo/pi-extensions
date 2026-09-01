@@ -28,7 +28,7 @@ stories:
   - id: e07s04
     title: Interactive subcommand selection and granular pattern saving
     bcps: 3
-    status: todo
+    status: passing
     delta: ADDED
     spec: e07s04-granular-subcommand-saving.md
     tasks: e07s04-tasks.yaml
