@@ -92,11 +92,31 @@ test("strips redirects and keeps the subcommand", () => {
   assert.deepEqual(result.subcommands[0].args, ["log"]);
 });
 
-test("fails closed on command substitution", () => {
-  const result = parseBashCommand("echo $(whoami)");
-  assert.equal(result.ok, false);
-  if (result.ok) return;
-  assert.equal(result.reason, "unsupported_syntax");
+test("recursively parses command substitution $(cmd) into subcommands", () => {
+  const result = parseBashCommand("echo $(jj status)");
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.equal(result.subcommands.length, 2);
+  assert.equal(result.subcommands[0].command, "echo");
+  assert.equal(result.subcommands[1].normalized, "jj status");
+});
+
+test("recursively parses backtick command substitution into subcommands", () => {
+  const result = parseBashCommand("echo `jj status`");
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.equal(result.subcommands.length, 2);
+  assert.equal(result.subcommands[0].command, "echo");
+  assert.equal(result.subcommands[1].normalized, "jj status");
+});
+
+test("recursively parses subshells (cmd) into subcommands", () => {
+  const result = parseBashCommand("(jj status; jj diff --summary)");
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.equal(result.subcommands.length, 2);
+  assert.equal(result.subcommands[0].normalized, "jj status");
+  assert.equal(result.subcommands[1].normalized, "jj diff --summary");
 });
 
 test("fails closed on for loop", () => {
