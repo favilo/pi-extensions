@@ -18,6 +18,7 @@ import {
 } from "./config.ts";
 import { createPersistedTrustResolver, resolveCurrentProjectPolicyPath, resolveScopedPermissionDecision, type ScopedPermissionDecision } from "./scope.ts";
 import { evaluateBashSubcommands, saveSubcommandAllowRules } from "./bash-subcommands.ts";
+import { isYoloModeEnabled } from "./yolo-mode.ts";
 import type { PermissionDecision, ToolPermissionBoundary, ToolRequest } from "./permission-boundary.ts";
 import { isPermissionPromptCancellation } from "./prompt-input.ts";
 import { SteeringEditor } from "./steering-editor.ts";
@@ -1367,6 +1368,12 @@ export default function toolPermissionPolicy(pi: ExtensionAPI) {
   }
 
   pi.on("session_start", (_event, ctx) => {
+    if (isYoloModeEnabled()) {
+      if (ctx.hasUI) {
+        ctx.ui.notify("YOLO permission mode active via environment variable.", "warning");
+      }
+      audit({ tool: "permissions", decision: "yolo_mode_activated", cwd: ctx.cwd });
+    }
     if (process.env.PI_SUBAGENT_DEBUG === "1" && ctx.hasUI) {
       ctx.ui.notify(`Subagent debug log: ${subagentDebugPath()}`, "info");
     }

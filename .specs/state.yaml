@@ -8,8 +8,8 @@ git:
   parent_bookmark: main
 planning:
   e17:
-    status: in_progress
-    story_id: e17s01
+    status: completed
+    story_id: e17s02
     capsule: .specs/epics/e17-environment-protected-yolo-mode
     wsjf: 7.0
     scoring:
@@ -17,7 +17,7 @@ planning:
       time_criticality: 7
       risk_reduction: 6
       job_size: 3
-      rationale: Environment-gated YOLO mode (PI_YOLO_MODE=1) allows promptless execution for containerized Pi sessions while retaining audit logs.
+      rationale: Environment-gated YOLO mode (PI_YOLO_MODE=1 / PI_PERMISSION_YOLO=1), session startup notification, and audit logging complete across e17s01-s02.
   e07:
     status: completed
     story_id: e07s05
@@ -77,14 +77,13 @@ planning:
     constraints:
     - Do not modify the e06 repair flow or child-private bridge catalog.
 handoff:
-  last_step_completed: Planned Epic e17 (Environment-protected YOLO permission mode). Starting e17s01.
+  last_step_completed: Completed e17 — Environment-gated YOLO permission mode (PI_YOLO_MODE=1 / PI_PERMISSION_YOLO=1) implemented and verified. All 292 tests green.
   open_decisions: []
   required_reading:
   - .specs/epics/e17-environment-protected-yolo-mode/epic.yaml
   - .specs/epics/e17-environment-protected-yolo-mode/e17s01-yolo-permission-mode.md
-  - .specs/epics/e17-environment-protected-yolo-mode/e17s01-tasks.yaml
-  next_skill: develop-tdd
-  context: Epic e17 planned. Starting e17s01 for environment-gated YOLO permission policy mode (PI_YOLO_MODE=1).
+  next_skill: verify-work
+  context: Epic e17 complete across e17s01-s02. Environment-gated YOLO permission mode allows promptless single-session execution for Docker/automation workflows while preserving audit logging and explicit deny rule precedence. 292 tests green.
   blocker: null
   deferred_work:
   - Consolidate safeStringify and JSON formatting helpers into a shared utility module

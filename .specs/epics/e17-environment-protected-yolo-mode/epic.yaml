@@ -2,19 +2,19 @@ id: e17
 title: Environment-protected YOLO permission mode
 wsjf: 7.0
 total_bcps: 6
-status: planned
+status: completed
 stories:
   - id: e17s01
     title: Environment-gated YOLO permission policy mode
     bcps: 3
-    status: todo
+    status: passing
     delta: ADDED
     spec: e17s01-yolo-permission-mode.md
     tasks: e17s01-tasks.yaml
   - id: e17s02
     title: Container & session environment protection guardrails
     bcps: 3
-    status: todo
+    status: passing
     delta: ADDED
     spec: e17s02-yolo-guardrails-and-audit.md
     tasks: e17s02-tasks.yaml

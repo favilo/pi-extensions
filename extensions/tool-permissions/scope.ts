@@ -2,6 +2,7 @@ import { existsSync, realpathSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import { CONFIG_DIR_NAME, getAgentDir, ProjectTrustStore } from "@earendil-works/pi-coding-agent";
 import { loadPermissions, permissionDecision, permissionKeyForTool, type Permissions } from "./config.ts";
+import { isYoloModeEnabled } from "./yolo-mode.ts";
 
 export type TrustEntry = { path: string; decision: boolean };
 export type TrustResolver = (cwd: string) => TrustEntry | null;
@@ -13,7 +14,7 @@ export type ScopeFileSystem = {
 
 export type ScopedPermissionDecision = {
   decision: "allow" | "deny" | "ask";
-  source: "project" | "user" | "none";
+  source: "project" | "user" | "none" | "yolo_mode";
   path?: string;
   diagnostic?: string;
 };
@@ -131,7 +132,7 @@ export function resolveScopedPermissionDecision(options: {
       loadPermissions(options.userPermissionsPath)[permissionKeyForTool(options.toolName)],
       options.input,
     );
-    return { decision, source: decision === "ask" ? "none" : "user", path: options.userPermissionsPath };
+    if (decision !== "ask") return { decision, source: "user", path: options.userPermissionsPath };
   } catch (error) {
     return {
       decision: "ask",
@@ -140,6 +141,12 @@ export function resolveScopedPermissionDecision(options: {
       diagnostic: `User permission policy could not be read: ${error instanceof Error ? error.message : String(error)}`,
     };
   }
+
+  if (isYoloModeEnabled()) {
+    return { decision: "allow", source: "yolo_mode" };
+  }
+
+  return { decision: "ask", source: "none", path: options.userPermissionsPath };
 }
 
 export function defaultScopeFileSystem(): ScopeFileSystem {
