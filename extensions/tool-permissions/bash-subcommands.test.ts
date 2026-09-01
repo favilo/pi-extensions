@@ -127,7 +127,7 @@ test("fails asking (ask) when command contains unsupported syntax or parse error
     },
   });
   try {
-    const result = evaluateBashSubcommands("jj status && $(whoami)", tmpDir, { userPermissionsPath });
+    const result = evaluateBashSubcommands("for f in *.ts; do echo $f; done", tmpDir, { userPermissionsPath });
     assert.equal(result.decision, "ask");
     assert.match(result.reason ?? "", /unsupported/i);
   } finally {

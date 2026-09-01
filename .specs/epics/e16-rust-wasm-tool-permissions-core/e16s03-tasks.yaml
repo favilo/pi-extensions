@@ -1,0 +1,27 @@
+story_id: e16s03
+title: Port Bash permission evaluation to a Rust/WASM core
+status: todo
+bcps: 4
+delta: ADDED
+spec: e16s03-rust-permission-engine.md
+tasks:
+  - id: 1
+    description: Add failing parity tests for deny precedence, atomic whole-command denial, ask fallback, denied-subcommand details, and invalid-module-output handling.
+    verify: node --test extensions/tool-permissions/bash-subcommands.test.ts extensions/tool-permissions/wasm-decision-engine.test.ts
+    status: todo
+    risk: P0
+  - id: 2
+    description: Implement the Rust/WASM decision engine for Bash subcommand authorization with validated structured results.
+    verify: node --test extensions/tool-permissions/bash-subcommands.test.ts extensions/tool-permissions/wasm-decision-engine.test.ts
+    status: todo
+    risk: P0
+  - id: 3
+    description: Route Bash authorization through the WASM engine while preserving prompt, audit, and denial-reporting behavior in the TypeScript host.
+    verify: node --test extensions/tool-permissions/permission-boundary.test.ts extensions/tool-permissions/wasm-decision-engine.test.ts
+    status: todo
+    risk: P0
+  - id: 4
+    description: Re-run security-focused regression and package checks before marking the story passing.
+    verify: npm run check
+    status: todo
+    risk: P1

@@ -1,9 +1,7 @@
-// e07s01 — Spike Bash parsing and subcommand permission contracts
+// e07s05 — Recursive Bash parsing for command substitutions and subshells
 //
-// Uses `unbash` (0-dep TypeScript Bash parser) to parse compound Bash commands
-// into individual subcommands with source spans. Complex syntax (command
-// substitution, loops, functions, conditionals) is marked unsupported —
-// fail-closed — so the permission boundary never auto-allows uncertain syntax.
+// Uses `unbash` (0-dep TypeScript Bash parser) to parse compound Bash commands,
+// subshells, and command substitutions `$(cmd)` / `` `cmd` `` into individual subcommands.
 
 import { parse, type ParsedScript, type Node, type Command, type Word, type WordPart } from "unbash";
 
@@ -22,13 +20,6 @@ export type BashParseResult =
   | { ok: true; subcommands: ParsedSubcommand[] }
   | { ok: false; reason: "unsupported_syntax" | "parse_error"; detail: string };
 
-/** Node types that are too complex for safe subcommand-level permissioning. */
-const UNSUPPORTED_TYPES = new Set([
-  "If", "For", "ArithmeticFor", "Select", "While", "Function",
-  "Subshell", "BraceGroup", "Case", "Coproc", "TestCommand",
-  "ArithmeticCommand",
-]);
-
 /** Convert a Word to its evaluated value (unquoted). */
 function wordValue(word: Word): string {
   return word.value;
@@ -36,13 +27,12 @@ function wordValue(word: Word): string {
 
 /** Word part types that execute or expand dynamically — fail-closed. */
 const UNSUPPORTED_PART_TYPES = new Set([
-  "CommandExpansion",
   "ProcessSubstitution",
   "ArithmeticExpansion",
   "ParameterExpansion",
 ]);
 
-/** Check whether a word contains any dynamic expansion parts. */
+/** Check whether a word contains any non-handled dynamic expansion parts. */
 function hasUnsupportedParts(word: Word): boolean {
   if (!word.parts) return false;
   return word.parts.some((part: WordPart) => UNSUPPORTED_PART_TYPES.has(part.type));
@@ -92,9 +82,33 @@ function extractSubcommands(
       return { ok: true };
     }
 
+    case "Subshell":
+    case "BraceGroup": {
+      const bodyCommands = (node as any).body?.commands;
+      if (Array.isArray(bodyCommands)) {
+        for (const child of bodyCommands) {
+          const result = extractSubcommands(child, source, subcommands);
+          if (!result.ok) return result;
+        }
+      }
+      return { ok: true };
+    }
+
+    case "CompoundList": {
+      const commands = (node as any).commands;
+      if (Array.isArray(commands)) {
+        for (const child of commands) {
+          const result = extractSubcommands(child, source, subcommands);
+          if (!result.ok) return result;
+        }
+      }
+      return { ok: true };
+    }
+
     case "Command": {
-      // Fail closed if any word (name or args) contains dynamic expansion.
       const allWords = [node.name, ...node.suffix].filter((w): w is Word => w !== undefined);
+
+      // Check for unsupported word parts
       const unsafeWord = allWords.find(hasUnsupportedParts);
       if (unsafeWord) {
         return {
@@ -136,6 +150,23 @@ function extractSubcommands(
       }
 
       subcommands.push(commandToSubcommand(node, source));
+
+      // Check for command substitutions in word parts: $(cmd) or `cmd`
+      for (const word of allWords) {
+        if (!word.parts) continue;
+        for (const part of word.parts) {
+          if (part.type === "CommandExpansion") {
+            const innerScript = (part as any).script;
+            if (innerScript && Array.isArray(innerScript.commands)) {
+              for (const innerStmt of innerScript.commands) {
+                const result = extractSubcommands(innerStmt, source, subcommands);
+                if (!result.ok) return result;
+              }
+            }
+          }
+        }
+      }
+
       return { ok: true };
     }
 

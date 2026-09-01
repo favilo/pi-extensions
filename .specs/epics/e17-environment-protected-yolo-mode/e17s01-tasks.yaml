@@ -1,0 +1,22 @@
+story_id: e17s01
+title: Environment-gated YOLO permission policy mode
+status: todo
+bcps: 3
+delta: ADDED
+spec: e17s01-yolo-permission-mode.md
+tasks:
+  - id: 1
+    description: Add failing test contracts for PI_YOLO_MODE=1 and PI_PERMISSION_YOLO=1 environment variable evaluation.
+    verify: node --test extensions/tool-permissions/yolo-mode.test.ts
+    status: todo
+    risk: P1
+  - id: 2
+    description: Integrate environment gate into resolveToolPermissionDecision and tool permission handlers.
+    verify: node --test extensions/tool-permissions/yolo-mode.test.ts
+    status: todo
+    risk: P1
+  - id: 3
+    description: Run complete package regression and type checks.
+    verify: npm run check
+    status: todo
+    risk: P1

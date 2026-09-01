@@ -1,0 +1,40 @@
+story_id: e07s05
+verified_at: "2026-09-01T09:50:00Z"
+verifier: verify-work
+status: passing
+vcs:
+  kind: jj
+  bookmark: favilo/e07-bash-subcommand-permissions
+phases:
+  task_verification:
+    passed: true
+    tasks: 3
+  typecheck:
+    passed: true
+    command: "npm run typecheck"
+  tests:
+    passed: true
+    command: "node --test extensions/tool-permissions/bash-parser.test.ts extensions/tool-permissions/bash-subcommands.test.ts"
+  terminal_verdict:
+    command: "npm run check:ci"
+    exit_code: 0
+    captured_at: "2026-09-01T09:50:00Z"
+    note: "All 289 tests green across preflight, test guard, plan consistency, and portability checks."
+  security:
+    passed: true
+    report: ".specs/security/epics/e07/THREAT_MODEL.md"
+    note: "Command substitutions $(cmd) and backticks `cmd` are recursively extracted and evaluated atomically."
+  manual:
+    passed: true
+    confirmed_by_user: true
+    steps:
+      - step: "Parse command substitution echo $(jj status)"
+        expected: "Outer command and inner command jj status are extracted as subcommands."
+        actual: "Verified parseBashCommand returns both outer echo and inner jj status subcommands."
+        passed: true
+      - step: "Parse backticks and subshell (cmd1; cmd2)"
+        expected: "Inner subcommands extracted recursively for evaluation."
+        actual: "Verified backticks and subshells extract inner subcommands with relative source spans."
+        passed: true
+  gaps:
+    closed: true

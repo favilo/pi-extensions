@@ -1,0 +1,34 @@
+id: e16
+title: Rust/WASM core migration for tool-permissions
+wsjf: 0.0
+total_bcps: 14
+status: planned
+stories:
+  - id: e16s01
+    title: Spike a supported Rust/WASM boundary for tool-permissions
+    bcps: 3
+    status: todo
+    delta: ADDED
+    spec: e16s01-rust-wasm-boundary-spike.md
+    tasks: e16s01-tasks.yaml
+  - id: e16s02
+    title: Port Bash parsing to a Rust/WASM core
+    bcps: 4
+    status: todo
+    delta: ADDED
+    spec: e16s02-rust-bash-parser-parity.md
+    tasks: e16s02-tasks.yaml
+  - id: e16s03
+    title: Port Bash permission evaluation to a Rust/WASM core
+    bcps: 4
+    status: todo
+    delta: ADDED
+    spec: e16s03-rust-permission-engine.md
+    tasks: e16s03-tasks.yaml
+  - id: e16s04
+    title: Integrate the Rust/WASM core with packaging, fallback, and docs
+    bcps: 3
+    status: todo
+    delta: ADDED
+    spec: e16s04-rust-wasm-runtime-integration.md
+    tasks: e16s04-tasks.yaml

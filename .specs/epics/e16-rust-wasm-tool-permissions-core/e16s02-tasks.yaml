@@ -1,0 +1,27 @@
+story_id: e16s02
+title: Port Bash parsing to a Rust/WASM core
+status: todo
+bcps: 4
+delta: ADDED
+spec: e16s02-rust-bash-parser-parity.md
+tasks:
+  - id: 1
+    description: Add parity fixtures and failing tests that compare TypeScript and Rust/WASM parsing across simple, compound, recursive, and unsupported Bash syntax.
+    verify: node --test extensions/tool-permissions/bash-parser.test.ts extensions/tool-permissions/wasm-parser-parity.test.ts
+    status: todo
+    risk: P1
+  - id: 2
+    description: Implement the Rust/WASM parser for command units, source spans, command substitutions, subshells, brace groups, and unsupported-syntax detection.
+    verify: node --test extensions/tool-permissions/bash-parser.test.ts extensions/tool-permissions/wasm-parser-parity.test.ts
+    status: todo
+    risk: P1
+  - id: 3
+    description: Route the host parser adapter through the WASM path while preserving validated TypeScript fallback behavior.
+    verify: node --test extensions/tool-permissions/bash-subcommands.test.ts extensions/tool-permissions/wasm-parser-parity.test.ts
+    status: todo
+    risk: P1
+  - id: 4
+    description: Run the full package checks after removing redundant TypeScript-only parsing paths that are superseded by parity coverage.
+    verify: npm run check
+    status: todo
+    risk: P2

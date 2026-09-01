@@ -1,15 +1,26 @@
 active_flow: build_epic
-active_epic_id: e07
-active_story_id: e07s05
-active_story: Recursive subcommand parsing for command substitutions and subshells
+active_epic_id: e17
+active_story_id: e17s01
+active_story: Environment-gated YOLO permission policy mode
 active_bug_id: null
 git:
   bookmark: favilo/e07-bash-subcommand-permissions
   parent_bookmark: main
 planning:
-  e07:
+  e17:
     status: in_progress
-    story_id: e07s04
+    story_id: e17s01
+    capsule: .specs/epics/e17-environment-protected-yolo-mode
+    wsjf: 7.0
+    scoring:
+      business_value: 8
+      time_criticality: 7
+      risk_reduction: 6
+      job_size: 3
+      rationale: Environment-gated YOLO mode (PI_YOLO_MODE=1) allows promptless execution for containerized Pi sessions while retaining audit logs.
+  e07:
+    status: completed
+    story_id: e07s05
     capsule: .specs/epics/e07-bash-subcommand-permissions
     wsjf: 5.5
     scoring:
@@ -17,7 +28,7 @@ planning:
       time_criticality: 8
       risk_reduction: 8
       job_size: 4
-      rationale: e07s01-s03 passing. e07s04 (granular subcommand saving UI) and e07s05 (command substitution parsing) added.
+      rationale: Subcommand parsing, decision boundary, per-subcommand auditing, interactive subcommand selection mode, and recursive command substitution parsing complete across e07s01-s05.
   e11:
     status: completed
     story_id: e11s04
@@ -66,13 +77,14 @@ planning:
     constraints:
     - Do not modify the e06 repair flow or child-private bridge catalog.
 handoff:
-  last_step_completed: Completed e07s04 — subcommand selection mode and granular pattern saving implemented. Moving to e07s05.
+  last_step_completed: Planned Epic e17 (Environment-protected YOLO permission mode). Starting e17s01.
   open_decisions: []
   required_reading:
-  - .specs/epics/e07-bash-subcommand-permissions/e07s05-command-substitution-parsing.md
-  - .specs/epics/e07-bash-subcommand-permissions/e07s05-tasks.yaml
+  - .specs/epics/e17-environment-protected-yolo-mode/epic.yaml
+  - .specs/epics/e17-environment-protected-yolo-mode/e17s01-yolo-permission-mode.md
+  - .specs/epics/e17-environment-protected-yolo-mode/e17s01-tasks.yaml
   next_skill: develop-tdd
-  context: Completed e07s04. Starting e07s05 for recursive subcommand parsing for command substitutions $(cmd) and subshells.
+  context: Epic e17 planned. Starting e17s01 for environment-gated YOLO permission policy mode (PI_YOLO_MODE=1).
   blocker: null
   deferred_work:
   - Consolidate safeStringify and JSON formatting helpers into a shared utility module
