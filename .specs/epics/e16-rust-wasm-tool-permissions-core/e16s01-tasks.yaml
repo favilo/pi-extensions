@@ -18,7 +18,7 @@ tasks:
   - id: 3
     description: Implement the TypeScript host adapter, validated structured contract, and fail-closed TypeScript fallback path.
     verify: node --test extensions/tool-permissions/wasm-loader.test.ts extensions/tool-permissions/wasm-contract.test.ts
-    status: todo
+    status: passing
     risk: P1
   - id: 4
     description: Document the chosen Rust/WASM boundary, including whether pi-oxided was viable, and run the package checks.
