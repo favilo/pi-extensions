@@ -1,7 +1,7 @@
 active_flow: build_epic
 active_epic_id: e16
-active_story_id: e16s01
-active_story: Spike a supported Rust/WASM boundary for tool-permissions
+active_story_id: e16s05
+active_story: Establish a native NAPI-RS Node package for tool-permissions
 active_bug_id: null
 git:
   bookmark: favilo/e16-rust-wasm-tool-permissions-core
@@ -105,10 +105,11 @@ handoff:
   - .specs/epics/e16-rust-wasm-tool-permissions-core/e16s01-rust-wasm-boundary-spike.md
   - .specs/epics/e16-rust-wasm-tool-permissions-core/e16s01-tasks.yaml
   - .specs/security/epics/e16/THREAT_MODEL.md
-  next_skill: plan-work
-  context: e16s01 is verified. Next, plan a NAPI-RS native Node package spike so Rust
-    can own tool-permissions logic while a minimal JS entrypoint only registers Pi hooks.
-    a supported Rust/WASM packaging and host-module contract for tool-permissions
+  next_skill: develop-tdd
+  context: e16s05 is planned and consistency-checked. Implement the standalone NAPI-RS
+    package with Rust-owned pure computation and a minimal Pi registration shim.
+    can own tool-permissions logic while a minimal JS entrypoint only registers Pi
+    hooks. a supported Rust/WASM packaging and host-module contract for tool-permissions
     before porting parser or permission logic. Preserve fail-closed behavior and keep
     TypeScript as the authoritative fallback until parity is proven.
   blocker: null
@@ -157,9 +158,9 @@ metrics:
       total_seconds: 422866.0
       avg_seconds: 60409.42857142857
     plan-work:
-      calls: 2
-      total_seconds: 1156.0
-      avg_seconds: 578.0
+      calls: 3
+      total_seconds: 1580.0
+      avg_seconds: 526.6666666666666
     configurable-root-test:
       calls: 2
       total_seconds: 2.0
