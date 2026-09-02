@@ -1,3 +1,4 @@
+import { createRequire } from "node:module";
 import {
   createNativeProbeRequest,
   decodeNativeProbeResponse,
@@ -16,6 +17,14 @@ export type NativeLoaderOptions = {
 export type NativeLoadResult =
   | { engine: "native"; response: NativeProbeResponse }
   | { engine: "typescript"; reason: string };
+
+export async function loadNativePackageProbe(packagePath: string, nonce?: string): Promise<NativeLoadResult> {
+  const require = createRequire(import.meta.url);
+  return loadNativeProbe({
+    nonce,
+    load: () => require(packagePath) as NativeModule,
+  });
+}
 
 export async function loadNativeProbe(options: NativeLoaderOptions): Promise<NativeLoadResult> {
   try {
