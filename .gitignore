@@ -1,4 +1,5 @@
 **/__pycache__/
 node_modules/
 **/target/
+extensions/tool-permissions/native/*.node
 *.log

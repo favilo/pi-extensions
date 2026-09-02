@@ -107,9 +107,9 @@ handoff:
   - .specs/security/epics/e16/THREAT_MODEL.md
   next_skill: develop-tdd
   context: e16s05 is planned and consistency-checked. Implement the standalone NAPI-RS
-    package with Rust-owned pure computation and a minimal Pi registration shim.
-    can own tool-permissions logic while a minimal JS entrypoint only registers Pi
-    hooks. a supported Rust/WASM packaging and host-module contract for tool-permissions
+    package with Rust-owned pure computation and a minimal Pi registration shim. can
+    own tool-permissions logic while a minimal JS entrypoint only registers Pi hooks.
+    a supported Rust/WASM packaging and host-module contract for tool-permissions
     before porting parser or permission logic. Preserve fail-closed behavior and keep
     TypeScript as the authoritative fallback until parity is proven.
   blocker: null
@@ -157,6 +157,7 @@ metrics:
       calls: 7
       total_seconds: 422866.0
       avg_seconds: 60409.42857142857
+      _start: '2026-09-02T18:12:16Z'
     plan-work:
       calls: 3
       total_seconds: 1580.0

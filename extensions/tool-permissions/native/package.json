@@ -1,0 +1,10 @@
+{
+  "name": "@pi-extensions/tool-permissions-native",
+  "version": "0.1.0",
+  "private": true,
+  "type": "commonjs",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "files": ["index.js", "index.d.ts", "*.node", "wasi/"],
+  "engines": { "node": ">=20" }
+}

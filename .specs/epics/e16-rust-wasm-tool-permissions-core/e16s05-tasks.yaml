@@ -9,7 +9,7 @@ tasks:
     description: Scaffold the standalone NAPI-RS crate, package manifest, generated-loader location, and minimal typed native probe.
     verify: cargo test --manifest-path extensions/tool-permissions/native/Cargo.toml
     risk: P0
-    status: failing
+    status: passing
     security: high
     allure:
       severity: critical
