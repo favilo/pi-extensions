@@ -1,4 +1,5 @@
 import { parseBashCommand, type ParsedSubcommand } from "./bash-parser.ts";
+import { parseWithNativeFallback } from "./native-parser-loader.ts";
 import { saveAllowedRule } from "./config.ts";
 import { resolveToolPermissionDecision } from "./index.ts";
 
@@ -50,16 +51,11 @@ export function evaluateBashSubcommands(
     };
   }
 
-  const parseResult = parseBashCommand(command);
+  const parseResult = parseWithNativeFallback(command, () => parseBashCommand(command));
   if (!parseResult.ok) {
-    if (rawDecision.decision === "allow") {
-      safeAudit({ tool: "bash", command, decision: "allow", cwd, source: rawDecision.source });
-      return {
-        decision: "allow",
-        subcommands: [],
-        source: rawDecision.source,
-      };
-    }
+    // A broad raw allow must not bypass parser uncertainty. An unsupported or
+    // malformed command can hide additional executions, so it requires an
+    // explicit prompt; configured deny rules were handled above.
     const reason = `Bash command contains unsupported syntax (${parseResult.detail}) and requires explicit permission.`;
     safeAudit({ tool: "bash", command, decision: "ask", cwd, reason });
     return {

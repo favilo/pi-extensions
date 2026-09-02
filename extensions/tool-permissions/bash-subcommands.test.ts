@@ -135,6 +135,21 @@ test("fails asking (ask) when command contains unsupported syntax or parse error
   }
 });
 
+test("asks instead of allowing process-substitution syntax through a broad rule", () => {
+  const { tmpDir, userPermissionsPath } = createPolicyDir({
+    bash: {
+      allow: [{}],
+      deny: [],
+    },
+  });
+  try {
+    const result = evaluateBashSubcommands("echo hi > >(cat)", tmpDir, { userPermissionsPath });
+    assert.equal(result.decision, "ask");
+  } finally {
+    rmSync(tmpDir, { recursive: true, force: true });
+  }
+});
+
 test("returns detailed reason identifying denied subcommand for agent error reporting", () => {
   const { tmpDir, userPermissionsPath } = createPolicyDir({
     bash: {

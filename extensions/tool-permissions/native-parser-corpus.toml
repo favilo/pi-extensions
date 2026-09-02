@@ -1,0 +1,28 @@
+# Shared corpus for the TypeScript/native Bash parser parity suite.
+[[cases]]
+name = "simple"
+command = "jj status"
+
+[[cases]]
+name = "compound-and-pipeline"
+command = "jj status && jj diff --stat | tee result.txt"
+
+[[cases]]
+name = "quoted-argument"
+command = "echo \"hello world\""
+
+[[cases]]
+name = "redirect"
+command = "jj log > output.txt"
+
+[[cases]]
+name = "command-substitution"
+command = "echo $(jj status)"
+
+[[cases]]
+name = "subshell"
+command = "(jj status; jj diff --summary)"
+
+[[cases]]
+name = "unsupported-loop"
+command = "for f in *.ts; do echo $f; done"

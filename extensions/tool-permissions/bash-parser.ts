@@ -117,6 +117,19 @@ function extractSubcommands(
         };
       }
 
+      // Process-substitution redirects execute a nested command but are not
+      // represented as command-expansion word parts. Keep them fail-asking
+      // until their semantics are modeled explicitly.
+      const processRedirect = (node as any).redirects?.find((redirect: any) =>
+        typeof redirect.content === "string" && /^[<>]\(/.test(redirect.content),
+      );
+      if (processRedirect) {
+        return {
+          ok: false,
+          detail: `unsupported syntax: process substitution redirect "${processRedirect.content}"`,
+        };
+      }
+
       // Check for bash -c 'payload' — recursively parse the payload.
       if (node.name && wordValue(node.name) === "bash") {
         const dashC = node.suffix.find((w) => wordValue(w) === "-c");

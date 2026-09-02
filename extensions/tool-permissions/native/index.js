@@ -700,4 +700,10 @@ if (!nativeBinding) {
 }
 
 module.exports = nativeBinding
+module.exports.evaluatePermission = nativeBinding.evaluatePermission
+module.exports.evaluatePolicy = nativeBinding.evaluatePolicy
+module.exports.NativeOperation = nativeBinding.NativeOperation
+module.exports.parse = nativeBinding.parse
+module.exports.parsePolicy = nativeBinding.parsePolicy
+module.exports.PermissionDecision = nativeBinding.PermissionDecision
 module.exports.probe = nativeBinding.probe

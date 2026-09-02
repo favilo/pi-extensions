@@ -106,10 +106,10 @@ handoff:
   - .specs/epics/e16-rust-wasm-tool-permissions-core/e16s01-tasks.yaml
   - .specs/security/epics/e16/THREAT_MODEL.md
   next_skill: verify-work
-  context: e16s05 native package tasks and automated gates are complete. Verify the native-only
-    package direction and startup fallback before advancing to Rust parser parity. can
-    own tool-permissions logic while a minimal JS entrypoint only registers Pi hooks.
-    a supported Rust/WASM packaging and host-module contract for tool-permissions
+  context: e16s05 native package tasks and automated gates are complete. Verify the
+    native-only package direction and startup fallback before advancing to Rust parser
+    parity. can own tool-permissions logic while a minimal JS entrypoint only registers
+    Pi hooks. a supported Rust/WASM packaging and host-module contract for tool-permissions
     before porting parser or permission logic. Preserve fail-closed behavior and keep
     TypeScript as the authoritative fallback until parity is proven.
   blocker: null
@@ -154,10 +154,9 @@ metrics:
       total_seconds: 3246.0
       avg_seconds: 1082.0
     develop-tdd:
-      calls: 7
-      total_seconds: 422866.0
-      avg_seconds: 60409.42857142857
-      _start: '2026-09-02T18:12:16Z'
+      calls: 8
+      total_seconds: 424933.0
+      avg_seconds: 53116.625
     plan-work:
       calls: 3
       total_seconds: 1580.0
