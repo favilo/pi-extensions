@@ -93,8 +93,8 @@ planning:
     constraints:
     - Do not modify the e06 repair flow or child-private bridge catalog.
 handoff:
-  last_step_completed: Completed e16s01 Rust/WASM boundary, host adapter, fallback,
-    documentation, and package verification.
+  last_step_completed: Completed e16s05 native NAPI package scaffold, validated loader,
+    Pi startup diagnostics, package build, and full automated checks.
   open_decisions:
   - Is pi-oxidized-ext (pi_ext) compatible with a narrow tool-permissions NAPI package,
     or should the project use a standalone NAPI-RS crate and generated package loader?
@@ -105,9 +105,9 @@ handoff:
   - .specs/epics/e16-rust-wasm-tool-permissions-core/e16s01-rust-wasm-boundary-spike.md
   - .specs/epics/e16-rust-wasm-tool-permissions-core/e16s01-tasks.yaml
   - .specs/security/epics/e16/THREAT_MODEL.md
-  next_skill: develop-tdd
-  context: e16s05 is planned and consistency-checked. Implement the standalone NAPI-RS
-    package with Rust-owned pure computation and a minimal Pi registration shim. can
+  next_skill: verify-work
+  context: e16s05 native package tasks and automated gates are complete. Verify the native-only
+    package direction and startup fallback before advancing to Rust parser parity. can
     own tool-permissions logic while a minimal JS entrypoint only registers Pi hooks.
     a supported Rust/WASM packaging and host-module contract for tool-permissions
     before porting parser or permission logic. Preserve fail-closed behavior and keep

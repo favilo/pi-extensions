@@ -92,7 +92,7 @@ Tests and startup diagnostics identify the selected engine, package artifact, co
 1. Scaffold the standalone NAPI-RS crate, package manifest, generated-loader location, and minimal typed native probe → verify: `cargo test --manifest-path extensions/tool-permissions/native/Cargo.toml`
 2. Add failing host contract tests for native loading, version/output validation, engine identity, and fail-safe fallback → verify: `node --test extensions/tool-permissions/native-loader.test.ts extensions/tool-permissions/native-contract.test.ts`
 3. Implement the JS host adapter and minimal Pi registration seam without moving prompts, audit, persistence, or execution into Rust → verify: `node --test extensions/tool-permissions/native-loader.test.ts extensions/tool-permissions/native-contract.test.ts extensions/tool-permissions/permission-boundary.test.ts`
-4. Add native/WASI build and package scripts, then document the package/runtime matrix and `pi_ext` comparison → verify: `npm run build:native && npm pack --dry-run`
+4. Add native/WASI build and package scripts, then document the package/runtime matrix and `pi_ext` comparison → verify: `npm run build:native && npm pack --dry-run ./extensions/tool-permissions/native`
 5. Run the full package gates and confirm existing permission behavior remains green → verify: `npm run check`
 
 ## 20. Definition of done

@@ -6,18 +6,18 @@ delta: ADDED
 spec: e16s02-rust-bash-parser-parity.md
 tasks:
   - id: 1
-    description: Add parity fixtures and failing tests that compare TypeScript and Rust/WASM parsing across simple, compound, recursive, and unsupported Bash syntax.
-    verify: node --test extensions/tool-permissions/bash-parser.test.ts extensions/tool-permissions/wasm-parser-parity.test.ts
+    description: Add parity fixtures and failing tests that compare TypeScript and native parsing across simple, compound, recursive, and unsupported Bash syntax.
+    verify: node --test extensions/tool-permissions/bash-parser.test.ts extensions/tool-permissions/native-parser-parity.test.ts
     status: todo
     risk: P1
   - id: 2
-    description: Implement the Rust/WASM parser for command units, source spans, command substitutions, subshells, brace groups, and unsupported-syntax detection.
-    verify: node --test extensions/tool-permissions/bash-parser.test.ts extensions/tool-permissions/wasm-parser-parity.test.ts
+    description: Implement the native Rust parser for command units, source spans, command substitutions, subshells, brace groups, and unsupported-syntax detection.
+    verify: node --test extensions/tool-permissions/bash-parser.test.ts extensions/tool-permissions/native-parser-parity.test.ts
     status: todo
     risk: P1
   - id: 3
-    description: Route the host parser adapter through the WASM path while preserving validated TypeScript fallback behavior.
-    verify: node --test extensions/tool-permissions/bash-subcommands.test.ts extensions/tool-permissions/wasm-parser-parity.test.ts
+    description: Route the host parser adapter through the native path while preserving validated TypeScript fallback behavior.
+    verify: node --test extensions/tool-permissions/bash-subcommands.test.ts extensions/tool-permissions/native-parser-parity.test.ts
     status: todo
     risk: P1
   - id: 4

@@ -21,7 +21,7 @@ stories:
   - id: e16s05
     title: Establish a native NAPI-RS Node package for tool-permissions
     bcps: 4
-    status: todo
+    status: passing
     delta: ADDED
     spec: e16s05-napi-native-node-package.md
     tasks: e16s05-tasks.yaml

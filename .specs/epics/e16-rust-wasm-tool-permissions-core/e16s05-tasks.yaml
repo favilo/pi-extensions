@@ -1,6 +1,6 @@
 story_id: e16s05
 title: Establish a native NAPI-RS Node package for tool-permissions
-status: failing
+status: passing
 bcps: 4
 delta: ADDED
 spec: e16s05-napi-native-node-package.md
@@ -40,9 +40,9 @@ tasks:
         - "Integration"
   - id: 4
     description: Add native/WASI build and package scripts, then document the package/runtime matrix and pi_ext comparison.
-    verify: npm run build:native && npm pack --dry-run
+    verify: npm run build:native && npm pack --dry-run ./extensions/tool-permissions/native
     risk: P1
-    status: failing
+    status: passing
     security: medium
     allure:
       severity: high
@@ -53,7 +53,7 @@ tasks:
     description: Run the full package gates and confirm existing permission behavior remains green.
     verify: npm run check
     risk: P1
-    status: failing
+    status: passing
     security: high
     allure:
       severity: high
