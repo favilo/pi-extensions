@@ -1,10 +1,10 @@
 {
-  "generated_at": "2026-08-06T19:34:27.073548+00:00",
+  "generated_at": "2026-09-02T17:44:27.028985+00:00",
   "version": "1.0",
   "summary": {
-    "total_findings": 2,
+    "total_findings": 7,
     "high": 0,
-    "medium": 2,
+    "medium": 7,
     "low": 0
   },
   "findings": [
@@ -19,7 +19,42 @@
       "check": "double-tag",
       "file": ".specs/epics/e03-directory-local-tool-permissions/e03s03-scoped-permissions-editor.md",
       "severity": "MEDIUM",
-      "description": "File '.specs/epics/e03-directory-local-tool-permissions/e03s03-scoped-permissions-editor.md' is tagged with multiple stories: e03s02, e03s03",
+      "description": "File '.specs/epics/e03-directory-local-tool-permissions/e03s03-scoped-permissions-editor.md' is tagged with multiple stories: e03s02, e03s03, e08s01",
+      "remediation": "Review whether this file genuinely implements multiple stories. If it's a shared utility, this is acceptable."
+    },
+    {
+      "check": "double-tag",
+      "file": ".specs/epics/e07-bash-subcommand-permissions/e07s02-subcommand-decision-boundary.md",
+      "severity": "MEDIUM",
+      "description": "File '.specs/epics/e07-bash-subcommand-permissions/e07s02-subcommand-decision-boundary.md' is tagged with multiple stories: e04s01, e07s01",
+      "remediation": "Review whether this file genuinely implements multiple stories. If it's a shared utility, this is acceptable."
+    },
+    {
+      "check": "double-tag",
+      "file": ".specs/epics/e06-permission-enforced-subagents/e06s02-permission-enforced-subagent-runtime.md",
+      "severity": "MEDIUM",
+      "description": "File '.specs/epics/e06-permission-enforced-subagents/e06s02-permission-enforced-subagent-runtime.md' is tagged with multiple stories: e06s01, e06s04, e08s01",
+      "remediation": "Review whether this file genuinely implements multiple stories. If it's a shared utility, this is acceptable."
+    },
+    {
+      "check": "double-tag",
+      "file": ".specs/epics/e06-permission-enforced-subagents/e06s05-tasks.yaml",
+      "severity": "MEDIUM",
+      "description": "File '.specs/epics/e06-permission-enforced-subagents/e06s05-tasks.yaml' is tagged with multiple stories: e06s05, e06s06",
+      "remediation": "Review whether this file genuinely implements multiple stories. If it's a shared utility, this is acceptable."
+    },
+    {
+      "check": "double-tag",
+      "file": ".specs/epics/e07-bash-subcommand-permissions/e07s03-subcommand-audit-and-denials.md",
+      "severity": "MEDIUM",
+      "description": "File '.specs/epics/e07-bash-subcommand-permissions/e07s03-subcommand-audit-and-denials.md' is tagged with multiple stories: e07s01, e07s03",
+      "remediation": "Review whether this file genuinely implements multiple stories. If it's a shared utility, this is acceptable."
+    },
+    {
+      "check": "double-tag",
+      "file": ".specs/epics/e10-vim-permission-steering/e10s02-tasks.yaml",
+      "severity": "MEDIUM",
+      "description": "File '.specs/epics/e10-vim-permission-steering/e10s02-tasks.yaml' is tagged with multiple stories: e10s01, e10s02",
       "remediation": "Review whether this file genuinely implements multiple stories. If it's a shared utility, this is acceptable."
     }
   ]
