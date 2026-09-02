@@ -9,9 +9,11 @@ cargo build --manifest-path extensions/tool-permissions/wasm/Cargo.toml \
   --target wasm32-unknown-unknown --release
 ```
 
-The initial boundary uses `wasm-bindgen` with a JSON request/response string.
-The TypeScript host remains authoritative and validates the versioned contract;
-any artifact, runtime, or decode failure falls back to TypeScript.
+The initial boundary uses `wasm-bindgen` with `serde-wasm-bindgen` to exchange
+structured JavaScript values. Rust accepts a deserialized `ProbeRequest` and
+returns a serialized `ProbeResponse`. The TypeScript host remains authoritative
+and validates the versioned contract; any artifact, runtime, or decode failure
+falls back to TypeScript.
 
 `pi-oxidized` is a Rust rewrite of the broader Pi runtime, so adopting it
 would expand this spike's scope and runtime coupling. Its `pi-oxidized-ext`

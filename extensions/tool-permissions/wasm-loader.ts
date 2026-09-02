@@ -7,8 +7,8 @@ import {
 } from "./wasm-contract.ts";
 
 export type WasmModule = {
-  /** wasm-bindgen exposes the pure probe as a JSON string function. */
-  probe(requestJson: string): unknown | Promise<unknown>;
+  /** wasm-bindgen exposes the serde request/response as JavaScript objects. */
+  probe(request: WasmProbeRequest): unknown | Promise<unknown>;
 };
 
 export type WasmLoaderOptions = {
@@ -29,7 +29,7 @@ export async function loadWasmProbe(options: WasmLoaderOptions): Promise<WasmLoa
     }
     const module = await options.instantiate(artifact);
     const request = createProbeRequest(options.nonce ?? "tool-permissions");
-    const response = decodeProbeResponse(await module.probe(JSON.stringify(request)));
+    const response = decodeProbeResponse(await module.probe(request));
     if (response.payload.nonce !== request.payload.nonce) {
       throw new Error("WASM contract nonce mismatch");
     }

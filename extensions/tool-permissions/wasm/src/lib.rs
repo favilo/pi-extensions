@@ -3,56 +3,65 @@ use wasm_bindgen::prelude::*;
 
 const CONTRACT_VERSION: u8 = 1;
 
-#[derive(Deserialize)]
-struct ProbeRequest {
-    version: u8,
-    operation: String,
-    payload: ProbePayload,
+#[derive(Deserialize, Serialize)]
+pub struct ProbeRequest {
+    pub version: u8,
+    pub operation: String,
+    pub payload: ProbePayload,
 }
 
 #[derive(Deserialize, Serialize)]
-struct ProbePayload {
-    nonce: String,
+pub struct ProbePayload {
+    pub nonce: String,
 }
 
 #[derive(Serialize)]
-struct ProbeResponse {
-    version: u8,
-    operation: &'static str,
-    ok: bool,
-    payload: ProbePayload,
+pub struct ProbeResponse {
+    pub version: u8,
+    pub operation: &'static str,
+    pub ok: bool,
+    pub payload: ProbePayload,
 }
 
-/// Pure probe boundary: the host owns JSON validation and all side effects.
-#[wasm_bindgen]
-pub fn probe(request_json: String) -> String {
-    let Ok(request) = serde_json::from_str::<ProbeRequest>(&request_json) else {
-        return "{}".to_owned();
-    };
+fn build_response(request: ProbeRequest) -> Result<ProbeResponse, &'static str> {
     if request.version != CONTRACT_VERSION || request.operation != "health" {
-        return "{}".to_owned();
+        return Err("incompatible probe request");
     }
-    serde_json::to_string(&ProbeResponse {
+    Ok(ProbeResponse {
         version: CONTRACT_VERSION,
         operation: "health",
         ok: true,
         payload: request.payload,
     })
-    .unwrap_or_else(|_| "{}".to_owned())
+}
+
+/// Pure probe boundary: the host owns contract validation and all side effects.
+#[wasm_bindgen]
+pub fn probe(request: JsValue) -> Result<JsValue, JsValue> {
+    let request: ProbeRequest = serde_wasm_bindgen::from_value(request)
+        .map_err(|error| JsValue::from_str(&format!("invalid probe request: {error}")))?;
+    let response = build_response(request).map_err(JsValue::from_str)?;
+    serde_wasm_bindgen::to_value(&response)
+        .map_err(|error| JsValue::from_str(&format!("failed to encode probe response: {error}")))
 }
 
 #[cfg(test)]
 mod tests {
-    use super::probe;
+    use super::{build_response, ProbeRequest};
 
     #[test]
-    fn probe_returns_a_distinct_health_response() {
-        let request = r#"{"version":1,"operation":"health","payload":{"nonce":"test"}}"#;
-        let response = probe(request.to_owned());
-        assert_ne!(response, request);
-        assert_eq!(
-            response,
-            r#"{"version":1,"operation":"health","ok":true,"payload":{"nonce":"test"}}"#,
-        );
+    fn probe_returns_a_distinct_typed_health_response() {
+        let request = ProbeRequest {
+            version: 1,
+            operation: "health".to_owned(),
+            payload: super::ProbePayload {
+                nonce: "test".to_owned(),
+            },
+        };
+        let response = build_response(request).expect("compatible request");
+        assert_eq!(response.version, 1);
+        assert_eq!(response.operation, "health");
+        assert!(response.ok);
+        assert_eq!(response.payload.nonce, "test");
     }
 }
