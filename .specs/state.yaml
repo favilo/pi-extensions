@@ -149,10 +149,9 @@ metrics:
       total_seconds: 3246.0
       avg_seconds: 1082.0
     develop-tdd:
-      calls: 6
-      total_seconds: 362555.0
-      avg_seconds: 60425.833333333336
-      _start: '2026-09-02T00:38:41Z'
+      calls: 7
+      total_seconds: 422866.0
+      avg_seconds: 60409.42857142857
     plan-work:
       calls: 2
       total_seconds: 1156.0

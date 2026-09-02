@@ -37,5 +37,22 @@ pub fn probe(request_json: String) -> String {
         operation: "health",
         ok: true,
         payload: request.payload,
-    }).unwrap_or_else(|_| "{}".to_owned())
+    })
+    .unwrap_or_else(|_| "{}".to_owned())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::probe;
+
+    #[test]
+    fn probe_returns_a_distinct_health_response() {
+        let request = r#"{"version":1,"operation":"health","payload":{"nonce":"test"}}"#;
+        let response = probe(request.to_owned());
+        assert_ne!(response, request);
+        assert_eq!(
+            response,
+            r#"{"version":1,"operation":"health","ok":true,"payload":{"nonce":"test"}}"#,
+        );
+    }
 }
