@@ -197,6 +197,7 @@ export function parseBashCommand(command: string): BashParseResult {
   if (!trimmed) {
     return { ok: false, reason: "parse_error", detail: "empty command" };
   }
+  const offset = command.length - command.trimStart().length;
 
   let script: ParsedScript;
   try {
@@ -232,6 +233,13 @@ export function parseBashCommand(command: string): BashParseResult {
 
   if (subcommands.length === 0) {
     return { ok: false, reason: "parse_error", detail: "no subcommands found" };
+  }
+
+  for (const subcommand of subcommands) {
+    subcommand.span = {
+      start: subcommand.span.start + offset,
+      end: subcommand.span.end + offset,
+    };
   }
 
   return { ok: true, subcommands };
