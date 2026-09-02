@@ -1,5 +1,10 @@
 import { readFileSync } from "node:fs";
-import { decodeProbeResponse, type WasmProbeRequest, type WasmProbeResponse } from "./wasm-contract.ts";
+import {
+  createProbeRequest,
+  decodeProbeResponse,
+  type WasmProbeRequest,
+  type WasmProbeResponse,
+} from "./wasm-contract.ts";
 
 export type WasmModule = {
   probe(request: WasmProbeRequest): unknown | Promise<unknown>;
@@ -16,9 +21,22 @@ export type WasmLoadResult =
   | { engine: "typescript"; reason: string };
 
 export async function loadWasmProbe(options: WasmLoaderOptions): Promise<WasmLoadResult> {
-  // Stub intentionally falls back until the RED contract is implemented.
-  void options;
-  return { engine: "typescript", reason: "WASM probe unavailable" };
+  try {
+    const artifact = readWasmArtifact(options.artifactPath);
+    if (!options.instantiate) {
+      return { engine: "typescript", reason: "WASM runtime is unavailable" };
+    }
+    const module = await options.instantiate(artifact);
+    const request = createProbeRequest(options.nonce ?? "tool-permissions");
+    const response = decodeProbeResponse(await module.probe(request));
+    if (response.payload.nonce !== request.payload.nonce) {
+      throw new Error("WASM contract nonce mismatch");
+    }
+    return { engine: "wasm", response };
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : "unknown WASM initialization failure";
+    return { engine: "typescript", reason: `WASM probe rejected: ${reason}` };
+  }
 }
 
 export function readWasmArtifact(path: string): Uint8Array {
