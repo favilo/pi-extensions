@@ -96,16 +96,18 @@ handoff:
   last_step_completed: Completed e16s01 Rust/WASM boundary, host adapter, fallback,
     documentation, and package verification.
   open_decisions:
-  - Is pi-oxided compatible with the required Pi package/runtime shape, or does e16s01
-    need a narrower Rust/WASM host boundary?
+  - Is pi-oxidized-ext (pi_ext) compatible with a narrow tool-permissions NAPI package,
+    or should the project use a standalone NAPI-RS crate and generated package loader?
+  - Can Pi's current ExtensionAPI be registered through a minimal JS entrypoint while
+    keeping parser and permission decisions entirely in Rust?
   required_reading:
   - .specs/epics/e16-rust-wasm-tool-permissions-core/epic.yaml
   - .specs/epics/e16-rust-wasm-tool-permissions-core/e16s01-rust-wasm-boundary-spike.md
   - .specs/epics/e16-rust-wasm-tool-permissions-core/e16s01-tasks.yaml
   - .specs/security/epics/e16/THREAT_MODEL.md
-  next_skill: verify-work
-  context: e16s01 implementation and package verification are complete. Validate the
-    documented WASM boundary and safe TypeScript fallback before advancing to e16s02.
+  next_skill: plan-work
+  context: e16s01 is verified. Next, plan a NAPI-RS native Node package spike so Rust
+    can own tool-permissions logic while a minimal JS entrypoint only registers Pi hooks.
     a supported Rust/WASM packaging and host-module contract for tool-permissions
     before porting parser or permission logic. Preserve fail-closed behavior and keep
     TypeScript as the authoritative fallback until parity is proven.
