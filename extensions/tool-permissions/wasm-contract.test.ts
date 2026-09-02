@@ -14,6 +14,20 @@ test("creates a versioned structured probe request", () => {
   });
 });
 
+test("accepts a JSON-encoded response from the wasm-bindgen bridge", () => {
+  assert.deepEqual(decodeProbeResponse(JSON.stringify({
+    version: WASM_CONTRACT_VERSION,
+    operation: "health",
+    ok: true,
+    payload: { nonce: "nonce-1" },
+  })), {
+    version: WASM_CONTRACT_VERSION,
+    operation: "health",
+    ok: true,
+    payload: { nonce: "nonce-1" },
+  });
+});
+
 test("accepts only a compatible structured probe response", () => {
   assert.deepEqual(decodeProbeResponse({
     version: WASM_CONTRACT_VERSION,
