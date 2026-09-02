@@ -18,6 +18,16 @@ export type NativeLoadResult =
   | { engine: "typescript"; reason: string };
 
 export async function loadNativeProbe(options: NativeLoaderOptions): Promise<NativeLoadResult> {
-  void options;
-  return { engine: "typescript", reason: "native probe unavailable" };
+  try {
+    const module = await options.load();
+    const request = createNativeProbeRequest(options.nonce ?? "tool-permissions");
+    const response = decodeNativeProbeResponse(await module.probe(request));
+    if (response.nonce !== request.nonce) {
+      throw new Error("native contract nonce mismatch");
+    }
+    return { engine: "native", response };
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : "unknown native initialization failure";
+    return { engine: "typescript", reason: `native probe rejected: ${reason}` };
+  }
 }

@@ -20,7 +20,7 @@ tasks:
     description: Add failing host contract tests for native loading, version/output validation, engine identity, and fail-safe fallback.
     verify: node --test extensions/tool-permissions/native-loader.test.ts extensions/tool-permissions/native-contract.test.ts
     risk: P0
-    status: failing
+    status: passing
     security: high
     allure:
       severity: critical
