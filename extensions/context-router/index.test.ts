@@ -89,12 +89,12 @@ test("router establishes and maintains only the baseline plus deliberate selecte
 
   await harness.emit("session_start");
   assert.deepEqual(harness.activeTools(), [
-    "read", "bash", "bash_task", "edit", "write", "grep", "find", "ls", "subagent", "find_tools", "find_skills",
+    "read", "bash", "bash_task", "edit", "write", "grep", "find", "ls", "subagent", "subagent_result", "find_tools", "find_skills",
   ]);
 
   harness.addLateTool({ name: "mcp__late", description: "Late provider", sourceInfo: { source: "mcp" } });
   await harness.emit("turn_start");
-  assert.doesNotMatch(harness.activeTools().join(","), /subagent_result|mcp__late|mcp__deploy/);
+  assert.doesNotMatch(harness.activeTools().join(","), /mcp__late|mcp__deploy/);
 
   const finder = harness.finder();
   assert.ok(finder?.execute);
@@ -115,7 +115,7 @@ test("router establishes and maintains only the baseline plus deliberate selecte
   await harness.emit("session_shutdown");
   await harness.emit("session_start");
   assert.deepEqual(harness.activeTools(), [
-    "read", "bash", "bash_task", "edit", "write", "grep", "find", "ls", "subagent", "find_tools", "find_skills",
+    "read", "bash", "bash_task", "edit", "write", "grep", "find", "ls", "subagent", "subagent_result", "find_tools", "find_skills",
   ]);
 });
 
@@ -156,23 +156,23 @@ test("before_agent_start appends availability section preserving existing prompt
 test("tool_call lazily activates registered but inactive non-MCP tools", async () => {
   const harness = routerHarness([
     { name: "read", description: "Read files", sourceInfo: { source: "builtin" } },
-    { name: "subagent_result", description: "Read a child result", sourceInfo: { source: "extension" } },
+    { name: "custom_extension_tool", description: "Custom extension tool", sourceInfo: { source: "extension" } },
   ]);
 
   await harness.emit("session_start");
-  assert.ok(!harness.activeTools().includes("subagent_result"));
+  assert.ok(!harness.activeTools().includes("custom_extension_tool"));
 
   const handlers = harness.toolCallHandlers();
   assert.ok(handlers.length > 0, "must have tool_call handler");
 
   let activated = false;
   for (const handler of handlers) {
-    const event = { toolName: "subagent_result", toolCallId: "tc-1", input: {} };
+    const event = { toolName: "custom_extension_tool", toolCallId: "tc-1", input: {} };
     const result = await handler(event);
     if (!result || (result as { block?: boolean }).block !== true) {
       activated = true;
     }
   }
 
-  assert.ok(activated || harness.activeTools().includes("subagent_result"), "must activate subagent_result");
+  assert.ok(activated || harness.activeTools().includes("custom_extension_tool"), "must activate custom_extension_tool");
 });

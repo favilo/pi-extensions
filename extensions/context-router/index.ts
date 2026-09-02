@@ -19,6 +19,7 @@ const BASELINE_TOOLS = [
   "find",
   "ls",
   "subagent",
+  "subagent_result",
   "find_tools",
   "find_skills",
 ] as const;

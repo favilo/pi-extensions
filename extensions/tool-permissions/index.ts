@@ -541,16 +541,15 @@ async function presentScrollablePermission(
       steering: steeringReason,
     };
   }
-  const publishedPreview = typeof pi.appendEntry === "function";
-  const preview: PermissionPreview = {
-    title,
-    body: previewText ?? body,
-    ...(stickyHeader ? { stickyHeader } : {}),
-    ...(toolCallId ? { toolCallId } : {}),
-  };
-  pi.appendEntry?.<PermissionPreview>("permission-preview", preview);
-
+  const publishedPreview = typeof pi.appendEntry === "function" && Boolean(toolCallId);
   if (publishedPreview && toolCallId) {
+    const preview: PermissionPreview = {
+      title,
+      body: previewText ?? body,
+      ...(stickyHeader ? { stickyHeader } : {}),
+      toolCallId,
+    };
+    pi.appendEntry?.<PermissionPreview>("permission-preview", preview);
     promptedPreviews.set(toolCallId, preview);
     pendingPreviewReviews.add(toolCallId);
   }
