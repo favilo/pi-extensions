@@ -23,6 +23,14 @@ export function createProbeRequest(nonce: string): WasmProbeRequest {
 }
 
 export function decodeProbeResponse(value: unknown): WasmProbeResponse {
+  if (typeof value === "string") {
+    if (value.length > 4096) throw new Error("WASM contract response is too large");
+    try {
+      value = JSON.parse(value);
+    } catch {
+      throw new Error("WASM contract response is not valid JSON");
+    }
+  }
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     throw new Error("WASM contract response must be an object");
   }
