@@ -20,12 +20,15 @@ test("loads a compatible artifact and completes the version handshake", async ()
       artifactPath: artifact.path,
       nonce: "nonce-1",
       instantiate: async () => ({
-        probe: (request) => ({
-          version: WASM_CONTRACT_VERSION,
-          operation: request.operation,
-          ok: true,
-          payload: { nonce: request.payload.nonce },
-        }),
+        probe: (requestJson) => {
+          const request = JSON.parse(requestJson) as { operation: string; payload: { nonce: string } };
+          return JSON.stringify({
+            version: WASM_CONTRACT_VERSION,
+            operation: request.operation,
+            ok: true,
+            payload: { nonce: request.payload.nonce },
+          });
+        },
       }),
     });
     assert.deepEqual(result, {
