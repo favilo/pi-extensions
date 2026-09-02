@@ -31,7 +31,7 @@ tasks:
     description: Implement the JS host adapter and minimal Pi registration seam without moving prompts, audit, persistence, or execution into Rust.
     verify: node --test extensions/tool-permissions/native-loader.test.ts extensions/tool-permissions/native-contract.test.ts extensions/tool-permissions/permission-boundary.test.ts
     risk: P0
-    status: failing
+    status: passing
     security: high
     allure:
       severity: critical

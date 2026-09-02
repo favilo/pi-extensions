@@ -19,6 +19,7 @@ import {
 import { createPersistedTrustResolver, resolveCurrentProjectPolicyPath, resolveScopedPermissionDecision, type ScopedPermissionDecision } from "./scope.ts";
 import { evaluateBashSubcommands, saveSubcommandAllowRules } from "./bash-subcommands.ts";
 import { isYoloModeEnabled } from "./yolo-mode.ts";
+import { loadNativePackageProbe } from "./native-loader.ts";
 import type { PermissionDecision, ToolPermissionBoundary, ToolRequest } from "./permission-boundary.ts";
 import { isPermissionPromptCancellation } from "./prompt-input.ts";
 import { SteeringEditor } from "./steering-editor.ts";
@@ -1366,7 +1367,19 @@ export default function toolPermissionPolicy(pi: ExtensionAPI) {
     });
   }
 
-  pi.on("session_start", (_event, ctx) => {
+  pi.on("session_start", async (_event, ctx) => {
+    const nativePackage = process.env.PI_TOOL_PERMISSIONS_NATIVE_PACKAGE;
+    if (nativePackage) {
+      const nativeResult = await loadNativePackageProbe(nativePackage);
+      if (ctx.hasUI) {
+        ctx.ui.notify(
+          nativeResult.engine === "native"
+            ? "Native tool-permissions probe active (contract v1)."
+            : `Tool-permissions using TypeScript fallback: ${nativeResult.reason}`,
+          nativeResult.engine === "native" ? "info" : "warning",
+        );
+      }
+    }
     if (isYoloModeEnabled()) {
       if (ctx.hasUI) {
         ctx.ui.notify("YOLO permission mode active via environment variable.", "warning");
