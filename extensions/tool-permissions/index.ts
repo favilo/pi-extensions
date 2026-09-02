@@ -18,7 +18,7 @@ import {
 } from "./config.ts";
 import { createPersistedTrustResolver, resolveCurrentProjectPolicyPath, resolveScopedPermissionDecision, type ScopedPermissionDecision } from "./scope.ts";
 import { evaluateBashSubcommands, saveSubcommandAllowRules } from "./bash-subcommands.ts";
-import { isYoloModeEnabled } from "./yolo-mode.ts";
+import { isYoloEnvironmentAdmitted, isYoloModeActive, setYoloSessionState } from "./yolo-mode.ts";
 import type { PermissionDecision, ToolPermissionBoundary, ToolRequest } from "./permission-boundary.ts";
 import { isPermissionPromptCancellation } from "./prompt-input.ts";
 import { SteeringEditor } from "./steering-editor.ts";
@@ -890,6 +890,7 @@ export async function promptToolPermissionRequest(
       compact(request.input, 8000),
     ].join("\n"),
   );
+  if (result.steering) (request as { promptSteering?: string }).promptSteering = result.steering;
   const decision = result.allowed ? "allow" : result.decision;
   logSubagentDebug("permission-prompt-result", { request, decision, result });
   return decision;
@@ -1367,15 +1368,35 @@ export default function toolPermissionPolicy(pi: ExtensionAPI) {
   }
 
   pi.on("session_start", (_event, ctx) => {
-    if (isYoloModeEnabled()) {
-      if (ctx.hasUI) {
-        ctx.ui.notify("YOLO permission mode active via environment variable.", "warning");
-      }
-      audit({ tool: "permissions", decision: "yolo_mode_activated", cwd: ctx.cwd });
+    setYoloSessionState(false);
+    if (isYoloEnvironmentAdmitted() && ctx.hasUI) {
+      ctx.ui.notify("YOLO mode is available. Type /yolo on to activate promptless execution for this session.", "info");
     }
     if (process.env.PI_SUBAGENT_DEBUG === "1" && ctx.hasUI) {
       ctx.ui.notify(`Subagent debug log: ${subagentDebugPath()}`, "info");
     }
+  });
+
+  pi.registerCommand("yolo", {
+    description: "Enable or disable YOLO permission mode (/yolo [on|off])",
+    handler: async (args, ctx) => {
+      if (!isYoloEnvironmentAdmitted()) {
+        ctx.ui.notify("YOLO mode is disabled in this environment. Set PI_YOLO_MODE=1 in your environment to enable /yolo.", "error");
+        return;
+      }
+      const mode = args.trim().toLowerCase();
+      if (mode === "on") {
+        setYoloSessionState(true);
+        ctx.ui.notify("YOLO permission mode ENABLED for this session.", "warning");
+        audit({ tool: "permissions", decision: "yolo_mode_enabled", cwd: ctx.cwd });
+      } else if (mode === "off") {
+        setYoloSessionState(false);
+        ctx.ui.notify("YOLO permission mode DISABLED for this session.", "info");
+        audit({ tool: "permissions", decision: "yolo_mode_disabled", cwd: ctx.cwd });
+      } else {
+        ctx.ui.notify(`YOLO mode is currently ${isYoloModeActive() ? "ON" : "OFF"}. Usage: /yolo [on|off]`, "info");
+      }
+    },
   });
 
   pi.registerCommand("permissions", {
@@ -1396,6 +1417,7 @@ export default function toolPermissionPolicy(pi: ExtensionAPI) {
   });
 
   pi.on("session_shutdown", (_event, ctx) => {
+    setYoloSessionState(false);
     pendingSteering.clear();
     promptedPreviews.clear();
     pendingPreviewReviews.clear();

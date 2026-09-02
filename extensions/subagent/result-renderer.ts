@@ -6,6 +6,7 @@ const MAX_EXPANDED_OUTPUT_BYTES = 8 * 1_024;
 
 export type SubagentResultDisplay = {
   summary: string;
+  expandedText?: string;
   expandedJson?: string;
 };
 
@@ -50,7 +51,7 @@ export function subagentResultDisplay(
   if (!result.found) {
     return {
       summary: "unknown subagent",
-      ...(expanded ? { expandedJson: prettyJson(result) } : {}),
+      ...(expanded ? { expandedText: "Subagent task not found.", expandedJson: prettyJson(result) } : {}),
     };
   }
 
@@ -58,16 +59,23 @@ export function subagentResultDisplay(
     const summary = `${result.status} • exported ${result.bytesWritten} bytes -> ${result.destinationPath}`;
     return {
       summary,
-      ...(expanded ? { expandedJson: prettyJson(result) } : {}),
+      ...(expanded ? { expandedText: `Snapshot exported to ${result.destinationPath} (${result.bytesWritten} bytes)`, expandedJson: prettyJson(result) } : {}),
     };
   }
 
   const outputBytes = result.outputBytes?.returned ?? 0;
   const truncation = result.outputTruncated ? " • truncated" : "";
   const summary = `${result.status} • ${outputBytes} bytes${truncation}`;
+  const expandedText = expanded
+    ? [
+        ...(result.taskPrompt?.trim() ? [`Prompt:\n${result.taskPrompt.trim()}`] : []),
+        result.output ?? "No output text.",
+      ].join("\n\n")
+    : undefined;
 
   return {
     summary,
+    expandedText,
     ...(expanded ? { expandedJson: prettyJson(presentationSnapshot(result)) } : {}),
   };
 }

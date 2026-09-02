@@ -139,6 +139,18 @@ test("returns a structured failure when the authorized child action crashes", as
   assert.deepEqual(audit, ["child:allow:read", "child:failed:read"]);
 });
 
+test("binds permission-prompt steering to the execution result", async () => {
+  const toolRequest = { ...request({ steering: undefined }), promptSteering: "run only the focused test" };
+  const boundary: ToolPermissionBoundary = {
+    evaluate: async () => "allow",
+    execute: async () => ({ content: [{ type: "text", text: "ok" }] }),
+  };
+
+  const result = await executeToolRequest(toolRequest, boundary);
+
+  assert.equal(result.steering, "run only the focused test");
+});
+
 test("audits the decision and preserves actor, cwd, and steering context", async () => {
   const entries: Array<Record<string, unknown>> = [];
   const toolRequest = request({ toolName: "write", steering: "Update the report." });

@@ -28,7 +28,7 @@ import {
 import { createCompletionSignalDispatcher } from "./completion-delivery.ts";
 import { subagentResultDisplay } from "./result-renderer.ts";
 import { renderSubagentToolRequestCall, type SubagentToolRequestCallArgs } from "./tool-request-renderer.ts";
-import { createPanelManager, createSubagentTranscriptPanel } from "./transcript-panel.ts";
+import { createPanelManager, createSubagentTranscriptPanel, renderSubagentTabBar } from "./transcript-panel.ts";
 
 const subagentParameters = {
   type: "object",
@@ -154,6 +154,7 @@ async function executeParentTool(
   invocationSignal: AbortSignal | undefined,
   controller: BackgroundSessionController,
   panelManager: ReturnType<typeof createPanelManager>,
+  activeSubagentUis: Map<string, ExtensionContext["ui"]>,
 ) {
   const tools = Object.fromEntries(normalToolDefinitions(cwd).map((tool) => [tool.name, tool]));
   const parentSessionDir = parentContext.sessionManager.getSessionFile()
@@ -210,6 +211,7 @@ async function executeParentTool(
 
   panelManager.registerChildPanel(launched.id, cwd);
   if (parentContext.hasUI) {
+    activeSubagentUis.set(launched.id, parentContext.ui);
     parentContext.ui.setStatus("subagent", `Subagent running: ${launched.id} • Ctrl+Tab / Alt+T`);
     parentContext.ui.setWidget("subagent", [
       `Subagent running: ${launched.id} • Press Ctrl+Tab or Alt+T, or type /subagent:panels`,
@@ -220,12 +222,14 @@ async function executeParentTool(
 
 export default function subagentExtension(pi: ExtensionAPI): void {
   const panelManager = createPanelManager();
+  const activeSubagentUis = new Map<string, ExtensionContext["ui"]>();
 
   const openTranscriptOverlay = async (ctx: ExtensionContext, initialChildId: string) => {
     if (!ctx.hasUI || typeof ctx.ui.custom !== "function") return;
 
     await ctx.ui.custom((tui, theme, _keybindings, done) => {
-      let currentChildId = initialChildId;
+      let currentChildId = panelManager.selectPanel(initialChildId);
+      if (currentChildId === "main") currentChildId = initialChildId;
 
       const buildPanel = (id: string) => {
         const snapshot = controller.result(id);
@@ -237,6 +241,7 @@ export default function subagentExtension(pi: ExtensionAPI): void {
           childId: id,
           status,
           cwd,
+          taskPrompt: controller.getTaskPrompt(id),
           theme: theme as never,
         });
 
@@ -256,9 +261,19 @@ export default function subagentExtension(pi: ExtensionAPI): void {
         currentChildId = newId;
         activePanel = buildPanel(currentChildId);
         if (ctx.hasUI) {
-          ctx.ui.setStatus("subagent-panel", `Panel: ${currentChildId} (Ctrl+Tab/Alt+T: next, Escape: main)`);
+          ctx.ui.setStatus("subagent-panel", `Panel: ${currentChildId} (Ctrl+Tab/Alt+T: next, d: dismiss, Escape: main)`);
         }
         tui.requestRender();
+      };
+
+      const dismissCurrentPanel = () => {
+        panelManager.unregisterChildPanel(currentChildId);
+        const remaining = panelManager.getPanels().filter((panel) => panel !== "main");
+        if (remaining.length === 0) {
+          done(undefined);
+          return;
+        }
+        switchChildPanel(remaining.at(-1) ?? "main");
       };
 
       const unsubscribeInput = ctx.ui.onTerminalInput((data) => {
@@ -272,6 +287,10 @@ export default function subagentExtension(pi: ExtensionAPI): void {
           switchChildPanel(prev);
           return { consume: true };
         }
+        if (data === "d" || data === "D") {
+          dismissCurrentPanel();
+          return { consume: true };
+        }
         if (data === "\x1b" || data === "q" || data === "Q") {
           panelManager.returnToMain();
           done(undefined);
@@ -282,7 +301,14 @@ export default function subagentExtension(pi: ExtensionAPI): void {
 
       return {
         render(width: number) {
-          return activePanel.render(width);
+          return [
+            ...renderSubagentTabBar({
+              panels: panelManager.getPanels(),
+              activePanelId: currentChildId,
+              theme: theme as never,
+            }, width),
+            ...activePanel.render(width),
+          ];
         },
         invalidate() {},
         dispose() {
@@ -342,7 +368,15 @@ export default function subagentExtension(pi: ExtensionAPI): void {
     pi.registerCommand("subagent:panels", {
       description: "Cycle or view subagent transcript panels",
       handler: async (args, ctx) => {
-        const active = args.trim() === "main" ? panelManager.returnToMain() : panelManager.cycleNext();
+        const trimmed = args.trim();
+        const childPanels = panelManager.getPanels().filter((panel) => panel !== "main");
+        const active = trimmed === "main"
+          ? panelManager.returnToMain()
+          : trimmed === "next"
+            ? panelManager.cycleNext()
+            : trimmed === "prev"
+              ? panelManager.cyclePrevious()
+              : panelManager.selectPanel(childPanels.at(-1) ?? "main");
         if (active === "main") {
           if (ctx.hasUI) {
             ctx.ui.notify("Active panel: main", "info");
@@ -367,6 +401,21 @@ export default function subagentExtension(pi: ExtensionAPI): void {
     async () => { throw new Error("Background child session factory was not supplied by the launch request."); },
     {
       notify: (message, options) => completionSignals.notify(message, options),
+      onFinish: (id) => {
+        const ui = activeSubagentUis.get(id);
+        activeSubagentUis.delete(id);
+        if (!ui) return;
+        if (activeSubagentUis.size === 0) {
+          ui.setStatus("subagent", undefined);
+          ui.setWidget("subagent", undefined);
+          return;
+        }
+        const latest = [...activeSubagentUis.keys()].at(-1);
+        ui.setStatus("subagent", `Subagent running: ${latest} • ${activeSubagentUis.size} active • Ctrl+Tab / Alt+T`);
+        ui.setWidget("subagent", [
+          `Subagent running: ${latest} • ${activeSubagentUis.size} active • Press Ctrl+Tab or Alt+T, or type /subagent:panels`,
+        ]);
+      },
       debug: (event, details) => logSubagentDebug(event, details),
     },
   );
@@ -384,11 +433,26 @@ export default function subagentExtension(pi: ExtensionAPI): void {
     parameters: subagentParameters,
     async execute(_toolCallId, params: SubagentParameters, signal, _onUpdate, ctx) {
       const cwd = resolveSubagentCwd(ctx.cwd, params.cwd);
-      const result = await executeParentTool(pi, cwd, ctx, params, signal, controller, panelManager);
+      const result = await executeParentTool(pi, cwd, ctx, params, signal, controller, panelManager, activeSubagentUis);
+      const details = { ...result, taskPrompt: params.task };
       return {
-        content: [{ type: "text", text: JSON.stringify(result) }],
-        details: result,
+        content: [{ type: "text", text: JSON.stringify(details) }],
+        details,
       };
+    },
+    renderResult(result, { isPartial }, theme) {
+      if (isPartial) return new Text(theme.fg("warning", "Launching subagent..."), 0, 0);
+      const details = result.details as { id?: string; cwd?: string; status?: string; taskPrompt?: string } | undefined;
+      const content = result.content[0];
+      if (!details?.id) return new Text(content?.type === "text" ? content.text : "No result", 0, 0);
+      let text = theme.fg("accent", `Subagent ${details.id} • ${details.status ?? "running"} • ${details.cwd ?? ""}`);
+      if (details.taskPrompt?.trim()) {
+        text += `\n${theme.bold("Prompt:")}`;
+        for (const line of details.taskPrompt.trim().split("\n")) {
+          text += `\n${theme.fg("dim", line)}`;
+        }
+      }
+      return new Text(text, 0, 0);
     },
   });
 
@@ -446,7 +510,16 @@ export default function subagentExtension(pi: ExtensionAPI): void {
             ? "error"
             : "accent";
       let text = theme.fg(statusColor, display.summary);
-      if (display.expandedJson) text += `\n${highlightCode(display.expandedJson, "json").join("\n")}`;
+      if (expanded && display.expandedText) {
+        const rawLines = display.expandedText.split("\n");
+        const lines = rawLines.slice(0, 30);
+        for (const line of lines) {
+          text += `\n${theme.fg("dim", line)}`;
+        }
+        if (rawLines.length > 30) {
+          text += `\n${theme.fg("muted", `... ${rawLines.length - 30} more lines`)}`;
+        }
+      }
       return new Text(text, 0, 0);
     },
   });
@@ -459,7 +532,11 @@ export default function subagentExtension(pi: ExtensionAPI): void {
     completionSignals.parentSettled();
   });
 
-  pi.on("session_shutdown", async () => {
+  pi.on("session_shutdown", async (_event, ctx) => {
+    if (ctx?.hasUI) {
+      ctx.ui.setStatus("subagent", undefined);
+      ctx.ui.setWidget("subagent", undefined);
+    }
     completionSignals.close();
     await controller.close();
   });

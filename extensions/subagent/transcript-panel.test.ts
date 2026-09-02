@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { visibleWidth } from "@earendil-works/pi-tui";
 import type { NormalizedBackgroundEvent } from "./background-events.ts";
-import { createPanelManager, createSubagentTranscriptPanel, type SubagentTranscriptPanelOptions } from "./transcript-panel.ts";
+import { createPanelManager, createSubagentTranscriptPanel, renderSubagentTabBar, type SubagentTranscriptPanelOptions } from "./transcript-panel.ts";
 
 const dummyTheme = {
   fg: (_color: string, text: string) => text,
@@ -71,6 +71,44 @@ test("updates panel status and seals rendering on child completion", () => {
   assert.match(fullText, /completed/);
 });
 
+test("renders the prompt passed to the subagent tool", () => {
+  const panel = createSubagentTranscriptPanel({
+    childId: "child-prompt-1",
+    status: "running",
+    cwd: "/workspace/sub-task",
+    taskPrompt: "Inspect the repo and run the focused tests.",
+    theme: dummyTheme,
+  });
+
+  const text = panel.render(100).join("\n");
+  assert.match(text, /Prompt:/);
+  assert.match(text, /Inspect the repo and run the focused tests\./);
+});
+
+test("coalesces streamed assistant text deltas before wrapping", () => {
+  const panel = createSubagentTranscriptPanel({
+    childId: "child-streamed-output",
+    status: "completed",
+    cwd: "/workspace/sub-task",
+    theme: dummyTheme,
+  });
+
+  for (const [index, text] of ["Sub", "agent", " tool", " launched", " and", " completed", " successfully", "."].entries()) {
+    panel.addEvent({
+      childId: "child-streamed-output",
+      sequence: index + 1,
+      type: "assistant-text",
+      payload: { text },
+      truncated: false,
+    });
+  }
+
+  const lines = panel.render(120);
+  const rendered = lines.join("\n");
+  assert.match(rendered, /Subagent tool launched and completed successfully\./);
+  assert.doesNotMatch(rendered, /Sub\nagent\n tool\n launched/);
+});
+
 test("PanelManager cycles between main and child panels with deterministic return to main", () => {
   const manager = createPanelManager();
   assert.equal(manager.getActivePanelId(), "main");
@@ -96,6 +134,19 @@ test("PanelManager cycles between main and child panels with deterministic retur
   manager.selectPanel("child-101");
   manager.unregisterChildPanel("child-101");
   assert.equal(manager.getActivePanelId(), "main");
+});
+
+test("renders a subagent tab bar with active tab and dismiss shortcut hint", () => {
+  const lines = renderSubagentTabBar({
+    panels: ["main", "aaaaaaaa-bbbb", "cccccccc-dddd"],
+    activePanelId: "cccccccc-dddd",
+    theme: dummyTheme,
+  }, 100);
+
+  const text = lines.join("\n");
+  assert.match(text, /1:aaaaaaaa/);
+  assert.match(text, /\[2:cccccccc\]/);
+  assert.match(text, /d dismiss/);
 });
 
 test("guarantees no rendered line exceeds the requested terminal width", () => {
@@ -135,4 +186,82 @@ test("guarantees no rendered line exceeds the requested terminal width", () => {
       `Line ${i + 1} exceeds width ${width}: ${lineWidth} chars ("${lines[i]?.slice(0, 30)}...")`,
     );
   }
+});
+
+test("renders clean tool call and result formatting for subagent-tool-request events", () => {
+  const panel = createSubagentTranscriptPanel({
+    childId: "child-clean-1",
+    status: "running",
+    cwd: "/workspace/project",
+    theme: dummyTheme,
+  });
+
+  panel.addEvent({
+    childId: "child-clean-1",
+    sequence: 1,
+    type: "tool-call",
+    payload: {
+      toolName: "subagent-tool-request",
+      input: { toolName: "bash", input: { command: "jj status" } },
+    },
+    truncated: false,
+  });
+
+  panel.addEvent({
+    childId: "child-clean-1",
+    sequence: 2,
+    type: "tool-result",
+    payload: {
+      toolName: "subagent-tool-request",
+      result: {
+        value: {
+          content: [{ type: "text", text: "Working copy (@) now at: abc1234" }],
+        },
+      },
+      isError: false,
+    },
+    truncated: false,
+  });
+
+  const text = panel.render(80).join("\n");
+  assert.match(text, /→ \$ jj status/);
+  assert.match(text, /Working copy \(@\) now at: abc1234/);
+  assert.doesNotMatch(text, /"subagent-tool-request"/);
+  assert.doesNotMatch(text, /"content":/);
+});
+
+test("renders steering entered in a permission prompt after the child tool result", () => {
+  const panel = createSubagentTranscriptPanel({
+    childId: "child-steered-1",
+    status: "running",
+    cwd: "/workspace/project",
+    theme: dummyTheme,
+  });
+
+  panel.addEvent({
+    childId: "child-steered-1",
+    sequence: 1,
+    type: "tool-result",
+    payload: {
+      toolName: "subagent-tool-request",
+      result: {
+        content: [{
+          type: "text",
+          text: JSON.stringify({
+            status: "allowed",
+            toolName: "bash",
+            steering: "please run this with extra care",
+            value: { content: [{ type: "text", text: "exit code: 0" }] },
+          }),
+        }],
+      },
+      isError: false,
+    },
+    truncated: false,
+  });
+
+  const text = panel.render(100).join("\n");
+  assert.match(text, /exit code: 0/);
+  assert.match(text, /Prompt: please run this with extra care/);
+  assert.doesNotMatch(text, /"steering"/);
 });

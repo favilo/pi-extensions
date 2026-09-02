@@ -72,25 +72,19 @@ function routerHarness(initial: ToolInfo[]) {
   };
 }
 
-test("router establishes and maintains only the baseline plus deliberate selected parent tools", async () => {
+test("router establishes and maintains all non-MCP registered parent tools by default", async () => {
   const harness = routerHarness([
     { name: "read", description: "Read files", sourceInfo: { source: "builtin" } },
     { name: "bash", description: "Run commands", sourceInfo: { source: "builtin" } },
-    { name: "bash_task", description: "Manage background Bash tasks", sourceInfo: { source: "extension" } },
-    { name: "edit", description: "Edit files", sourceInfo: { source: "builtin" } },
-    { name: "write", description: "Write files", sourceInfo: { source: "builtin" } },
-    { name: "grep", description: "Search text", sourceInfo: { source: "builtin" } },
-    { name: "find", description: "Find files", sourceInfo: { source: "builtin" } },
-    { name: "ls", description: "List files", sourceInfo: { source: "builtin" } },
     { name: "subagent", description: "Launch a child", sourceInfo: { source: "extension" } },
-    { name: "subagent_result", description: "Read a child result", sourceInfo: { source: "extension" } },
+    { name: "list_accounts", description: "List accounts", sourceInfo: { source: "extension" } },
     { name: "mcp__deploy", description: "Deploy a service", sourceInfo: { source: "mcp" }, parameters: { secret: "hidden" } },
   ]);
 
   await harness.emit("session_start");
-  assert.deepEqual(harness.activeTools(), [
-    "read", "bash", "bash_task", "edit", "write", "grep", "find", "ls", "subagent", "subagent_result", "find_tools", "find_skills",
-  ]);
+  assert.ok(harness.activeTools().includes("list_accounts"));
+  assert.ok(harness.activeTools().includes("subagent"));
+  assert.ok(!harness.activeTools().includes("mcp__deploy"));
 
   harness.addLateTool({ name: "mcp__late", description: "Late provider", sourceInfo: { source: "mcp" } });
   await harness.emit("turn_start");
@@ -98,9 +92,6 @@ test("router establishes and maintains only the baseline plus deliberate selecte
 
   const finder = harness.finder();
   assert.ok(finder?.execute);
-  await finder.execute("find-background", { query: "background Bash", select: ["bash_task"] }, new AbortController().signal, undefined, {});
-  await harness.emit("turn_start");
-  assert.equal(harness.activeTools().filter((name) => name === "bash_task").length, 1);
 
   const result = await finder.execute("find-deploy", { query: "deploy", select: ["mcp__deploy"] }, new AbortController().signal, undefined, {});
   assert.deepEqual(result.details, { matches: ["mcp__deploy"], added: ["mcp__deploy"] });
@@ -114,9 +105,8 @@ test("router establishes and maintains only the baseline plus deliberate selecte
 
   await harness.emit("session_shutdown");
   await harness.emit("session_start");
-  assert.deepEqual(harness.activeTools(), [
-    "read", "bash", "bash_task", "edit", "write", "grep", "find", "ls", "subagent", "subagent_result", "find_tools", "find_skills",
-  ]);
+  assert.ok(harness.activeTools().includes("list_accounts"));
+  assert.ok(!harness.activeTools().includes("mcp__deploy"));
 });
 
 test("before_agent_start appends availability section preserving existing prompt", async () => {
@@ -153,26 +143,26 @@ test("before_agent_start appends availability section preserving existing prompt
   assert.match(prompt, /deploy/);
 });
 
-test("tool_call lazily activates registered but inactive non-MCP tools", async () => {
+test("tool_call lazily activates registered but inactive MCP tools", async () => {
   const harness = routerHarness([
     { name: "read", description: "Read files", sourceInfo: { source: "builtin" } },
-    { name: "custom_extension_tool", description: "Custom extension tool", sourceInfo: { source: "extension" } },
+    { name: "mcp__custom", description: "Custom MCP tool", sourceInfo: { source: "mcp" } },
   ]);
 
   await harness.emit("session_start");
-  assert.ok(!harness.activeTools().includes("custom_extension_tool"));
+  assert.ok(!harness.activeTools().includes("mcp__custom"));
 
   const handlers = harness.toolCallHandlers();
   assert.ok(handlers.length > 0, "must have tool_call handler");
 
   let activated = false;
   for (const handler of handlers) {
-    const event = { toolName: "custom_extension_tool", toolCallId: "tc-1", input: {} };
+    const event = { toolName: "mcp__custom", toolCallId: "tc-1", input: {} };
     const result = await handler(event);
     if (!result || (result as { block?: boolean }).block !== true) {
       activated = true;
     }
   }
 
-  assert.ok(activated || harness.activeTools().includes("custom_extension_tool"), "must activate custom_extension_tool");
+  assert.ok(activated || harness.activeTools().includes("mcp__custom"), "must activate mcp__custom");
 });

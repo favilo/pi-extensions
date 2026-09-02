@@ -32,7 +32,15 @@ export type ToolPermissionBoundary = {
 };
 
 function result(request: ToolRequest, status: ToolExecutionResult["status"], reason?: string, value?: unknown): ToolExecutionResult {
-  return { status, actor: request.actor, toolName: request.toolName, ...(reason ? { reason } : {}), ...(value !== undefined ? { value } : {}) };
+  const promptSteering = (request as { promptSteering?: unknown }).promptSteering;
+  return {
+    status,
+    actor: request.actor,
+    toolName: request.toolName,
+    ...(reason ? { reason } : {}),
+    ...(typeof promptSteering === "string" && promptSteering.trim() ? { steering: promptSteering.trim() } : {}),
+    ...(value !== undefined ? { value } : {}),
+  };
 }
 
 function audit(boundary: ToolPermissionBoundary, request: ToolRequest, decision: string, reason?: string): void {

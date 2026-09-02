@@ -2,7 +2,7 @@ import { existsSync, realpathSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import { CONFIG_DIR_NAME, getAgentDir, ProjectTrustStore } from "@earendil-works/pi-coding-agent";
 import { loadPermissions, permissionDecision, permissionKeyForTool, type Permissions } from "./config.ts";
-import { isYoloModeEnabled } from "./yolo-mode.ts";
+import { isYoloModeActive } from "./yolo-mode.ts";
 
 export type TrustEntry = { path: string; decision: boolean };
 export type TrustResolver = (cwd: string) => TrustEntry | null;
@@ -142,7 +142,7 @@ export function resolveScopedPermissionDecision(options: {
     };
   }
 
-  if (isYoloModeEnabled()) {
+  if (isYoloModeActive()) {
     return { decision: "allow", source: "yolo_mode" };
   }
 

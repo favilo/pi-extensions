@@ -13,6 +13,7 @@ const completed: BackgroundResult = {
   cwd: "/workspace/project",
   status: "completed",
   terminal: true,
+  taskPrompt: "Inspect the repo and summarize findings.",
   output: "finished ✓",
   outputBytes: { original: 12, returned: 12 },
   outputTruncated: false,
@@ -34,6 +35,13 @@ test("pretty-prints the structured result only when expanded", () => {
   assert.match(expanded.expandedJson ?? "", /\n  "found": true/);
   assert.doesNotMatch(expanded.expandedJson ?? "", /"events"/);
   assert.match(expanded.expandedJson ?? "", /finished ✓/);
+});
+
+test("renders the original task prompt before expanded output", () => {
+  const expanded = subagentResultDisplay(completed, true);
+
+  assert.match(expanded.expandedText ?? "", /Prompt:\nInspect the repo and summarize findings\./);
+  assert.match(expanded.expandedText ?? "", /finished ✓/);
 });
 
 test("caps defensive expanded output without introducing event details", () => {

@@ -25,6 +25,7 @@ export type BackgroundResult =
   | (BackgroundTaskSnapshot & {
     found: true;
     exported?: false;
+    taskPrompt?: string;
     output?: string;
     outputBytes?: { original: number; returned: number };
     outputTruncated?: boolean;
@@ -53,6 +54,7 @@ export type BackgroundSessionController = {
   result(id: string): BackgroundResult;
   exportResult(id: string, options: ExportResultOptions): Promise<BackgroundResult>;
   getEvents(id: string): NormalizedBackgroundEvent[];
+  getTaskPrompt(id: string): string | undefined;
   setStatus(id: string, status: "running" | "waiting-for-permission"): BackgroundTaskSnapshot | undefined;
   close(): Promise<void>;
 };
@@ -66,6 +68,7 @@ export type BackgroundCompletionSignal = {
 
 export type BackgroundControllerOptions = {
   notify?: (message: BackgroundCompletionSignal, options: { deliverAs: "steer"; triggerTurn: true }) => void;
+  onFinish?: (id: string, status: "completed" | "failed" | "cancelled") => void;
   cleanupTimeoutMs?: number;
   maxRetainedResults?: number;
   maxOutputBytes?: number;
@@ -109,6 +112,7 @@ export function createBackgroundSessionController(
     session: ManagedSubagentSession;
     events: ReturnType<typeof createBackgroundEventBuffer>;
     cancellation: AbortController;
+    taskPrompt: string;
     unsubscribe: () => void;
     output?: string;
     outputBytes?: { original: number; returned: number };
@@ -142,6 +146,7 @@ export function createBackgroundSessionController(
     if (!current || current.terminal) return;
     registry.transition(id, status);
     retainTerminal(id);
+    controllerOptions.onFinish?.(id, status);
     if (!closed) {
       controllerOptions.notify?.({
         customType: "subagent_finished",
@@ -225,6 +230,7 @@ export function createBackgroundSessionController(
       return {
         found: true,
         ...task,
+        taskPrompt: runtime.taskPrompt,
         ...(task.terminal && runtime.output !== undefined ? {
           output: runtime.output,
           outputBytes: runtime.outputBytes,
@@ -236,6 +242,10 @@ export function createBackgroundSessionController(
     getEvents(id) {
       const runtime = runtimes.get(id);
       return runtime ? runtime.events.snapshot().events : [];
+    },
+
+    getTaskPrompt(id) {
+      return runtimes.get(id)?.taskPrompt;
     },
 
     async exportResult(id, options) {
@@ -350,6 +360,7 @@ export function createBackgroundSessionController(
         session,
         events,
         cancellation,
+        taskPrompt: options.task,
         unsubscribe: () => {},
         output: undefined as string | undefined,
         outputBytes: undefined as { original: number; returned: number } | undefined,

@@ -33,11 +33,27 @@ test("registers background launch, explicit result lookup, ctrl+tab shortcut, an
   assert.deepEqual(shortcuts, ["ctrl+tab", "alt+t", "alt+shift+t"]);
   assert.deepEqual(events, ["message_start", "agent_settled", "session_shutdown"]);
 
+  const launchTool = tools.find(({ name }) => name === "subagent");
   const resultTool = tools.find(({ name }) => name === "subagent_result");
+  assert.equal(typeof launchTool?.renderResult, "function");
   assert.equal(typeof resultTool?.renderCall, "function");
   assert.equal(typeof resultTool?.renderResult, "function");
 
   const theme = { fg: (_color: string, text: string) => text, bold: (text: string) => text };
+  const launchRendered = launchTool?.renderResult?.({
+    content: [{ type: "text", text: "model-facing launch result" }],
+    details: {
+      id: "child-launch-1",
+      cwd: "/workspace",
+      status: "running",
+      terminal: false,
+      taskPrompt: "Investigate the flaky test and summarize it.",
+    },
+  }, { expanded: false, isPartial: false }, theme)?.render(160).join("\n") ?? "";
+  assert.match(launchRendered, /Subagent child-launch-1/);
+  assert.match(launchRendered, /Prompt:/);
+  assert.match(launchRendered, /Investigate the flaky test/);
+
   const result = {
     content: [{ type: "text", text: "model-facing result" }],
     details: {
@@ -59,7 +75,7 @@ test("registers background launch, explicit result lookup, ctrl+tab shortcut, an
   assert.match(expanded, /visible only when expanded/);
 });
 
-test("launching a subagent sets UI status, widget, and registers child panel in PanelManager", async () => {
+test("launching a subagent sets UI status, widget, registers child panel, and clears on completion", async () => {
   const tools: Array<{
     name: string;
     execute?: (toolCallId: string, params: unknown, signal: AbortSignal | undefined, onUpdate: unknown, ctx: unknown) => Promise<unknown>;
@@ -102,13 +118,14 @@ test("launching a subagent sets UI status, widget, and registers child panel in 
   };
 
   let createSessionCalled = false;
+  let resolvePrompt: (() => void) | undefined;
   const launchResult = await subagentTool.execute("launch-1", {
     task: "inspect repo",
     createSession: async () => {
       createSessionCalled = true;
       return {
         sessionId: "child-mock-1234",
-        prompt: async () => {},
+        prompt: () => new Promise<void>((resolve) => { resolvePrompt = resolve; }),
         subscribe: () => () => {},
         dispose: () => {},
       };
@@ -143,6 +160,80 @@ test("launching a subagent sets UI status, widget, and registers child panel in 
   assert.match(notifiedMessage, new RegExp(launchResult.details.id));
   assert.equal(customRenderedLines.length > 0, true);
   assert.match(customRenderedLines.join("\n"), new RegExp(`Subagent ${launchResult.details.id}`));
+  assert.match(customRenderedLines.join("\n"), /inspect repo/);
+
+  resolvePrompt?.();
+  await new Promise<void>((resolve) => setImmediate(resolve));
+  assert.equal(statuses.get("subagent"), undefined);
+  assert.equal(widgets.get("subagent"), undefined);
+});
+
+test("subagent panels command opens newest child and d dismisses the active panel", async () => {
+  const tools: Array<{
+    name: string;
+    execute?: (toolCallId: string, params: unknown, signal: AbortSignal | undefined, onUpdate: unknown, ctx: unknown) => Promise<unknown>;
+  }> = [];
+  const commands: Map<string, (args: string, ctx: unknown) => Promise<void>> = new Map();
+  const pi = {
+    registerTool(tool: { name: string }) { tools.push(tool); },
+    registerShortcut() {},
+    registerCommand(name: string, options: { handler: (args: string, ctx: unknown) => Promise<void> }) {
+      commands.set(name, options.handler);
+    },
+    on() {},
+    sendMessage() {},
+  } as unknown as ExtensionAPI;
+
+  subagentExtension(pi);
+  const subagentTool = tools.find(({ name }) => name === "subagent");
+  const panelsHandler = commands.get("subagent:panels");
+  assert.ok(subagentTool?.execute);
+  assert.ok(panelsHandler);
+
+  const ctx = {
+    cwd: process.cwd(),
+    hasUI: true,
+    mode: "tui",
+    getSystemPrompt: () => "parent policy prompt",
+    sessionManager: { getSessionFile: () => undefined, getSessionDir: () => "/tmp" },
+    ui: { setStatus() {}, setWidget() {}, notify() {} },
+  };
+  const createSession = async () => ({
+    prompt: async () => {},
+    subscribe: () => () => {},
+    dispose: () => {},
+  });
+  const first = await subagentTool.execute("launch-1", { task: "first", createSession }, undefined, undefined, ctx) as { details: { id: string } };
+  const second = await subagentTool.execute("launch-2", { task: "second", createSession }, undefined, undefined, ctx) as { details: { id: string } };
+
+  let component: { render(width: number): string[] } | undefined;
+  let inputHandler: ((data: string) => { consume: boolean } | undefined) | undefined;
+  let dismissed = false;
+  await panelsHandler("", {
+    ...ctx,
+    ui: {
+      ...ctx.ui,
+      custom: async (factory: (tui: unknown, theme: unknown, keybindings: unknown, done: (res: unknown) => void) => { render(width: number): string[] }) => {
+        const theme = { fg: (_c: string, t: string) => t, bold: (t: string) => t };
+        component = await factory({ requestRender() {} }, theme, {}, () => { dismissed = true; });
+      },
+      onTerminalInput: (handler: typeof inputHandler) => {
+        inputHandler = handler;
+        return () => {};
+      },
+      notify() {},
+    },
+  });
+
+  assert.ok(component);
+  assert.match(component.render(120).join("\n"), new RegExp(`Subagent ${second.details.id}`));
+  assert.match(component.render(120).join("\n"), /d dismiss/);
+
+  inputHandler?.("d");
+  const afterDismiss = component.render(120).join("\n");
+  assert.match(afterDismiss, new RegExp(`Subagent ${first.details.id}`));
+  assert.doesNotMatch(afterDismiss, new RegExp(`Subagent ${second.details.id}`));
+  assert.equal(dismissed, false);
 });
 
 test("forwards an already-cancelled launch invocation before constructing a child session", async () => {

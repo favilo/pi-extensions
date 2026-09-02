@@ -9,21 +9,6 @@ import {
 } from "./catalog.ts";
 import { buildAvailabilityPrompt, sanitizeSkillsPrompt, type SanitizerOutcome } from "./prompt.ts";
 
-const BASELINE_TOOLS = [
-  "read",
-  "bash",
-  "bash_task",
-  "edit",
-  "write",
-  "grep",
-  "find",
-  "ls",
-  "subagent",
-  "subagent_result",
-  "find_tools",
-  "find_skills",
-] as const;
-
 type FindToolsInput = { query: string; select?: string[] };
 type FindSkillsInput = { query: string };
 
@@ -31,6 +16,24 @@ function currentRegisteredNames(pi: ExtensionAPI): string[] {
   return pi.getAllTools()
     .map((tool) => tool.name)
     .filter((name): name is string => typeof name === "string");
+}
+
+function isMcpTool(source: string | undefined, name: string): boolean {
+  // MCP tools have source "mcp" or names prefixed with mcp__
+  if (source === "mcp") return true;
+  if (name.startsWith("mcp__")) return true;
+  return false;
+}
+
+/** Dynamically fetch all non-MCP tools registered in Pi so they are active by default. */
+function getNonMcpToolNames(pi: ExtensionAPI): string[] {
+  return (pi.getAllTools() as unknown as ToolRecord[])
+    .filter((tool) => {
+      const name = typeof tool.name === "string" ? tool.name : "";
+      const source = typeof tool.sourceInfo?.source === "string" ? tool.sourceInfo.source : "";
+      return name && !isMcpTool(source, name);
+    })
+    .map((tool) => tool.name as string);
 }
 
 function applySessionToolSet(pi: ExtensionAPI, selected: Set<string>): void {
@@ -41,17 +44,10 @@ function applySessionToolSet(pi: ExtensionAPI, selected: Set<string>): void {
 
   pi.setActiveTools([
     ...new Set([
-      ...BASELINE_TOOLS.filter((name) => registered.has(name)),
+      ...getNonMcpToolNames(pi),
       ...retainedSelections,
     ]),
   ]);
-}
-
-function isMcpTool(source: string | undefined, name: string): boolean {
-  // MCP tools have source "mcp" or names prefixed with mcp__
-  if (source === "mcp") return true;
-  if (name.startsWith("mcp__")) return true;
-  return false;
 }
 
 function buildToolSummaries(allTools: ToolRecord[]): Array<{ name: string; description: string }> {
@@ -201,16 +197,13 @@ export default function contextRouter(pi: ExtensionAPI): void {
     const activeNames = pi.getActiveTools();
     const toolName = event.toolName;
 
-    // Check if this is a registered but inactive non-MCP tool
-    if (activeNames.includes(toolName)) return; // Already active, let it proceed normally
+    // Check if this is a registered but inactive tool
+    if (activeNames.includes(toolName)) return;
 
     const tool = allTools.find((t) => t.name === toolName);
-    if (!tool) return; // Not registered, let Pi handle the error
+    if (!tool) return;
 
-    const source = typeof tool.sourceInfo?.source === "string" ? tool.sourceInfo.source : "";
-    if (isMcpTool(source, toolName)) return; // MCP tools require explicit activation via find_tools
-
-    // Lazy activation: add the tool to the active set
+    // Lazy activation: add the tool to active set
     pi.setActiveTools([...activeNames, toolName]);
   });
   pi.on("session_shutdown", () => {
