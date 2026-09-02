@@ -93,8 +93,8 @@ planning:
     constraints:
     - Do not modify the e06 repair flow or child-private bridge catalog.
 handoff:
-  last_step_completed: Surveyed e16 workspace context; specs YAML valid, baseline
-    typecheck clean, ready to begin e16s01 TDD.
+  last_step_completed: Completed e16s01 Rust/WASM boundary, host adapter, fallback,
+    documentation, and package verification.
   open_decisions:
   - Is pi-oxided compatible with the required Pi package/runtime shape, or does e16s01
     need a narrower Rust/WASM host boundary?
@@ -103,8 +103,9 @@ handoff:
   - .specs/epics/e16-rust-wasm-tool-permissions-core/e16s01-rust-wasm-boundary-spike.md
   - .specs/epics/e16-rust-wasm-tool-permissions-core/e16s01-tasks.yaml
   - .specs/security/epics/e16/THREAT_MODEL.md
-  next_skill: develop-tdd
-  context: Fresh exploratory workspace for epic e16. Start with e16s01 and validate
+  next_skill: verify-work
+  context: e16s01 implementation and package verification are complete. Validate the
+    documented WASM boundary and safe TypeScript fallback before advancing to e16s02.
     a supported Rust/WASM packaging and host-module contract for tool-permissions
     before porting parser or permission logic. Preserve fail-closed behavior and keep
     TypeScript as the authoritative fallback until parity is proven.

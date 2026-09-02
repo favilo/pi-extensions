@@ -7,7 +7,7 @@ stories:
   - id: e16s01
     title: Spike a supported Rust/WASM boundary for tool-permissions
     bcps: 3
-    status: todo
+    status: passing
     delta: ADDED
     spec: e16s01-rust-wasm-boundary-spike.md
     tasks: e16s01-tasks.yaml

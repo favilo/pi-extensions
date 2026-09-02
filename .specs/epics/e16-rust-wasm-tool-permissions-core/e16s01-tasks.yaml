@@ -23,5 +23,5 @@ tasks:
   - id: 4
     description: Document the chosen Rust/WASM boundary, including whether pi-oxided was viable, and run the package checks.
     verify: npm run check
-    status: todo
+    status: passing
     risk: P2
