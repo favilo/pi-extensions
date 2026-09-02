@@ -18,7 +18,12 @@ falls back to TypeScript.
 `pi-oxidized` is a Rust rewrite of the broader Pi runtime, so adopting it
 would expand this spike's scope and runtime coupling. Its `pi-oxidized-ext`
 (`pi_ext`) bridge remains an open compatibility experiment; it is not yet a
-dependency of this narrow probe. WASI Preview 1/2 remains a separate
-experiment because it requires a different Node adapter and packaging shape.
+dependency of this narrow probe. NAPI-RS documents `wasm32-wasip1-threads` as its supported WASI fallback
+target. This crate compiles for that target, but the current wasm-bindgen
+pipeline cannot prepare the threaded artifact (`__heap_base` is unavailable),
+and direct Node loading requires the `wasi_snapshot_preview1` host import.
+The next experiment is an napi-rs/`@emnapi`-style package/runtime adapter;
+WASI Preview 1/2 is not enabled in the production loader until that adapter is
+validated.
 
 The module has no shell, filesystem, network, or permission-decision APIs.
