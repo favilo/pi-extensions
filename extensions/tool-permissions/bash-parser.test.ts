@@ -148,3 +148,20 @@ test("source spans point to exact positions in the original text", () => {
   const second = result.subcommands[1];
   assert.equal(cmd.slice(second.span.start, second.span.end), "jj diff --stat");
 });
+
+test("source spans stay relative to the original text with leading whitespace", () => {
+  const cmd = "  jj status  ";
+  const result = parseBashCommand(cmd);
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.equal(result.subcommands.length, 1);
+  assert.equal(cmd.slice(result.subcommands[0].span.start, result.subcommands[0].span.end), "jj status");
+});
+
+test("source spans stay relative to the original text with a leading tab", () => {
+  const cmd = "\tjj status";
+  const result = parseBashCommand(cmd);
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.equal(cmd.slice(result.subcommands[0].span.start, result.subcommands[0].span.end), "jj status");
+});
