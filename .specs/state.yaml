@@ -1,12 +1,25 @@
 active_flow: build_epic
-active_epic_id: e17
-active_story_id: e17s01
-active_story: Environment-gated YOLO permission policy mode
+active_epic_id: e16
+active_story_id: e16s01
+active_story: Spike a supported Rust/WASM boundary for tool-permissions
 active_bug_id: null
 git:
-  bookmark: favilo/e07-bash-subcommand-permissions
+  bookmark: favilo/e16-rust-wasm-tool-permissions-core
   parent_bookmark: main
 planning:
+  e16:
+    status: completed
+    story_id: e16s04
+    capsule: .specs/epics/e16-rust-wasm-tool-permissions-core
+    wsjf: 0.0
+    scoring:
+      business_value: 0
+      time_criticality: 0
+      risk_reduction: 0
+      job_size: 1
+      rationale: Exploratory backlog epic. Pilot a hybrid Rust/WASM migration in the
+        pure-compute portions of tool-permissions, starting with a supported package/runtime
+        boundary and validating whether pi-oxided is viable.
   e17:
     status: completed
     story_id: e17s02
@@ -17,7 +30,8 @@ planning:
       time_criticality: 7
       risk_reduction: 6
       job_size: 3
-      rationale: Environment-gated YOLO mode (PI_YOLO_MODE=1 / PI_PERMISSION_YOLO=1), session startup notification, and audit logging complete across e17s01-s02.
+      rationale: Environment-gated YOLO mode (PI_YOLO_MODE=1 / PI_PERMISSION_YOLO=1),
+        session startup notification, and audit logging complete across e17s01-s02.
   e07:
     status: completed
     story_id: e07s05
@@ -28,7 +42,9 @@ planning:
       time_criticality: 8
       risk_reduction: 8
       job_size: 4
-      rationale: Subcommand parsing, decision boundary, per-subcommand auditing, interactive subcommand selection mode, and recursive command substitution parsing complete across e07s01-s05.
+      rationale: Subcommand parsing, decision boundary, per-subcommand auditing, interactive
+        subcommand selection mode, and recursive command substitution parsing complete
+        across e07s01-s05.
   e11:
     status: completed
     story_id: e11s04
@@ -77,13 +93,21 @@ planning:
     constraints:
     - Do not modify the e06 repair flow or child-private bridge catalog.
 handoff:
-  last_step_completed: Completed e17 — Environment-gated YOLO permission mode (PI_YOLO_MODE=1 / PI_PERMISSION_YOLO=1) implemented and verified. All 292 tests green.
-  open_decisions: []
+  last_step_completed: Surveyed e16 workspace context; specs YAML valid, baseline
+    typecheck clean, ready to begin e16s01 TDD.
+  open_decisions:
+  - Is pi-oxided compatible with the required Pi package/runtime shape, or does e16s01
+    need a narrower Rust/WASM host boundary?
   required_reading:
-  - .specs/epics/e17-environment-protected-yolo-mode/epic.yaml
-  - .specs/epics/e17-environment-protected-yolo-mode/e17s01-yolo-permission-mode.md
-  next_skill: verify-work
-  context: Epic e17 complete across e17s01-s02. Environment-gated YOLO permission mode allows promptless single-session execution for Docker/automation workflows while preserving audit logging and explicit deny rule precedence. 292 tests green.
+  - .specs/epics/e16-rust-wasm-tool-permissions-core/epic.yaml
+  - .specs/epics/e16-rust-wasm-tool-permissions-core/e16s01-rust-wasm-boundary-spike.md
+  - .specs/epics/e16-rust-wasm-tool-permissions-core/e16s01-tasks.yaml
+  - .specs/security/epics/e16/THREAT_MODEL.md
+  next_skill: develop-tdd
+  context: Fresh exploratory workspace for epic e16. Start with e16s01 and validate
+    a supported Rust/WASM packaging and host-module contract for tool-permissions
+    before porting parser or permission logic. Preserve fail-closed behavior and keep
+    TypeScript as the authoritative fallback until parity is proven.
   blocker: null
   deferred_work:
   - Consolidate safeStringify and JSON formatting helpers into a shared utility module
@@ -100,10 +124,10 @@ release:
   ci_note: GitHub Actions workflows passing (actionlint, python, quality, secrets,
     shellcheck)
 epic_cycle:
-  step: 4
-  current_step: 4
+  step: 1
+  current_step: 1
   story_bcps: 3
-  security_review: pass
+  security_review: pending
   plan_consistency: pass
 metrics:
   skill_timings:
@@ -113,9 +137,9 @@ metrics:
       avg_seconds: 1434.0
       _start: '2026-08-26T20:06:32Z'
     survey-context:
-      calls: 11
-      total_seconds: 7608.0
-      avg_seconds: 691.6363636363636
+      calls: 12
+      total_seconds: 7668.0
+      avg_seconds: 639.0
     verify-work:
       calls: 5
       total_seconds: 5191.0
@@ -128,7 +152,7 @@ metrics:
       calls: 6
       total_seconds: 362555.0
       avg_seconds: 60425.833333333336
-      _start: '2026-08-26T23:17:17Z'
+      _start: '2026-09-02T00:38:41Z'
     plan-work:
       calls: 2
       total_seconds: 1156.0
@@ -137,4 +161,4 @@ metrics:
       calls: 2
       total_seconds: 2.0
       avg_seconds: 1.0
-  story_start: '2026-08-29T00:06:41Z'
+  story_start: '2026-09-02T00:29:06Z'
