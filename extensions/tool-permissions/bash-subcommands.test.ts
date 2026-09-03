@@ -167,6 +167,53 @@ test("returns detailed reason identifying denied subcommand for agent error repo
   }
 });
 
+test("raw allow does not upgrade an unapproved parsed subcommand", () => {
+  const { tmpDir, userPermissionsPath } = createPolicyDir({
+    bash: {
+      allow: [{ command: "^jj status && cargo check$" }, { command: "^jj status$" }],
+      deny: [],
+    },
+  });
+  try {
+    const result = evaluateBashSubcommands("jj status && cargo check", tmpDir, { userPermissionsPath });
+    assert.equal(result.decision, "ask");
+  } finally {
+    rmSync(tmpDir, { recursive: true, force: true });
+  }
+});
+
+test("combined shell -c options are recursively inspected before broad bash allow", () => {
+  const { tmpDir, userPermissionsPath } = createPolicyDir({
+    bash: {
+      allow: [{ command: "^bash" }],
+      deny: [{ command: "^rm " }],
+    },
+  });
+  try {
+    const result = evaluateBashSubcommands("bash -lc 'rm -rf /'", tmpDir, { userPermissionsPath });
+    assert.equal(result.decision, "deny");
+    assert.equal(result.deniedSubcommand?.normalized, "rm -rf /");
+  } finally {
+    rmSync(tmpDir, { recursive: true, force: true });
+  }
+});
+
+test("dynamic command names fail asking even under broad bash allow", () => {
+  const { tmpDir, userPermissionsPath } = createPolicyDir({
+    bash: {
+      allow: [{}],
+      deny: [],
+    },
+  });
+  try {
+    const result = evaluateBashSubcommands("$(echo rm) -rf /", tmpDir, { userPermissionsPath });
+    assert.equal(result.decision, "ask");
+    assert.match(result.reason ?? "", /unsupported|dynamic/i);
+  } finally {
+    rmSync(tmpDir, { recursive: true, force: true });
+  }
+});
+
 test("audits each evaluated subcommand when audit option is supplied", () => {
   const { tmpDir, userPermissionsPath } = createPolicyDir({
     bash: {

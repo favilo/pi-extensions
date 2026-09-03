@@ -139,6 +139,24 @@ mod tests {
     }
 
     #[test]
+    fn permission_evaluation_returns_not_ok_for_invalid_native_regex() {
+        let response = super::evaluate_permission(super::PermissionEvaluationRequest {
+            version: 1,
+            operation: "evaluate_permission".into(),
+            nonce: "n".into(),
+            allow: vec![std::collections::HashMap::new()],
+            deny: vec![std::collections::HashMap::from([(
+                "command".into(),
+                "(?<=rm) -rf".into(),
+            )])],
+            input_json: "{\"command\":\"rm -rf /\"}".into(),
+        })
+        .unwrap();
+        assert!(!response.ok);
+        assert!(matches!(response.decision, super::PermissionDecision::Ask));
+    }
+
+    #[test]
     fn parses_compound_commands() {
         let response = parse(ParseRequest {
             version: 1,

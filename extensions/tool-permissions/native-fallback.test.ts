@@ -30,6 +30,45 @@ const compatibleProbe = `
 exports.probe = (request) => ({ version: ${NATIVE_CONTRACT_VERSION}, operation: request.operation, ok: true, nonce: request.nonce });
 `;
 
+test("operation loaders reject a compatible probe response with the wrong nonce", () => {
+  const wrongProbe = `exports.probe = (request) => ({ version: ${NATIVE_CONTRACT_VERSION}, operation: request.operation, ok: true, nonce: "wrong-probe" });`;
+
+  withNativeModule(`${wrongProbe}
+exports.parse = (request) => ({ version: ${NATIVE_CONTRACT_VERSION}, operation: "parse", ok: true, nonce: request.nonce, reason: "", detail: "", subcommands: [{ normalized: "native", command: "native", args: [], start: 0, end: 6 }] });
+`, () => {
+    const fallback = (): BashParseResult => ({ ok: true, subcommands: [{ normalized: "fallback", command: "fallback", args: [], span: { start: 0, end: 8 } }] });
+    assert.deepEqual(parseWithNativeFallback("native", fallback), fallback());
+  });
+
+  withNativeModule(`${wrongProbe}
+exports.parsePolicy = (request) => ({ version: ${NATIVE_CONTRACT_VERSION}, operation: "policy", ok: true, nonce: request.nonce, permissions: { bash: { allow: [{ command: "^native$" }], deny: [] } } });
+`, () => {
+    const fallbackPermissions: Permissions = { bash: { allow: [{ command: "^fallback$" }], deny: [] } };
+    assert.deepEqual(parsePolicyWithNativeFallback("[permissions.bash]", () => fallbackPermissions), fallbackPermissions);
+  });
+
+  withNativeModule(`${wrongProbe}
+exports.evaluatePermission = (request) => ({ version: ${NATIVE_CONTRACT_VERSION}, operation: "evaluate_permission", ok: true, nonce: request.nonce, decision: "allow" });
+`, () => {
+    assert.equal(evaluatePermissionWithNative({ allow: [{}], deny: [] }, { command: "native" }), undefined);
+  });
+});
+
+test("evaluation adapter accepts only evaluate_permission responses from evaluatePermission", () => {
+  const permission: ToolPermission = { allow: [{}], deny: [] };
+  withNativeModule(`${compatibleProbe}
+exports.evaluatePermission = (request) => ({ version: ${NATIVE_CONTRACT_VERSION}, operation: "evaluate_permission", ok: true, nonce: request.nonce, decision: "allow" });
+`, () => {
+    assert.equal(evaluatePermissionWithNative(permission, { command: "native" }), "allow");
+  });
+
+  withNativeModule(`${compatibleProbe}
+exports.evaluatePermission = (request) => ({ version: ${NATIVE_CONTRACT_VERSION}, operation: "evaluate", ok: true, nonce: request.nonce, decision: "allow" });
+`, () => {
+    assert.equal(evaluatePermissionWithNative(permission, { command: "native" }), undefined);
+  });
+});
+
 test("parser adapter falls back when native parse throws or returns incompatible output", () => {
   for (const parseBody of [
     `throw new Error("boom")`,
