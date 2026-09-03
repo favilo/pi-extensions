@@ -7,6 +7,7 @@ import { join } from "node:path";
 import { parseWithNativeFallback } from "./native-parser-loader.ts";
 import { parsePolicyWithNativeFallback } from "./native-policy-loader.ts";
 import { evaluatePermissionWithNative } from "./native-evaluation-loader.ts";
+import { evaluatePermissionOrchestrationWithNative } from "./native-orchestration-loader.ts";
 import { NATIVE_CONTRACT_VERSION } from "./native-contract.ts";
 import { setNativePackagePathForTests } from "./native-package.ts";
 import type { BashParseResult } from "./bash-parser.ts";
@@ -113,6 +114,20 @@ test("policy adapter falls back when native policy throws or returns malformed p
     withNativeModule(`${compatibleProbe}\nexports.parsePolicy = (request) => { ${parsePolicyBody}; };`, () => {
       const fallbackPermissions: Permissions = { bash: { allow: [{ command: "^fallback$" }], deny: [] } };
       assert.deepEqual(parsePolicyWithNativeFallback("[permissions.bash]", () => fallbackPermissions), fallbackPermissions);
+    });
+  }
+});
+
+test("orchestration adapter declines malformed or throwing native orchestration results", () => {
+  const permissions: Permissions = { read: { allow: [{}], deny: [] } };
+  for (const evaluateBody of [
+    `throw new Error("boom")`,
+    `return { version: ${NATIVE_CONTRACT_VERSION}, operation: "orchestrate_permission", ok: true, nonce: "wrong", permissionKey: "read", decision: "allow" }`,
+    `return { version: ${NATIVE_CONTRACT_VERSION}, operation: "orchestrate_permission", ok: true, nonce: request.nonce, permissionKey: "read", decision: "maybe" }`,
+    `return { version: ${NATIVE_CONTRACT_VERSION}, operation: "evaluate_permission", ok: true, nonce: request.nonce, permissionKey: "read", decision: "allow" }`,
+  ]) {
+    withNativeModule(`${compatibleProbe}\nexports.evaluatePermissionOrchestration = (request) => { ${evaluateBody}; };`, () => {
+      assert.equal(evaluatePermissionOrchestrationWithNative("read", permissions, { path: "/workspace" }), undefined);
     });
   }
 });

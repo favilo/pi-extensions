@@ -1,4 +1,5 @@
 import "../test-support/forbid-fetch.ts";
+import { createRequire } from "node:module";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
@@ -82,7 +83,7 @@ exports.evaluatePermissionOrchestration = (request) => {
 test("native permission orchestration matches TypeScript key mapping and decisions", () => {
   const permissions: Permissions = {
     read: { allow: [{ path: "^/workspace" }], deny: [{ path: "secret" }] },
-    write: { allow: [{ path: "^/workspace/out" }], deny: [{ path: "\.env$" }] },
+    write: { allow: [{ path: "^/workspace/out" }], deny: [{ path: "\\.env$" }] },
     subagent: { allow: [{ prompt: "review" }], deny: [{ prompt: "exfiltrate" }] },
     "mcp__example__search": { allow: [{ query: "safe" }], deny: [{ query: "token" }] },
     custom_tool: { allow: [{ nested: "true" }], deny: [] },
@@ -110,4 +111,43 @@ test("native permission orchestration matches TypeScript key mapping and decisio
       );
     }
   });
+});
+
+test("bundled native permission orchestration matches TypeScript key mapping and decisions", (t) => {
+  let evaluate: ((request: unknown) => { ok: boolean; operation: string; permissionKey: string; decision: string }) | undefined;
+  try {
+    evaluate = (createRequire(import.meta.url)("./native/index.js") as { evaluatePermissionOrchestration?: typeof evaluate }).evaluatePermissionOrchestration;
+  } catch {
+    t.skip("native artifact is not built; run npm run build:native");
+    return;
+  }
+  assert.ok(evaluate);
+  const permissions: Permissions = {
+    read: { allow: [{ path: "^/workspace" }], deny: [{ path: "secret" }] },
+    write: { allow: [{ path: "^/workspace/out" }], deny: [{ path: "\\.env$" }] },
+    "mcp__example__search": { allow: [{ query: "safe" }], deny: [{ query: "token" }] },
+  };
+  for (const { toolName, input } of [
+    { toolName: "ls", input: { path: "/workspace" } },
+    { toolName: "find", input: { path: "/workspace/secret" } },
+    { toolName: "edit", input: { path: "/workspace/out/file.txt" } },
+    { toolName: "write", input: { path: "/workspace/.env" } },
+    { toolName: "mcp__example__search", input: { query: "safe docs" } },
+    { toolName: "mcp__example__search", input: { query: "token docs" } },
+    { toolName: "unknown_tool", input: { value: "anything" } },
+  ] as const) {
+    const permissionKey = permissionKeyForTool(toolName);
+    const native = evaluate({
+      version: NATIVE_CONTRACT_VERSION,
+      operation: "orchestrate_permission",
+      nonce: "orchestration-parity",
+      toolName,
+      permissionsJson: JSON.stringify(permissions),
+      inputJson: JSON.stringify(input),
+    });
+    assert.equal(native.ok, true, toolName);
+    assert.equal(native.operation, "orchestrate_permission", toolName);
+    assert.equal(native.permissionKey, permissionKey, toolName);
+    assert.equal(native.decision, permissionDecision(permissions[permissionKey], input), toolName);
+  }
 });

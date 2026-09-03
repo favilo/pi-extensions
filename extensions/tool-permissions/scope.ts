@@ -2,6 +2,7 @@ import { existsSync, realpathSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import { CONFIG_DIR_NAME, getAgentDir, ProjectTrustStore } from "@earendil-works/pi-coding-agent";
 import { loadPermissions, permissionDecision, permissionKeyForTool, type Permissions } from "./config.ts";
+import { evaluatePermissionOrchestrationWithNative } from "./native-orchestration-loader.ts";
 import { isYoloModeEnabled } from "./yolo-mode.ts";
 
 export type TrustEntry = { path: string; decision: boolean };
@@ -92,6 +93,13 @@ export function resolveCurrentProjectPolicyPath(options: {
   return isInside(canonical(projectPath, fs), trustedPath) ? projectPath : undefined;
 }
 
+function orchestratedPermissionDecision(toolName: string, permissions: Permissions, input: unknown): "allow" | "deny" | "ask" {
+  const permissionKey = permissionKeyForTool(toolName);
+  const nativeDecision = evaluatePermissionOrchestrationWithNative(toolName, permissions, input);
+  if (nativeDecision?.permissionKey === permissionKey) return nativeDecision.decision;
+  return permissionDecision(permissions[permissionKey], input);
+}
+
 export function resolveScopedPermissionDecision(options: {
   cwd: string;
   toolName: string;
@@ -111,8 +119,9 @@ export function resolveScopedPermissionDecision(options: {
       const canonicalPolicyPath = canonical(policyPath, fs);
       if (!isInside(canonicalPolicyPath, trustedPath)) continue;
       try {
-        const decision = permissionDecision(
-          fs.loadPermissions(canonicalPolicyPath)[permissionKeyForTool(options.toolName)],
+        const decision = orchestratedPermissionDecision(
+          options.toolName,
+          fs.loadPermissions(canonicalPolicyPath),
           options.input,
         );
         if (decision !== "ask") return { decision, source: "project", path: canonicalPolicyPath };
@@ -128,8 +137,9 @@ export function resolveScopedPermissionDecision(options: {
   }
 
   try {
-    const decision = permissionDecision(
-      loadPermissions(options.userPermissionsPath)[permissionKeyForTool(options.toolName)],
+    const decision = orchestratedPermissionDecision(
+      options.toolName,
+      loadPermissions(options.userPermissionsPath),
       options.input,
     );
     if (decision !== "ask") return { decision, source: "user", path: options.userPermissionsPath };

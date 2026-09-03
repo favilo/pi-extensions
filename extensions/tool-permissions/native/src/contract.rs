@@ -1,4 +1,5 @@
 use napi_derive::napi;
+use serde::Deserialize;
 
 #[derive(derive_more::FromStr)]
 #[napi(string_enum = "snake_case")]
@@ -8,6 +9,7 @@ pub enum NativeOperation {
     Policy,
     Evaluate,
     EvaluatePermission,
+    OrchestratePermission,
 }
 
 #[derive(derive_more::FromStr)]
@@ -65,6 +67,7 @@ pub struct PolicyRequest {
     pub nonce: String,
     pub source: String,
 }
+#[derive(Deserialize)]
 #[napi(object)]
 pub struct PolicyPermission {
     pub allow: Vec<HashMap<String, String>>,
@@ -108,4 +111,25 @@ pub struct PermissionEvaluationRequest {
     pub allow: Vec<HashMap<String, String>>,
     pub deny: Vec<HashMap<String, String>>,
     pub input_json: String,
+}
+
+#[napi(object)]
+pub struct PermissionOrchestrationRequest {
+    pub version: i64,
+    pub operation: String,
+    pub nonce: String,
+    pub tool_name: String,
+    pub permissions_json: String,
+    pub input_json: String,
+}
+
+#[napi(object)]
+pub struct PermissionOrchestrationResponse {
+    pub version: i64,
+    pub operation: NativeOperation,
+    pub ok: bool,
+    pub nonce: String,
+    pub permission_key: String,
+    pub decision: PermissionDecision,
+    pub detail: String,
 }

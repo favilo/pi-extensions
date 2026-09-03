@@ -701,6 +701,7 @@ if (!nativeBinding) {
 
 module.exports = nativeBinding
 module.exports.evaluatePermission = nativeBinding.evaluatePermission
+module.exports.evaluatePermissionOrchestration = nativeBinding.evaluatePermissionOrchestration
 module.exports.evaluatePolicy = nativeBinding.evaluatePolicy
 module.exports.NativeOperation = nativeBinding.NativeOperation
 module.exports.parse = nativeBinding.parse

@@ -2,6 +2,8 @@
 /* eslint-disable */
 export declare function evaluatePermission(request: PermissionEvaluationRequest): EvaluateResponse
 
+export declare function evaluatePermissionOrchestration(request: PermissionOrchestrationRequest): PermissionOrchestrationResponse
+
 export declare function evaluatePolicy(request: EvaluateRequest): EvaluateResponse
 
 export interface EvaluateRequest {
@@ -27,7 +29,8 @@ export declare const enum NativeOperation {
   Parse = 'parse',
   Policy = 'policy',
   Evaluate = 'evaluate',
-  EvaluatePermission = 'evaluate_permission'
+  EvaluatePermission = 'evaluate_permission',
+  OrchestratePermission = 'orchestrate_permission'
 }
 
 export declare function parse(request: ParseRequest): ParseResponse
@@ -72,6 +75,25 @@ export interface PermissionEvaluationRequest {
   allow: Array<Record<string, string>>
   deny: Array<Record<string, string>>
   inputJson: string
+}
+
+export interface PermissionOrchestrationRequest {
+  version: number
+  operation: string
+  nonce: string
+  toolName: string
+  permissionsJson: string
+  inputJson: string
+}
+
+export interface PermissionOrchestrationResponse {
+  version: number
+  operation: NativeOperation
+  ok: boolean
+  nonce: string
+  permissionKey: string
+  decision: PermissionDecision
+  detail: string
 }
 
 export interface PolicyPermission {

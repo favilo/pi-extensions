@@ -4,7 +4,8 @@ mod policy;
 
 pub use contract::{
     EvaluateRequest, EvaluateResponse, NativeOperation, ParseRequest, ParseResponse,
-    ParsedSubcommand, PermissionDecision, PermissionEvaluationRequest, PolicyPermission,
+    ParsedSubcommand, PermissionDecision, PermissionEvaluationRequest,
+    PermissionOrchestrationRequest, PermissionOrchestrationResponse, PolicyPermission,
     PolicyRequest, PolicyResponse, ProbeRequest, ProbeResponse,
 };
 use napi::{Error, Result};
@@ -54,6 +55,19 @@ pub fn parse_policy(request: PolicyRequest) -> Result<PolicyResponse> {
 }
 
 #[napi]
+pub fn evaluate_permission_orchestration(
+    request: PermissionOrchestrationRequest,
+) -> Result<PermissionOrchestrationResponse> {
+    if request.version != CONTRACT_VERSION || request.operation != "orchestrate_permission" {
+        return Err(Error::from_reason(
+            "incompatible permission orchestration request",
+        ));
+    }
+    validate_nonce(&request.nonce)?;
+    Ok(policy::evaluate_orchestration(request))
+}
+
+#[napi]
 pub fn evaluate_policy(request: EvaluateRequest) -> Result<EvaluateResponse> {
     if request.version != CONTRACT_VERSION || request.operation != "evaluate" {
         return Err(Error::from_reason("incompatible evaluation request"));
@@ -76,8 +90,8 @@ pub fn evaluate_permission(request: PermissionEvaluationRequest) -> Result<Evalu
 #[cfg(test)]
 mod tests {
     use super::{
-        evaluate_policy, parse, parse_policy, probe, EvaluateRequest, ParseRequest, PolicyRequest,
-        ProbeRequest,
+        evaluate_permission_orchestration, evaluate_policy, parse, parse_policy, probe,
+        EvaluateRequest, ParseRequest, PermissionOrchestrationRequest, PolicyRequest, ProbeRequest,
     };
     #[test]
     fn probe_returns_a_distinct_typed_response() {
@@ -150,6 +164,22 @@ mod tests {
         })
         .unwrap();
         assert!(matches!(response.decision, super::PermissionDecision::Ask));
+    }
+
+    #[test]
+    fn orchestrates_permission_key_mapping_and_decisions() {
+        let response = evaluate_permission_orchestration(PermissionOrchestrationRequest {
+            version: 1,
+            operation: "orchestrate_permission".into(),
+            nonce: "n".into(),
+            tool_name: "grep".into(),
+            permissions_json: r#"{"read":{"allow":[{"path":"^/workspace"}],"deny":[{"path":"secret"}]}}"#.into(),
+            input_json: r#"{"path":"/workspace/secret.txt"}"#.into(),
+        })
+        .unwrap();
+        assert!(response.ok);
+        assert_eq!(response.permission_key, "read");
+        assert!(matches!(response.decision, super::PermissionDecision::Deny));
     }
 
     #[test]

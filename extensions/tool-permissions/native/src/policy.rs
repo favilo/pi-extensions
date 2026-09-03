@@ -1,6 +1,7 @@
 use crate::contract::{
     EvaluateRequest, EvaluateResponse, NativeOperation, PermissionDecision,
-    PermissionEvaluationRequest, PolicyPermission, PolicyRequest, PolicyResponse,
+    PermissionEvaluationRequest, PermissionOrchestrationRequest, PermissionOrchestrationResponse,
+    PolicyPermission, PolicyRequest, PolicyResponse,
 };
 use regex::Regex;
 use std::collections::HashMap;
@@ -107,6 +108,50 @@ pub fn evaluate_permission(request: PermissionEvaluationRequest) -> EvaluateResp
     )
 }
 
+pub fn evaluate_orchestration(request: PermissionOrchestrationRequest) -> PermissionOrchestrationResponse {
+    let input: serde_json::Value = match serde_json::from_str(&request.input_json) {
+        Ok(value) => value,
+        Err(error) => {
+            return orchestration_response(
+                request.nonce,
+                false,
+                permission_key_for_tool(&request.tool_name),
+                PermissionDecision::Ask,
+                &format!("invalid input JSON: {error}"),
+            )
+        }
+    };
+    let permissions: HashMap<String, PolicyPermission> = match serde_json::from_str(&request.permissions_json) {
+        Ok(value) => value,
+        Err(error) => {
+            return orchestration_response(
+                request.nonce,
+                false,
+                permission_key_for_tool(&request.tool_name),
+                PermissionDecision::Ask,
+                &format!("invalid permissions JSON: {error}"),
+            )
+        }
+    };
+    let permission_key = permission_key_for_tool(&request.tool_name);
+    let decision = match permissions.get(&permission_key) {
+        Some(permission) => match permission_decision(permission, &input) {
+            Ok(decision) => decision,
+            Err(error) => {
+                return orchestration_response(
+                    request.nonce,
+                    false,
+                    permission_key,
+                    PermissionDecision::Ask,
+                    &format!("invalid native regex: {error}"),
+                )
+            }
+        },
+        None => PermissionDecision::Ask,
+    };
+    orchestration_response(request.nonce, true, permission_key, decision, "orchestrated permission decision")
+}
+
 pub fn evaluate(request: EvaluateRequest) -> EvaluateResponse {
     let input: serde_json::Value = match serde_json::from_str(&request.input_json) {
         Ok(value) => value,
@@ -158,6 +203,14 @@ pub fn evaluate(request: EvaluateRequest) -> EvaluateResponse {
             PermissionDecision::Ask,
             &format!("invalid native regex: {error}"),
         ),
+    }
+}
+
+fn permission_key_for_tool(tool_name: &str) -> String {
+    match tool_name {
+        "read" | "ls" | "grep" | "find" => "read".into(),
+        "write" | "edit" => "write".into(),
+        _ => tool_name.into(),
     }
 }
 
@@ -227,6 +280,24 @@ fn evaluate_response_with_operation(
         operation,
         nonce,
         ok,
+        decision,
+        detail: detail.into(),
+    }
+}
+
+fn orchestration_response(
+    nonce: String,
+    ok: bool,
+    permission_key: String,
+    decision: PermissionDecision,
+    detail: &str,
+) -> PermissionOrchestrationResponse {
+    PermissionOrchestrationResponse {
+        version: crate::CONTRACT_VERSION,
+        operation: NativeOperation::OrchestratePermission,
+        ok,
+        nonce,
+        permission_key,
         decision,
         detail: detail.into(),
     }
