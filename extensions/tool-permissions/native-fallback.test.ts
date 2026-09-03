@@ -8,6 +8,7 @@ import { parseWithNativeFallback } from "./native-parser-loader.ts";
 import { parsePolicyWithNativeFallback } from "./native-policy-loader.ts";
 import { evaluatePermissionWithNative } from "./native-evaluation-loader.ts";
 import { NATIVE_CONTRACT_VERSION } from "./native-contract.ts";
+import { setNativePackagePathForTests } from "./native-package.ts";
 import type { BashParseResult } from "./bash-parser.ts";
 import type { Permissions, ToolPermission } from "./config.ts";
 
@@ -16,10 +17,12 @@ function withNativeModule(source: string, run: (packagePath: string) => void): v
   const directory = mkdtempSync(join(tmpdir(), "tool-permissions-native-fallback-"));
   const packagePath = join(directory, "index.cjs");
   writeFileSync(packagePath, source);
-  process.env.PI_TOOL_PERMISSIONS_NATIVE_PACKAGE = packagePath;
+  process.env.PI_TOOL_PERMISSIONS_NATIVE_PACKAGE = "1";
+  const restoreOverride = setNativePackagePathForTests(packagePath);
   try {
     run(packagePath);
   } finally {
+    restoreOverride();
     if (previous === undefined) delete process.env.PI_TOOL_PERMISSIONS_NATIVE_PACKAGE;
     else process.env.PI_TOOL_PERMISSIONS_NATIVE_PACKAGE = previous;
     rmSync(directory, { recursive: true, force: true });

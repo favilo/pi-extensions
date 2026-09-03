@@ -15,8 +15,8 @@ function nativeEnabled(value: string | undefined): boolean {
 }
 
 export function resolveNativePackagePath(environment: NodeJS.ProcessEnv = process.env): string | undefined {
-  if (testOverridePath) return testOverridePath;
-  return nativeEnabled(environment[NATIVE_PACKAGE_ENV]) ? bundledNativePackagePath() : undefined;
+  if (!nativeEnabled(environment[NATIVE_PACKAGE_ENV])) return undefined;
+  return testOverridePath ?? bundledNativePackagePath();
 }
 
 export function requireNativePackage(packagePath: string): unknown {

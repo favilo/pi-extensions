@@ -1,5 +1,5 @@
-import { createRequire } from "node:module";
 import { createNativeProbeRequest, decodeNativeProbeResponse, NATIVE_CONTRACT_VERSION, NATIVE_POLICY_NONCE } from "./native-contract.ts";
+import { requireNativePackage, resolveNativePackagePath } from "./native-package.ts";
 import type { Permissions } from "./config.ts";
 import type { NativeOperation } from "./native/index.d.ts";
 
@@ -7,12 +7,12 @@ type NativePolicy = { probe(request: unknown): unknown; parsePolicy(request: unk
 let cached: { path: string; module: NativePolicy } | undefined;
 
 export function parsePolicyWithNativeFallback(source: string, fallback: () => Permissions): Permissions {
-  const packagePath = process.env.PI_TOOL_PERMISSIONS_NATIVE_PACKAGE;
+  const packagePath = resolveNativePackagePath();
   if (!packagePath) return fallback();
   try {
     let module = cached?.path === packagePath ? cached.module : undefined;
     if (!module) {
-      const loaded = createRequire(import.meta.url)(packagePath) as Partial<NativePolicy>;
+      const loaded = requireNativePackage(packagePath) as Partial<NativePolicy>;
       if (typeof loaded.probe !== "function" || typeof loaded.parsePolicy !== "function") throw new Error("native policy module is missing exports");
       const probe = decodeNativeProbeResponse(loaded.probe(createNativeProbeRequest(NATIVE_POLICY_NONCE)));
       if (probe.nonce !== NATIVE_POLICY_NONCE) throw new Error("native policy probe nonce mismatch");

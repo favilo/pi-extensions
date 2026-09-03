@@ -20,6 +20,7 @@ import { createPersistedTrustResolver, resolveCurrentProjectPolicyPath, resolveS
 import { evaluateBashSubcommands, saveSubcommandAllowRules } from "./bash-subcommands.ts";
 import { isYoloModeEnabled } from "./yolo-mode.ts";
 import { loadNativePackageProbe } from "./native-loader.ts";
+import { resolveNativePackagePath } from "./native-package.ts";
 import type { PermissionDecision, ToolPermissionBoundary, ToolRequest } from "./permission-boundary.ts";
 import { isPermissionPromptCancellation } from "./prompt-input.ts";
 import { SteeringEditor } from "./steering-editor.ts";
@@ -1368,7 +1369,7 @@ export default function toolPermissionPolicy(pi: ExtensionAPI) {
   }
 
   pi.on("session_start", async (_event, ctx) => {
-    const nativePackage = process.env.PI_TOOL_PERMISSIONS_NATIVE_PACKAGE;
+    const nativePackage = resolveNativePackagePath();
     if (nativePackage) {
       const nativeResult = await loadNativePackageProbe(nativePackage);
       if (ctx.hasUI) {

@@ -1,9 +1,9 @@
-import { createRequire } from "node:module";
 import {
   createNativeProbeRequest,
   decodeNativeProbeResponse,
   type NativeProbeResponse,
 } from "./native-contract.ts";
+import { requireNativePackage } from "./native-package.ts";
 
 export type NativeModule = {
   probe(request: ReturnType<typeof createNativeProbeRequest>): unknown | Promise<unknown>;
@@ -19,10 +19,9 @@ export type NativeLoadResult =
   | { engine: "typescript"; reason: string };
 
 export async function loadNativePackageProbe(packagePath: string, nonce?: string): Promise<NativeLoadResult> {
-  const require = createRequire(import.meta.url);
   return loadNativeProbe({
     nonce,
-    load: () => require(packagePath) as NativeModule,
+    load: () => requireNativePackage(packagePath) as NativeModule,
   });
 }
 

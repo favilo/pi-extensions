@@ -1,5 +1,5 @@
-import { createRequire } from "node:module";
 import { createNativeProbeRequest, decodeNativeProbeResponse, NATIVE_CONTRACT_VERSION, NATIVE_PARSER_NONCE } from "./native-contract.ts";
+import { requireNativePackage, resolveNativePackagePath } from "./native-package.ts";
 import type { BashParseResult, ParsedSubcommand } from "./bash-parser.ts";
 import type { NativeOperation } from "./native/index.d.ts";
 
@@ -12,7 +12,7 @@ let cached: { path: string; module: NativeParserModule } | undefined;
 
 function loadModule(path: string): NativeParserModule {
   if (cached?.path === path) return cached.module;
-  const module = createRequire(import.meta.url)(path) as Partial<NativeParserModule>;
+  const module = requireNativePackage(path) as Partial<NativeParserModule>;
   if (typeof module.probe !== "function" || typeof module.parse !== "function") {
     throw new Error("native parser module is missing probe or parse");
   }
@@ -43,7 +43,7 @@ function decodeParseResult(value: unknown): BashParseResult {
 }
 
 export function parseWithNativeFallback(command: string, fallback: () => BashParseResult): BashParseResult {
-  const packagePath = process.env.PI_TOOL_PERMISSIONS_NATIVE_PACKAGE;
+  const packagePath = resolveNativePackagePath();
   if (!packagePath) return fallback();
   try {
     const module = loadModule(packagePath);

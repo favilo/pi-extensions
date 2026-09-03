@@ -6,6 +6,7 @@ import { dirname, join } from "node:path";
 import test from "node:test";
 import { stringify as stringifyToml } from "smol-toml";
 import toolPermissionPolicy, { logSubagentDebug, requiresSubagentRuntimeApproval, resolvePermissionEditorTarget, resolveToolPermissionDecision } from "./index.ts";
+import { setNativePackagePathForTests } from "./native-package.ts";
 
 test("reports native package selection or TypeScript fallback at session start", async () => {
   const directory = mkdtempSync(join(tmpdir(), "pi-permissions-native-runtime-"));
@@ -14,7 +15,8 @@ test("reports native package selection or TypeScript fallback at session start",
   const previousPackage = process.env.PI_TOOL_PERMISSIONS_NATIVE_PACKAGE;
   const notices: string[] = [];
   const handlers = new Map<string, (event: unknown, ctx: unknown) => unknown>();
-  process.env.PI_TOOL_PERMISSIONS_NATIVE_PACKAGE = packagePath;
+  process.env.PI_TOOL_PERMISSIONS_NATIVE_PACKAGE = "1";
+  const restoreNativePackagePath = setNativePackagePathForTests(packagePath);
   try {
     toolPermissionPolicy({
       registerCommand() {},
@@ -23,6 +25,7 @@ test("reports native package selection or TypeScript fallback at session start",
     await handlers.get("session_start")?.({}, { hasUI: true, cwd: "/tmp", ui: { notify(message: string) { notices.push(message); } } });
     assert.deepEqual(notices, ["Native tool-permissions probe active (contract v1)."]);
   } finally {
+    restoreNativePackagePath();
     if (previousPackage === undefined) delete process.env.PI_TOOL_PERMISSIONS_NATIVE_PACKAGE;
     else process.env.PI_TOOL_PERMISSIONS_NATIVE_PACKAGE = previousPackage;
     rmSync(directory, { recursive: true, force: true });
