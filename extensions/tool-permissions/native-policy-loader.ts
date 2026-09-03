@@ -18,8 +18,8 @@ export function parsePolicyWithNativeFallback(source: string, fallback: () => Pe
       module = loaded as NativePolicy;
       cached = { path: packagePath, module };
     }
-    const value = module.parsePolicy({ version: 1, operation: "policy" as NativeOperation, nonce: NATIVE_POLICY_NONCE, source }) as Record<string, unknown>;
-    if (value.version !== NATIVE_CONTRACT_VERSION || value.operation !== ("policy" as NativeOperation) || value.ok !== true) throw new Error("native policy response is invalid");
+    const value = module.parsePolicy({ version: NATIVE_CONTRACT_VERSION, operation: "policy" as NativeOperation, nonce: NATIVE_POLICY_NONCE, source }) as Record<string, unknown>;
+    if (value.version !== NATIVE_CONTRACT_VERSION || value.operation !== ("policy" as NativeOperation) || value.nonce !== NATIVE_POLICY_NONCE || value.ok !== true) throw new Error("native policy response is invalid");
     return decodePermissions(value.permissions);
   } catch {
     return fallback();
