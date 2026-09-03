@@ -1,7 +1,7 @@
 id: e16
 title: Rust/WASM core migration for tool-permissions
 wsjf: 0.0
-total_bcps: 18
+total_bcps: 27
 status: planned
 stories:
   - id: e16s01
@@ -14,7 +14,7 @@ stories:
   - id: e16s02
     title: Port Bash parsing to a Rust/WASM core
     bcps: 4
-    status: todo
+    status: passing
     delta: ADDED
     spec: e16s02-rust-bash-parser-parity.md
     tasks: e16s02-tasks.yaml
@@ -28,14 +28,28 @@ stories:
   - id: e16s03
     title: Port Bash permission evaluation to a Rust/WASM core
     bcps: 4
-    status: todo
+    status: passing
     delta: ADDED
     spec: e16s03-rust-permission-engine.md
     tasks: e16s03-tasks.yaml
   - id: e16s04
-    title: Integrate the Rust/WASM core with packaging, fallback, and docs
+    title: Enable bundled native runtime by default with packaging, fallback, and docs
     bcps: 3
     status: todo
     delta: ADDED
     spec: e16s04-rust-wasm-runtime-integration.md
     tasks: e16s04-tasks.yaml
+  - id: e16s06
+    title: Port permission orchestration helpers to the native Rust core
+    bcps: 4
+    status: todo
+    delta: ADDED
+    spec: e16s06-native-permission-orchestration.md
+    tasks: e16s06-tasks.yaml
+  - id: e16s07
+    title: Register Pi tool-permissions callbacks from Rust
+    bcps: 5
+    status: todo
+    delta: ADDED
+    spec: e16s07-rust-owned-pi-registration.md
+    tasks: e16s07-tasks.yaml

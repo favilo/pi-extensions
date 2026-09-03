@@ -1,0 +1,51 @@
+story_id: e16s06
+title: Port permission orchestration helpers to the native Rust core
+status: todo
+bcps: 4
+delta: ADDED
+spec: e16s06-native-permission-orchestration.md
+tasks:
+  - id: 1
+    description: Add failing parity tests for native orchestration across read, write, edit, subagent, MCP, and custom-tool permission decisions.
+    verify: node --test extensions/tool-permissions/permission-boundary.test.ts extensions/tool-permissions/native-orchestration-parity.test.ts
+    status: todo
+    risk: P0
+    security: high
+    allure:
+      severity: critical
+      categories:
+        - "Contract Tests"
+        - "Permission Orchestration"
+  - id: 2
+    description: Extend the native contract and Rust core with a pure permission-orchestration operation for key mapping, decision selection, reason classes, and audit-ready metadata.
+    verify: cargo test --manifest-path extensions/tool-permissions/native/Cargo.toml && node --test extensions/tool-permissions/native-orchestration-parity.test.ts
+    status: todo
+    risk: P0
+    security: high
+    allure:
+      severity: critical
+      categories:
+        - "Native Boundary"
+        - "Permission Orchestration"
+  - id: 3
+    description: Route eligible non-Bash permission decisions through native orchestration while preserving TypeScript-owned canonicalization, prompt queues, saved-rule persistence, audit writes, and execution.
+    verify: node --test extensions/tool-permissions/permission-boundary.test.ts extensions/tool-permissions/native-fallback.test.ts extensions/tool-permissions/native-orchestration-parity.test.ts
+    status: todo
+    risk: P0
+    security: high
+    allure:
+      severity: critical
+      categories:
+        - "Integration"
+        - "Fallback"
+  - id: 4
+    description: Run full security regression, native build, and package checks before marking orchestration parity passing.
+    verify: cargo test --manifest-path extensions/tool-permissions/native/Cargo.toml && npm run build:native && npm run check
+    status: todo
+    risk: P1
+    security: high
+    allure:
+      severity: critical
+      categories:
+        - "Security Review"
+        - "Regression"

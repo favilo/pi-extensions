@@ -1,4 +1,4 @@
-# e16s04 — Integrate the Rust/WASM core with packaging, fallback, and docs
+# e16s04 — Enable bundled native runtime by default with packaging, fallback, and docs
 
 ## 1. Identity
 - **Story:** e16s04
@@ -12,7 +12,7 @@
 Maintainers need the hybrid extension to build, test, package, and diagnose cleanly so the Rust/WASM path can ship without making normal Pi package use fragile.
 
 ## 3. Goal
-Finish runtime selection, packaging, CI coverage, and maintainer documentation for the hybrid TypeScript plus Rust/WASM `tool-permissions` extension.
+Finish default runtime selection, packaging, CI coverage, and maintainer documentation for the hybrid TypeScript plus bundled native Rust `tool-permissions` extension.
 
 ## 4. Non-goals
 - Porting unrelated extensions to Rust.
@@ -35,8 +35,8 @@ Package manifests, build scripts, CI commands, generated artifacts, and runtime 
 Repeatable build steps, checked verification coverage, packaged artifact inclusion, documented maintenance workflow, and deterministic runtime fallback behavior.
 
 ## 10. Requirements
-- ADDED: The package shall build and include the required WASM artifact(s) in a repeatable way for local development and packaged installation.
-- ADDED: Runtime selection shall be deterministic: use the validated Rust/WASM core when compatible, otherwise fall back to the existing TypeScript core with visible maintainer-facing diagnostics.
+- ADDED: The package shall build and include the required native artifact(s) in a repeatable way for local development and packaged installation.
+- ADDED: Runtime selection shall be deterministic: use the validated bundled native core by default when compatible, otherwise fall back to the existing TypeScript core with visible maintainer-facing diagnostics and an explicit disable switch.
 - ADDED: Prompt rendering, saved-rule flows, audit records, and existing non-Bash permission paths shall remain behaviorally unchanged by the migration.
 - ADDED: Repo documentation shall describe toolchain prerequisites, local build/test commands, packaging expectations, and the supported fallback behavior.
 
@@ -81,8 +81,8 @@ Verification should record which engine was active for relevant tests and whethe
 - `npm run check:ci`
 
 ## 19. Implementation steps
-1. Add failing integration tests for engine selection, truthful fallback diagnostics, and unchanged user-visible permission flows.
-2. Wire build and packaging steps for the Rust/WASM artifact.
+1. Add failing integration tests for native-by-default engine selection, explicit disable, truthful fallback diagnostics, and unchanged user-visible permission flows.
+2. Wire build and packaging steps for the bundled native artifact.
 3. Update repo documentation and maintainer workflow notes.
 4. Run the complete package suite and backlog-plan consistency checks.
 
