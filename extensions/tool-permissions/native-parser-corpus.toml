@@ -122,8 +122,24 @@ name = "bash-c-unsupported-payload-propagates"
 command = "bash -c 'for f in x; do echo $f; done'"
 
 [[cases]]
-name = "sh-c-payload-is-not-unwrapped"
+name = "sh-c-payload-is-unwrapped"
 command = "sh -c 'jj status'"
+
+[[cases]]
+name = "bash-lc-combined-option-payload"
+command = "bash -lc 'jj status'"
+
+[[cases]]
+name = "slash-bash-c-payload"
+command = "/bin/bash -c 'jj status'"
+
+[[cases]]
+name = "env-bash-c-payload"
+command = "env bash -c 'jj status'"
+
+[[cases]]
+name = "dynamic-command-name-is-unsupported"
+command = "$(echo rm) -rf /"
 
 [[cases]]
 name = "negated-command"

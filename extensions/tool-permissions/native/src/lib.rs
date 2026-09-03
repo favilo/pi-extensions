@@ -12,11 +12,21 @@ use napi_derive::napi;
 
 pub(crate) const CONTRACT_VERSION: i64 = 1;
 
+fn validate_nonce(nonce: &str) -> Result<()> {
+    if nonce.is_empty() || nonce.len() > 256 {
+        return Err(Error::from_reason(
+            "native request nonce must be 1-256 characters",
+        ));
+    }
+    Ok(())
+}
+
 #[napi]
 pub fn probe(request: ProbeRequest) -> Result<ProbeResponse> {
     if request.version != CONTRACT_VERSION || request.operation != "health" {
         return Err(Error::from_reason("incompatible probe request"));
     }
+    validate_nonce(&request.nonce)?;
     Ok(ProbeResponse {
         version: CONTRACT_VERSION,
         operation: NativeOperation::Health,
@@ -30,6 +40,7 @@ pub fn parse(request: ParseRequest) -> Result<ParseResponse> {
     if request.version != CONTRACT_VERSION || request.operation != "parse" {
         return Err(Error::from_reason("incompatible parse request"));
     }
+    validate_nonce(&request.nonce)?;
     Ok(parser::parse(request))
 }
 
@@ -38,6 +49,7 @@ pub fn parse_policy(request: PolicyRequest) -> Result<PolicyResponse> {
     if request.version != CONTRACT_VERSION || request.operation != "policy" {
         return Err(Error::from_reason("incompatible policy request"));
     }
+    validate_nonce(&request.nonce)?;
     Ok(policy::parse(request))
 }
 
@@ -46,6 +58,7 @@ pub fn evaluate_policy(request: EvaluateRequest) -> Result<EvaluateResponse> {
     if request.version != CONTRACT_VERSION || request.operation != "evaluate" {
         return Err(Error::from_reason("incompatible evaluation request"));
     }
+    validate_nonce(&request.nonce)?;
     Ok(policy::evaluate(request))
 }
 
@@ -56,6 +69,7 @@ pub fn evaluate_permission(request: PermissionEvaluationRequest) -> Result<Evalu
             "incompatible permission evaluation request",
         ));
     }
+    validate_nonce(&request.nonce)?;
     Ok(policy::evaluate_permission(request))
 }
 

@@ -14,7 +14,8 @@ export function parsePolicyWithNativeFallback(source: string, fallback: () => Pe
     if (!module) {
       const loaded = createRequire(import.meta.url)(packagePath) as Partial<NativePolicy>;
       if (typeof loaded.probe !== "function" || typeof loaded.parsePolicy !== "function") throw new Error("native policy module is missing exports");
-      decodeNativeProbeResponse(loaded.probe(createNativeProbeRequest(NATIVE_POLICY_NONCE)));
+      const probe = decodeNativeProbeResponse(loaded.probe(createNativeProbeRequest(NATIVE_POLICY_NONCE)));
+      if (probe.nonce !== NATIVE_POLICY_NONCE) throw new Error("native policy probe nonce mismatch");
       module = loaded as NativePolicy;
       cached = { path: packagePath, module };
     }

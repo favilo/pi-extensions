@@ -16,7 +16,8 @@ function loadModule(path: string): NativeParserModule {
   if (typeof module.probe !== "function" || typeof module.parse !== "function") {
     throw new Error("native parser module is missing probe or parse");
   }
-  decodeNativeProbeResponse(module.probe(createNativeProbeRequest(NATIVE_PARSER_NONCE)));
+  const probe = decodeNativeProbeResponse(module.probe(createNativeProbeRequest(NATIVE_PARSER_NONCE)));
+  if (probe.nonce !== NATIVE_PARSER_NONCE) throw new Error("native parser probe nonce mismatch");
   cached = { path, module: module as NativeParserModule };
   return cached.module;
 }

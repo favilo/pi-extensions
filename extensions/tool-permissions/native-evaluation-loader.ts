@@ -15,11 +15,12 @@ export function evaluatePermissionWithNative(permission: ToolPermission | undefi
     if (!module) {
       module = createRequire(import.meta.url)(path) as NativeModule;
       if (typeof module.evaluatePermission !== "function" || typeof (module as NativeModule & { probe?: unknown }).probe !== "function") return undefined;
-      decodeNativeProbeResponse((module as NativeModule & { probe: (request: unknown) => unknown }).probe(createNativeProbeRequest(NATIVE_EVALUATION_NONCE)));
+      const probe = decodeNativeProbeResponse((module as NativeModule & { probe: (request: unknown) => unknown }).probe(createNativeProbeRequest(NATIVE_EVALUATION_NONCE)));
+      if (probe.nonce !== NATIVE_EVALUATION_NONCE) return undefined;
       cached = { path, module };
     }
     const result = module.evaluatePermission({ version: NATIVE_CONTRACT_VERSION, operation: "evaluate_permission" as NativeOperation, nonce: NATIVE_EVALUATION_NONCE, allow: permission.allow, deny: permission.deny, inputJson: JSON.stringify(input) }) as Record<string, unknown>;
-    if (result.ok !== true || result.version !== NATIVE_CONTRACT_VERSION || result.operation !== ("evaluate" as NativeOperation) || result.nonce !== NATIVE_EVALUATION_NONCE || !["allow", "deny", "ask"].includes(result.decision as string)) return undefined;
+    if (result.ok !== true || result.version !== NATIVE_CONTRACT_VERSION || result.operation !== ("evaluate_permission" as NativeOperation) || result.nonce !== NATIVE_EVALUATION_NONCE || !["allow", "deny", "ask"].includes(result.decision as string)) return undefined;
     return result.decision as NativeDecision;
   } catch {
     return undefined;

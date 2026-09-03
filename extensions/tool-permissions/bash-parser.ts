@@ -38,6 +38,53 @@ function hasUnsupportedParts(word: Word): boolean {
   return word.parts.some((part: WordPart) => UNSUPPORTED_PART_TYPES.has(part.type));
 }
 
+function hasDynamicCommandName(word: Word): boolean {
+  if (!word.parts) return false;
+  return word.parts.some((part: WordPart) =>
+    part.type === "CommandExpansion" ||
+    part.type === "SimpleExpansion" ||
+    part.type === "ParameterExpansion" ||
+    part.type === "ArithmeticExpansion" ||
+    part.type === "ProcessSubstitution" ||
+    (part.type === "DoubleQuoted" && Array.isArray((part as any).parts) && (part as any).parts.some((inner: WordPart) =>
+      inner.type === "CommandExpansion" || inner.type === "SimpleExpansion" || inner.type === "ParameterExpansion" || inner.type === "ArithmeticExpansion" || inner.type === "ProcessSubstitution"
+    ))
+  );
+}
+
+const SHELL_BASENAMES = new Set(["bash", "sh", "zsh", "dash", "ksh"]);
+
+function basename(command: string): string {
+  const parts = command.split("/").filter(Boolean);
+  return parts.at(-1) ?? command;
+}
+
+function isShellCommand(command: string): boolean {
+  return SHELL_BASENAMES.has(basename(command));
+}
+
+function isShellCommandOption(value: string): boolean {
+  return value.startsWith("-") && !value.startsWith("--") && value.slice(1).includes("c");
+}
+
+function shellPayloadWord(cmd: Command): Word | undefined {
+  const name = cmd.name ? wordValue(cmd.name) : "";
+  const args = cmd.suffix.map(wordValue);
+  let searchStart = 0;
+  if (isShellCommand(name)) {
+    searchStart = 0;
+  } else if (name === "env") {
+    const shellIndex = args.findIndex(isShellCommand);
+    if (shellIndex < 0) return undefined;
+    searchStart = shellIndex + 1;
+  } else {
+    return undefined;
+  }
+  const optionOffset = args.slice(searchStart).findIndex(isShellCommandOption);
+  if (optionOffset < 0) return undefined;
+  return cmd.suffix[searchStart + optionOffset + 1];
+}
+
 /** Extract subcommands from a single Command node. */
 function commandToSubcommand(cmd: Command, source: string): ParsedSubcommand {
   const name = cmd.name;
@@ -130,36 +177,36 @@ function extractSubcommands(
         };
       }
 
-      // Check for bash -c 'payload' — recursively parse the payload.
-      if (node.name && wordValue(node.name) === "bash") {
-        const dashC = node.suffix.find((w) => wordValue(w) === "-c");
-        if (dashC) {
-          // The next word after -c is the payload
-          const dashCIndex = node.suffix.indexOf(dashC);
-          const payloadWord = node.suffix[dashCIndex + 1];
-          if (payloadWord) {
-            const payload = wordValue(payloadWord);
-            const inner = parseBashCommand(payload);
-            if (inner.ok) {
-              // Adjust inner spans to be relative to the outer source
-              for (const sub of inner.subcommands) {
-                subcommands.push({
-                  ...sub,
-                  span: {
-                    start: sub.span.start + payloadWord.pos,
-                    end: sub.span.end + payloadWord.pos,
-                  },
-                });
-              }
-              return { ok: true };
-            }
-            // Inner parse failed — propagate the failure
-            return {
-              ok: false,
-              detail: inner.detail,
-            };
+      if (node.name && hasDynamicCommandName(node.name)) {
+        return {
+          ok: false,
+          detail: `unsupported syntax: dynamic command name "${node.name.text}"`,
+        };
+      }
+
+      // Check for shell -c payloads — recursively parse the payload.
+      const payloadWord = shellPayloadWord(node);
+      if (payloadWord) {
+        const payload = wordValue(payloadWord);
+        const inner = parseBashCommand(payload);
+        if (inner.ok) {
+          // Adjust inner spans to be relative to the outer source
+          for (const sub of inner.subcommands) {
+            subcommands.push({
+              ...sub,
+              span: {
+                start: sub.span.start + payloadWord.pos,
+                end: sub.span.end + payloadWord.pos,
+              },
+            });
           }
+          return { ok: true };
         }
+        // Inner parse failed — propagate the failure
+        return {
+          ok: false,
+          detail: inner.detail,
+        };
       }
 
       subcommands.push(commandToSubcommand(node, source));

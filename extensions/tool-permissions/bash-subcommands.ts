@@ -22,7 +22,7 @@ export type EvaluateSubcommandOptions = Parameters<typeof resolveToolPermissionD
  * against the tool permission policy for "bash".
  * - If any subcommand or raw command matches a deny rule, the entire command is denied atomically.
  * - If any subcommand is unsupported or unparseable, the command falls back to "ask" (fail-asking) unless a deny rule matches.
- * - If all subcommands are allowed (or raw command matches an allow rule), the command is allowed.
+ * - If all extracted subcommands are allowed, the command is allowed.
  * - Otherwise (if any subcommand requires user approval), the decision is "ask".
  */
 export function evaluateBashSubcommands(
@@ -115,7 +115,7 @@ export function evaluateBashSubcommands(
     }
   }
 
-  const finalDecision: "allow" | "ask" = !hasAsk || rawDecision.decision === "allow" ? "allow" : "ask";
+  const finalDecision: "allow" | "ask" = hasAsk ? "ask" : "allow";
   const finalSource = finalDecision === "allow" ? (allowedSource ?? rawDecision.source) : undefined;
 
   safeAudit({

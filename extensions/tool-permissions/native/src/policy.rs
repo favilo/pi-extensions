@@ -87,22 +87,24 @@ pub fn evaluate_permission(request: PermissionEvaluationRequest) -> EvaluateResp
         allow: request.allow,
         deny: request.deny,
     };
-    let decision = if permission
-        .deny
-        .iter()
-        .any(|rule| matches_rule(rule, &input))
-    {
-        PermissionDecision::Deny
-    } else if permission
-        .allow
-        .iter()
-        .any(|rule| matches_rule(rule, &input))
-    {
-        PermissionDecision::Allow
-    } else {
-        PermissionDecision::Ask
+    let decision = match permission_decision(&permission, &input) {
+        Ok(decision) => decision,
+        Err(error) => {
+            return evaluate_response(
+                request.nonce,
+                false,
+                PermissionDecision::Ask,
+                &format!("invalid native regex: {error}"),
+            )
+        }
     };
-    evaluate_response(request.nonce, true, decision, "evaluated permission rules")
+    evaluate_response_with_operation(
+        NativeOperation::EvaluatePermission,
+        request.nonce,
+        true,
+        decision,
+        "evaluated permission rules",
+    )
 }
 
 pub fn evaluate(request: EvaluateRequest) -> EvaluateResponse {
@@ -131,45 +133,61 @@ pub fn evaluate(request: EvaluateRequest) -> EvaluateResponse {
             "no matching permission",
         );
     };
-    if permission
-        .deny
-        .iter()
-        .any(|rule| matches_rule(rule, &input))
-    {
-        return evaluate_response(
+    match permission_decision(permission, &input) {
+        Ok(PermissionDecision::Deny) => evaluate_response(
             request.nonce,
             true,
             PermissionDecision::Deny,
             "matched deny rule",
-        );
-    }
-    if permission
-        .allow
-        .iter()
-        .any(|rule| matches_rule(rule, &input))
-    {
-        return evaluate_response(
+        ),
+        Ok(PermissionDecision::Allow) => evaluate_response(
             request.nonce,
             true,
             PermissionDecision::Allow,
             "matched allow rule",
-        );
+        ),
+        Ok(PermissionDecision::Ask) => evaluate_response(
+            request.nonce,
+            true,
+            PermissionDecision::Ask,
+            "no matching allow rule",
+        ),
+        Err(error) => evaluate_response(
+            request.nonce,
+            false,
+            PermissionDecision::Ask,
+            &format!("invalid native regex: {error}"),
+        ),
     }
-    evaluate_response(
-        request.nonce,
-        true,
-        PermissionDecision::Ask,
-        "no matching allow rule",
-    )
 }
 
-fn matches_rule(rule: &HashMap<String, String>, input: &serde_json::Value) -> bool {
-    rule.iter().all(|(path, pattern)| {
-        field_value(input, path).is_some_and(|value| {
-            Regex::new(pattern)
-                .map(|regex| regex.is_match(&pattern_value(value)))
-                .unwrap_or(false)
-        })
+fn permission_decision(
+    permission: &PolicyPermission,
+    input: &serde_json::Value,
+) -> Result<PermissionDecision, String> {
+    if permission.deny.iter().try_fold(false, |matched, rule| {
+        Ok::<_, String>(matched || matches_rule(rule, input)?)
+    })? {
+        return Ok(PermissionDecision::Deny);
+    }
+    if permission.allow.iter().try_fold(false, |matched, rule| {
+        Ok::<_, String>(matched || matches_rule(rule, input)?)
+    })? {
+        return Ok(PermissionDecision::Allow);
+    }
+    Ok(PermissionDecision::Ask)
+}
+
+fn matches_rule(rule: &HashMap<String, String>, input: &serde_json::Value) -> Result<bool, String> {
+    rule.iter().try_fold(true, |matched, (path, pattern)| {
+        if !matched {
+            return Ok(false);
+        }
+        let Some(value) = field_value(input, path) else {
+            return Ok(false);
+        };
+        let regex = Regex::new(pattern).map_err(|error| error.to_string())?;
+        Ok(regex.is_match(&pattern_value(value)))
     })
 }
 
@@ -194,9 +212,19 @@ fn evaluate_response(
     decision: PermissionDecision,
     detail: &str,
 ) -> EvaluateResponse {
+    evaluate_response_with_operation(NativeOperation::Evaluate, nonce, ok, decision, detail)
+}
+
+fn evaluate_response_with_operation(
+    operation: NativeOperation,
+    nonce: String,
+    ok: bool,
+    decision: PermissionDecision,
+    detail: &str,
+) -> EvaluateResponse {
     EvaluateResponse {
         version: crate::CONTRACT_VERSION,
-        operation: NativeOperation::Evaluate,
+        operation,
         nonce,
         ok,
         decision,

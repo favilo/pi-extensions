@@ -267,10 +267,64 @@ fn parse_subcommands(command: &str) -> Result<Vec<ParsedSubcommand>, (String, St
     }
 }
 
-fn maybe_bash_c_payload(args: &[(String, usize, usize)]) -> Option<(String, usize)> {
+fn primary_has_dynamic_command_name(primary: &PrimaryExpression) -> bool {
+    match primary {
+        PrimaryExpression::CommandSubstitution(_)
+        | PrimaryExpression::Expansion(_)
+        | PrimaryExpression::SimpleExpansion(_)
+        | PrimaryExpression::ArithmeticExpansion(_)
+        | PrimaryExpression::ProcessSubstitution(_) => true,
+        PrimaryExpression::StringNode(value) => value
+            .parts
+            .iter()
+            .any(|part| !matches!(part, StringPart::Content(_) | StringPart::Raw { .. })),
+        PrimaryExpression::TranslatedString(value) => value
+            .parts
+            .iter()
+            .any(|part| !matches!(part, StringPart::Content(_) | StringPart::Raw { .. })),
+        _ => false,
+    }
+}
+
+fn command_name_has_dynamic(name: &bash_ast::ast::CommandName) -> bool {
+    match &name.inner {
+        CommandNameInner::Primary(primary) => primary_has_dynamic_command_name(primary),
+        CommandNameInner::Concatenation(value) => {
+            value.parts.iter().any(primary_has_dynamic_command_name)
+        }
+    }
+}
+
+fn basename(command: &str) -> &str {
+    command
+        .rsplit('/')
+        .find(|part| !part.is_empty())
+        .unwrap_or(command)
+}
+
+fn is_shell_command(command: &str) -> bool {
+    matches!(basename(command), "bash" | "sh" | "zsh" | "dash" | "ksh")
+}
+
+fn is_shell_c_option(value: &str) -> bool {
+    value.starts_with('-') && !value.starts_with("--") && value[1..].contains('c')
+}
+
+fn maybe_shell_c_payload(name: &str, args: &[(String, usize, usize)]) -> Option<(String, usize)> {
+    let search_start = if is_shell_command(name) {
+        0
+    } else if name == "env" {
+        args.iter()
+            .position(|(text, _, _)| is_shell_command(text))?
+            + 1
+    } else {
+        return None;
+    };
     args.iter()
-        .position(|(text, _, _)| text == "-c")
-        .and_then(|index| args.get(index + 1))
+        .enumerate()
+        .skip(search_start)
+        .find(|(_, (text, _, _))| is_shell_c_option(text))
+        .and_then(|(index, _)| args.get(index + 1))
         .map(|(payload, start, _)| (payload.clone(), *start))
 }
 
@@ -287,6 +341,10 @@ fn walk_command(
         return Err("unsupported syntax: process substitution redirect".into());
     }
 
+    if command_name_has_dynamic(&command.name) {
+        return Err("unsupported syntax: dynamic command name".into());
+    }
+
     let mut nested = Vec::new();
     let name = command_name(&command.name, source, &mut nested)?;
     let args = command
@@ -298,16 +356,14 @@ fn walk_command(
         })
         .collect::<Result<Vec<_>, _>>()?;
 
-    if name == "bash" {
-        if let Some((payload, payload_start)) = maybe_bash_c_payload(&args) {
-            let mut inner = parse_subcommands(&payload).map_err(|(_, detail)| detail)?;
-            for command in &mut inner {
-                command.start += payload_start as i64;
-                command.end += payload_start as i64;
-            }
-            output.extend(inner);
-            return Ok(None);
+    if let Some((payload, payload_start)) = maybe_shell_c_payload(&name, &args) {
+        let mut inner = parse_subcommands(&payload).map_err(|(_, detail)| detail)?;
+        for command in &mut inner {
+            command.start += payload_start as i64;
+            command.end += payload_start as i64;
         }
+        output.extend(inner);
+        return Ok(None);
     }
 
     let span = command.span;
