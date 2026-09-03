@@ -24,9 +24,12 @@ function withEnv(values: Record<string, string | undefined>, run: () => void): v
   }
 }
 
-test("native package env var is a boolean enable switch for the bundled package", () => {
+test("native package is enabled by default with an explicit disable switch", () => {
+  assert.equal(resolveNativePackagePath({}), bundledNativePackagePath());
   assert.equal(resolveNativePackagePath({ PI_TOOL_PERMISSIONS_NATIVE_PACKAGE: "1" }), bundledNativePackagePath());
   assert.equal(resolveNativePackagePath({ PI_TOOL_PERMISSIONS_NATIVE_PACKAGE: "true" }), bundledNativePackagePath());
+  assert.equal(resolveNativePackagePath({ PI_TOOL_PERMISSIONS_NATIVE_DISABLE: "1" }), undefined);
+  assert.equal(resolveNativePackagePath({ PI_TOOL_PERMISSIONS_NATIVE_DISABLE: "true" }), undefined);
   assert.equal(resolveNativePackagePath({ PI_TOOL_PERMISSIONS_NATIVE_PACKAGE: "0" }), undefined);
   assert.equal(resolveNativePackagePath({ PI_TOOL_PERMISSIONS_NATIVE_PACKAGE: "/tmp/attacker/index.cjs" }), undefined);
 });
