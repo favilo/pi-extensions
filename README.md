@@ -65,6 +65,24 @@ Permission rules and audit entries are stored locally and are not part of this r
 
 Run `/permissions` or `/permissions user` in Pi to edit the user rules. Run `/permissions local` to edit the current trusted project's rules. Permission prompts use Ctrl+A to save a project-scoped rule and Ctrl+Shift+A to save a user-scoped rule. When Pi has a persisted trust decision for the current project, trusted `.pi/permissions.toml` files are also discovered from the current directory up to the nearest Git or Jujutsu repository boundary. The nearest matching project rule overrides user policy; missing or unreadable trust data leaves user policy unchanged.
 
+### Native runtime
+
+The `tool-permissions` bundled native Rust core is enabled by default when its packaged NAPI artifact is compatible with the current Node runtime. Pi shows a startup diagnostic when the native probe is active, or a warning when the bundled native package cannot load and TypeScript fallback is used. To force the TypeScript implementation for diagnosis, start Pi with `PI_TOOL_PERMISSIONS_NATIVE_DISABLE=1`.
+
+For local development, rebuild the bundled artifact after Rust changes:
+
+```bash
+npm run build:native
+```
+
+Before publishing or testing packaged installs, confirm the native package includes its JS entrypoint, type declarations, and generated `.node` artifact:
+
+```bash
+npm pack --dry-run ./extensions/tool-permissions/native
+```
+
+The native package remains a pure computation boundary. Prompt rendering, policy editing and persistence, project trust checks, audit writes, and tool execution stay in the TypeScript host and fall back safely if native loading or output validation fails.
+
 ### Multiline steering & Vim keybindings
 
 Permission prompts support Vim modal editing (`[INSERT]` / `[NORMAL]` modes) and custom editor extensions (such as `pi-vim-mode`).

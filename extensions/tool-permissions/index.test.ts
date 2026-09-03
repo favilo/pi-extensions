@@ -151,9 +151,11 @@ test("debug logging uses a random private directory and rejects non-regular targ
 
 test("announces the debug log location only to interactive sessions", async () => {
   const previousDebug = process.env.PI_SUBAGENT_DEBUG;
+  const previousNativeDisable = process.env.PI_TOOL_PERMISSIONS_NATIVE_DISABLE;
   const handlers = new Map<string, (event: unknown, ctx: unknown) => unknown>();
   const notices: Array<{ message: string; level: string }> = [];
   process.env.PI_SUBAGENT_DEBUG = "1";
+  process.env.PI_TOOL_PERMISSIONS_NATIVE_DISABLE = "1";
 
   try {
     toolPermissionPolicy({
@@ -182,6 +184,8 @@ test("announces the debug log location only to interactive sessions", async () =
   } finally {
     if (previousDebug === undefined) delete process.env.PI_SUBAGENT_DEBUG;
     else process.env.PI_SUBAGENT_DEBUG = previousDebug;
+    if (previousNativeDisable === undefined) delete process.env.PI_TOOL_PERMISSIONS_NATIVE_DISABLE;
+    else process.env.PI_TOOL_PERMISSIONS_NATIVE_DISABLE = previousNativeDisable;
   }
 });
 

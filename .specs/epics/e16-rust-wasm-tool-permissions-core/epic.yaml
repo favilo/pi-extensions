@@ -35,7 +35,7 @@ stories:
   - id: e16s04
     title: Enable bundled native runtime by default with packaging, fallback, and docs
     bcps: 3
-    status: todo
+    status: passing
     delta: ADDED
     spec: e16s04-rust-wasm-runtime-integration.md
     tasks: e16s04-tasks.yaml

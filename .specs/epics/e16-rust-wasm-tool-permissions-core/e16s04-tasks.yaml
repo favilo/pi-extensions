@@ -1,6 +1,6 @@
 story_id: e16s04
 title: Enable bundled native runtime by default with packaging, fallback, and docs
-status: todo
+status: passing
 bcps: 3
 delta: ADDED
 spec: e16s04-rust-wasm-runtime-integration.md
@@ -8,20 +8,20 @@ tasks:
   - id: 1
     description: Add failing integration tests for native-by-default engine selection, explicit disable, truthful fallback diagnostics, and unchanged Pi-facing permission flows.
     verify: node --test extensions/tool-permissions/index.test.ts extensions/tool-permissions/documentation.test.ts
-    status: todo
+    status: passing
     risk: P1
   - id: 2
     description: Wire repeatable local build and packaged-install artifact inclusion for the bundled native core.
     verify: node --test extensions/tool-permissions/index.test.ts extensions/tool-permissions/documentation.test.ts
-    status: todo
+    status: passing
     risk: P1
   - id: 3
     description: Document maintainer build/test/package workflow and runtime fallback expectations.
     verify: node --test extensions/tool-permissions/documentation.test.ts
-    status: todo
+    status: passing
     risk: P2
   - id: 4
     description: Run full CI-facing checks after hybrid runtime integration.
     verify: npm run check:ci
-    status: todo
+    status: passing
     risk: P1
