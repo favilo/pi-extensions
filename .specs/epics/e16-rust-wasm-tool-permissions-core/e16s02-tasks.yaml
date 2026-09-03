@@ -1,27 +1,51 @@
 story_id: e16s02
 title: Port Bash parsing to a Rust/WASM core
-status: todo
+status: passing
 bcps: 4
 delta: ADDED
 spec: e16s02-rust-bash-parser-parity.md
 tasks:
   - id: 1
-    description: Add parity fixtures and failing tests that compare TypeScript and native parsing across simple, compound, recursive, and unsupported Bash syntax.
-    verify: node --test extensions/tool-permissions/bash-parser.test.ts extensions/tool-permissions/native-parser-parity.test.ts
-    status: todo
+    description: Add parity fixtures and failing tests that compare TypeScript and native parsing across simple, compound, recursive, shell-wrapper, dynamic-name, redirect, and unsupported Bash syntax.
+    verify: node --test extensions/tool-permissions/bash-parser.test.ts extensions/tool-permissions/native-parser-parity.test.ts extensions/tool-permissions/native-parser-dangerous.test.ts
+    status: passing
     risk: P1
+    security: high
+    allure:
+      severity: critical
+      categories:
+        - "Contract Tests"
+        - "Native Parser"
   - id: 2
-    description: Implement the native Rust parser for command units, source spans, command substitutions, subshells, brace groups, and unsupported-syntax detection.
-    verify: node --test extensions/tool-permissions/bash-parser.test.ts extensions/tool-permissions/native-parser-parity.test.ts
-    status: todo
+    description: Implement the native Rust parser for command units, source spans, command substitutions, shell -c payloads, subshells, brace groups, redirects, and unsupported-syntax detection.
+    verify: cargo test --manifest-path extensions/tool-permissions/native/Cargo.toml && node --test extensions/tool-permissions/native-parser-parity.test.ts
+    status: passing
     risk: P1
+    security: high
+    allure:
+      severity: critical
+      categories:
+        - "Security Review"
+        - "Native Parser"
   - id: 3
     description: Route the host parser adapter through the native path while preserving validated TypeScript fallback behavior.
-    verify: node --test extensions/tool-permissions/bash-subcommands.test.ts extensions/tool-permissions/native-parser-parity.test.ts
-    status: todo
+    verify: node --test extensions/tool-permissions/bash-subcommands.test.ts extensions/tool-permissions/native-fallback.test.ts extensions/tool-permissions/native-parser-parity.test.ts
+    status: passing
     risk: P1
+    security: high
+    allure:
+      severity: critical
+      categories:
+        - "Native Boundary"
+        - "Fallback"
   - id: 4
-    description: Run the full package checks after removing redundant TypeScript-only parsing paths that are superseded by parity coverage.
-    verify: npm run check
-    status: todo
+    description: Run the full package checks and independent security review after parser parity and fail-ask behavior are hardened.
+    verify: cargo test --manifest-path extensions/tool-permissions/native/Cargo.toml && npm run build:native && npm run check
+    status: passing
     risk: P2
+    security: high
+    allure:
+      severity: high
+      categories:
+        - "Security Review"
+        - "Regression"
