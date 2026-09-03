@@ -14,19 +14,37 @@ test("native policy evaluation matches TypeScript decisions", (t) => {
   }
   assert.ok(evaluate);
   const source = `[permissions.bash]
-allow = [{ command = '^jj' }, { "metadata.mode" = '^safe$', enabled = '^true$' }, { tags = '\\[\\"trusted\\"\\]' }]
+allow = [
+  { command = '^jj' },
+  { "metadata.mode" = '^safe$', enabled = '^true$' },
+  { tags = '\\[\\"trusted\\"\\]' },
+  {},
+]
 deny = [{ command = '^rm' }]
+
+[permissions.mcp__example_provider__search]
+allow = [
+  { query = '^public', "filters.created_date_range.start_date" = '^2025-' },
+  { ids = '\\[\\"one\\",\\"two\\"\\]' },
+]
+deny = [{ query = 'secret' }]
 `;
   const permissions = parsePermissionsTypescript(source);
-  for (const input of [
-    { command: "jj status" },
-    { command: "rm -rf /" },
-    { command: "echo hi" },
-    { metadata: { mode: "safe" }, enabled: true },
-    { tags: ["trusted"] },
-  ]) {
-    const native = evaluate({ version: 1, operation: "evaluate", nonce: "parity", source, tool: "bash", inputJson: JSON.stringify(input) });
+  for (const { tool, input } of [
+    { tool: "bash", input: { command: "jj status" } },
+    { tool: "bash", input: { command: "rm -rf /" } },
+    { tool: "bash", input: { command: "echo hi" } },
+    { tool: "bash", input: { metadata: { mode: "safe" }, enabled: true } },
+    { tool: "bash", input: { tags: ["trusted"] } },
+    { tool: "mcp__example_provider__search", input: { query: "public roadmap", filters: { created_date_range: { start_date: "2025-01-01" } } } },
+    { tool: "mcp__example_provider__search", input: { query: "public roadmap", filters: { created_date_range: { start_date: "2024-01-01" } } } },
+    { tool: "mcp__example_provider__search", input: { query: "secret roadmap" } },
+    { tool: "mcp__example_provider__search", input: { page_size: 1 } },
+    { tool: "mcp__example_provider__search", input: { ids: ["one", "two"] } },
+    { tool: "unknown_tool", input: { query: "public roadmap" } },
+  ] as const) {
+    const native = evaluate({ version: 1, operation: "evaluate", nonce: "parity", source, tool, inputJson: JSON.stringify(input) });
     assert.equal(native.ok, true);
-    assert.equal(native.decision, permissionDecision(permissions.bash, input), input.command);
+    assert.equal(native.decision, permissionDecision(permissions[tool], input), `${tool} ${JSON.stringify(input)}`);
   }
 });
