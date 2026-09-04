@@ -8,7 +8,7 @@ import { stringify as stringifyToml } from "smol-toml";
 import toolPermissionPolicy, { logSubagentDebug, requiresSubagentRuntimeApproval, resolvePermissionEditorTarget, resolveToolPermissionDecision } from "./index.ts";
 import { setNativePackagePathForTests } from "./native-package.ts";
 
-test("native registration owns lifecycle, tool_call, and tool_result callback wiring without duplicates", async () => {
+test("native registration owns lifecycle, command, and tool callback wiring without duplicates", async () => {
   const directory = mkdtempSync(join(tmpdir(), "pi-permissions-native-registration-default-"));
   const packagePath = join(directory, "native.cjs");
   writeFileSync(packagePath, `
@@ -17,19 +17,22 @@ exports.registerToolPermissionsCallbacks = (request, pi, bridge) => {
   pi.on("session_start", (_event, ctx) => ctx.hasUI && ctx.ui.notify("Rust native registration active.", "info"));
   pi.on("tool_call", (event, ctx) => bridge.handleToolCall(event, ctx));
   pi.on("tool_result", (event, ctx) => bridge.handleToolResult(event, ctx));
-  return { version: 1, operation: "register_callbacks", ok: true, nonce: request.nonce, registrations: ["session_start", "tool_call", "tool_result"] };
+  pi.on("session_shutdown", (event, ctx) => bridge.handleSessionShutdown(event, ctx));
+  pi.registerCommand("permissions", { description: "Edit user or local tool permissions", handler: (args, ctx) => bridge.handlePermissionsCommand(args, ctx) });
+  return { version: 1, operation: "register_callbacks", ok: true, nonce: request.nonce, registrations: ["session_start", "tool_call", "tool_result", "session_shutdown", "command:permissions"] };
 };
 `, "utf8");
   const previousPackage = process.env.PI_TOOL_PERMISSIONS_NATIVE_PACKAGE;
   const previousDisable = process.env.PI_TOOL_PERMISSIONS_NATIVE_DISABLE;
   const notices: Array<{ message: string; level: string }> = [];
+  const commandCalls: Array<{ name: string; options: { description?: string; handler: (args: string, ctx: unknown) => unknown } }> = [];
   const handlers = new Map<string, Array<(event: unknown, ctx: unknown) => unknown>>();
   delete process.env.PI_TOOL_PERMISSIONS_NATIVE_PACKAGE;
   delete process.env.PI_TOOL_PERMISSIONS_NATIVE_DISABLE;
   const restoreNativePackagePath = setNativePackagePathForTests(packagePath);
   try {
     toolPermissionPolicy({
-      registerCommand() {},
+      registerCommand(name: string, options: { description?: string; handler: (args: string, ctx: unknown) => unknown }) { commandCalls.push({ name, options }); },
       on(event: string, handler: (event: unknown, ctx: unknown) => unknown) {
         handlers.set(event, [...(handlers.get(event) ?? []), handler]);
       },
@@ -37,6 +40,9 @@ exports.registerToolPermissionsCallbacks = (request, pi, bridge) => {
     assert.equal(handlers.get("session_start")?.length, 2);
     assert.equal(handlers.get("tool_call")?.length, 1);
     assert.equal(handlers.get("tool_result")?.length, 1);
+    assert.equal(handlers.get("session_shutdown")?.length, 1);
+    assert.equal(commandCalls.length, 1);
+    assert.equal(commandCalls[0]?.name, "permissions");
     for (const handler of handlers.get("session_start") ?? []) {
       await handler({}, { hasUI: true, cwd: "/tmp", ui: { notify(message: string, level: string) { notices.push({ message, level }); } } });
     }
@@ -45,6 +51,10 @@ exports.registerToolPermissionsCallbacks = (request, pi, bridge) => {
     assert.equal(result, undefined);
     const toolResult = await handlers.get("tool_result")?.[0]?.({ toolCallId: "native-tool-call", content: [] }, { cwd: "/tmp" });
     assert.equal(toolResult, undefined);
+    const shutdownResult = await handlers.get("session_shutdown")?.[0]?.({}, { sessionId: "native-session" });
+    assert.equal(shutdownResult, undefined);
+    await commandCalls[0]?.options.handler("bad extra args", { cwd: "/tmp", ui: { notify(message: string, level: string) { notices.push({ message, level }); } } });
+    assert.deepEqual(notices.at(-1), { message: "Usage: /permissions [user|local]", level: "error" });
   } finally {
     restoreNativePackagePath();
     if (previousPackage === undefined) delete process.env.PI_TOOL_PERMISSIONS_NATIVE_PACKAGE;

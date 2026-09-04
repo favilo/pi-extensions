@@ -7,11 +7,13 @@ export type NativeRegistrationResult =
   | { mode: "native"; registrations: string[] }
   | { mode: "typescript"; reason: string };
 
-type NativeRegistrationHost = Pick<ExtensionAPI, "on">;
+type NativeRegistrationHost = Pick<ExtensionAPI, "on" | "registerCommand">;
 
 type NativeRegistrationBridge = {
   handleToolCall(event: unknown, ctx: unknown): unknown;
   handleToolResult?(event: unknown, ctx: unknown): unknown;
+  handleSessionShutdown?(event: unknown, ctx: unknown): unknown;
+  handlePermissionsCommand?(args: unknown, ctx: unknown): unknown;
 };
 
 type NativeRegistrationModule = {

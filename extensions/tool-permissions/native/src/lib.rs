@@ -133,6 +133,43 @@ pub fn register_tool_permissions_callbacks(
             on_tool_result.call(FnArgs::from(("tool_result".to_owned(), tool_result_handler)))?;
             registrations.push("tool_result".to_owned());
         }
+
+        if let Ok(handle_session_shutdown) = bridge
+            .get_named_property::<Function<FnArgs<(Unknown<'_>, Unknown<'_>)>, Unknown<'_>>>("handleSessionShutdown")
+            .and_then(|function| function.create_ref())
+        {
+            let session_shutdown_handler = env.create_function_from_closure("toolPermissionsSessionShutdown", move |ctx| {
+                let event: Unknown = ctx.get(0)?;
+                let extension_context: Unknown = ctx.get(1)?;
+                let handle_session_shutdown = handle_session_shutdown.borrow_back(ctx.env)?;
+                handle_session_shutdown.call(FnArgs::from((event, extension_context)))
+            })?;
+            let on_session_shutdown: Function<FnArgs<(String, Function<(), Unknown<'_>>)>, ()> = pi
+                .get_named_property("on")
+                .map_err(|error| Error::from_reason(format!("pi.on is unavailable for session_shutdown: {error}")))?;
+            on_session_shutdown.call(FnArgs::from(("session_shutdown".to_owned(), session_shutdown_handler)))?;
+            registrations.push("session_shutdown".to_owned());
+        }
+
+        if let Ok(handle_permissions_command) = bridge
+            .get_named_property::<Function<FnArgs<(String, Unknown<'_>)>, Unknown<'_>>>("handlePermissionsCommand")
+            .and_then(|function| function.create_ref())
+        {
+            let command_handler: Function<(), Unknown<'_>> = env.create_function_from_closure("toolPermissionsCommand", move |ctx| {
+                let args: String = ctx.get(0)?;
+                let command_context: Unknown = ctx.get(1)?;
+                let handle_permissions_command = handle_permissions_command.borrow_back(ctx.env)?;
+                handle_permissions_command.call(FnArgs::from((args, command_context)))
+            })?;
+            let mut command_options = Object::new(&env)?;
+            command_options.set_named_property("description", "Edit user or local tool permissions")?;
+            command_options.set_named_property("handler", command_handler)?;
+            let register_command: Function<FnArgs<(String, Object)>, ()> = pi
+                .get_named_property("registerCommand")
+                .map_err(|error| Error::from_reason(format!("pi.registerCommand is unavailable: {error}")))?;
+            register_command.call(FnArgs::from(("permissions".to_owned(), command_options)))?;
+            registrations.push("command:permissions".to_owned());
+        }
     }
 
     Ok(NativeRegistrationResponse {

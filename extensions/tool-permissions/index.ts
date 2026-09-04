@@ -1,5 +1,5 @@
 // story: e03s01
-import { CONFIG_DIR_NAME, generateDiffString, getAgentDir, isToolCallEventType, renderDiff, type ExtensionAPI, type ToolResultEvent } from "@earendil-works/pi-coding-agent";
+import { CONFIG_DIR_NAME, generateDiffString, getAgentDir, isToolCallEventType, renderDiff, type ExtensionAPI, type ExtensionCommandContext, type ToolResultEvent } from "@earendil-works/pi-coding-agent";
 import { CURSOR_MARKER, matchesKey, Text, visibleWidth, wrapTextWithAnsi, type Component, type Focusable } from "@earendil-works/pi-tui";
 import ignore from "ignore";
 import { spawn } from "node:child_process";
@@ -1337,6 +1337,27 @@ async function handleUnknownToolPermission(toolName: string, input: unknown, ctx
   if (!result.allowed) return deniedResult(`User denied ${toolName}.`, result);
 }
 
+async function handleRegisteredPermissionsCommand(args: string, ctx: ExtensionCommandContext): Promise<void> {
+  const target = resolvePermissionEditorTarget(args, ctx.cwd);
+  if ("error" in target) {
+    ctx.ui.notify(target.error, "error");
+    return;
+  }
+  try {
+    await editPermissionsInExternalEditor(ctx, target);
+  } catch (error) {
+    ctx.ui.notify(error instanceof Error ? error.message : String(error), "error");
+  }
+}
+
+function handleRegisteredSessionShutdown(ctx: any): void {
+  pendingSteering.clear();
+  promptedPreviews.clear();
+  pendingPreviewReviews.clear();
+  previewReviewOverrides.clear();
+  closePermissionPromptQueue(permissionParentSessionId(ctx));
+}
+
 function handleRegisteredToolResult(event: ToolResultEvent): { content?: ToolResultEvent["content"] } | undefined {
   promptedPreviews.delete(event.toolCallId);
   const steering = pendingSteering.get(event.toolCallId);
@@ -1437,10 +1458,14 @@ export default function toolPermissionPolicy(pi: ExtensionAPI) {
   const nativeRegistration = registerNativeToolPermissionsCallbacks(pi, {
     handleToolCall: (event, ctx) => handleRegisteredToolCall(event, ctx, pi),
     handleToolResult: (event) => handleRegisteredToolResult(event as ToolResultEvent),
+    handleSessionShutdown: (_event, ctx) => handleRegisteredSessionShutdown(ctx),
+    handlePermissionsCommand: (args, ctx) => handleRegisteredPermissionsCommand(String(args), ctx as ExtensionCommandContext),
   });
   const nativeOwnsSessionStartDiagnostics = nativeRegistration.mode === "native" && nativeRegistration.registrations.includes("session_start");
   const nativeOwnsToolCall = nativeRegistration.mode === "native" && nativeRegistration.registrations.includes("tool_call");
   const nativeOwnsToolResult = nativeRegistration.mode === "native" && nativeRegistration.registrations.includes("tool_result");
+  const nativeOwnsSessionShutdown = nativeRegistration.mode === "native" && nativeRegistration.registrations.includes("session_shutdown");
+  const nativeOwnsPermissionsCommand = nativeRegistration.mode === "native" && nativeRegistration.registrations.includes("command:permissions");
 
   pi.on("session_start", async (_event, ctx) => {
     const nativePackage = resolveNativePackagePath();
@@ -1466,30 +1491,16 @@ export default function toolPermissionPolicy(pi: ExtensionAPI) {
     }
   });
 
-  pi.registerCommand("permissions", {
-    description: `Edit user or local tool permissions`,
-    handler: async (args, ctx) => {
-      const target = resolvePermissionEditorTarget(args, ctx.cwd);
-      if ("error" in target) {
-        ctx.ui.notify(target.error, "error");
-        return;
-      }
-      await ctx.waitForIdle();
-      try {
-        await editPermissionsInExternalEditor(ctx, target);
-      } catch (error) {
-        ctx.ui.notify(error instanceof Error ? error.message : String(error), "error");
-      }
-    },
-  });
+  if (!nativeOwnsPermissionsCommand) {
+    pi.registerCommand("permissions", {
+      description: `Edit user or local tool permissions`,
+      handler: handleRegisteredPermissionsCommand,
+    });
+  }
 
-  pi.on("session_shutdown", (_event, ctx) => {
-    pendingSteering.clear();
-    promptedPreviews.clear();
-    pendingPreviewReviews.clear();
-    previewReviewOverrides.clear();
-    closePermissionPromptQueue(permissionParentSessionId(ctx));
-  });
+  if (!nativeOwnsSessionShutdown) {
+    pi.on("session_shutdown", (_event, ctx) => handleRegisteredSessionShutdown(ctx));
+  }
 
   if (!nativeOwnsToolResult) {
     pi.on("tool_result", (event) => handleRegisteredToolResult(event));
