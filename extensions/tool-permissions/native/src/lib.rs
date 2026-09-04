@@ -69,32 +69,37 @@ pub fn register_tool_permissions_callbacks(
     }
     validate_nonce(&request.nonce)?;
 
+    let handle_session_start = bridge.as_ref().and_then(|bridge| {
+        bridge
+            .get_named_property::<Function<FnArgs<(Unknown<'_>, Unknown<'_>)>, Unknown<'_>>>("handleSessionStart")
+            .and_then(|function| function.create_ref())
+            .ok()
+    });
     let on: Function<FnArgs<(String, Function<(), ()>)>, ()> = pi
         .get_named_property("on")
         .map_err(|error| Error::from_reason(format!("pi.on is unavailable: {error}")))?;
-    let handler = env.create_function_from_closure("toolPermissionsSessionStart", |ctx| {
-        let session_context: Object = match ctx.get(1) {
-            Ok(value) => value,
-            Err(_) => return Ok(()),
-        };
-        if !session_context
-            .get_named_property::<bool>("hasUI")
-            .unwrap_or(false)
-        {
-            return Ok(());
+    let handler = env.create_function_from_closure("toolPermissionsSessionStart", move |ctx| {
+        let event: Unknown = ctx.get(0)?;
+        let extension_context: Unknown = ctx.get(1)?;
+        if let Ok(session_context) = ctx.get::<Object>(1) {
+            if session_context
+                .get_named_property::<bool>("hasUI")
+                .unwrap_or(false)
+            {
+                if let Ok(ui) = session_context.get_named_property::<Object>("ui") {
+                    if let Ok(notify) = ui.get_named_property::<Function<FnArgs<(String, String)>, ()>>("notify") {
+                        notify.call(FnArgs::from((
+                            "Rust native registration active.".to_owned(),
+                            "info".to_owned(),
+                        )))?;
+                    }
+                }
+            }
         }
-        let ui: Object = match session_context.get_named_property("ui") {
-            Ok(value) => value,
-            Err(_) => return Ok(()),
-        };
-        let notify: Function<FnArgs<(String, String)>, ()> = match ui.get_named_property("notify") {
-            Ok(value) => value,
-            Err(_) => return Ok(()),
-        };
-        notify.call(FnArgs::from((
-            "Rust native registration active.".to_owned(),
-            "info".to_owned(),
-        )))?;
+        if let Some(handle_session_start) = &handle_session_start {
+            let handle_session_start = handle_session_start.borrow_back(ctx.env)?;
+            handle_session_start.call(FnArgs::from((event, extension_context)))?;
+        }
         Ok(())
     })?;
     on.call(FnArgs::from(("session_start".to_owned(), handler)))?;

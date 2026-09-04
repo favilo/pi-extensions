@@ -14,7 +14,10 @@ test("native registration owns lifecycle, command, and tool callback wiring with
   writeFileSync(packagePath, `
 exports.probe = (request) => ({ version: 1, operation: request.operation, ok: true, nonce: request.nonce });
 exports.registerToolPermissionsCallbacks = (request, pi, bridge) => {
-  pi.on("session_start", (_event, ctx) => ctx.hasUI && ctx.ui.notify("Rust native registration active.", "info"));
+  pi.on("session_start", (event, ctx) => {
+    if (ctx.hasUI) ctx.ui.notify("Rust native registration active.", "info");
+    return bridge.handleSessionStart(event, ctx);
+  });
   pi.on("tool_call", (event, ctx) => bridge.handleToolCall(event, ctx));
   pi.on("tool_result", (event, ctx) => bridge.handleToolResult(event, ctx));
   pi.on("session_shutdown", (event, ctx) => bridge.handleSessionShutdown(event, ctx));
@@ -37,7 +40,7 @@ exports.registerToolPermissionsCallbacks = (request, pi, bridge) => {
         handlers.set(event, [...(handlers.get(event) ?? []), handler]);
       },
     } as never);
-    assert.equal(handlers.get("session_start")?.length, 2);
+    assert.equal(handlers.get("session_start")?.length, 1);
     assert.equal(handlers.get("tool_call")?.length, 1);
     assert.equal(handlers.get("tool_result")?.length, 1);
     assert.equal(handlers.get("session_shutdown")?.length, 1);

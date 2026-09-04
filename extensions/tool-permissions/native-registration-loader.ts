@@ -10,6 +10,7 @@ export type NativeRegistrationResult =
 type NativeRegistrationHost = Pick<ExtensionAPI, "on" | "registerCommand">;
 
 type NativeRegistrationBridge = {
+  handleSessionStart?(event: unknown, ctx: unknown): unknown;
   handleToolCall(event: unknown, ctx: unknown): unknown;
   handleToolResult?(event: unknown, ctx: unknown): unknown;
   handleSessionShutdown?(event: unknown, ctx: unknown): unknown;

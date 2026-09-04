@@ -66,6 +66,7 @@ test("bundled Rust registration calls pi.on and registerCommand for delegated ca
   assert.ok(register);
   const handlers = new Map<string, (event: unknown, ctx: any) => unknown>();
   const commands = new Map<string, { description?: string; handler: (args: string, ctx: unknown) => unknown }>();
+  const handledSessionStarts: Array<{ event: unknown; ctx: unknown }> = [];
   const handledToolCalls: Array<{ event: unknown; ctx: unknown }> = [];
   const handledToolResults: Array<{ event: unknown; ctx: unknown }> = [];
   const handledSessionShutdowns: Array<{ event: unknown; ctx: unknown }> = [];
@@ -74,6 +75,9 @@ test("bundled Rust registration calls pi.on and registerCommand for delegated ca
     on(eventName: string, handler: (event: unknown, ctx: any) => unknown) { handlers.set(eventName, handler); },
     registerCommand(name: string, options: { description?: string; handler: (args: string, ctx: unknown) => unknown }) { commands.set(name, options); },
   }, {
+    handleSessionStart(event: unknown, ctx: unknown) {
+      handledSessionStarts.push({ event, ctx });
+    },
     handleToolCall(event: unknown, ctx: unknown) {
       handledToolCalls.push({ event, ctx });
       return { block: true, reason: "delegated" };
@@ -96,8 +100,11 @@ test("bundled Rust registration calls pi.on and registerCommand for delegated ca
   assert.equal(commands.get("permissions")?.description, "Edit user or local tool permissions");
 
   const notices: Array<{ message: string; level: string }> = [];
-  await handlers.get("session_start")?.({}, { hasUI: true, ui: { notify: (message: string, level: string) => notices.push({ message, level }) } });
+  const sessionStartEvent = {};
+  const sessionStartContext = { hasUI: true, ui: { notify: (message: string, level: string) => notices.push({ message, level }) } };
+  await handlers.get("session_start")?.(sessionStartEvent, sessionStartContext);
   assert.deepEqual(notices, [{ message: "Rust native registration active.", level: "info" }]);
+  assert.deepEqual(handledSessionStarts, [{ event: sessionStartEvent, ctx: sessionStartContext }]);
   const toolCallEvent = { toolName: "read", toolCallId: "native-tool-call", input: { path: "README.md" } };
   const toolCallContext = { cwd: "/tmp", hasUI: false, ui: {} };
   assert.deepEqual(await handlers.get("tool_call")?.(toolCallEvent, toolCallContext), { block: true, reason: "delegated" });

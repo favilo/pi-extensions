@@ -1337,6 +1337,30 @@ async function handleUnknownToolPermission(toolName: string, input: unknown, ctx
   if (!result.allowed) return deniedResult(`User denied ${toolName}.`, result);
 }
 
+async function handleRegisteredSessionStart(ctx: PermissionContext, options: { reportNativeProbe?: boolean } = {}): Promise<void> {
+  const nativePackage = resolveNativePackagePath();
+  if (options.reportNativeProbe !== false && nativePackage) {
+    const nativeResult = await loadNativePackageProbe(nativePackage);
+    if (ctx.hasUI) {
+      ctx.ui.notify?.(
+        nativeResult.engine === "native"
+          ? "Native tool-permissions probe active (contract v1)."
+          : `Tool-permissions using TypeScript fallback: ${nativeResult.reason}`,
+        nativeResult.engine === "native" ? "info" : "warning",
+      );
+    }
+  }
+  if (isYoloModeEnabled()) {
+    if (ctx.hasUI) {
+      ctx.ui.notify?.("YOLO permission mode active via environment variable.", "warning");
+    }
+    audit({ tool: "permissions", decision: "yolo_mode_activated", cwd: ctx.cwd });
+  }
+  if (process.env.PI_SUBAGENT_DEBUG === "1" && ctx.hasUI) {
+    ctx.ui.notify?.(`Subagent debug log: ${subagentDebugPath()}`, "info");
+  }
+}
+
 async function handleRegisteredPermissionsCommand(args: string, ctx: ExtensionCommandContext): Promise<void> {
   const target = resolvePermissionEditorTarget(args, ctx.cwd);
   if ("error" in target) {
@@ -1456,6 +1480,7 @@ export default function toolPermissionPolicy(pi: ExtensionAPI) {
   }
 
   const nativeRegistration = registerNativeToolPermissionsCallbacks(pi, {
+    handleSessionStart: (_event, ctx) => handleRegisteredSessionStart(ctx as PermissionContext, { reportNativeProbe: false }),
     handleToolCall: (event, ctx) => handleRegisteredToolCall(event, ctx, pi),
     handleToolResult: (event) => handleRegisteredToolResult(event as ToolResultEvent),
     handleSessionShutdown: (_event, ctx) => handleRegisteredSessionShutdown(ctx),
@@ -1467,29 +1492,9 @@ export default function toolPermissionPolicy(pi: ExtensionAPI) {
   const nativeOwnsSessionShutdown = nativeRegistration.mode === "native" && nativeRegistration.registrations.includes("session_shutdown");
   const nativeOwnsPermissionsCommand = nativeRegistration.mode === "native" && nativeRegistration.registrations.includes("command:permissions");
 
-  pi.on("session_start", async (_event, ctx) => {
-    const nativePackage = resolveNativePackagePath();
-    if (nativePackage && !nativeOwnsSessionStartDiagnostics) {
-      const nativeResult = await loadNativePackageProbe(nativePackage);
-      if (ctx.hasUI) {
-        ctx.ui.notify(
-          nativeResult.engine === "native"
-            ? "Native tool-permissions probe active (contract v1)."
-            : `Tool-permissions using TypeScript fallback: ${nativeResult.reason}`,
-          nativeResult.engine === "native" ? "info" : "warning",
-        );
-      }
-    }
-    if (isYoloModeEnabled()) {
-      if (ctx.hasUI) {
-        ctx.ui.notify("YOLO permission mode active via environment variable.", "warning");
-      }
-      audit({ tool: "permissions", decision: "yolo_mode_activated", cwd: ctx.cwd });
-    }
-    if (process.env.PI_SUBAGENT_DEBUG === "1" && ctx.hasUI) {
-      ctx.ui.notify(`Subagent debug log: ${subagentDebugPath()}`, "info");
-    }
-  });
+  if (!nativeOwnsSessionStartDiagnostics) {
+    pi.on("session_start", async (_event, ctx) => handleRegisteredSessionStart(ctx));
+  }
 
   if (!nativeOwnsPermissionsCommand) {
     pi.registerCommand("permissions", {
