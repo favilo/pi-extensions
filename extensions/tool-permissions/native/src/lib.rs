@@ -116,6 +116,23 @@ pub fn register_tool_permissions_callbacks(
             .map_err(|error| Error::from_reason(format!("pi.on is unavailable for tool_call: {error}")))?;
         on_tool_call.call(FnArgs::from(("tool_call".to_owned(), tool_call_handler)))?;
         registrations.push("tool_call".to_owned());
+
+        if let Ok(handle_tool_result) = bridge
+            .get_named_property::<Function<FnArgs<(Unknown<'_>, Unknown<'_>)>, Unknown<'_>>>("handleToolResult")
+            .and_then(|function| function.create_ref())
+        {
+            let tool_result_handler = env.create_function_from_closure("toolPermissionsToolResult", move |ctx| {
+                let event: Unknown = ctx.get(0)?;
+                let extension_context: Unknown = ctx.get(1)?;
+                let handle_tool_result = handle_tool_result.borrow_back(ctx.env)?;
+                handle_tool_result.call(FnArgs::from((event, extension_context)))
+            })?;
+            let on_tool_result: Function<FnArgs<(String, Function<(), Unknown<'_>>)>, ()> = pi
+                .get_named_property("on")
+                .map_err(|error| Error::from_reason(format!("pi.on is unavailable for tool_result: {error}")))?;
+            on_tool_result.call(FnArgs::from(("tool_result".to_owned(), tool_result_handler)))?;
+            registrations.push("tool_result".to_owned());
+        }
     }
 
     Ok(NativeRegistrationResponse {

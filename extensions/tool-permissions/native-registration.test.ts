@@ -55,7 +55,7 @@ const assert = require("node:assert/strict");
   assert.deepEqual(notices, [{ message: "Rust native registration active.", level: "info" }]);
 });
 
-test("bundled Rust registration calls pi.on for lifecycle and tool_call delegation", async (t) => {
+test("bundled Rust registration calls pi.on for lifecycle, tool_call, and tool_result delegation", async (t) => {
   let register: ((request: unknown, pi: unknown, bridge?: unknown) => { ok: boolean; operation: string; registrations: string[] }) | undefined;
   try {
     register = (createRequire(import.meta.url)("./native/index.js") as { registerToolPermissionsCallbacks?: typeof register }).registerToolPermissionsCallbacks;
@@ -66,6 +66,7 @@ test("bundled Rust registration calls pi.on for lifecycle and tool_call delegati
   assert.ok(register);
   const handlers = new Map<string, (event: unknown, ctx: any) => unknown>();
   const handledToolCalls: Array<{ event: unknown; ctx: unknown }> = [];
+  const handledToolResults: Array<{ event: unknown; ctx: unknown }> = [];
   const response = register({ version: NATIVE_CONTRACT_VERSION, operation: "register_callbacks", nonce: "registration-parity" }, {
     on(eventName: string, handler: (event: unknown, ctx: any) => unknown) { handlers.set(eventName, handler); },
   }, {
@@ -73,10 +74,14 @@ test("bundled Rust registration calls pi.on for lifecycle and tool_call delegati
       handledToolCalls.push({ event, ctx });
       return { block: true, reason: "delegated" };
     },
+    handleToolResult(event: unknown, ctx: unknown) {
+      handledToolResults.push({ event, ctx });
+      return { content: [{ type: "text", text: "delegated" }] };
+    },
   });
   assert.equal(response.ok, true);
   assert.equal(response.operation, "register_callbacks");
-  assert.deepEqual(response.registrations, ["session_start", "tool_call"]);
+  assert.deepEqual(response.registrations, ["session_start", "tool_call", "tool_result"]);
 
   const notices: Array<{ message: string; level: string }> = [];
   await handlers.get("session_start")?.({}, { hasUI: true, ui: { notify: (message: string, level: string) => notices.push({ message, level }) } });
@@ -85,6 +90,10 @@ test("bundled Rust registration calls pi.on for lifecycle and tool_call delegati
   const toolCallContext = { cwd: "/tmp", hasUI: false, ui: {} };
   assert.deepEqual(await handlers.get("tool_call")?.(toolCallEvent, toolCallContext), { block: true, reason: "delegated" });
   assert.deepEqual(handledToolCalls, [{ event: toolCallEvent, ctx: toolCallContext }]);
+  const toolResultEvent = { toolCallId: "native-tool-call", content: [] };
+  const toolResultContext = { cwd: "/tmp" };
+  assert.deepEqual(await handlers.get("tool_result")?.(toolResultEvent, toolResultContext), { content: [{ type: "text", text: "delegated" }] });
+  assert.deepEqual(handledToolResults, [{ event: toolResultEvent, ctx: toolResultContext }]);
 });
 
 test("native registration falls back without installing duplicate callbacks", () => {

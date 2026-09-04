@@ -11,6 +11,7 @@ type NativeRegistrationHost = Pick<ExtensionAPI, "on">;
 
 type NativeRegistrationBridge = {
   handleToolCall(event: unknown, ctx: unknown): unknown;
+  handleToolResult?(event: unknown, ctx: unknown): unknown;
 };
 
 type NativeRegistrationModule = {

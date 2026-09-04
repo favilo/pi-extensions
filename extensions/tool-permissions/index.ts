@@ -1,5 +1,5 @@
 // story: e03s01
-import { CONFIG_DIR_NAME, generateDiffString, getAgentDir, isToolCallEventType, renderDiff, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { CONFIG_DIR_NAME, generateDiffString, getAgentDir, isToolCallEventType, renderDiff, type ExtensionAPI, type ToolResultEvent } from "@earendil-works/pi-coding-agent";
 import { CURSOR_MARKER, matchesKey, Text, visibleWidth, wrapTextWithAnsi, type Component, type Focusable } from "@earendil-works/pi-tui";
 import ignore from "ignore";
 import { spawn } from "node:child_process";
@@ -1337,6 +1337,21 @@ async function handleUnknownToolPermission(toolName: string, input: unknown, ctx
   if (!result.allowed) return deniedResult(`User denied ${toolName}.`, result);
 }
 
+function handleRegisteredToolResult(event: ToolResultEvent): { content?: ToolResultEvent["content"] } | undefined {
+  promptedPreviews.delete(event.toolCallId);
+  const steering = pendingSteering.get(event.toolCallId);
+  if (!steering) return undefined;
+  pendingSteering.delete(event.toolCallId);
+  return {
+    content: [
+      ...event.content,
+      // Providers may join text blocks into one string, so the marker text
+      // itself must signal this is not part of the tool's own output.
+      { type: "text", text: `\n\n<user-steering source="permission-prompt">\n${steering}\n</user-steering>` },
+    ],
+  };
+}
+
 async function handleRegisteredToolCall(event: any, extensionContext: any, pi: ExtensionAPI): Promise<ToolCallEventResult> {
   // Bind the pi tool-call identity to this invocation so prompts and
   // steering messages can reference the exact call.
@@ -1421,9 +1436,11 @@ export default function toolPermissionPolicy(pi: ExtensionAPI) {
 
   const nativeRegistration = registerNativeToolPermissionsCallbacks(pi, {
     handleToolCall: (event, ctx) => handleRegisteredToolCall(event, ctx, pi),
+    handleToolResult: (event) => handleRegisteredToolResult(event as ToolResultEvent),
   });
   const nativeOwnsSessionStartDiagnostics = nativeRegistration.mode === "native" && nativeRegistration.registrations.includes("session_start");
   const nativeOwnsToolCall = nativeRegistration.mode === "native" && nativeRegistration.registrations.includes("tool_call");
+  const nativeOwnsToolResult = nativeRegistration.mode === "native" && nativeRegistration.registrations.includes("tool_result");
 
   pi.on("session_start", async (_event, ctx) => {
     const nativePackage = resolveNativePackagePath();
@@ -1474,20 +1491,9 @@ export default function toolPermissionPolicy(pi: ExtensionAPI) {
     closePermissionPromptQueue(permissionParentSessionId(ctx));
   });
 
-  pi.on("tool_result", (event) => {
-    promptedPreviews.delete(event.toolCallId);
-    const steering = pendingSteering.get(event.toolCallId);
-    if (!steering) return undefined;
-    pendingSteering.delete(event.toolCallId);
-    return {
-      content: [
-        ...event.content,
-        // Providers may join text blocks into one string, so the marker text
-        // itself must signal this is not part of the tool's own output.
-        { type: "text", text: `\n\n<user-steering source="permission-prompt">\n${steering}\n</user-steering>` },
-      ],
-    };
-  });
+  if (!nativeOwnsToolResult) {
+    pi.on("tool_result", (event) => handleRegisteredToolResult(event));
+  }
 
   if (!nativeOwnsToolCall) {
     pi.on("tool_call", (event, extensionContext) => handleRegisteredToolCall(event, extensionContext, pi));
