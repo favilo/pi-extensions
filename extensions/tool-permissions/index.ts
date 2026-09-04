@@ -1337,6 +1337,56 @@ async function handleUnknownToolPermission(toolName: string, input: unknown, ctx
   if (!result.allowed) return deniedResult(`User denied ${toolName}.`, result);
 }
 
+async function handleRegisteredToolCall(event: any, extensionContext: any, pi: ExtensionAPI): Promise<ToolCallEventResult> {
+  // Bind the pi tool-call identity to this invocation so prompts and
+  // steering messages can reference the exact call.
+  const ctx = { ...extensionContext, toolCallId: event.toolCallId };
+  // Child sessions expose this bridge as their only tool. Its payload is
+  // authorized by the parent boundary, so the child-side policy must not
+  // intercept it as an unknown standalone tool.
+  if (event.toolName === "subagent-tool-request") {
+    logSubagentDebug("bridge-hook-bypass", {
+      toolName: event.toolName,
+      input: event.input,
+      mode: ctx.mode,
+      hasUI: ctx.hasUI,
+      hasCustomUI: typeof ctx.ui.custom === "function",
+      result: undefined,
+    });
+    // Undefined is the extension hook's allow/no-op result, not a denial.
+    return undefined;
+  }
+
+  if (isToolCallEventType("read", event)) {
+    return handleReadPermission(event.input, ctx, pi);
+  }
+
+  if (isToolCallEventType("grep", event) || isToolCallEventType("find", event) || isToolCallEventType("ls", event)) {
+    return handlePathPermission(event.toolName, event.input, ctx, pi);
+  }
+
+  if (isToolCallEventType("write", event) || isToolCallEventType("edit", event)) {
+    return handleFileEditPermission(event.toolName, event.input, ctx, pi);
+  }
+
+  if (isToolCallEventType("bash", event)) {
+    return handleBashPermission(event.input, ctx, pi);
+  }
+
+  if (isToolCallEventType<"subagent", SubagentInput>("subagent", event)) {
+    return handleSubagentPermission(event.input, ctx, pi);
+  }
+
+  if (event.toolName === "subagent_result") {
+    if (typeof (event.input as Record<string, unknown>)?.full_context === "string") {
+      return handleSubagentResultExportPermission(event.input as SubagentResultExportInput, ctx, pi);
+    }
+    return undefined;
+  }
+
+  return handleUnknownToolPermission(event.toolName, event.input, ctx, pi);
+}
+
 export default function toolPermissionPolicy(pi: ExtensionAPI) {
   if (typeof (pi as Partial<ExtensionAPI>).registerEntryRenderer === "function") {
     pi.registerEntryRenderer<PermissionPreview>("permission-preview", (entry, options, theme) => {
@@ -1369,8 +1419,11 @@ export default function toolPermissionPolicy(pi: ExtensionAPI) {
     });
   }
 
-  const nativeRegistration = registerNativeToolPermissionsCallbacks(pi);
+  const nativeRegistration = registerNativeToolPermissionsCallbacks(pi, {
+    handleToolCall: (event, ctx) => handleRegisteredToolCall(event, ctx, pi),
+  });
   const nativeOwnsSessionStartDiagnostics = nativeRegistration.mode === "native" && nativeRegistration.registrations.includes("session_start");
+  const nativeOwnsToolCall = nativeRegistration.mode === "native" && nativeRegistration.registrations.includes("tool_call");
 
   pi.on("session_start", async (_event, ctx) => {
     const nativePackage = resolveNativePackagePath();
@@ -1436,53 +1489,7 @@ export default function toolPermissionPolicy(pi: ExtensionAPI) {
     };
   });
 
-  pi.on("tool_call", async (event, extensionContext) => {
-    // Bind the pi tool-call identity to this invocation so prompts and
-    // steering messages can reference the exact call.
-    const ctx = { ...extensionContext, toolCallId: event.toolCallId };
-    // Child sessions expose this bridge as their only tool. Its payload is
-    // authorized by the parent boundary, so the child-side policy must not
-    // intercept it as an unknown standalone tool.
-    if (event.toolName === "subagent-tool-request") {
-      logSubagentDebug("bridge-hook-bypass", {
-        toolName: event.toolName,
-        input: event.input,
-        mode: ctx.mode,
-        hasUI: ctx.hasUI,
-        hasCustomUI: typeof ctx.ui.custom === "function",
-        result: undefined,
-      });
-      // Undefined is the extension hook's allow/no-op result, not a denial.
-      return undefined;
-    }
-
-    if (isToolCallEventType("read", event)) {
-      return handleReadPermission(event.input, ctx, pi);
-    }
-
-    if (isToolCallEventType("grep", event) || isToolCallEventType("find", event) || isToolCallEventType("ls", event)) {
-      return handlePathPermission(event.toolName, event.input, ctx, pi);
-    }
-
-    if (isToolCallEventType("write", event) || isToolCallEventType("edit", event)) {
-      return handleFileEditPermission(event.toolName, event.input, ctx, pi);
-    }
-
-    if (isToolCallEventType("bash", event)) {
-      return handleBashPermission(event.input, ctx, pi);
-    }
-
-    if (isToolCallEventType<"subagent", SubagentInput>("subagent", event)) {
-      return handleSubagentPermission(event.input, ctx, pi);
-    }
-
-    if (event.toolName === "subagent_result") {
-      if (typeof (event.input as Record<string, unknown>)?.full_context === "string") {
-        return handleSubagentResultExportPermission(event.input as SubagentResultExportInput, ctx, pi);
-      }
-      return undefined;
-    }
-
-    return handleUnknownToolPermission(event.toolName, event.input, ctx, pi);
-  });
+  if (!nativeOwnsToolCall) {
+    pi.on("tool_call", (event, extensionContext) => handleRegisteredToolCall(event, extensionContext, pi));
+  }
 }

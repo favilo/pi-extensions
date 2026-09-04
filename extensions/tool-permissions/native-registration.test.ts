@@ -46,8 +46,8 @@ const assert = require("node:assert/strict");
   const handlers = new Map<string, (event: unknown, ctx: any) => unknown>();
   withNativeRegistrationModule(moduleSource, () => {
     const result = registerNativeToolPermissionsCallbacks({
-      on(eventName, handler) { handlers.set(eventName, handler); },
-    });
+      on(eventName: string, handler: (event: unknown, ctx: any) => unknown) { handlers.set(eventName, handler); },
+    } as never);
     assert.deepEqual(result, { mode: "native", registrations: ["session_start"] });
   });
   const notices: Array<{ message: string; level: string }> = [];
@@ -55,8 +55,8 @@ const assert = require("node:assert/strict");
   assert.deepEqual(notices, [{ message: "Rust native registration active.", level: "info" }]);
 });
 
-test("bundled Rust registration calls pi.on for lifecycle diagnostics", async (t) => {
-  let register: ((request: unknown, pi: unknown) => { ok: boolean; operation: string; registrations: string[] }) | undefined;
+test("bundled Rust registration calls pi.on for lifecycle and tool_call delegation", async (t) => {
+  let register: ((request: unknown, pi: unknown, bridge?: unknown) => { ok: boolean; operation: string; registrations: string[] }) | undefined;
   try {
     register = (createRequire(import.meta.url)("./native/index.js") as { registerToolPermissionsCallbacks?: typeof register }).registerToolPermissionsCallbacks;
   } catch {
@@ -65,24 +65,34 @@ test("bundled Rust registration calls pi.on for lifecycle diagnostics", async (t
   }
   assert.ok(register);
   const handlers = new Map<string, (event: unknown, ctx: any) => unknown>();
+  const handledToolCalls: Array<{ event: unknown; ctx: unknown }> = [];
   const response = register({ version: NATIVE_CONTRACT_VERSION, operation: "register_callbacks", nonce: "registration-parity" }, {
     on(eventName: string, handler: (event: unknown, ctx: any) => unknown) { handlers.set(eventName, handler); },
+  }, {
+    handleToolCall(event: unknown, ctx: unknown) {
+      handledToolCalls.push({ event, ctx });
+      return { block: true, reason: "delegated" };
+    },
   });
   assert.equal(response.ok, true);
   assert.equal(response.operation, "register_callbacks");
-  assert.deepEqual(response.registrations, ["session_start"]);
+  assert.deepEqual(response.registrations, ["session_start", "tool_call"]);
 
   const notices: Array<{ message: string; level: string }> = [];
   await handlers.get("session_start")?.({}, { hasUI: true, ui: { notify: (message: string, level: string) => notices.push({ message, level }) } });
   assert.deepEqual(notices, [{ message: "Rust native registration active.", level: "info" }]);
+  const toolCallEvent = { toolName: "read", toolCallId: "native-tool-call", input: { path: "README.md" } };
+  const toolCallContext = { cwd: "/tmp", hasUI: false, ui: {} };
+  assert.deepEqual(await handlers.get("tool_call")?.(toolCallEvent, toolCallContext), { block: true, reason: "delegated" });
+  assert.deepEqual(handledToolCalls, [{ event: toolCallEvent, ctx: toolCallContext }]);
 });
 
 test("native registration falls back without installing duplicate callbacks", () => {
   const handlers: Array<string> = [];
   withNativeRegistrationModule(compatibleProbe, () => {
     const result = registerNativeToolPermissionsCallbacks({
-      on(eventName) { handlers.push(eventName); },
-    });
+      on(eventName: string) { handlers.push(eventName); },
+    } as never);
     assert.equal(result.mode, "typescript");
   });
   assert.deepEqual(handlers, []);

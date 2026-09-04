@@ -9,7 +9,7 @@ pub use contract::{
     PolicyPermission, PolicyRequest, PolicyResponse, ProbeRequest, ProbeResponse,
 };
 use napi::{
-    bindgen_prelude::{FnArgs, Function, JsObjectValue, Object},
+    bindgen_prelude::{FnArgs, Function, FunctionRef, JsObjectValue, Object, Unknown},
     Env, Error, Result,
 };
 use napi_derive::napi;
@@ -62,6 +62,7 @@ pub fn register_tool_permissions_callbacks(
     env: Env,
     request: NativeRegistrationRequest,
     pi: Object,
+    bridge: Option<Object>,
 ) -> Result<NativeRegistrationResponse> {
     if request.version != CONTRACT_VERSION || request.operation != "register_callbacks" {
         return Err(Error::from_reason("incompatible registration request"));
@@ -98,12 +99,31 @@ pub fn register_tool_permissions_callbacks(
     })?;
     on.call(FnArgs::from(("session_start".to_owned(), handler)))?;
 
+    let mut registrations = vec!["session_start".to_owned()];
+    if let Some(bridge) = bridge {
+        let handle_tool_call: FunctionRef<FnArgs<(Unknown<'_>, Unknown<'_>)>, Unknown<'_>> = bridge
+            .get_named_property::<Function<FnArgs<(Unknown<'_>, Unknown<'_>)>, Unknown<'_>>>("handleToolCall")
+            .map_err(|error| Error::from_reason(format!("tool_call bridge is unavailable: {error}")))?
+            .create_ref()?;
+        let tool_call_handler = env.create_function_from_closure("toolPermissionsToolCall", move |ctx| {
+            let event: Unknown = ctx.get(0)?;
+            let extension_context: Unknown = ctx.get(1)?;
+            let handle_tool_call = handle_tool_call.borrow_back(ctx.env)?;
+            handle_tool_call.call(FnArgs::from((event, extension_context)))
+        })?;
+        let on_tool_call: Function<FnArgs<(String, Function<(), Unknown<'_>>)>, ()> = pi
+            .get_named_property("on")
+            .map_err(|error| Error::from_reason(format!("pi.on is unavailable for tool_call: {error}")))?;
+        on_tool_call.call(FnArgs::from(("tool_call".to_owned(), tool_call_handler)))?;
+        registrations.push("tool_call".to_owned());
+    }
+
     Ok(NativeRegistrationResponse {
         version: CONTRACT_VERSION,
         operation: NativeOperation::RegisterCallbacks,
         ok: true,
         nonce: request.nonce,
-        registrations: vec!["session_start".to_owned()],
+        registrations,
     })
 }
 

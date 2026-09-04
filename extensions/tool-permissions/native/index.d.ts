@@ -148,4 +148,4 @@ export interface ProbeResponse {
   nonce: string
 }
 
-export declare function registerToolPermissionsCallbacks(request: NativeRegistrationRequest, pi: object): NativeRegistrationResponse
+export declare function registerToolPermissionsCallbacks(request: NativeRegistrationRequest, pi: object, bridge?: object | undefined | null): NativeRegistrationResponse

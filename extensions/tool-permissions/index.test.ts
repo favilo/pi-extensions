@@ -8,14 +8,15 @@ import { stringify as stringifyToml } from "smol-toml";
 import toolPermissionPolicy, { logSubagentDebug, requiresSubagentRuntimeApproval, resolvePermissionEditorTarget, resolveToolPermissionDecision } from "./index.ts";
 import { setNativePackagePathForTests } from "./native-package.ts";
 
-test("native registration is attempted during tool-permissions initialization without duplicate lifecycle diagnostics", async () => {
+test("native registration owns lifecycle and tool_call callback wiring without duplicates", async () => {
   const directory = mkdtempSync(join(tmpdir(), "pi-permissions-native-registration-default-"));
   const packagePath = join(directory, "native.cjs");
   writeFileSync(packagePath, `
 exports.probe = (request) => ({ version: 1, operation: request.operation, ok: true, nonce: request.nonce });
-exports.registerToolPermissionsCallbacks = (request, pi) => {
+exports.registerToolPermissionsCallbacks = (request, pi, bridge) => {
   pi.on("session_start", (_event, ctx) => ctx.hasUI && ctx.ui.notify("Rust native registration active.", "info"));
-  return { version: 1, operation: "register_callbacks", ok: true, nonce: request.nonce, registrations: ["session_start"] };
+  pi.on("tool_call", (event, ctx) => bridge.handleToolCall(event, ctx));
+  return { version: 1, operation: "register_callbacks", ok: true, nonce: request.nonce, registrations: ["session_start", "tool_call"] };
 };
 `, "utf8");
   const previousPackage = process.env.PI_TOOL_PERMISSIONS_NATIVE_PACKAGE;
@@ -32,11 +33,14 @@ exports.registerToolPermissionsCallbacks = (request, pi) => {
         handlers.set(event, [...(handlers.get(event) ?? []), handler]);
       },
     } as never);
-    assert.ok((handlers.get("session_start")?.length ?? 0) >= 1);
+    assert.equal(handlers.get("session_start")?.length, 2);
+    assert.equal(handlers.get("tool_call")?.length, 1);
     for (const handler of handlers.get("session_start") ?? []) {
       await handler({}, { hasUI: true, cwd: "/tmp", ui: { notify(message: string, level: string) { notices.push({ message, level }); } } });
     }
     assert.deepEqual(notices, [{ message: "Rust native registration active.", level: "info" }]);
+    const result = await handlers.get("tool_call")?.[0]?.({ toolName: "subagent-tool-request", toolCallId: "native-tool-call", input: {} }, { mode: "child", cwd: "/tmp", hasUI: false, ui: {} });
+    assert.equal(result, undefined);
   } finally {
     restoreNativePackagePath();
     if (previousPackage === undefined) delete process.env.PI_TOOL_PERMISSIONS_NATIVE_PACKAGE;

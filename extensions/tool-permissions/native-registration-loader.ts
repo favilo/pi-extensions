@@ -1,3 +1,4 @@
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { createNativeProbeRequest, decodeNativeProbeResponse, NATIVE_CONTRACT_VERSION, NATIVE_REGISTRATION_NONCE } from "./native-contract.ts";
 import { requireNativePackage, resolveNativePackagePath } from "./native-package.ts";
 import type { NativeOperation } from "./native/index.d.ts";
@@ -6,8 +7,10 @@ export type NativeRegistrationResult =
   | { mode: "native"; registrations: string[] }
   | { mode: "typescript"; reason: string };
 
-type NativeRegistrationHost = {
-  on(eventName: "session_start", handler: (event: unknown, ctx: { hasUI?: boolean; ui?: { notify?: (message: string, level: "info" | "warning" | "error") => void } }) => unknown): void;
+type NativeRegistrationHost = Pick<ExtensionAPI, "on">;
+
+type NativeRegistrationBridge = {
+  handleToolCall(event: unknown, ctx: unknown): unknown;
 };
 
 type NativeRegistrationModule = {
@@ -16,10 +19,10 @@ type NativeRegistrationModule = {
     version: typeof NATIVE_CONTRACT_VERSION;
     operation: NativeOperation;
     nonce: typeof NATIVE_REGISTRATION_NONCE;
-  }, pi: NativeRegistrationHost): unknown;
+  }, pi: NativeRegistrationHost, bridge?: NativeRegistrationBridge): unknown;
 };
 
-export function registerNativeToolPermissionsCallbacks(pi: NativeRegistrationHost): NativeRegistrationResult {
+export function registerNativeToolPermissionsCallbacks(pi: NativeRegistrationHost, bridge?: NativeRegistrationBridge): NativeRegistrationResult {
   const packagePath = resolveNativePackagePath();
   if (!packagePath) return { mode: "typescript", reason: "native package disabled" };
   try {
@@ -33,7 +36,7 @@ export function registerNativeToolPermissionsCallbacks(pi: NativeRegistrationHos
       version: NATIVE_CONTRACT_VERSION,
       operation: "register_callbacks" as NativeOperation,
       nonce: NATIVE_REGISTRATION_NONCE,
-    }, pi) as Record<string, unknown>;
+    }, pi, bridge) as Record<string, unknown>;
     if (!response || typeof response !== "object" || Array.isArray(response)) return { mode: "typescript", reason: "native registration response is invalid" };
     if (response.version !== NATIVE_CONTRACT_VERSION || response.operation !== ("register_callbacks" as NativeOperation) || response.ok !== true || response.nonce !== NATIVE_REGISTRATION_NONCE) {
       return { mode: "typescript", reason: "native registration response contract mismatch" };
