@@ -175,6 +175,24 @@ pub fn register_tool_permissions_callbacks(
             register_command.call(FnArgs::from(("permissions".to_owned(), command_options)))?;
             registrations.push("command:permissions".to_owned());
         }
+
+        if let Ok(render_permission_preview) = bridge
+            .get_named_property::<Function<FnArgs<(Unknown<'_>, Unknown<'_>, Unknown<'_>)>, Unknown<'_>>>("renderPermissionPreview")
+            .and_then(|function| function.create_ref())
+        {
+            let renderer: Function<(), Unknown<'_>> = env.create_function_from_closure("toolPermissionsPreviewRenderer", move |ctx| {
+                let entry: Unknown = ctx.get(0)?;
+                let options: Unknown = ctx.get(1)?;
+                let theme: Unknown = ctx.get(2)?;
+                let render_permission_preview = render_permission_preview.borrow_back(ctx.env)?;
+                render_permission_preview.call(FnArgs::from((entry, options, theme)))
+            })?;
+            let register_entry_renderer: Function<FnArgs<(String, Function<(), Unknown<'_>>)>, ()> = pi
+                .get_named_property("registerEntryRenderer")
+                .map_err(|error| Error::from_reason(format!("pi.registerEntryRenderer is unavailable: {error}")))?;
+            register_entry_renderer.call(FnArgs::from(("permission-preview".to_owned(), renderer)))?;
+            registrations.push("entry_renderer:permission-preview".to_owned());
+        }
     }
 
     Ok(NativeRegistrationResponse {

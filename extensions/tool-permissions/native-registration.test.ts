@@ -66,6 +66,7 @@ test("bundled Rust registration calls pi.on and registerCommand for delegated ca
   assert.ok(register);
   const handlers = new Map<string, (event: unknown, ctx: any) => unknown>();
   const commands = new Map<string, { description?: string; handler: (args: string, ctx: unknown) => unknown }>();
+  const renderers = new Map<string, (entry: unknown, options: unknown, theme: unknown) => unknown>();
   const handledSessionStarts: Array<{ event: unknown; ctx: unknown }> = [];
   const handledToolCalls: Array<{ event: unknown; ctx: unknown }> = [];
   const handledToolResults: Array<{ event: unknown; ctx: unknown }> = [];
@@ -74,6 +75,7 @@ test("bundled Rust registration calls pi.on and registerCommand for delegated ca
   const response = register({ version: NATIVE_CONTRACT_VERSION, operation: "register_callbacks", nonce: "registration-parity" }, {
     on(eventName: string, handler: (event: unknown, ctx: any) => unknown) { handlers.set(eventName, handler); },
     registerCommand(name: string, options: { description?: string; handler: (args: string, ctx: unknown) => unknown }) { commands.set(name, options); },
+    registerEntryRenderer(type: string, renderer: (entry: unknown, options: unknown, theme: unknown) => unknown) { renderers.set(type, renderer); },
   }, {
     handleSessionStart(event: unknown, ctx: unknown) {
       handledSessionStarts.push({ event, ctx });
@@ -93,11 +95,18 @@ test("bundled Rust registration calls pi.on and registerCommand for delegated ca
       handledCommands.push({ args, ctx });
       return Promise.resolve();
     },
+    renderPermissionPreview(entry: unknown, options: unknown, theme: unknown) {
+      return { entry, options, theme };
+    },
   });
   assert.equal(response.ok, true);
   assert.equal(response.operation, "register_callbacks");
-  assert.deepEqual(response.registrations, ["session_start", "tool_call", "tool_result", "session_shutdown", "command:permissions"]);
+  assert.deepEqual(response.registrations, ["session_start", "tool_call", "tool_result", "session_shutdown", "command:permissions", "entry_renderer:permission-preview"]);
   assert.equal(commands.get("permissions")?.description, "Edit user or local tool permissions");
+  const rendererEntry = { data: { title: "Review", body: "Body" } };
+  const rendererOptions = { expanded: true };
+  const rendererTheme = {};
+  assert.deepEqual(renderers.get("permission-preview")?.(rendererEntry, rendererOptions, rendererTheme), { entry: rendererEntry, options: rendererOptions, theme: rendererTheme });
 
   const notices: Array<{ message: string; level: string }> = [];
   const sessionStartEvent = {};

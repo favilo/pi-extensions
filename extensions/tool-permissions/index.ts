@@ -1397,6 +1397,35 @@ function handleRegisteredToolResult(event: ToolResultEvent): { content?: ToolRes
   };
 }
 
+function renderRegisteredPermissionPreview(entry: { data?: PermissionPreview }, options: { expanded: boolean }, theme: any): Component | undefined {
+  const preview = entry.data;
+  if (!preview || typeof preview.title !== "string" || typeof preview.body !== "string") return undefined;
+  const capturedExpanded = options.expanded;
+  return {
+    render(width: number): string[] {
+      const id = typeof preview.toolCallId === "string" ? preview.toolCallId : undefined;
+      const override = id ? previewReviewOverrides.get(id) : undefined;
+      const pending = id !== undefined && pendingPreviewReviews.has(id);
+      const expanded = override ?? (pending ? true : capturedExpanded);
+      const header = theme.fg("accent", theme.bold(preview.title));
+      const stickyHeader = typeof preview.stickyHeader === "string" ? `\n${theme.fg("muted", preview.stickyHeader)}` : "";
+      if (pending && expanded) {
+        // Review phase: the prompt frame below already carries title, path, and hints.
+        return new Text(preview.body, 0, 0).render(width);
+      }
+      if (!pending) {
+        // Once prompt is settled, omit preview rendering so only native tool widget remains in transcript.
+        return [];
+      }
+      const content = expanded
+        ? `${header}${stickyHeader}\n\n${preview.body}`
+        : `${header}${stickyHeader}\n\n${theme.fg("dim", `${preview.body.split("\n").length} lines — Ctrl+O to expand`)}`;
+      return new Text(content, 0, 0).render(width);
+    },
+    invalidate(): void {},
+  };
+}
+
 async function handleRegisteredToolCall(event: any, extensionContext: any, pi: ExtensionAPI): Promise<ToolCallEventResult> {
   // Bind the pi tool-call identity to this invocation so prompts and
   // steering messages can reference the exact call.
@@ -1448,38 +1477,8 @@ async function handleRegisteredToolCall(event: any, extensionContext: any, pi: E
 }
 
 export default function toolPermissionPolicy(pi: ExtensionAPI) {
-  if (typeof (pi as Partial<ExtensionAPI>).registerEntryRenderer === "function") {
-    pi.registerEntryRenderer<PermissionPreview>("permission-preview", (entry, options, theme) => {
-      const preview = entry.data;
-      if (!preview || typeof preview.title !== "string" || typeof preview.body !== "string") return undefined;
-      const capturedExpanded = options.expanded;
-      return {
-        render(width: number): string[] {
-          const id = typeof preview.toolCallId === "string" ? preview.toolCallId : undefined;
-          const override = id ? previewReviewOverrides.get(id) : undefined;
-          const pending = id !== undefined && pendingPreviewReviews.has(id);
-          const expanded = override ?? (pending ? true : capturedExpanded);
-          const header = theme.fg("accent", theme.bold(preview.title));
-          const stickyHeader = typeof preview.stickyHeader === "string" ? `\n${theme.fg("muted", preview.stickyHeader)}` : "";
-          if (pending && expanded) {
-            // Review phase: the prompt frame below already carries title, path, and hints.
-            return new Text(preview.body, 0, 0).render(width);
-          }
-          if (!pending) {
-            // Once prompt is settled, omit preview rendering so only native tool widget remains in transcript.
-            return [];
-          }
-          const content = expanded
-            ? `${header}${stickyHeader}\n\n${preview.body}`
-            : `${header}${stickyHeader}\n\n${theme.fg("dim", `${preview.body.split("\n").length} lines — Ctrl+O to expand`)}`;
-          return new Text(content, 0, 0).render(width);
-        },
-        invalidate(): void {},
-      };
-    });
-  }
-
   const nativeRegistration = registerNativeToolPermissionsCallbacks(pi, {
+    renderPermissionPreview: (entry, options, theme) => renderRegisteredPermissionPreview(entry as { data?: PermissionPreview }, options as { expanded: boolean }, theme),
     handleSessionStart: (_event, ctx) => handleRegisteredSessionStart(ctx as PermissionContext, { reportNativeProbe: false }),
     handleToolCall: (event, ctx) => handleRegisteredToolCall(event, ctx, pi),
     handleToolResult: (event) => handleRegisteredToolResult(event as ToolResultEvent),
@@ -1491,6 +1490,11 @@ export default function toolPermissionPolicy(pi: ExtensionAPI) {
   const nativeOwnsToolResult = nativeRegistration.mode === "native" && nativeRegistration.registrations.includes("tool_result");
   const nativeOwnsSessionShutdown = nativeRegistration.mode === "native" && nativeRegistration.registrations.includes("session_shutdown");
   const nativeOwnsPermissionsCommand = nativeRegistration.mode === "native" && nativeRegistration.registrations.includes("command:permissions");
+  const nativeOwnsPermissionPreviewRenderer = nativeRegistration.mode === "native" && nativeRegistration.registrations.includes("entry_renderer:permission-preview");
+
+  if (!nativeOwnsPermissionPreviewRenderer && typeof (pi as Partial<ExtensionAPI>).registerEntryRenderer === "function") {
+    pi.registerEntryRenderer<PermissionPreview>("permission-preview", renderRegisteredPermissionPreview);
+  }
 
   if (!nativeOwnsSessionStartDiagnostics) {
     pi.on("session_start", async (_event, ctx) => handleRegisteredSessionStart(ctx));

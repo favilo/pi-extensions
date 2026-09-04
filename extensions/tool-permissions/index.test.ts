@@ -22,13 +22,15 @@ exports.registerToolPermissionsCallbacks = (request, pi, bridge) => {
   pi.on("tool_result", (event, ctx) => bridge.handleToolResult(event, ctx));
   pi.on("session_shutdown", (event, ctx) => bridge.handleSessionShutdown(event, ctx));
   pi.registerCommand("permissions", { description: "Edit user or local tool permissions", handler: (args, ctx) => bridge.handlePermissionsCommand(args, ctx) });
-  return { version: 1, operation: "register_callbacks", ok: true, nonce: request.nonce, registrations: ["session_start", "tool_call", "tool_result", "session_shutdown", "command:permissions"] };
+  pi.registerEntryRenderer("permission-preview", bridge.renderPermissionPreview);
+  return { version: 1, operation: "register_callbacks", ok: true, nonce: request.nonce, registrations: ["session_start", "tool_call", "tool_result", "session_shutdown", "command:permissions", "entry_renderer:permission-preview"] };
 };
 `, "utf8");
   const previousPackage = process.env.PI_TOOL_PERMISSIONS_NATIVE_PACKAGE;
   const previousDisable = process.env.PI_TOOL_PERMISSIONS_NATIVE_DISABLE;
   const notices: Array<{ message: string; level: string }> = [];
   const commandCalls: Array<{ name: string; options: { description?: string; handler: (args: string, ctx: unknown) => unknown } }> = [];
+  const rendererCalls: Array<{ type: string; renderer: (entry: unknown, options: unknown, theme: unknown) => unknown }> = [];
   const handlers = new Map<string, Array<(event: unknown, ctx: unknown) => unknown>>();
   delete process.env.PI_TOOL_PERMISSIONS_NATIVE_PACKAGE;
   delete process.env.PI_TOOL_PERMISSIONS_NATIVE_DISABLE;
@@ -36,6 +38,7 @@ exports.registerToolPermissionsCallbacks = (request, pi, bridge) => {
   try {
     toolPermissionPolicy({
       registerCommand(name: string, options: { description?: string; handler: (args: string, ctx: unknown) => unknown }) { commandCalls.push({ name, options }); },
+      registerEntryRenderer(type: string, renderer: (entry: unknown, options: unknown, theme: unknown) => unknown) { rendererCalls.push({ type, renderer }); },
       on(event: string, handler: (event: unknown, ctx: unknown) => unknown) {
         handlers.set(event, [...(handlers.get(event) ?? []), handler]);
       },
@@ -46,6 +49,8 @@ exports.registerToolPermissionsCallbacks = (request, pi, bridge) => {
     assert.equal(handlers.get("session_shutdown")?.length, 1);
     assert.equal(commandCalls.length, 1);
     assert.equal(commandCalls[0]?.name, "permissions");
+    assert.equal(rendererCalls.length, 1);
+    assert.equal(rendererCalls[0]?.type, "permission-preview");
     for (const handler of handlers.get("session_start") ?? []) {
       await handler({}, { hasUI: true, cwd: "/tmp", ui: { notify(message: string, level: string) { notices.push({ message, level }); } } });
     }
