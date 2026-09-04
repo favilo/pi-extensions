@@ -708,3 +708,4 @@ module.exports.parse = nativeBinding.parse
 module.exports.parsePolicy = nativeBinding.parsePolicy
 module.exports.PermissionDecision = nativeBinding.PermissionDecision
 module.exports.probe = nativeBinding.probe
+module.exports.registerToolPermissionsCallbacks = nativeBinding.registerToolPermissionsCallbacks

@@ -10,6 +10,7 @@ pub enum NativeOperation {
     Evaluate,
     EvaluatePermission,
     OrchestratePermission,
+    RegisterCallbacks,
 }
 
 #[derive(derive_more::FromStr)]
@@ -132,4 +133,20 @@ pub struct PermissionOrchestrationResponse {
     pub permission_key: String,
     pub decision: PermissionDecision,
     pub detail: String,
+}
+
+#[napi(object)]
+pub struct NativeRegistrationRequest {
+    pub version: i64,
+    pub operation: String,
+    pub nonce: String,
+}
+
+#[napi(object)]
+pub struct NativeRegistrationResponse {
+    pub version: i64,
+    pub operation: NativeOperation,
+    pub ok: bool,
+    pub nonce: String,
+    pub registrations: Vec<String>,
 }

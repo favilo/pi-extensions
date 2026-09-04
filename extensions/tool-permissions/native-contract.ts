@@ -7,6 +7,7 @@ export const NATIVE_POLICY_NONCE = "tool-permissions-policy" as const;
 export const NATIVE_PARSER_NONCE = "tool-permissions-parser" as const;
 export const NATIVE_EVALUATION_NONCE = "tool-permissions-evaluation" as const;
 export const NATIVE_ORCHESTRATION_NONCE = "tool-permissions-orchestration" as const;
+export const NATIVE_REGISTRATION_NONCE = "tool-permissions-registration" as const;
 
 export type NativeProbeRequest = {
   version: typeof NATIVE_CONTRACT_VERSION;

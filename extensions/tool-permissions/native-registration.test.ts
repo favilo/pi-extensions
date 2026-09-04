@@ -1,4 +1,5 @@
 import "../test-support/forbid-fetch.ts";
+import { createRequire } from "node:module";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
@@ -31,11 +32,13 @@ function withNativeRegistrationModule(source: string, run: () => void): void {
 
 const compatibleProbe = `exports.probe = (request) => ({ version: ${NATIVE_CONTRACT_VERSION}, operation: request.operation, ok: true, nonce: request.nonce });`;
 
-test("native registration uses a constrained facade to install lifecycle diagnostics", async () => {
+test("native registration passes pi so native can call pi.on for lifecycle diagnostics", async () => {
   const moduleSource = `${compatibleProbe}
-exports.registerToolPermissionsCallbacks = (request, facade) => {
-  assert.deepStrictEqual(Object.keys(facade).sort(), ["registerSessionStartNotice"]);
-  facade.registerSessionStartNotice("Rust native registration active.", "info");
+exports.registerToolPermissionsCallbacks = (request, pi) => {
+  assert.equal(typeof pi.on, "function");
+  pi.on("session_start", (_event, ctx) => {
+    if (ctx.hasUI) ctx.ui.notify("Rust native registration active.", "info");
+  });
   return { version: ${NATIVE_CONTRACT_VERSION}, operation: "register_callbacks", ok: true, nonce: request.nonce, registrations: ["session_start"] };
 };
 const assert = require("node:assert/strict");
@@ -47,6 +50,28 @@ const assert = require("node:assert/strict");
     });
     assert.deepEqual(result, { mode: "native", registrations: ["session_start"] });
   });
+  const notices: Array<{ message: string; level: string }> = [];
+  await handlers.get("session_start")?.({}, { hasUI: true, ui: { notify: (message: string, level: string) => notices.push({ message, level }) } });
+  assert.deepEqual(notices, [{ message: "Rust native registration active.", level: "info" }]);
+});
+
+test("bundled Rust registration calls pi.on for lifecycle diagnostics", async (t) => {
+  let register: ((request: unknown, pi: unknown) => { ok: boolean; operation: string; registrations: string[] }) | undefined;
+  try {
+    register = (createRequire(import.meta.url)("./native/index.js") as { registerToolPermissionsCallbacks?: typeof register }).registerToolPermissionsCallbacks;
+  } catch {
+    t.skip("native artifact is not built; run npm run build:native");
+    return;
+  }
+  assert.ok(register);
+  const handlers = new Map<string, (event: unknown, ctx: any) => unknown>();
+  const response = register({ version: NATIVE_CONTRACT_VERSION, operation: "register_callbacks", nonce: "registration-parity" }, {
+    on(eventName: string, handler: (event: unknown, ctx: any) => unknown) { handlers.set(eventName, handler); },
+  });
+  assert.equal(response.ok, true);
+  assert.equal(response.operation, "register_callbacks");
+  assert.deepEqual(response.registrations, ["session_start"]);
+
   const notices: Array<{ message: string; level: string }> = [];
   await handlers.get("session_start")?.({}, { hasUI: true, ui: { notify: (message: string, level: string) => notices.push({ message, level }) } });
   assert.deepEqual(notices, [{ message: "Rust native registration active.", level: "info" }]);

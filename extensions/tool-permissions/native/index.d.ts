@@ -30,7 +30,22 @@ export declare const enum NativeOperation {
   Policy = 'policy',
   Evaluate = 'evaluate',
   EvaluatePermission = 'evaluate_permission',
-  OrchestratePermission = 'orchestrate_permission'
+  OrchestratePermission = 'orchestrate_permission',
+  RegisterCallbacks = 'register_callbacks'
+}
+
+export interface NativeRegistrationRequest {
+  version: number
+  operation: string
+  nonce: string
+}
+
+export interface NativeRegistrationResponse {
+  version: number
+  operation: NativeOperation
+  ok: boolean
+  nonce: string
+  registrations: Array<string>
 }
 
 export declare function parse(request: ParseRequest): ParseResponse
@@ -132,3 +147,5 @@ export interface ProbeResponse {
   ok: boolean
   nonce: string
 }
+
+export declare function registerToolPermissionsCallbacks(request: NativeRegistrationRequest, pi: object): NativeRegistrationResponse

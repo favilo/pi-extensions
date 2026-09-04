@@ -23,7 +23,7 @@ Introduce a Rust-owned registration adapter that can register the tool-permissio
 Maintainers evaluating how far native extension assembly can move while keeping Pi package behavior stable.
 
 ## 6. User journey
-A maintainer enables the Rust registration experiment. The TypeScript entrypoint loads the bundled native package, passes a constrained host registration facade, and Rust registers the same session and tool callback hooks that the TypeScript shim registered before. If the native registration fails or is disabled, TypeScript registration remains the safe default.
+A maintainer enables the Rust registration experiment. The TypeScript entrypoint loads the bundled native package, passes the Pi registration host to Rust, and Rust calls `pi.on` to register safe session callback hooks before progressively migrating additional extension assembly. If the native registration fails or is disabled, TypeScript registration remains the safe default.
 
 ## 7. Preconditions
 - e16s04 production native selection is complete.
@@ -31,13 +31,13 @@ A maintainer enables the Rust registration experiment. The TypeScript entrypoint
 - Pi extension API callback semantics are documented and covered by tests.
 
 ## 8. Inputs
-A constrained host facade for `pi.on`, command registration, diagnostics, and validated permission operations; native registration contract metadata; existing callback fixtures.
+A Pi registration host exposing `pi.on` for lifecycle registration, native registration contract metadata, and existing callback fixtures.
 
 ## 9. Outputs
 A versioned native registration operation, a minimal TypeScript fallback shim, parity tests for registered callbacks, and diagnostics identifying TypeScript-vs-Rust registration mode.
 
 ## 10. Requirements
-- ADDED: Rust registration shall use a constrained host facade rather than receiving the full mutable Pi ExtensionAPI object.
+- ADDED: Rust registration shall call `pi.on` directly through the host-supplied Pi registration object.
 - ADDED: Native-registered callbacks shall preserve event names, ordering assumptions, prompt behavior, command registration behavior, and shutdown cleanup semantics.
 - ADDED: Registration failures, missing exports, version mismatches, or callback panics shall fall back to the TypeScript registration path without dropping the permission boundary.
 - ADDED: The first native registration slice shall be lifecycle/diagnostic-only unless tests prove request-handling parity and fallback safety.
@@ -46,7 +46,7 @@ A versioned native registration operation, a minimal TypeScript fallback shim, p
 Incremental migration, API containment, deterministic fallback, and observable runtime mode.
 
 ## 12. Interfaces and contracts
-TypeScript calls a versioned native registration export with a constrained registration facade. Rust invokes facade methods to register callbacks. Callback bodies may delegate back through validated host services for prompts, filesystem, audit, and execution until those responsibilities are explicitly ported in later stories.
+TypeScript calls a versioned native registration export with the Pi registration host. Rust invokes `pi.on` directly to register callbacks. Callback bodies may delegate back through validated host services for prompts, filesystem, audit, and execution until those responsibilities are explicitly ported in later stories.
 
 ## 13. State
 Native registration state is process-local and torn down through existing Pi lifecycle hooks. Persistent user state remains TypeScript-owned.
@@ -57,7 +57,7 @@ Native registration state is process-local and torn down through existing Pi lif
 - Pi extension API documentation for callback registration semantics.
 
 ## 15. Failure modes
-Native code receives too much host authority, callbacks are double-registered, fallback leaves no permission hook installed, callback ordering changes prompt behavior, or shutdown cleanup diverges.
+Native code receives more Pi authority than intended, callbacks are double-registered, fallback leaves no permission hook installed, callback ordering changes prompt behavior, or shutdown cleanup diverges.
 
 ## 16. Observability
 Startup diagnostics shall report registration mode. Tests shall assert exact registered event names, command names, fallback reason, and that no duplicate callback path is active.
@@ -66,7 +66,7 @@ Startup diagnostics shall report registration mode. Tests shall assert exact reg
 ### Scenario: Rust registers lifecycle callbacks
 **Given** the native registration experiment is enabled and the native package is compatible
 **When** tool-permissions initializes
-**Then** Rust registers the expected lifecycle callbacks through the constrained facade and diagnostics report Rust registration.
+**Then** Rust registers the expected lifecycle callbacks through `pi.on` and diagnostics report Rust registration.
 
 ### Scenario: Registration failure falls back safely
 **Given** native registration is missing, incompatible, or throws
@@ -91,4 +91,4 @@ Startup diagnostics shall report registration mode. Tests shall assert exact reg
 5. Run full package and plan checks.
 
 ## 20. Definition of done
-The extension can experimentally register Pi callbacks from Rust through a constrained, versioned facade, with TypeScript fallback preserving the permission boundary and user-facing behavior.
+The extension can experimentally register Pi callbacks from Rust through direct `pi.on` calls behind a versioned native contract, with TypeScript fallback preserving the permission boundary and user-facing behavior.

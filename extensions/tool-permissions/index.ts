@@ -21,6 +21,7 @@ import { evaluateBashSubcommands, saveSubcommandAllowRules } from "./bash-subcom
 import { isYoloModeEnabled } from "./yolo-mode.ts";
 import { loadNativePackageProbe } from "./native-loader.ts";
 import { resolveNativePackagePath } from "./native-package.ts";
+import { registerNativeToolPermissionsCallbacks } from "./native-registration-loader.ts";
 import type { PermissionDecision, ToolPermissionBoundary, ToolRequest } from "./permission-boundary.ts";
 import { isPermissionPromptCancellation } from "./prompt-input.ts";
 import { SteeringEditor } from "./steering-editor.ts";
@@ -1368,9 +1369,12 @@ export default function toolPermissionPolicy(pi: ExtensionAPI) {
     });
   }
 
+  const nativeRegistration = registerNativeToolPermissionsCallbacks(pi);
+  const nativeOwnsSessionStartDiagnostics = nativeRegistration.mode === "native" && nativeRegistration.registrations.includes("session_start");
+
   pi.on("session_start", async (_event, ctx) => {
     const nativePackage = resolveNativePackagePath();
-    if (nativePackage) {
+    if (nativePackage && !nativeOwnsSessionStartDiagnostics) {
       const nativeResult = await loadNativePackageProbe(nativePackage);
       if (ctx.hasUI) {
         ctx.ui.notify(

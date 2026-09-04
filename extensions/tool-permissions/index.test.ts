@@ -8,6 +8,45 @@ import { stringify as stringifyToml } from "smol-toml";
 import toolPermissionPolicy, { logSubagentDebug, requiresSubagentRuntimeApproval, resolvePermissionEditorTarget, resolveToolPermissionDecision } from "./index.ts";
 import { setNativePackagePathForTests } from "./native-package.ts";
 
+test("native registration is attempted during tool-permissions initialization without duplicate lifecycle diagnostics", async () => {
+  const directory = mkdtempSync(join(tmpdir(), "pi-permissions-native-registration-default-"));
+  const packagePath = join(directory, "native.cjs");
+  writeFileSync(packagePath, `
+exports.probe = (request) => ({ version: 1, operation: request.operation, ok: true, nonce: request.nonce });
+exports.registerToolPermissionsCallbacks = (request, pi) => {
+  pi.on("session_start", (_event, ctx) => ctx.hasUI && ctx.ui.notify("Rust native registration active.", "info"));
+  return { version: 1, operation: "register_callbacks", ok: true, nonce: request.nonce, registrations: ["session_start"] };
+};
+`, "utf8");
+  const previousPackage = process.env.PI_TOOL_PERMISSIONS_NATIVE_PACKAGE;
+  const previousDisable = process.env.PI_TOOL_PERMISSIONS_NATIVE_DISABLE;
+  const notices: Array<{ message: string; level: string }> = [];
+  const handlers = new Map<string, Array<(event: unknown, ctx: unknown) => unknown>>();
+  delete process.env.PI_TOOL_PERMISSIONS_NATIVE_PACKAGE;
+  delete process.env.PI_TOOL_PERMISSIONS_NATIVE_DISABLE;
+  const restoreNativePackagePath = setNativePackagePathForTests(packagePath);
+  try {
+    toolPermissionPolicy({
+      registerCommand() {},
+      on(event: string, handler: (event: unknown, ctx: unknown) => unknown) {
+        handlers.set(event, [...(handlers.get(event) ?? []), handler]);
+      },
+    } as never);
+    assert.ok((handlers.get("session_start")?.length ?? 0) >= 1);
+    for (const handler of handlers.get("session_start") ?? []) {
+      await handler({}, { hasUI: true, cwd: "/tmp", ui: { notify(message: string, level: string) { notices.push({ message, level }); } } });
+    }
+    assert.deepEqual(notices, [{ message: "Rust native registration active.", level: "info" }]);
+  } finally {
+    restoreNativePackagePath();
+    if (previousPackage === undefined) delete process.env.PI_TOOL_PERMISSIONS_NATIVE_PACKAGE;
+    else process.env.PI_TOOL_PERMISSIONS_NATIVE_PACKAGE = previousPackage;
+    if (previousDisable === undefined) delete process.env.PI_TOOL_PERMISSIONS_NATIVE_DISABLE;
+    else process.env.PI_TOOL_PERMISSIONS_NATIVE_DISABLE = previousDisable;
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
 test("reports native package selection or TypeScript fallback at session start", async () => {
   const directory = mkdtempSync(join(tmpdir(), "pi-permissions-native-runtime-"));
   const packagePath = join(directory, "native.cjs");

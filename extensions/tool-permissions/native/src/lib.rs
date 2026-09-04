@@ -3,12 +3,15 @@ mod parser;
 mod policy;
 
 pub use contract::{
-    EvaluateRequest, EvaluateResponse, NativeOperation, ParseRequest, ParseResponse,
-    ParsedSubcommand, PermissionDecision, PermissionEvaluationRequest,
-    PermissionOrchestrationRequest, PermissionOrchestrationResponse, PolicyPermission,
-    PolicyRequest, PolicyResponse, ProbeRequest, ProbeResponse,
+    EvaluateRequest, EvaluateResponse, NativeOperation, NativeRegistrationRequest,
+    NativeRegistrationResponse, ParseRequest, ParseResponse, ParsedSubcommand, PermissionDecision,
+    PermissionEvaluationRequest, PermissionOrchestrationRequest, PermissionOrchestrationResponse,
+    PolicyPermission, PolicyRequest, PolicyResponse, ProbeRequest, ProbeResponse,
 };
-use napi::{Error, Result};
+use napi::{
+    bindgen_prelude::{FnArgs, Function, JsObjectValue, Object},
+    Env, Error, Result,
+};
 use napi_derive::napi;
 
 pub(crate) const CONTRACT_VERSION: i64 = 1;
@@ -52,6 +55,56 @@ pub fn parse_policy(request: PolicyRequest) -> Result<PolicyResponse> {
     }
     validate_nonce(&request.nonce)?;
     Ok(policy::parse(request))
+}
+
+#[napi]
+pub fn register_tool_permissions_callbacks(
+    env: Env,
+    request: NativeRegistrationRequest,
+    pi: Object,
+) -> Result<NativeRegistrationResponse> {
+    if request.version != CONTRACT_VERSION || request.operation != "register_callbacks" {
+        return Err(Error::from_reason("incompatible registration request"));
+    }
+    validate_nonce(&request.nonce)?;
+
+    let on: Function<FnArgs<(String, Function<(), ()>)>, ()> = pi
+        .get_named_property("on")
+        .map_err(|error| Error::from_reason(format!("pi.on is unavailable: {error}")))?;
+    let handler = env.create_function_from_closure("toolPermissionsSessionStart", |ctx| {
+        let session_context: Object = match ctx.get(1) {
+            Ok(value) => value,
+            Err(_) => return Ok(()),
+        };
+        if !session_context
+            .get_named_property::<bool>("hasUI")
+            .unwrap_or(false)
+        {
+            return Ok(());
+        }
+        let ui: Object = match session_context.get_named_property("ui") {
+            Ok(value) => value,
+            Err(_) => return Ok(()),
+        };
+        let notify: Function<FnArgs<(String, String)>, ()> = match ui.get_named_property("notify") {
+            Ok(value) => value,
+            Err(_) => return Ok(()),
+        };
+        notify.call(FnArgs::from((
+            "Rust native registration active.".to_owned(),
+            "info".to_owned(),
+        )))?;
+        Ok(())
+    })?;
+    on.call(FnArgs::from(("session_start".to_owned(), handler)))?;
+
+    Ok(NativeRegistrationResponse {
+        version: CONTRACT_VERSION,
+        operation: NativeOperation::RegisterCallbacks,
+        ok: true,
+        nonce: request.nonce,
+        registrations: vec!["session_start".to_owned()],
+    })
 }
 
 #[napi]
@@ -173,7 +226,8 @@ mod tests {
             operation: "orchestrate_permission".into(),
             nonce: "n".into(),
             tool_name: "grep".into(),
-            permissions_json: r#"{"read":{"allow":[{"path":"^/workspace"}],"deny":[{"path":"secret"}]}}"#.into(),
+            permissions_json:
+                r#"{"read":{"allow":[{"path":"^/workspace"}],"deny":[{"path":"secret"}]}}"#.into(),
             input_json: r#"{"path":"/workspace/secret.txt"}"#.into(),
         })
         .unwrap();
