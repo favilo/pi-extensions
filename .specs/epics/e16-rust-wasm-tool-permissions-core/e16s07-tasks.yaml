@@ -1,14 +1,14 @@
 story_id: e16s07
 title: Register Pi tool-permissions callbacks from Rust
-status: todo
+status: passing
 bcps: 5
 delta: ADDED
 spec: e16s07-rust-owned-pi-registration.md
 tasks:
   - id: 1
-    description: Read Pi extension callback API docs and add failing tests for a constrained native registration facade, exact callback names, command registration, diagnostics, and duplicate-registration prevention.
+    description: Read Pi extension callback API docs and add failing tests for native registration, exact callback names, command registration, diagnostics, and duplicate-registration prevention.
     verify: node --test extensions/tool-permissions/index.test.ts extensions/tool-permissions/native-registration.test.ts
-    status: todo
+    status: passing
     risk: P1
     security: high
     allure:
@@ -17,9 +17,9 @@ tasks:
         - "Contract Tests"
         - "Native Registration"
   - id: 2
-    description: Implement the native registration contract/export and lifecycle diagnostic callback registration through the constrained host facade.
+    description: Implement the native registration contract/export and lifecycle diagnostic callback registration through direct pi.on registration.
     verify: cargo test --manifest-path extensions/tool-permissions/native/Cargo.toml && node --test extensions/tool-permissions/native-registration.test.ts
-    status: todo
+    status: passing
     risk: P1
     security: high
     allure:
@@ -30,7 +30,7 @@ tasks:
   - id: 3
     description: Add TypeScript-vs-Rust registration selection, fallback diagnostics, and protections so registration failure installs the TypeScript permission boundary exactly once.
     verify: node --test extensions/tool-permissions/index.test.ts extensions/tool-permissions/native-registration.test.ts extensions/tool-permissions/permission-boundary.test.ts
-    status: todo
+    status: passing
     risk: P1
     security: high
     allure:
@@ -39,9 +39,9 @@ tasks:
         - "Fallback"
         - "Integration"
   - id: 4
-    description: Migrate the first eligible tool-permissions callbacks behind Rust registration while preserving prompt, audit, saved-rule, and denial parity.
+    description: Migrate eligible tool-permissions callback registrations behind Rust registration while preserving prompt, audit, saved-rule, and denial parity through host bridges.
     verify: node --test extensions/tool-permissions/native-registration.test.ts extensions/tool-permissions/permission-boundary.test.ts extensions/tool-permissions/bash-subcommands.test.ts
-    status: todo
+    status: passing
     risk: P1
     security: high
     allure:
@@ -52,7 +52,7 @@ tasks:
   - id: 5
     description: Run full security regression, native build, package checks, and plan consistency after native callback registration integration.
     verify: cargo test --manifest-path extensions/tool-permissions/native/Cargo.toml && npm run build:native && npm run check && npm run check:plans
-    status: todo
+    status: passing
     risk: P1
     security: high
     allure:

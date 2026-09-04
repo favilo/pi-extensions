@@ -54,3 +54,7 @@ export function registerNativeToolPermissionsCallbacks(pi: NativeRegistrationHos
     return { mode: "typescript", reason: error instanceof Error ? error.message : String(error) };
   }
 }
+
+export function hasNativeRegistration(result: NativeRegistrationResult, name: string): boolean {
+  return false;
+}

@@ -7,7 +7,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { NATIVE_CONTRACT_VERSION } from "./native-contract.ts";
 import { setNativePackagePathForTests } from "./native-package.ts";
-import { registerNativeToolPermissionsCallbacks } from "./native-registration-loader.ts";
+import { hasNativeRegistration, registerNativeToolPermissionsCallbacks } from "./native-registration-loader.ts";
 
 function withNativeRegistrationModule(source: string, run: () => void): void {
   const previousPackage = process.env.PI_TOOL_PERMISSIONS_NATIVE_PACKAGE;
@@ -140,4 +140,10 @@ test("native registration falls back without installing duplicate callbacks", ()
     assert.equal(result.mode, "typescript");
   });
   assert.deepEqual(handlers, []);
+});
+
+test("hasNativeRegistration identifies registered capabilities when native, false when typescript fallback", () => {
+  assert.equal(hasNativeRegistration({ mode: "native", registrations: ["session_start", "tool_call"] }, "session_start"), true);
+  assert.equal(hasNativeRegistration({ mode: "native", registrations: ["session_start", "tool_call"] }, "command:permissions"), false);
+  assert.equal(hasNativeRegistration({ mode: "typescript", reason: "disabled" }, "session_start"), false);
 });

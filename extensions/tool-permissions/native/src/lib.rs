@@ -1,6 +1,7 @@
 mod contract;
 mod parser;
 mod policy;
+mod registration;
 
 pub use contract::{
     EvaluateRequest, EvaluateResponse, NativeOperation, NativeRegistrationRequest,
@@ -8,10 +9,7 @@ pub use contract::{
     PermissionEvaluationRequest, PermissionOrchestrationRequest, PermissionOrchestrationResponse,
     PolicyPermission, PolicyRequest, PolicyResponse, ProbeRequest, ProbeResponse,
 };
-use napi::{
-    bindgen_prelude::{FnArgs, Function, FunctionRef, JsObjectValue, Object, Unknown},
-    Env, Error, Result,
-};
+use napi::{Env, Error, Result};
 use napi_derive::napi;
 
 pub(crate) const CONTRACT_VERSION: i64 = 1;
@@ -61,147 +59,10 @@ pub fn parse_policy(request: PolicyRequest) -> Result<PolicyResponse> {
 pub fn register_tool_permissions_callbacks(
     env: Env,
     request: NativeRegistrationRequest,
-    pi: Object,
-    bridge: Option<Object>,
+    pi: napi::bindgen_prelude::Object,
+    bridge: Option<napi::bindgen_prelude::Object>,
 ) -> Result<NativeRegistrationResponse> {
-    if request.version != CONTRACT_VERSION || request.operation != "register_callbacks" {
-        return Err(Error::from_reason("incompatible registration request"));
-    }
-    validate_nonce(&request.nonce)?;
-
-    let handle_session_start = bridge.as_ref().and_then(|bridge| {
-        bridge
-            .get_named_property::<Function<FnArgs<(Unknown<'_>, Unknown<'_>)>, Unknown<'_>>>("handleSessionStart")
-            .and_then(|function| function.create_ref())
-            .ok()
-    });
-    let on: Function<FnArgs<(String, Function<(), ()>)>, ()> = pi
-        .get_named_property("on")
-        .map_err(|error| Error::from_reason(format!("pi.on is unavailable: {error}")))?;
-    let handler = env.create_function_from_closure("toolPermissionsSessionStart", move |ctx| {
-        let event: Unknown = ctx.get(0)?;
-        let extension_context: Unknown = ctx.get(1)?;
-        if let Ok(session_context) = ctx.get::<Object>(1) {
-            if session_context
-                .get_named_property::<bool>("hasUI")
-                .unwrap_or(false)
-            {
-                if let Ok(ui) = session_context.get_named_property::<Object>("ui") {
-                    if let Ok(notify) = ui.get_named_property::<Function<FnArgs<(String, String)>, ()>>("notify") {
-                        notify.call(FnArgs::from((
-                            "Rust native registration active.".to_owned(),
-                            "info".to_owned(),
-                        )))?;
-                    }
-                }
-            }
-        }
-        if let Some(handle_session_start) = &handle_session_start {
-            let handle_session_start = handle_session_start.borrow_back(ctx.env)?;
-            handle_session_start.call(FnArgs::from((event, extension_context)))?;
-        }
-        Ok(())
-    })?;
-    on.call(FnArgs::from(("session_start".to_owned(), handler)))?;
-
-    let mut registrations = vec!["session_start".to_owned()];
-    if let Some(bridge) = bridge {
-        let handle_tool_call: FunctionRef<FnArgs<(Unknown<'_>, Unknown<'_>)>, Unknown<'_>> = bridge
-            .get_named_property::<Function<FnArgs<(Unknown<'_>, Unknown<'_>)>, Unknown<'_>>>("handleToolCall")
-            .map_err(|error| Error::from_reason(format!("tool_call bridge is unavailable: {error}")))?
-            .create_ref()?;
-        let tool_call_handler = env.create_function_from_closure("toolPermissionsToolCall", move |ctx| {
-            let event: Unknown = ctx.get(0)?;
-            let extension_context: Unknown = ctx.get(1)?;
-            let handle_tool_call = handle_tool_call.borrow_back(ctx.env)?;
-            handle_tool_call.call(FnArgs::from((event, extension_context)))
-        })?;
-        let on_tool_call: Function<FnArgs<(String, Function<(), Unknown<'_>>)>, ()> = pi
-            .get_named_property("on")
-            .map_err(|error| Error::from_reason(format!("pi.on is unavailable for tool_call: {error}")))?;
-        on_tool_call.call(FnArgs::from(("tool_call".to_owned(), tool_call_handler)))?;
-        registrations.push("tool_call".to_owned());
-
-        if let Ok(handle_tool_result) = bridge
-            .get_named_property::<Function<FnArgs<(Unknown<'_>, Unknown<'_>)>, Unknown<'_>>>("handleToolResult")
-            .and_then(|function| function.create_ref())
-        {
-            let tool_result_handler = env.create_function_from_closure("toolPermissionsToolResult", move |ctx| {
-                let event: Unknown = ctx.get(0)?;
-                let extension_context: Unknown = ctx.get(1)?;
-                let handle_tool_result = handle_tool_result.borrow_back(ctx.env)?;
-                handle_tool_result.call(FnArgs::from((event, extension_context)))
-            })?;
-            let on_tool_result: Function<FnArgs<(String, Function<(), Unknown<'_>>)>, ()> = pi
-                .get_named_property("on")
-                .map_err(|error| Error::from_reason(format!("pi.on is unavailable for tool_result: {error}")))?;
-            on_tool_result.call(FnArgs::from(("tool_result".to_owned(), tool_result_handler)))?;
-            registrations.push("tool_result".to_owned());
-        }
-
-        if let Ok(handle_session_shutdown) = bridge
-            .get_named_property::<Function<FnArgs<(Unknown<'_>, Unknown<'_>)>, Unknown<'_>>>("handleSessionShutdown")
-            .and_then(|function| function.create_ref())
-        {
-            let session_shutdown_handler = env.create_function_from_closure("toolPermissionsSessionShutdown", move |ctx| {
-                let event: Unknown = ctx.get(0)?;
-                let extension_context: Unknown = ctx.get(1)?;
-                let handle_session_shutdown = handle_session_shutdown.borrow_back(ctx.env)?;
-                handle_session_shutdown.call(FnArgs::from((event, extension_context)))
-            })?;
-            let on_session_shutdown: Function<FnArgs<(String, Function<(), Unknown<'_>>)>, ()> = pi
-                .get_named_property("on")
-                .map_err(|error| Error::from_reason(format!("pi.on is unavailable for session_shutdown: {error}")))?;
-            on_session_shutdown.call(FnArgs::from(("session_shutdown".to_owned(), session_shutdown_handler)))?;
-            registrations.push("session_shutdown".to_owned());
-        }
-
-        if let Ok(handle_permissions_command) = bridge
-            .get_named_property::<Function<FnArgs<(String, Unknown<'_>)>, Unknown<'_>>>("handlePermissionsCommand")
-            .and_then(|function| function.create_ref())
-        {
-            let command_handler: Function<(), Unknown<'_>> = env.create_function_from_closure("toolPermissionsCommand", move |ctx| {
-                let args: String = ctx.get(0)?;
-                let command_context: Unknown = ctx.get(1)?;
-                let handle_permissions_command = handle_permissions_command.borrow_back(ctx.env)?;
-                handle_permissions_command.call(FnArgs::from((args, command_context)))
-            })?;
-            let mut command_options = Object::new(&env)?;
-            command_options.set_named_property("description", "Edit user or local tool permissions")?;
-            command_options.set_named_property("handler", command_handler)?;
-            let register_command: Function<FnArgs<(String, Object)>, ()> = pi
-                .get_named_property("registerCommand")
-                .map_err(|error| Error::from_reason(format!("pi.registerCommand is unavailable: {error}")))?;
-            register_command.call(FnArgs::from(("permissions".to_owned(), command_options)))?;
-            registrations.push("command:permissions".to_owned());
-        }
-
-        if let Ok(render_permission_preview) = bridge
-            .get_named_property::<Function<FnArgs<(Unknown<'_>, Unknown<'_>, Unknown<'_>)>, Unknown<'_>>>("renderPermissionPreview")
-            .and_then(|function| function.create_ref())
-        {
-            let renderer: Function<(), Unknown<'_>> = env.create_function_from_closure("toolPermissionsPreviewRenderer", move |ctx| {
-                let entry: Unknown = ctx.get(0)?;
-                let options: Unknown = ctx.get(1)?;
-                let theme: Unknown = ctx.get(2)?;
-                let render_permission_preview = render_permission_preview.borrow_back(ctx.env)?;
-                render_permission_preview.call(FnArgs::from((entry, options, theme)))
-            })?;
-            let register_entry_renderer: Function<FnArgs<(String, Function<(), Unknown<'_>>)>, ()> = pi
-                .get_named_property("registerEntryRenderer")
-                .map_err(|error| Error::from_reason(format!("pi.registerEntryRenderer is unavailable: {error}")))?;
-            register_entry_renderer.call(FnArgs::from(("permission-preview".to_owned(), renderer)))?;
-            registrations.push("entry_renderer:permission-preview".to_owned());
-        }
-    }
-
-    Ok(NativeRegistrationResponse {
-        version: CONTRACT_VERSION,
-        operation: NativeOperation::RegisterCallbacks,
-        ok: true,
-        nonce: request.nonce,
-        registrations,
-    })
+    registration::register_callbacks(&env, request, pi, bridge)
 }
 
 #[napi]

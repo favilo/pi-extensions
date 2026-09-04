@@ -2,7 +2,7 @@ id: e16
 title: Rust/WASM core migration for tool-permissions
 wsjf: 0.0
 total_bcps: 27
-status: planned
+status: passing
 stories:
   - id: e16s01
     title: Spike a supported Rust/WASM boundary for tool-permissions
@@ -49,7 +49,7 @@ stories:
   - id: e16s07
     title: Register Pi tool-permissions callbacks from Rust
     bcps: 5
-    status: todo
+    status: passing
     delta: ADDED
     spec: e16s07-rust-owned-pi-registration.md
     tasks: e16s07-tasks.yaml
