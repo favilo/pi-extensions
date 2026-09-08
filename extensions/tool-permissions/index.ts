@@ -21,7 +21,7 @@ import { evaluateBashSubcommands, saveSubcommandAllowRules } from "./bash-subcom
 import { isYoloModeEnabled } from "./yolo-mode.ts";
 import { loadNativePackageProbe } from "./native-loader.ts";
 import { resolveNativePackagePath } from "./native-package.ts";
-import { registerNativeToolPermissionsCallbacks } from "./native-registration-loader.ts";
+import { hasNativeRegistration, registerNativeToolPermissionsCallbacks } from "./native-registration-loader.ts";
 import type { PermissionDecision, ToolPermissionBoundary, ToolRequest } from "./permission-boundary.ts";
 import { isPermissionPromptCancellation } from "./prompt-input.ts";
 import { SteeringEditor } from "./steering-editor.ts";
@@ -1485,37 +1485,31 @@ export default function toolPermissionPolicy(pi: ExtensionAPI) {
     handleSessionShutdown: (_event, ctx) => handleRegisteredSessionShutdown(ctx),
     handlePermissionsCommand: (args, ctx) => handleRegisteredPermissionsCommand(String(args), ctx as ExtensionCommandContext),
   });
-  const nativeOwnsSessionStartDiagnostics = nativeRegistration.mode === "native" && nativeRegistration.registrations.includes("session_start");
-  const nativeOwnsToolCall = nativeRegistration.mode === "native" && nativeRegistration.registrations.includes("tool_call");
-  const nativeOwnsToolResult = nativeRegistration.mode === "native" && nativeRegistration.registrations.includes("tool_result");
-  const nativeOwnsSessionShutdown = nativeRegistration.mode === "native" && nativeRegistration.registrations.includes("session_shutdown");
-  const nativeOwnsPermissionsCommand = nativeRegistration.mode === "native" && nativeRegistration.registrations.includes("command:permissions");
-  const nativeOwnsPermissionPreviewRenderer = nativeRegistration.mode === "native" && nativeRegistration.registrations.includes("entry_renderer:permission-preview");
 
-  if (!nativeOwnsPermissionPreviewRenderer && typeof (pi as Partial<ExtensionAPI>).registerEntryRenderer === "function") {
+  if (!hasNativeRegistration(nativeRegistration, "entry_renderer:permission-preview") && typeof (pi as Partial<ExtensionAPI>).registerEntryRenderer === "function") {
     pi.registerEntryRenderer<PermissionPreview>("permission-preview", renderRegisteredPermissionPreview);
   }
 
-  if (!nativeOwnsSessionStartDiagnostics) {
+  if (!hasNativeRegistration(nativeRegistration, "session_start")) {
     pi.on("session_start", async (_event, ctx) => handleRegisteredSessionStart(ctx));
   }
 
-  if (!nativeOwnsPermissionsCommand) {
+  if (!hasNativeRegistration(nativeRegistration, "command:permissions")) {
     pi.registerCommand("permissions", {
       description: `Edit user or local tool permissions`,
       handler: handleRegisteredPermissionsCommand,
     });
   }
 
-  if (!nativeOwnsSessionShutdown) {
+  if (!hasNativeRegistration(nativeRegistration, "session_shutdown")) {
     pi.on("session_shutdown", (_event, ctx) => handleRegisteredSessionShutdown(ctx));
   }
 
-  if (!nativeOwnsToolResult) {
+  if (!hasNativeRegistration(nativeRegistration, "tool_result")) {
     pi.on("tool_result", (event) => handleRegisteredToolResult(event));
   }
 
-  if (!nativeOwnsToolCall) {
+  if (!hasNativeRegistration(nativeRegistration, "tool_call")) {
     pi.on("tool_call", (event, extensionContext) => handleRegisteredToolCall(event, extensionContext, pi));
   }
 }

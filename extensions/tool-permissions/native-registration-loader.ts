@@ -56,5 +56,5 @@ export function registerNativeToolPermissionsCallbacks(pi: NativeRegistrationHos
 }
 
 export function hasNativeRegistration(result: NativeRegistrationResult, name: string): boolean {
-  return false;
+  return result.mode === "native" && result.registrations.includes(name);
 }
