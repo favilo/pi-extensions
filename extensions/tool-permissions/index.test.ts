@@ -408,7 +408,7 @@ test("resolved child runtime fails closed without a UI despite a broad subagent 
           modelId: "gpt-5.6-terra",
           source: "explicit",
         }),
-        installOauth() {},
+        async installOauth() {},
         consume: async () => {},
       };
     },
@@ -472,7 +472,7 @@ test("resolves and displays the selected runtime before approving a broadly allo
           modelId: "gpt-5.6-terra",
           source: "explicit",
         }),
-        installOauth() {},
+        async installOauth() {},
         consume: async () => {},
       };
     },
@@ -665,6 +665,41 @@ test("find_tools and find_skills policy evaluation matches generic custom-tool b
     assert.deepEqual(unmatchedResult, {
       block: true,
       reason: "Blocked find_tools: tool use requires explicit interactive permission or an allow rule.",
+    });
+  } finally {
+    if (previousAgentDir === undefined) delete process.env.PI_CODING_AGENT_DIR;
+    else process.env.PI_CODING_AGENT_DIR = previousAgentDir;
+  }
+});
+
+test("normally registered Pi MCP tools pass through the tool_call permission boundary", async () => {
+  const agentDir = mkdtempSync(join(tmpdir(), "pi-permissions-mcp-"));
+  writeFileSync(join(agentDir, "permissions.toml"), stringifyToml({
+    permissions: {
+      "mcp__notion__notion_search": { allow: [], deny: [{ query: "secret" }] },
+    },
+  }));
+  const previousAgentDir = process.env.PI_CODING_AGENT_DIR;
+  process.env.PI_CODING_AGENT_DIR = agentDir;
+  const handlers = new Map<string, (event: { toolName: string; input: Record<string, unknown> }, ctx: unknown) => Promise<unknown>>();
+
+  try {
+    const { default: permissionPolicy } = await import(`./index.ts?normal-mcp=${encodeURIComponent(agentDir)}`);
+    permissionPolicy({
+      registerCommand() {},
+      on(event: string, handler: (event: { toolName: string; input: Record<string, unknown> }, ctx: unknown) => Promise<unknown>) {
+        if (event === "tool_call") handlers.set(event, handler);
+      },
+      getAllTools: () => [{ name: "mcp__notion__notion_search" }],
+    } as never);
+
+    const result = await handlers.get("tool_call")!(
+      { toolName: "mcp__notion__notion_search", input: { query: "secret roadmap" } },
+      { cwd: "/tmp/project", hasUI: false, mode: "json" },
+    );
+    assert.deepEqual(result, {
+      block: true,
+      reason: "Blocked mcp__notion__notion_search: arguments match a configured deny rule.",
     });
   } finally {
     if (previousAgentDir === undefined) delete process.env.PI_CODING_AGENT_DIR;

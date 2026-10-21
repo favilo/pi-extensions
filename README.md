@@ -43,6 +43,7 @@ For active development, install the local checkout of the same fork instead. The
 
 | Extension | Purpose |
 | --- | --- |
+| `activate-skill` | Loads matching Agent Skill instructions through the normal Pi tool and permission pipeline. |
 | `built-in-tool-renderer` | Provides compact custom rendering for Pi's built-in tools. |
 | `clear-reload` | Adds `/clear` to start a fresh session and reload resources. |
 | `enable-extra-tools` | Activates `grep`, `find`, and `ls`, and adds `/tools-debug`. |
@@ -50,7 +51,7 @@ For active development, install the local checkout of the same fork instead. The
 | `focus-aware-cursor` | Keeps terminal cursor visibility synchronized with terminal focus. |
 | `jj-status` | Shows the active Jujutsu bookmark or change ID instead of `detached`. |
 | `local-agent-context` | Loads `AGENTS.local.md` and `AGENTS.override.md` into the system prompt. |
-| `mcp` | Registers independent MCP tool providers and reports their status through `/mcp`. |
+| `mcp` | Registers event-published MCP providers and reports them through `/mcp-providers`; Pi's built-in `/mcp` continues to manage `mcp.json`. |
 | `tool-permissions` | Applies configurable allow and deny rules to tool calls. |
 | `usage` | Displays current provider and account usage information via `/usage`. |
 
@@ -110,8 +111,12 @@ npm run check
 
 Each extension owns its implementation and tests under `extensions/<name>/`. Only the explicit `index.ts` files in `package.json` are loaded by Pi.
 
-To create a machine-local MCP provider, see [`extensions/mcp/README.md`](extensions/mcp/README.md) and the self-contained [`examples/mcp-provider/`](examples/mcp-provider/) extension.
+Normal MCP servers belong in `~/.pi/agent/mcp.json` or `.pi/mcp.json` and are managed by Pi's built-in `/mcp` command. Their calls pass through extension `tool_call` hooks, including `tool-permissions`.
+
+The event-published provider registry is also loaded for adapters such as the former Codex MCP proxy. It uses `/mcp-providers`, so it coexists with built-in MCP. See [`extensions/mcp/README.md`](extensions/mcp/README.md) and [`examples/mcp-provider/`](examples/mcp-provider/).
 
 ## Local-only integrations
 
 Environment-specific MCP integrations remain machine-local and are intentionally excluded from this repository.
+
+

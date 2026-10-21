@@ -26,6 +26,7 @@
     "extensions": [
       "./extensions/built-in-tool-renderer/index.ts",
       "./extensions/clear-reload/index.ts",
+      "./extensions/activate-skill/index.ts",
       "./extensions/enable-extra-tools/index.ts",
       "./extensions/exit/index.ts",
       "./extensions/focus-aware-cursor/index.ts",
@@ -34,8 +35,7 @@
       "./extensions/mcp/index.ts",
       "./extensions/tool-permissions/index.ts",
       "./extensions/subagent/index.ts",
-      "./extensions/usage/index.ts",
-      "./extensions/context-router/index.ts"
+      "./extensions/usage/index.ts"
     ]
   },
   "dependencies": {

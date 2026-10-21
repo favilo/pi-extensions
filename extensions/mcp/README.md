@@ -1,6 +1,8 @@
 # MCP provider registry
 
-This extension gives Pi one provider-neutral `/mcp` command and one registry for MCP tool providers. Providers remain independent extensions: they own transport, authentication, configuration, tool execution, and status wording.
+This extension gives Pi a provider-neutral `/mcp-providers` command and one registry for event-published MCP providers. Providers remain independent extensions: they own transport, authentication, configuration, tool execution, and status wording.
+
+The distinct command name is intentional. Registering `/mcp` would replace Pi's built-in MCP session support and stop session loading from `~/.pi/agent/mcp.json` and `.pi/mcp.json`. `/mcp-providers` lets this registry coexist with Pi's built-in `/mcp`.
 
 The registry intentionally knows nothing about Codex or any other provider.
 
