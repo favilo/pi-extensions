@@ -2,6 +2,8 @@ import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { patch as patchToml, TomlFormat } from "@decimalturn/toml-patch";
 import { parse as parseToml } from "smol-toml";
+import { parsePolicyWithNativeFallback } from "./native-policy-loader.ts";
+import { evaluatePermissionWithNative } from "./native-evaluation-loader.ts";
 
 export type PermissionRule = Record<string, string>;
 
@@ -38,15 +40,17 @@ function parseRules(value: unknown, field: string): PermissionRule[] {
   return value.map((item, index) => {
     const rule = object(item);
     if (!rule) throw new Error(`${field}[${index}] must be a table`);
+    const decoded: PermissionRule = {};
     for (const [path, pattern] of Object.entries(rule)) {
       if (!path || typeof pattern !== "string") throw new Error(`${field}[${index}] must contain string patterns`);
       new RegExp(pattern);
+      decoded[path] = pattern;
     }
-    return rule as PermissionRule;
+    return decoded;
   });
 }
 
-export function parsePermissions(source: string): Permissions {
+export function parsePermissionsTypescript(source: string): Permissions {
   const root = object(parseToml(source));
   const table = object(root?.permissions);
   if (!table) return {};
@@ -59,6 +63,10 @@ export function parsePermissions(source: string): Permissions {
       deny: parseRules(permission.deny, `permissions.${toolName}.deny`),
     }];
   }));
+}
+
+export function parsePermissions(source: string): Permissions {
+  return parsePolicyWithNativeFallback(source, () => parsePermissionsTypescript(source));
 }
 
 export function loadPermissions(path: string): Permissions {
@@ -95,6 +103,8 @@ export function matchesPermissionRule(rule: PermissionRule, input: unknown): boo
 
 export function permissionDecision(permission: ToolPermission | undefined, input: unknown): "allow" | "deny" | "ask" {
   if (!permission) return "ask";
+  const nativeDecision = evaluatePermissionWithNative(permission, input);
+  if (nativeDecision !== undefined) return nativeDecision;
   if (permission.deny.some((rule) => matchesPermissionRule(rule, input))) return "deny";
   if (permission.allow.some((rule) => matchesPermissionRule(rule, input))) return "allow";
   return "ask";

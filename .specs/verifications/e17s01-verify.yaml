@@ -1,0 +1,40 @@
+story_id: e17s01
+verified_at: "2026-09-01T10:00:00Z"
+verifier: verify-work
+status: passing
+vcs:
+  kind: jj
+  bookmark: favilo/e07-bash-subcommand-permissions
+phases:
+  task_verification:
+    passed: true
+    tasks: 3
+  typecheck:
+    passed: true
+    command: "npm run typecheck"
+  tests:
+    passed: true
+    command: "node --test extensions/tool-permissions/yolo-mode.test.ts"
+  terminal_verdict:
+    command: "npm run check:ci"
+    exit_code: 0
+    captured_at: "2026-09-01T10:00:00Z"
+    note: "All 292 tests green across preflight, test guard, plan consistency, and portability checks."
+  security:
+    passed: true
+    report: ".specs/security/epics/e17/THREAT_MODEL.md"
+    note: "YOLO mode is environment-gated via PI_YOLO_MODE=1 or PI_PERMISSION_YOLO=1; explicit deny rules in permissions.toml still take precedence."
+  manual:
+    passed: true
+    confirmed_by_user: true
+    steps:
+      - step: "Run Pi session with PI_YOLO_MODE=1"
+        expected: "Tool calls are allowed automatically without interactive prompts; TUI warns YOLO mode active."
+        actual: "Verified isYoloModeEnabled allows tool calls and notifies session start."
+        passed: true
+      - step: "Verify audit logging"
+        expected: "All executed tool calls and session startup event are recorded in audit.log."
+        actual: "Verified audit logger records yolo_mode_activated and tool execution events."
+        passed: true
+  gaps:
+    closed: true

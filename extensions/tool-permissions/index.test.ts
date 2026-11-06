@@ -1,11 +1,154 @@
 import "../test-support/forbid-fetch.ts";
 import assert from "node:assert/strict";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import test from "node:test";
 import { stringify as stringifyToml } from "smol-toml";
 import toolPermissionPolicy, { logSubagentDebug, requiresSubagentRuntimeApproval, resolvePermissionEditorTarget, resolveToolPermissionDecision } from "./index.ts";
+import { setNativePackagePathForTests } from "./native-package.ts";
+
+test("native registration owns lifecycle, command, and tool callback wiring without duplicates", async () => {
+  const directory = mkdtempSync(join(tmpdir(), "pi-permissions-native-registration-default-"));
+  const packagePath = join(directory, "native.cjs");
+  writeFileSync(packagePath, `
+exports.probe = (request) => ({ version: 1, operation: request.operation, ok: true, nonce: request.nonce });
+exports.registerToolPermissionsCallbacks = (request, pi, bridge) => {
+  pi.on("session_start", (event, ctx) => {
+    if (ctx.hasUI) ctx.ui.notify("Rust native registration active.", "info");
+    return bridge.handleSessionStart(event, ctx);
+  });
+  pi.on("tool_call", (event, ctx) => bridge.handleToolCall(event, ctx));
+  pi.on("tool_result", (event, ctx) => bridge.handleToolResult(event, ctx));
+  pi.on("session_shutdown", (event, ctx) => bridge.handleSessionShutdown(event, ctx));
+  pi.registerCommand("permissions", { description: "Edit user or local tool permissions", handler: (args, ctx) => bridge.handlePermissionsCommand(args, ctx) });
+  pi.registerEntryRenderer("permission-preview", bridge.renderPermissionPreview);
+  return { version: 1, operation: "register_callbacks", ok: true, nonce: request.nonce, registrations: ["session_start", "tool_call", "tool_result", "session_shutdown", "command:permissions", "entry_renderer:permission-preview"] };
+};
+`, "utf8");
+  const previousPackage = process.env.PI_TOOL_PERMISSIONS_NATIVE_PACKAGE;
+  const previousDisable = process.env.PI_TOOL_PERMISSIONS_NATIVE_DISABLE;
+  const notices: Array<{ message: string; level: string }> = [];
+  const commandCalls: Array<{ name: string; options: { description?: string; handler: (args: string, ctx: unknown) => unknown } }> = [];
+  const rendererCalls: Array<{ type: string; renderer: (entry: unknown, options: unknown, theme: unknown) => unknown }> = [];
+  const handlers = new Map<string, Array<(event: unknown, ctx: unknown) => unknown>>();
+  delete process.env.PI_TOOL_PERMISSIONS_NATIVE_PACKAGE;
+  delete process.env.PI_TOOL_PERMISSIONS_NATIVE_DISABLE;
+  const restoreNativePackagePath = setNativePackagePathForTests(packagePath);
+  try {
+    toolPermissionPolicy({
+      registerCommand(name: string, options: { description?: string; handler: (args: string, ctx: unknown) => unknown }) { commandCalls.push({ name, options }); },
+      registerEntryRenderer(type: string, renderer: (entry: unknown, options: unknown, theme: unknown) => unknown) { rendererCalls.push({ type, renderer }); },
+      on(event: string, handler: (event: unknown, ctx: unknown) => unknown) {
+        handlers.set(event, [...(handlers.get(event) ?? []), handler]);
+      },
+    } as never);
+    assert.equal(handlers.get("session_start")?.length, 1);
+    assert.equal(handlers.get("tool_call")?.length, 1);
+    assert.equal(handlers.get("tool_result")?.length, 1);
+    assert.equal(handlers.get("session_shutdown")?.length, 1);
+    assert.equal(commandCalls.length, 1);
+    assert.equal(commandCalls[0]?.name, "permissions");
+    assert.equal(rendererCalls.length, 1);
+    assert.equal(rendererCalls[0]?.type, "permission-preview");
+    for (const handler of handlers.get("session_start") ?? []) {
+      await handler({}, { hasUI: true, cwd: "/tmp", ui: { notify(message: string, level: string) { notices.push({ message, level }); } } });
+    }
+    assert.deepEqual(notices, [{ message: "Rust native registration active.", level: "info" }]);
+    const result = await handlers.get("tool_call")?.[0]?.({ toolName: "subagent-tool-request", toolCallId: "native-tool-call", input: {} }, { mode: "child", cwd: "/tmp", hasUI: false, ui: {} });
+    assert.equal(result, undefined);
+    const toolResult = await handlers.get("tool_result")?.[0]?.({ toolCallId: "native-tool-call", content: [] }, { cwd: "/tmp" });
+    assert.equal(toolResult, undefined);
+    const shutdownResult = await handlers.get("session_shutdown")?.[0]?.({}, { sessionId: "native-session" });
+    assert.equal(shutdownResult, undefined);
+    await commandCalls[0]?.options.handler("bad extra args", { cwd: "/tmp", ui: { notify(message: string, level: string) { notices.push({ message, level }); } } });
+    assert.deepEqual(notices.at(-1), { message: "Usage: /permissions [user|local]", level: "error" });
+  } finally {
+    restoreNativePackagePath();
+    if (previousPackage === undefined) delete process.env.PI_TOOL_PERMISSIONS_NATIVE_PACKAGE;
+    else process.env.PI_TOOL_PERMISSIONS_NATIVE_PACKAGE = previousPackage;
+    if (previousDisable === undefined) delete process.env.PI_TOOL_PERMISSIONS_NATIVE_DISABLE;
+    else process.env.PI_TOOL_PERMISSIONS_NATIVE_DISABLE = previousDisable;
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("reports native package selection or TypeScript fallback at session start", async () => {
+  const directory = mkdtempSync(join(tmpdir(), "pi-permissions-native-runtime-"));
+  const packagePath = join(directory, "native.cjs");
+  writeFileSync(packagePath, "module.exports = { probe(request) { return { version: 1, operation: request.operation, ok: true, nonce: request.nonce }; } };", "utf8");
+  const previousPackage = process.env.PI_TOOL_PERMISSIONS_NATIVE_PACKAGE;
+  const previousDisable = process.env.PI_TOOL_PERMISSIONS_NATIVE_DISABLE;
+  const notices: string[] = [];
+  const handlers = new Map<string, (event: unknown, ctx: unknown) => unknown>();
+  delete process.env.PI_TOOL_PERMISSIONS_NATIVE_PACKAGE;
+  delete process.env.PI_TOOL_PERMISSIONS_NATIVE_DISABLE;
+  const restoreNativePackagePath = setNativePackagePathForTests(packagePath);
+  try {
+    toolPermissionPolicy({
+      registerCommand() {},
+      on(event: string, handler: (event: unknown, ctx: unknown) => unknown) { handlers.set(event, handler); },
+    } as never);
+    await handlers.get("session_start")?.({}, { hasUI: true, cwd: "/tmp", ui: { notify(message: string) { notices.push(message); } } });
+    assert.deepEqual(notices, ["Native tool-permissions probe active (contract v1)."]);
+  } finally {
+    restoreNativePackagePath();
+    if (previousPackage === undefined) delete process.env.PI_TOOL_PERMISSIONS_NATIVE_PACKAGE;
+    else process.env.PI_TOOL_PERMISSIONS_NATIVE_PACKAGE = previousPackage;
+    if (previousDisable === undefined) delete process.env.PI_TOOL_PERMISSIONS_NATIVE_DISABLE;
+    else process.env.PI_TOOL_PERMISSIONS_NATIVE_DISABLE = previousDisable;
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("reports fallback when the default bundled native package cannot load", async () => {
+  const previousPackage = process.env.PI_TOOL_PERMISSIONS_NATIVE_PACKAGE;
+  const previousDisable = process.env.PI_TOOL_PERMISSIONS_NATIVE_DISABLE;
+  const notices: string[] = [];
+  const handlers = new Map<string, (event: unknown, ctx: unknown) => unknown>();
+  const restoreNativePackagePath = setNativePackagePathForTests("/definitely/missing/tool-permissions-native.cjs");
+  delete process.env.PI_TOOL_PERMISSIONS_NATIVE_PACKAGE;
+  delete process.env.PI_TOOL_PERMISSIONS_NATIVE_DISABLE;
+  try {
+    toolPermissionPolicy({
+      registerCommand() {},
+      on(event: string, handler: (event: unknown, ctx: unknown) => unknown) { handlers.set(event, handler); },
+    } as never);
+    await handlers.get("session_start")?.({}, { hasUI: true, cwd: "/tmp", ui: { notify(message: string) { notices.push(message); } } });
+    assert.equal(notices.length, 1);
+    assert.match(notices[0] ?? "", /^Tool-permissions using TypeScript fallback: /);
+  } finally {
+    restoreNativePackagePath();
+    if (previousPackage === undefined) delete process.env.PI_TOOL_PERMISSIONS_NATIVE_PACKAGE;
+    else process.env.PI_TOOL_PERMISSIONS_NATIVE_PACKAGE = previousPackage;
+    if (previousDisable === undefined) delete process.env.PI_TOOL_PERMISSIONS_NATIVE_DISABLE;
+    else process.env.PI_TOOL_PERMISSIONS_NATIVE_DISABLE = previousDisable;
+  }
+});
+
+test("explicit native disable suppresses native startup probing", async () => {
+  const previousPackage = process.env.PI_TOOL_PERMISSIONS_NATIVE_PACKAGE;
+  const previousDisable = process.env.PI_TOOL_PERMISSIONS_NATIVE_DISABLE;
+  const notices: string[] = [];
+  const handlers = new Map<string, (event: unknown, ctx: unknown) => unknown>();
+  const restoreNativePackagePath = setNativePackagePathForTests("/definitely/missing/tool-permissions-native.cjs");
+  process.env.PI_TOOL_PERMISSIONS_NATIVE_DISABLE = "1";
+  delete process.env.PI_TOOL_PERMISSIONS_NATIVE_PACKAGE;
+  try {
+    toolPermissionPolicy({
+      registerCommand() {},
+      on(event: string, handler: (event: unknown, ctx: unknown) => unknown) { handlers.set(event, handler); },
+    } as never);
+    await handlers.get("session_start")?.({}, { hasUI: true, cwd: "/tmp", ui: { notify(message: string) { notices.push(message); } } });
+    assert.deepEqual(notices, []);
+  } finally {
+    restoreNativePackagePath();
+    if (previousPackage === undefined) delete process.env.PI_TOOL_PERMISSIONS_NATIVE_PACKAGE;
+    else process.env.PI_TOOL_PERMISSIONS_NATIVE_PACKAGE = previousPackage;
+    if (previousDisable === undefined) delete process.env.PI_TOOL_PERMISSIONS_NATIVE_DISABLE;
+    else process.env.PI_TOOL_PERMISSIONS_NATIVE_DISABLE = previousDisable;
+  }
+});
 
 const userPolicy = stringifyToml({
   permissions: {
@@ -73,9 +216,11 @@ test("debug logging uses a random private directory and rejects non-regular targ
 
 test("announces the debug log location only to interactive sessions", async () => {
   const previousDebug = process.env.PI_SUBAGENT_DEBUG;
+  const previousNativeDisable = process.env.PI_TOOL_PERMISSIONS_NATIVE_DISABLE;
   const handlers = new Map<string, (event: unknown, ctx: unknown) => unknown>();
   const notices: Array<{ message: string; level: string }> = [];
   process.env.PI_SUBAGENT_DEBUG = "1";
+  process.env.PI_TOOL_PERMISSIONS_NATIVE_DISABLE = "1";
 
   try {
     toolPermissionPolicy({
@@ -104,6 +249,8 @@ test("announces the debug log location only to interactive sessions", async () =
   } finally {
     if (previousDebug === undefined) delete process.env.PI_SUBAGENT_DEBUG;
     else process.env.PI_SUBAGENT_DEBUG = previousDebug;
+    if (previousNativeDisable === undefined) delete process.env.PI_TOOL_PERMISSIONS_NATIVE_DISABLE;
+    else process.env.PI_TOOL_PERMISSIONS_NATIVE_DISABLE = previousNativeDisable;
   }
 });
 
@@ -122,13 +269,14 @@ test("resolves bare and explicit user permission editor targets", () => {
 test("resolves an eligible local permission editor target", () => {
   const root = mkdtempSync(join(tmpdir(), "pi-permissions-index-"));
   const cwd = join(root, "project");
+  mkdirSync(cwd);
   const userPath = join(root, "user", "permissions.toml");
   assert.deepEqual(resolvePermissionEditorTarget("local", cwd, {
     userPermissionsPath: userPath,
     trustResolver: () => ({ path: root, decision: true }),
   }), {
     scope: "local",
-    path: join(cwd, ".pi", "permissions.toml"),
+    path: join(realpathSync(cwd), ".pi", "permissions.toml"),
   });
 });
 
@@ -261,7 +409,7 @@ test("resolved child runtime fails closed without a UI despite a broad subagent 
           modelId: "gpt-5.6-terra",
           source: "explicit",
         }),
-        installOauth() {},
+        async installOauth() {},
         consume: async () => {},
       };
     },
@@ -325,7 +473,7 @@ test("resolves and displays the selected runtime before approving a broadly allo
           modelId: "gpt-5.6-terra",
           source: "explicit",
         }),
-        installOauth() {},
+        async installOauth() {},
         consume: async () => {},
       };
     },
@@ -422,7 +570,7 @@ test("subagent_result with full_context evaluates under write permission policy"
     });
 
     assert.deepEqual(result, { block: true, reason: "Blocked write: arguments match a configured deny rule." });
-    assert.equal(input.full_context, exportPath);
+    assert.equal(input.full_context, join(realpathSync(exportDir), "output.json"));
   } finally {
     rmSync(exportDir, { recursive: true, force: true });
     if (previousAgentDir === undefined) delete process.env.PI_CODING_AGENT_DIR;
@@ -518,6 +666,41 @@ test("find_tools and find_skills policy evaluation matches generic custom-tool b
     assert.deepEqual(unmatchedResult, {
       block: true,
       reason: "Blocked find_tools: tool use requires explicit interactive permission or an allow rule.",
+    });
+  } finally {
+    if (previousAgentDir === undefined) delete process.env.PI_CODING_AGENT_DIR;
+    else process.env.PI_CODING_AGENT_DIR = previousAgentDir;
+  }
+});
+
+test("normally registered Pi MCP tools pass through the tool_call permission boundary", async () => {
+  const agentDir = mkdtempSync(join(tmpdir(), "pi-permissions-mcp-"));
+  writeFileSync(join(agentDir, "permissions.toml"), stringifyToml({
+    permissions: {
+      "mcp__notion__notion_search": { allow: [], deny: [{ query: "secret" }] },
+    },
+  }));
+  const previousAgentDir = process.env.PI_CODING_AGENT_DIR;
+  process.env.PI_CODING_AGENT_DIR = agentDir;
+  const handlers = new Map<string, (event: { toolName: string; input: Record<string, unknown> }, ctx: unknown) => Promise<unknown>>();
+
+  try {
+    const { default: permissionPolicy } = await import(`./index.ts?normal-mcp=${encodeURIComponent(agentDir)}`);
+    permissionPolicy({
+      registerCommand() {},
+      on(event: string, handler: (event: { toolName: string; input: Record<string, unknown> }, ctx: unknown) => Promise<unknown>) {
+        if (event === "tool_call") handlers.set(event, handler);
+      },
+      getAllTools: () => [{ name: "mcp__notion__notion_search" }],
+    } as never);
+
+    const result = await handlers.get("tool_call")!(
+      { toolName: "mcp__notion__notion_search", input: { query: "secret roadmap" } },
+      { cwd: "/tmp/project", hasUI: false, mode: "json" },
+    );
+    assert.deepEqual(result, {
+      block: true,
+      reason: "Blocked mcp__notion__notion_search: arguments match a configured deny rule.",
     });
   } finally {
     if (previousAgentDir === undefined) delete process.env.PI_CODING_AGENT_DIR;

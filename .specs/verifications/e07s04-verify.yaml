@@ -1,0 +1,40 @@
+story_id: e07s04
+verified_at: "2026-09-01T09:45:00Z"
+verifier: verify-work
+status: passing
+vcs:
+  kind: jj
+  bookmark: favilo/e07-bash-subcommand-permissions
+phases:
+  task_verification:
+    passed: true
+    tasks: 3
+  typecheck:
+    passed: true
+    command: "npm run typecheck"
+  tests:
+    passed: true
+    command: "node --test extensions/tool-permissions/bash-subcommands.test.ts"
+  terminal_verdict:
+    command: "npm run check:ci"
+    exit_code: 0
+    captured_at: "2026-09-01T09:45:00Z"
+    note: "All 289 tests green across preflight, test guard, plan consistency, and portability checks."
+  security:
+    passed: true
+    report: ".specs/security/epics/e07/THREAT_MODEL.md"
+    note: "Granular subcommand rule saving writes exact regex patterns ^<subcommand>$ without wildcard escapes."
+  manual:
+    passed: true
+    confirmed_by_user: true
+    steps:
+      - step: "Open subcommand rule saving mode with Ctrl+S"
+        expected: "Permission prompt switches to subcommand selection view with togglable checkboxes."
+        actual: "Verified Ctrl+S enters subcommand selection mode showing list of subcommands."
+        passed: true
+      - step: "Save allow rules for selected subcommands"
+        expected: "Selected subcommands are saved to permissions.toml as individual allow rules."
+        actual: "Verified saveSubcommandAllowRules persists rules that allow targeted subcommands."
+        passed: true
+  gaps:
+    closed: true

@@ -62,20 +62,24 @@ const mockProvider: McpToolProvider = {
   getStatusSections: () => [{ title: "Mock server", lines: ["ready"] }],
 };
 
-test("the package explicitly loads the shared MCP extension", async () => {
+test("the package loads the provider registry without replacing built-in /mcp", async () => {
   const packageJson = JSON.parse(await readFile(new URL("../../package.json", import.meta.url), "utf8")) as {
     pi?: { extensions?: string[] };
   };
+  const harness = fakePi();
+  mcpExtension(harness.pi);
 
   assert.ok(packageJson.pi?.extensions?.includes("./extensions/mcp/index.ts"));
+  assert.ok(harness.commands.has("mcp-providers"));
+  assert.ok(!harness.commands.has("mcp"));
 });
 
-test("a provider contributes a callable tool and named /mcp status section", async () => {
+test("a provider contributes a callable tool and named /mcp-providers status section", async () => {
   const harness = fakePi();
   mcpExtension(harness.pi);
   registerMcpProvider(harness.pi, mockProvider);
 
-  await harness.commands.get("mcp")?.handler("", {});
+  await harness.commands.get("mcp-providers")?.handler("", {});
 
   assert.deepEqual(harness.tools, ["mcp__mock__ping"]);
   assert.equal(harness.messages.length, 1);
@@ -94,7 +98,7 @@ test("a duplicate provider identity is visible without replacing the healthy pro
     tools: [],
   });
 
-  await harness.commands.get("mcp")?.handler("", {});
+  await harness.commands.get("mcp-providers")?.handler("", {});
 
   assert.deepEqual(harness.tools, ["mcp__mock__ping"]);
   assert.match(harness.messages.at(-1) ?? "", /Conflicting provider/);
@@ -114,7 +118,7 @@ test("disposing a rejected duplicate preserves the accepted provider", async () 
   });
 
   disposeRejected();
-  await harness.commands.get("mcp")?.handler("", {});
+  await harness.commands.get("mcp-providers")?.handler("", {});
 
   assert.deepEqual(harness.activeTools(), ["mcp__mock__ping"]);
   assert.doesNotMatch(harness.messages.at(-1) ?? "", /Provider failure/);

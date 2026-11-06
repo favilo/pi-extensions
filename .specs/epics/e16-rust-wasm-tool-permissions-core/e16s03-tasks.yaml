@@ -1,0 +1,51 @@
+story_id: e16s03
+title: Port Bash permission evaluation to the native Rust core
+status: passing
+bcps: 4
+delta: ADDED
+spec: e16s03-rust-permission-engine.md
+tasks:
+  - id: 1
+    description: Add failing parity and fallback tests for deny precedence, atomic whole-command denial, ask fallback, denied-subcommand details, invalid native output, native regex fallback, and shell-wrapper bypass prevention.
+    verify: node --test extensions/tool-permissions/bash-subcommands.test.ts extensions/tool-permissions/native-evaluation-parity.test.ts extensions/tool-permissions/native-fallback.test.ts
+    status: passing
+    risk: P0
+    security: high
+    allure:
+      severity: critical
+      categories:
+        - "Contract Tests"
+        - "Permission Evaluation"
+  - id: 2
+    description: Implement the native Rust permission evaluator for deny precedence, allow/ask outcomes, dotted field paths, arrays/objects as compact JSON, invalid-regex fallback, and validated structured results.
+    verify: cargo test --manifest-path extensions/tool-permissions/native/Cargo.toml && node --test extensions/tool-permissions/native-evaluation-parity.test.ts
+    status: passing
+    risk: P0
+    security: high
+    allure:
+      severity: critical
+      categories:
+        - "Security Review"
+        - "Native Boundary"
+  - id: 3
+    description: Route permission rule evaluation through the native evaluator while preserving prompt, audit, denial-reporting, and TypeScript fallback behavior in the host.
+    verify: node --test extensions/tool-permissions/permission-boundary.test.ts extensions/tool-permissions/bash-subcommands.test.ts extensions/tool-permissions/native-fallback.test.ts
+    status: passing
+    risk: P0
+    security: high
+    allure:
+      severity: critical
+      categories:
+        - "Integration"
+        - "Fallback"
+  - id: 4
+    description: Re-run security-focused regressions, native boundary audit, native build, and package checks before marking the story passing.
+    verify: cargo test --manifest-path extensions/tool-permissions/native/Cargo.toml && npm run build:native && npm run check
+    status: passing
+    risk: P1
+    security: high
+    allure:
+      severity: critical
+      categories:
+        - "Security Review"
+        - "Regression"

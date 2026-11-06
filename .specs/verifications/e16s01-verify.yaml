@@ -1,0 +1,40 @@
+story_id: e16s01
+verified_at: "2026-09-02T17:43:33Z"
+verifier: verify-work
+risk: P1
+phases:
+  smoke:
+    passed: true
+    note: "Compiled WASM binding was invoked from Node and returned a typed response."
+  build:
+    passed: true
+    command: "cargo build --manifest-path extensions/tool-permissions/wasm/Cargo.toml --target wasm32-unknown-unknown --release"
+  typecheck:
+    passed: true
+    command: "npm run typecheck"
+  tests:
+    passed: true
+    command: "npm run check"
+    note: "297 repository tests passed; fetch-guard check passed."
+  rust_tests:
+    passed: true
+    command: "cargo test --manifest-path extensions/tool-permissions/wasm/Cargo.toml"
+    note: "1 Rust regression test passed."
+  terminal_verdict:
+    command: "npm run check"
+    exit_code: 0
+    captured_at: "2026-09-02T17:43:33Z"
+    note: "Single contiguous terminal run; typecheck, 297 tests, and test guard all passed."
+  manual:
+    status: passed
+    confirmed_by_user: true
+    steps:
+      - step: "Review extensions/tool-permissions/wasm/README.md and the typed JsValue boundary."
+        expected: "Rust owns only pure typed probe computation; TypeScript owns validation, runtime selection, and fallback."
+      - step: "Confirm the compiled Node probe response is structured and differs from its request."
+        expected: "Response contains version 1, operation health, ok true, and the original nonce."
+      - step: "Confirm missing, incompatible, and throwing module cases use the TypeScript engine."
+        expected: "No broken WASM result is treated as an allow or successful WASM path."
+  gaps:
+    closed: true
+    note: "No mechanical or manual gaps found."

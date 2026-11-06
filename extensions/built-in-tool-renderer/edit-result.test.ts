@@ -201,3 +201,38 @@ test("calls without a reason render exactly as before", () => {
     .join("\n");
   assert.doesNotMatch(bash, /reason/i);
 });
+
+test("write tool renders line additions and expanded content details", () => {
+  const renderer = captureTool("write");
+  const collapsed = renderer
+    .renderResult(
+      {
+        content: [{ type: "text", text: "Successfully wrote 20 bytes" }],
+        details: { content: "first line\nsecond line\nthird line", linesWritten: 3 },
+      },
+      { expanded: false, isPartial: false },
+      theme,
+      { isError: false },
+    )
+    .render(120)
+    .join("\n");
+
+  assert.match(collapsed, /\+3/);
+
+  const expanded = renderer
+    .renderResult(
+      {
+        content: [{ type: "text", text: "Successfully wrote 20 bytes" }],
+        details: { content: "first line\nsecond line\nthird line", linesWritten: 3 },
+      },
+      { expanded: true, isPartial: false },
+      theme,
+      { isError: false },
+    )
+    .render(120)
+    .join("\n");
+
+  assert.match(expanded, /\+first line/);
+  assert.match(expanded, /\+second line/);
+  assert.match(expanded, /\+third line/);
+});

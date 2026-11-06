@@ -83,3 +83,18 @@ test("migrates the legacy log once without duplicating entries", () => {
   assert.equal(contents.split(legacyEntry).length - 1, 1);
   assert.equal(existsSync(legacyPath), false);
 });
+
+test("swallows write errors gracefully without throwing to callers", () => {
+  const home = mkdtempSync(join(tmpdir(), "pi-permission-audit-"));
+  const warnings: string[] = [];
+  const logger = createAuditLogger({
+    homeDir: "/nonexistent-read-only-root-dir/impossible",
+    now: () => new Date("2026-07-31T12:00:00.000Z"),
+    warn: (msg) => warnings.push(msg),
+  });
+
+  assert.doesNotThrow(() => {
+    logger.write({ tool: "bash", decision: "deny_pattern" });
+  });
+  assert.ok(warnings.length > 0);
+});

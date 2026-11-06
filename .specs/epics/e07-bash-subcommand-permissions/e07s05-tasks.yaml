@@ -1,0 +1,22 @@
+story_id: e07s05
+title: Recursive subcommand parsing for command substitutions and subshells
+status: passing
+bcps: 3
+delta: ADDED
+spec: e07s05-command-substitution-parsing.md
+tasks:
+  - id: 1
+    description: Add syntax test contracts for command substitutions $(cmd), backticks, and subshells in bash-parser tests.
+    verify: node --test extensions/tool-permissions/bash-parser.test.ts
+    status: passing
+    risk: P1
+  - id: 2
+    description: Extend unbash AST traversal to extract subcommands inside CommandExpansion and Subshell nodes recursively.
+    verify: node --test extensions/tool-permissions/bash-subcommands.test.ts
+    status: passing
+    risk: P1
+  - id: 3
+    description: Run complete package regression and type checks.
+    verify: npm run check
+    status: passing
+    risk: P1

@@ -1,0 +1,62 @@
+story_id: e16s05
+title: Establish a native NAPI-RS Node package for tool-permissions
+status: passing
+bcps: 4
+delta: ADDED
+spec: e16s05-napi-native-node-package.md
+tasks:
+  - id: 1
+    description: Scaffold the standalone NAPI-RS crate, package manifest, generated-loader location, and minimal typed native probe.
+    verify: cargo test --manifest-path extensions/tool-permissions/native/Cargo.toml
+    risk: P0
+    status: passing
+    security: high
+    allure:
+      severity: critical
+      categories:
+        - "Security Review"
+        - "Native Boundary"
+  - id: 2
+    description: Add failing host contract tests for native loading, version/output validation, engine identity, and fail-safe fallback.
+    verify: node --test extensions/tool-permissions/native-loader.test.ts extensions/tool-permissions/native-contract.test.ts
+    risk: P0
+    status: passing
+    security: high
+    allure:
+      severity: critical
+      categories:
+        - "Security Review"
+        - "Contract Tests"
+  - id: 3
+    description: Implement the JS host adapter and minimal Pi registration seam without moving prompts, audit, persistence, or execution into Rust.
+    verify: node --test extensions/tool-permissions/native-loader.test.ts extensions/tool-permissions/native-contract.test.ts extensions/tool-permissions/permission-boundary.test.ts
+    risk: P0
+    status: passing
+    security: high
+    allure:
+      severity: critical
+      categories:
+        - "Security Review"
+        - "Integration"
+  - id: 4
+    description: Add native/WASI build and package scripts, then document the package/runtime matrix and pi_ext comparison.
+    verify: npm run build:native && npm pack --dry-run ./extensions/tool-permissions/native
+    risk: P1
+    status: passing
+    security: medium
+    allure:
+      severity: high
+      categories:
+        - "Packaging"
+        - "Native Boundary"
+  - id: 5
+    description: Run the full package gates and confirm existing permission behavior remains green.
+    verify: npm run check
+    risk: P1
+    status: passing
+    security: high
+    allure:
+      severity: high
+      categories:
+        - "Security Review"
+        - "Regression"

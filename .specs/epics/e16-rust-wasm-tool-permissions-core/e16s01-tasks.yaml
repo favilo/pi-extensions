@@ -1,0 +1,27 @@
+story_id: e16s01
+title: Spike a supported Rust/WASM boundary for tool-permissions
+status: passing
+bcps: 3
+delta: ADDED
+spec: e16s01-rust-wasm-boundary-spike.md
+tasks:
+  - id: 1
+    description: Add failing host-loader contracts for artifact discovery, ABI/version handshake, and safe fallback when initialization fails.
+    verify: node --test extensions/tool-permissions/wasm-loader.test.ts extensions/tool-permissions/wasm-contract.test.ts
+    status: passing
+    risk: P1
+  - id: 2
+    description: Stand up a Rust crate and minimal WASM artifact for the hybrid extension, using pi-oxided if it proves compatible with the required package/runtime shape.
+    verify: node --test extensions/tool-permissions/wasm-loader.test.ts extensions/tool-permissions/wasm-contract.test.ts
+    status: passing
+    risk: P1
+  - id: 3
+    description: Implement the TypeScript host adapter, validated structured contract, and fail-closed TypeScript fallback path.
+    verify: node --test extensions/tool-permissions/wasm-loader.test.ts extensions/tool-permissions/wasm-contract.test.ts
+    status: passing
+    risk: P1
+  - id: 4
+    description: Document the chosen Rust/WASM boundary, including whether pi-oxided was viable, and run the package checks.
+    verify: npm run check
+    status: passing
+    risk: P2

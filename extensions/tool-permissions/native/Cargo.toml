@@ -1,0 +1,21 @@
+[package]
+name = "tool-permissions-native"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+napi = { version = "3.12.2", features = ["napi8"] }
+napi-derive = "3.6.3"
+bash-ast = "0.8.22"
+toml = "1.1.5"
+serde = { version = "1.0.229", features = ["derive"] }
+regex = "1.13.1"
+serde_json = "1.0.145"
+derive_more = { version = "2.1.1", features = ["from_str"] }
+
+[build-dependencies]
+napi-build = "2.2.3"

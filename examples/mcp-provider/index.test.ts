@@ -66,7 +66,7 @@ test("the authoring example demonstrates the public contract without external se
   const result = await tool.execute("call-1", { text: "hello" }, undefined, undefined, {} as never);
   assert.equal(result.content[0]?.type === "text" ? result.content[0].text : undefined, "mock: hello");
 
-  await testHarness.commands.get("mcp")?.handler("", {});
+  await testHarness.commands.get("mcp-providers")?.handler("", {});
   assert.match(testHarness.messages.at(-1) ?? "", /Example healthy server/);
   assert.match(testHarness.messages.at(-1) ?? "", /Example failed server/);
 

@@ -1,0 +1,56 @@
+id: e18
+title: WASM-only tool-permissions runtime
+wsjf: 2.1
+total_bcps: 35
+status: planning
+scope: .specs/product/SCOPE-e18-wasm-only-tool-permissions.yaml
+stories:
+  - id: e18s00
+    title: Re-evaluate pi-oxidized and pi-oxidized-ext
+    bcps: 3
+    status: failing
+    delta: ADDED
+    spec: e18s00-pi-oxidized-host.md
+    tasks: e18s00-tasks.yaml
+  - id: e18s01
+    title: Move path canonicalization, project trust, and .aiignore into WASM
+    bcps: 5
+    status: failing
+    delta: MODIFIED
+    spec: e18s01-wasm-path-trust-aiignore.md
+    tasks: e18s01-tasks.yaml
+  - id: e18s02
+    title: Move audit log writes into WASM
+    bcps: 3
+    status: failing
+    delta: MODIFIED
+    spec: e18s02-wasm-audit-writes.md
+    tasks: e18s02-tasks.yaml
+  - id: e18s03
+    title: Move rule saves and permissions.toml patches into WASM
+    bcps: 5
+    status: failing
+    delta: MODIFIED
+    spec: e18s03-wasm-rule-saves.md
+    tasks: e18s03-tasks.yaml
+  - id: e18s04
+    title: Move the prompt UI, steering editor, and prompt queue into WASM
+    bcps: 8
+    status: failing
+    delta: MODIFIED
+    spec: e18s04-wasm-prompt-ui.md
+    tasks: e18s04-tasks.yaml
+  - id: e18s05
+    title: Move tool execution sequencing into WASM
+    bcps: 8
+    status: failing
+    delta: MODIFIED
+    spec: e18s05-wasm-tool-execution.md
+    tasks: e18s05-tasks.yaml
+  - id: e18s06
+    title: Remove the TypeScript permission fallback
+    bcps: 3
+    status: failing
+    delta: REMOVED
+    spec: e18s06-remove-typescript-fallback.md
+    tasks: e18s06-tasks.yaml

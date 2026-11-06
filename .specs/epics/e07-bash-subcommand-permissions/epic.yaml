@@ -1,27 +1,41 @@
 id: e07
 title: Bash subcommand permission evaluation
 wsjf: 5.5
-total_bcps: 9
-status: planned
+total_bcps: 15
+status: completed
 stories:
   - id: e07s01
     title: Spike Bash parsing and subcommand permission contracts
     bcps: 3
-    status: todo
+    status: passing
     delta: ADDED
     spec: e07s01-bash-parser-spike.md
     tasks: e07s01-tasks.yaml
   - id: e07s02
     title: Allowlist individual Bash subcommands and deny whole commands safely
     bcps: 4
-    status: todo
+    status: passing
     delta: ADDED
     spec: e07s02-subcommand-decision-boundary.md
     tasks: e07s02-tasks.yaml
   - id: e07s03
     title: Audit Bash components and report denied subcommands to agents
     bcps: 2
-    status: todo
+    status: passing
     delta: ADDED
     spec: e07s03-subcommand-audit-and-denials.md
     tasks: e07s03-tasks.yaml
+  - id: e07s04
+    title: Interactive subcommand selection and granular pattern saving
+    bcps: 3
+    status: passing
+    delta: ADDED
+    spec: e07s04-granular-subcommand-saving.md
+    tasks: e07s04-tasks.yaml
+  - id: e07s05
+    title: Recursive subcommand parsing for command substitutions and subshells
+    bcps: 3
+    status: passing
+    delta: ADDED
+    spec: e07s05-command-substitution-parsing.md
+    tasks: e07s05-tasks.yaml

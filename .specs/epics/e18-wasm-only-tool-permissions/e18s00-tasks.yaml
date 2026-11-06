@@ -1,0 +1,51 @@
+story_id: e18s00
+title: Re-evaluate pi-oxidized and pi-oxidized-ext
+status: failing
+bcps: 3
+delta: ADDED
+spec: e18s00-pi-oxidized-host.md
+tasks:
+  - id: 1
+    description: Add a failing test that requires the decision record to name pi-oxidized and pi-oxidized-ext and to say adopt or reject. No new security findings in affected paths.
+    verify: node --test extensions/tool-permissions/native-pi-oxidized-decision.test.ts
+    risk: P1
+    security: medium
+    status: failing
+    allure:
+      severity: high
+      categories:
+        - "Contract Tests"
+        - "Security Review"
+  - id: 2
+    description: Probe pi-oxidized-ext registration without authorizing a tool call, and record the inspected version plus the result. No new security findings in affected paths.
+    verify: node --test extensions/tool-permissions/native-pi-oxidized-decision.test.ts
+    risk: P1
+    security: medium
+    status: failing
+    allure:
+      severity: high
+      categories:
+        - "Native Boundary"
+        - "Security Review"
+  - id: 3
+    description: Write the adopt or reject decision record. No new security findings in affected paths.
+    verify: node --test extensions/tool-permissions/native-pi-oxidized-decision.test.ts
+    risk: P1
+    security: medium
+    status: failing
+    allure:
+      severity: high
+      categories:
+        - "Integration"
+        - "Security Review"
+  - id: 4
+    description: Run full checks. No new security findings in affected paths.
+    verify: npm run check
+    risk: P1
+    security: medium
+    status: failing
+    allure:
+      severity: high
+      categories:
+        - "Regression"
+        - "Security Review"

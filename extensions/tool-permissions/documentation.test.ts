@@ -14,6 +14,24 @@ test("documents user and project permission policy locations and trust behavior"
   assert.match(readme, /seven days/);
 });
 
+test("documents native tool-permissions runtime build, packaging, and fallback behavior", () => {
+  const readme = readFileSync(new URL("../../README.md", import.meta.url), "utf8");
+  const rootPackage = readFileSync(new URL("../../package.json", import.meta.url), "utf8");
+  const nativePackage = readFileSync(new URL("./native/package.json", import.meta.url), "utf8");
+
+  assert.match(readme, /bundled native Rust core is enabled by default/);
+  assert.match(readme, /PI_TOOL_PERMISSIONS_NATIVE_DISABLE=1/);
+  assert.match(readme, /npm run build:native/);
+  assert.match(readme, /npm pack --dry-run \.\/extensions\/tool-permissions\/native/);
+  assert.match(rootPackage, /"build:native"/);
+  assert.match(rootPackage, /wasm32-wasip1-threads/);
+  assert.match(readme, /wasm32-wasip1-threads/);
+  assert.match(readme, /does not load a platform `\.node` library/);
+  assert.match(nativePackage, /"files"\s*:/);
+  assert.match(nativePackage, /"generated\/"/);
+  assert.match(nativePackage, /"generated\/index\.js"/);
+});
+
 test("documents both scoped save shortcuts in the prompt implementation", () => {
   const source = readFileSync(new URL("./index.ts", import.meta.url), "utf8");
   assert.match(source, /Ctrl\+A allow\+save project/);

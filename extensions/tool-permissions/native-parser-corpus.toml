@@ -1,0 +1,182 @@
+# Shared corpus for the TypeScript/native Bash parser parity suite.
+#
+# Known intentional divergences (do not add these as parity cases):
+# - `time <cmd>`: unbash models `time` as a keyword and unwraps it (including
+#   flags); bash-ast parses `time` as a plain command word, so the native
+#   parser keeps it in the normalized text. Native is stricter (anchored
+#   allow rules will not match), which fails toward ask.
+# - `var=1` (bare assignment): TypeScript emits an empty command name; native
+#   reports unsupported_syntax. Both fail toward ask.
+# - Nested command substitutions inside double quotes: the native parser
+#   extracts the nested subcommands; the TypeScript parser currently does
+#   not. Covered natively in native-parser-dangerous.test.ts.
+# - Escape sequences inside $'...' and '...' (e.g. $'a\tb') are not evaluated
+#   by the native parser; only wrapper quotes are stripped.
+
+[[cases]]
+name = "simple"
+command = "jj status"
+
+[[cases]]
+name = "compound-and-pipeline"
+command = "jj status && jj diff --stat | tee result.txt"
+
+[[cases]]
+name = "quoted-argument"
+command = "echo \"hello world\""
+
+[[cases]]
+name = "redirect"
+command = "jj log > output.txt"
+
+[[cases]]
+name = "command-substitution"
+command = "echo $(jj status)"
+
+[[cases]]
+name = "subshell"
+command = "(jj status; jj diff --summary)"
+
+[[cases]]
+name = "unsupported-loop"
+command = "for f in *.ts; do echo $f; done"
+
+[[cases]]
+name = "leading-and-trailing-whitespace"
+command = "  jj status  "
+
+[[cases]]
+name = "leading-tab"
+command = "\tjj status"
+
+[[cases]]
+name = "single-quoted-argument"
+command = "echo 'single quoted'"
+
+[[cases]]
+name = "ansi-c-quoted-argument"
+command = "echo $'ansi'"
+
+[[cases]]
+name = "adjacent-quoted-words-concatenate"
+command = "echo 'it''s'"
+
+[[cases]]
+name = "quoted-argument-with-inner-double-quotes"
+command = "jj status --config 'ui.color=\"always\"'"
+
+[[cases]]
+name = "regex-argument-quoted"
+command = "grep -E 'foo|bar' file.txt"
+
+[[cases]]
+name = "multi-word-quoted-argument"
+command = "jj commit -m 'multi word message'"
+
+[[cases]]
+name = "simple-parameter-expansion"
+command = "echo $HOME"
+
+[[cases]]
+name = "simple-expansion-inside-double-quotes"
+command = "echo \"pre $HOME post\""
+
+[[cases]]
+name = "unsupported-braced-parameter-expansion"
+command = "echo ${HOME}"
+
+[[cases]]
+name = "unsupported-arithmetic-expansion"
+command = "echo $((1+2))"
+
+[[cases]]
+name = "export-declaration"
+command = "export FOO=bar"
+
+[[cases]]
+name = "export-declaration-multiple-assignments"
+command = "export FOO=bar JJ=x"
+
+[[cases]]
+name = "declare-declaration"
+command = "declare -x FOO=bar"
+
+[[cases]]
+name = "assignment-prefix"
+command = "FOO=bar jj status"
+
+[[cases]]
+name = "bash-c-single-quoted-payload"
+command = "bash -c 'jj status'"
+
+[[cases]]
+name = "bash-c-double-quoted-payload"
+command = "bash -c \"jj status\""
+
+[[cases]]
+name = "bash-c-compound-payload"
+command = "bash -c 'jj status && jj diff'"
+
+[[cases]]
+name = "bash-c-unsupported-payload-propagates"
+command = "bash -c 'for f in x; do echo $f; done'"
+
+[[cases]]
+name = "sh-c-payload-is-unwrapped"
+command = "sh -c 'jj status'"
+
+[[cases]]
+name = "bash-lc-combined-option-payload"
+command = "bash -lc 'jj status'"
+
+[[cases]]
+name = "slash-bash-c-payload"
+command = "/bin/bash -c 'jj status'"
+
+[[cases]]
+name = "env-bash-c-payload"
+command = "env bash -c 'jj status'"
+
+[[cases]]
+name = "dynamic-command-name-is-unsupported"
+command = "$(echo rm) -rf /"
+
+[[cases]]
+name = "negated-command"
+command = "! jj status"
+
+[[cases]]
+name = "redirect-on-subshell-keeps-inner-spans"
+command = "(jj status; jj diff) > out.txt"
+
+[[cases]]
+name = "redirect-on-brace-group-keeps-inner-spans"
+command = "{ jj status; } > out.txt"
+
+[[cases]]
+name = "heredoc-span-covers-delimiter-not-body"
+command = "cat <<EOF\nhi\nEOF"
+
+[[cases]]
+name = "herestring-redirect"
+command = "grep x <<< hi"
+
+[[cases]]
+name = "multiple-redirects-extend-command-span"
+command = "jj status >out.txt 2>err.txt"
+
+[[cases]]
+name = "redirect-with-command-substitution"
+command = "echo $(jj status) > f.txt"
+
+[[cases]]
+name = "multiple-command-substitutions"
+command = "echo $(jj log -r x) and $(jj diff)"
+
+[[cases]]
+name = "background-command"
+command = "jj status &"
+
+[[cases]]
+name = "pipeline-with-stderr-capture"
+command = "jj status |& tee f"

@@ -32,7 +32,7 @@ test("creates an isolated runtime using the account-switcher selection capabilit
         modelId: "gpt-5.6-terra",
         source: "explicit" as const,
       }),
-      installOauth: (registry: unknown) => { installed.registry = registry; },
+      installOauth: async (registry: unknown) => { installed.registry = registry; },
       consume: async () => {},
     }),
   };
@@ -58,7 +58,7 @@ test("consumes a one-shot selection only after child session construction succee
       modelId: "gpt-5.6-terra",
       source: "one-shot" as const,
     }),
-    installOauth() {},
+    async installOauth() {},
     consume: async () => { consumes += 1; order.push("consume"); },
   };
   const input = {};
@@ -106,7 +106,7 @@ test("constructs a child runtime from any published provider selection (antigrav
         modelId: c.modelId,
         source: "explicit" as const,
       }),
-      installOauth: (registry: unknown) => {
+      installOauth: async (registry: unknown) => {
         installedRegistry = registry;
         if (registry && typeof (registry as Record<string, unknown>).registerProvider === "function") {
           (registry as { registerProvider: (id: string, def: unknown) => void }).registerProvider(c.provider, {

@@ -1,5 +1,5 @@
 // story: e03s01
-import { CONFIG_DIR_NAME, generateDiffString, getAgentDir, isToolCallEventType, renderDiff, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { CONFIG_DIR_NAME, generateDiffString, getAgentDir, isToolCallEventType, renderDiff, type ExtensionAPI, type ExtensionCommandContext, type ToolResultEvent } from "@earendil-works/pi-coding-agent";
 import { CURSOR_MARKER, matchesKey, Text, visibleWidth, wrapTextWithAnsi, type Component, type Focusable } from "@earendil-works/pi-tui";
 import ignore from "ignore";
 import { spawn } from "node:child_process";
@@ -17,6 +17,11 @@ import {
   type PermissionRule,
 } from "./config.ts";
 import { createPersistedTrustResolver, resolveCurrentProjectPolicyPath, resolveScopedPermissionDecision, type ScopedPermissionDecision } from "./scope.ts";
+import { evaluateBashSubcommands, saveSubcommandAllowRules } from "./bash-subcommands.ts";
+import { isYoloModeEnabled } from "./yolo-mode.ts";
+import { loadNativePackageProbe } from "./native-loader.ts";
+import { resolveNativePackagePath } from "./native-package.ts";
+import { hasNativeRegistration, registerNativeToolPermissionsCallbacks } from "./native-registration-loader.ts";
 import type { PermissionDecision, ToolPermissionBoundary, ToolRequest } from "./permission-boundary.ts";
 import { isPermissionPromptCancellation } from "./prompt-input.ts";
 import { SteeringEditor } from "./steering-editor.ts";
@@ -91,6 +96,7 @@ type AuditEntry = {
   cwd: string;
   path?: string;
   command?: string;
+  subcommand?: string;
   pattern?: string;
   scope?: "project" | "user";
   reason?: string;
@@ -538,16 +544,15 @@ async function presentScrollablePermission(
       steering: steeringReason,
     };
   }
-  const publishedPreview = typeof pi.appendEntry === "function";
-  const preview: PermissionPreview = {
-    title,
-    body: previewText ?? body,
-    ...(stickyHeader ? { stickyHeader } : {}),
-    ...(toolCallId ? { toolCallId } : {}),
-  };
-  pi.appendEntry?.<PermissionPreview>("permission-preview", preview);
-
+  const publishedPreview = typeof pi.appendEntry === "function" && Boolean(toolCallId);
   if (publishedPreview && toolCallId) {
+    const preview: PermissionPreview = {
+      title,
+      body: previewText ?? body,
+      ...(stickyHeader ? { stickyHeader } : {}),
+      toolCallId,
+    };
+    pi.appendEntry?.<PermissionPreview>("permission-preview", preview);
     promptedPreviews.set(toolCallId, preview);
     pendingPreviewReviews.add(toolCallId);
   }
@@ -578,8 +583,14 @@ async function presentScrollablePermission(
     }
   };
 
+  const subcommandsToSave = allowPattern?.toolName === "bash" && (previewText || body)
+    ? evaluateBashSubcommands(previewText || body, ctx.cwd).subcommands.map((s) => s.normalized)
+    : [];
+
   return ctx.ui.custom<PermissionResult>((tui, theme: any, keybindings: any, finish) => {
     let settled = false;
+    let subcommandMode = false;
+    const selectedSubcommands = new Set<number>(subcommandsToSave.map((_, i) => i));
     const customFactory = (ctx.ui as any)?.getEditorComponent?.();
     const isVim =
       process.env.PI_VIM_MODE === "1" ||
@@ -623,7 +634,8 @@ async function presentScrollablePermission(
       const contentWidth = Math.max(1, width - 2);
 
       const wrappedBody = publishedPreview ? [] : rawLines.flatMap((line) => wrapWithContinuation(line, contentWidth, continuationPrefix));
-      const allowHint = allowPattern ? " • Ctrl+A allow+save project • Ctrl+Shift+A allow+save user • Ctrl+E edit pattern" : "";
+      const subcommandHint = subcommandsToSave.length > 0 ? " • Ctrl+S subcommands" : "";
+      const allowHint = allowPattern ? ` • Ctrl+A allow+save project • Ctrl+Shift+A allow+save user • Ctrl+E edit pattern${subcommandHint}` : "";
       const steeringAllowHint = allowPattern ? " • Ctrl+A project-save+steer • Ctrl+Shift+A user-save+steer" : "";
       const navigationHint = steeringMode
         ? isVim
@@ -638,6 +650,17 @@ async function presentScrollablePermission(
       const wrap = (text: string): string[] => wrapWithContinuation(text, width, continuationPrefix);
 
       const steeringBoxLines = steeringEditor.render(contentWidth);
+
+      if (subcommandMode) {
+        return [
+          ...wrap(theme.fg("accent", theme.bold("Subcommand Rule Saving Mode:"))),
+          ...subcommandsToSave.flatMap((sub, i) =>
+            wrap(theme.fg(selectedSubcommands.has(i) ? "success" : "dim", `  ${selectedSubcommands.has(i) ? "[x]" : "[ ]"} ${i + 1}. ${sub}`))
+          ),
+          "",
+          ...wrap(theme.fg("dim", `1-${subcommandsToSave.length} toggle • a select all • Ctrl+A save project • Ctrl+Shift+A save user • Esc exit`)),
+        ];
+      }
 
       return [
         ...wrap(theme.fg("accent", theme.bold(title))),
@@ -713,6 +736,49 @@ async function presentScrollablePermission(
         return;
       }
 
+      if (subcommandMode) {
+        if (matchesKey(data, "escape")) {
+          subcommandMode = false;
+          tui.requestRender();
+          return;
+        }
+        if (data === "a" || data === "A") {
+          subcommandsToSave.forEach((_, i) => selectedSubcommands.add(i));
+          tui.requestRender();
+          return;
+        }
+        const digit = parseInt(data, 10);
+        if (!isNaN(digit) && digit >= 1 && digit <= subcommandsToSave.length) {
+          const idx = digit - 1;
+          if (selectedSubcommands.has(idx)) selectedSubcommands.delete(idx);
+          else selectedSubcommands.add(idx);
+          tui.requestRender();
+          return;
+        }
+        if (matchesKey(data, "ctrl+a") || matchesKey(data, "ctrl+shift+a")) {
+          const scope: "project" | "user" = matchesKey(data, "ctrl+shift+a") ? "user" : "project";
+          const target = scope === "project" ? projectPath : getUserPermissionsPath();
+          if (!target) {
+            ctx.ui.notify?.("Project permissions cannot be saved because this directory is not trusted.", "warning");
+            return;
+          }
+          const chosen = subcommandsToSave.filter((_, i) => selectedSubcommands.has(i));
+          if (!chosen.length) {
+            ctx.ui.notify?.("No subcommands selected.", "warning");
+            return;
+          }
+          if (saveSubcommandAllowRules(target, chosen)) {
+            ctx.ui.notify?.(`Saved ${scope} permission rules for ${chosen.length} subcommand(s).`, "info");
+            subcommandMode = false;
+            tui.requestRender();
+          } else {
+            ctx.ui.notify?.(`Could not save subcommand rules to ${target}.`, "error");
+          }
+          return;
+        }
+        return;
+      }
+
       if (isPermissionPromptCancellation(data)) {
         done({ allowed: false, decision: "cancel" });
         return;
@@ -724,6 +790,11 @@ async function presentScrollablePermission(
       }
       if (matchesKey(data, "ctrl+y")) {
         done({ allowed: true, decision: "allow_once" });
+        return;
+      }
+      if (subcommandsToSave.length > 0 && (matchesKey(data, "ctrl+s") || data === "s")) {
+        subcommandMode = true;
+        tui.requestRender();
         return;
       }
       if (allowPattern && matchesKey(data, "ctrl+shift+a")) {
@@ -913,6 +984,10 @@ export function resolvePermissionDecisionForRequest(
   options: PermissionResolverOptions = {},
 ): PermissionDecision {
   const { input, canonicalCwd } = normalizedPermissionInput(request);
+  if (request.toolName === "bash" && typeof input === "object" && input !== null && typeof (input as any).command === "string") {
+    const subcommandEval = evaluateBashSubcommands((input as any).command, request.cwd, options);
+    return subcommandEval.decision;
+  }
   const resolved = resolveToolPermissionDecision(request.toolName, input, request.cwd, options);
   if (resolved.diagnostic) throw new Error(resolved.diagnostic);
   if (resolved.decision === "deny") return "deny";
@@ -1115,14 +1190,25 @@ async function handleFileEditPermission(toolName: string, input: FileEditInput, 
 
 async function handleBashPermission(input: BashInput, ctx: PermissionContext, pi: ExtensionAPI): Promise<ToolCallEventResult> {
   const command = typeof input.command === "string" ? input.command : "";
+  const subcommandEval = evaluateBashSubcommands(command, ctx.cwd, {
+    audit: (entry) => {
+      if (typeof entry.decision === "string") {
+        audit({ tool: "bash", cwd: ctx.cwd, ...entry, decision: entry.decision });
+      }
+    },
+  });
   const decision = configuredDecision("bash", input, ctx.cwd);
   const configurationResult = await handleConfigurationDiagnostic(decision, ctx, pi);
   if (configurationResult === "allow_once") return;
   if (configurationResult) return configurationResult;
 
-  if (decision.decision === "deny") return configuredDeny("bash", ctx, { command });
-  if (decision.decision === "allow") {
-    audit({ tool: "bash", decision: "allow_pattern", cwd: ctx.cwd, command });
+  if (subcommandEval.decision === "deny") {
+    const reason = subcommandEval.reason || "Blocked bash: arguments match a configured deny rule.";
+    audit({ tool: "bash", decision: "deny_pattern", cwd: ctx.cwd, command, reason });
+    return { block: true, reason };
+  }
+  if (subcommandEval.decision === "allow") {
+    audit({ tool: "bash", decision: "allow_pattern", cwd: ctx.cwd, command, reason: subcommandEval.source });
     return;
   }
   if (!ctx.hasUI) {
@@ -1251,131 +1337,179 @@ async function handleUnknownToolPermission(toolName: string, input: unknown, ctx
   if (!result.allowed) return deniedResult(`User denied ${toolName}.`, result);
 }
 
+async function handleRegisteredSessionStart(ctx: PermissionContext, options: { reportNativeProbe?: boolean } = {}): Promise<void> {
+  const nativePackage = resolveNativePackagePath();
+  if (options.reportNativeProbe !== false && nativePackage) {
+    const nativeResult = await loadNativePackageProbe(nativePackage);
+    if (ctx.hasUI) {
+      ctx.ui.notify?.(
+        nativeResult.engine === "native"
+          ? "Native tool-permissions probe active (contract v1)."
+          : `Tool-permissions using TypeScript fallback: ${nativeResult.reason}`,
+        nativeResult.engine === "native" ? "info" : "warning",
+      );
+    }
+  }
+  if (isYoloModeEnabled()) {
+    if (ctx.hasUI) {
+      ctx.ui.notify?.("YOLO permission mode active via environment variable.", "warning");
+    }
+    audit({ tool: "permissions", decision: "yolo_mode_activated", cwd: ctx.cwd });
+  }
+  if (process.env.PI_SUBAGENT_DEBUG === "1" && ctx.hasUI) {
+    ctx.ui.notify?.(`Subagent debug log: ${subagentDebugPath()}`, "info");
+  }
+}
+
+async function handleRegisteredPermissionsCommand(args: string, ctx: ExtensionCommandContext): Promise<void> {
+  const target = resolvePermissionEditorTarget(args, ctx.cwd);
+  if ("error" in target) {
+    ctx.ui.notify(target.error, "error");
+    return;
+  }
+  try {
+    await editPermissionsInExternalEditor(ctx, target);
+  } catch (error) {
+    ctx.ui.notify(error instanceof Error ? error.message : String(error), "error");
+  }
+}
+
+function handleRegisteredSessionShutdown(ctx: any): void {
+  pendingSteering.clear();
+  promptedPreviews.clear();
+  pendingPreviewReviews.clear();
+  previewReviewOverrides.clear();
+  closePermissionPromptQueue(permissionParentSessionId(ctx));
+}
+
+function handleRegisteredToolResult(event: ToolResultEvent): { content?: ToolResultEvent["content"] } | undefined {
+  promptedPreviews.delete(event.toolCallId);
+  const steering = pendingSteering.get(event.toolCallId);
+  if (!steering) return undefined;
+  pendingSteering.delete(event.toolCallId);
+  return {
+    content: [
+      ...event.content,
+      // Providers may join text blocks into one string, so the marker text
+      // itself must signal this is not part of the tool's own output.
+      { type: "text", text: `\n\n<user-steering source="permission-prompt">\n${steering}\n</user-steering>` },
+    ],
+  };
+}
+
+function renderRegisteredPermissionPreview(entry: { data?: PermissionPreview }, options: { expanded: boolean }, theme: any): Component | undefined {
+  const preview = entry.data;
+  if (!preview || typeof preview.title !== "string" || typeof preview.body !== "string") return undefined;
+  const capturedExpanded = options.expanded;
+  return {
+    render(width: number): string[] {
+      const id = typeof preview.toolCallId === "string" ? preview.toolCallId : undefined;
+      const override = id ? previewReviewOverrides.get(id) : undefined;
+      const pending = id !== undefined && pendingPreviewReviews.has(id);
+      const expanded = override ?? (pending ? true : capturedExpanded);
+      const header = theme.fg("accent", theme.bold(preview.title));
+      const stickyHeader = typeof preview.stickyHeader === "string" ? `\n${theme.fg("muted", preview.stickyHeader)}` : "";
+      if (pending && expanded) {
+        // Review phase: the prompt frame below already carries title, path, and hints.
+        return new Text(preview.body, 0, 0).render(width);
+      }
+      if (!pending) {
+        // Once prompt is settled, omit preview rendering so only native tool widget remains in transcript.
+        return [];
+      }
+      const content = expanded
+        ? `${header}${stickyHeader}\n\n${preview.body}`
+        : `${header}${stickyHeader}\n\n${theme.fg("dim", `${preview.body.split("\n").length} lines — Ctrl+O to expand`)}`;
+      return new Text(content, 0, 0).render(width);
+    },
+    invalidate(): void {},
+  };
+}
+
+async function handleRegisteredToolCall(event: any, extensionContext: any, pi: ExtensionAPI): Promise<ToolCallEventResult> {
+  // Bind the pi tool-call identity to this invocation so prompts and
+  // steering messages can reference the exact call.
+  const ctx = { ...extensionContext, toolCallId: event.toolCallId };
+  // Child sessions expose this bridge as their only tool. Its payload is
+  // authorized by the parent boundary, so the child-side policy must not
+  // intercept it as an unknown standalone tool.
+  if (event.toolName === "subagent-tool-request") {
+    logSubagentDebug("bridge-hook-bypass", {
+      toolName: event.toolName,
+      input: event.input,
+      mode: ctx.mode,
+      hasUI: ctx.hasUI,
+      hasCustomUI: typeof ctx.ui.custom === "function",
+      result: undefined,
+    });
+    // Undefined is the extension hook's allow/no-op result, not a denial.
+    return undefined;
+  }
+
+  if (isToolCallEventType("read", event)) {
+    return handleReadPermission(event.input, ctx, pi);
+  }
+
+  if (isToolCallEventType("grep", event) || isToolCallEventType("find", event) || isToolCallEventType("ls", event)) {
+    return handlePathPermission(event.toolName, event.input, ctx, pi);
+  }
+
+  if (isToolCallEventType("write", event) || isToolCallEventType("edit", event)) {
+    return handleFileEditPermission(event.toolName, event.input, ctx, pi);
+  }
+
+  if (isToolCallEventType("bash", event)) {
+    return handleBashPermission(event.input, ctx, pi);
+  }
+
+  if (isToolCallEventType<"subagent", SubagentInput>("subagent", event)) {
+    return handleSubagentPermission(event.input, ctx, pi);
+  }
+
+  if (event.toolName === "subagent_result") {
+    if (typeof (event.input as Record<string, unknown>)?.full_context === "string") {
+      return handleSubagentResultExportPermission(event.input as SubagentResultExportInput, ctx, pi);
+    }
+    return undefined;
+  }
+
+  return handleUnknownToolPermission(event.toolName, event.input, ctx, pi);
+}
+
 export default function toolPermissionPolicy(pi: ExtensionAPI) {
-  if (typeof (pi as Partial<ExtensionAPI>).registerEntryRenderer === "function") {
-    pi.registerEntryRenderer<PermissionPreview>("permission-preview", (entry, options, theme) => {
-      const preview = entry.data;
-      if (!preview || typeof preview.title !== "string" || typeof preview.body !== "string") return undefined;
-      const capturedExpanded = options.expanded;
-      return {
-        render(width: number): string[] {
-          const id = typeof preview.toolCallId === "string" ? preview.toolCallId : undefined;
-          const override = id ? previewReviewOverrides.get(id) : undefined;
-          const pending = id !== undefined && pendingPreviewReviews.has(id);
-          const expanded = override ?? (pending ? true : capturedExpanded);
-          const header = theme.fg("accent", theme.bold(preview.title));
-          const stickyHeader = typeof preview.stickyHeader === "string" ? `\n${theme.fg("muted", preview.stickyHeader)}` : "";
-          if (pending && expanded) {
-            // Review phase: the prompt frame below already carries title, path, and hints.
-            return new Text(preview.body, 0, 0).render(width);
-          }
-          const content = expanded
-            ? `${header}${stickyHeader}\n\n${preview.body}`
-            : `${header}${stickyHeader}\n\n${theme.fg("dim", `${preview.body.split("\n").length} lines — Ctrl+O to expand`)}`;
-          return new Text(content, 0, 0).render(width);
-        },
-        invalidate(): void {},
-      };
+  const nativeRegistration = registerNativeToolPermissionsCallbacks(pi, {
+    renderPermissionPreview: (entry, options, theme) => renderRegisteredPermissionPreview(entry as { data?: PermissionPreview }, options as { expanded: boolean }, theme),
+    handleSessionStart: (_event, ctx) => handleRegisteredSessionStart(ctx as PermissionContext, { reportNativeProbe: false }),
+    handleToolCall: (event, ctx) => handleRegisteredToolCall(event, ctx, pi),
+    handleToolResult: (event) => handleRegisteredToolResult(event as ToolResultEvent),
+    handleSessionShutdown: (_event, ctx) => handleRegisteredSessionShutdown(ctx),
+    handlePermissionsCommand: (args, ctx) => handleRegisteredPermissionsCommand(String(args), ctx as ExtensionCommandContext),
+  });
+
+  if (!hasNativeRegistration(nativeRegistration, "entry_renderer:permission-preview") && typeof (pi as Partial<ExtensionAPI>).registerEntryRenderer === "function") {
+    pi.registerEntryRenderer<PermissionPreview>("permission-preview", renderRegisteredPermissionPreview);
+  }
+
+  if (!hasNativeRegistration(nativeRegistration, "session_start")) {
+    pi.on("session_start", async (_event, ctx) => handleRegisteredSessionStart(ctx));
+  }
+
+  if (!hasNativeRegistration(nativeRegistration, "command:permissions")) {
+    pi.registerCommand("permissions", {
+      description: `Edit user or local tool permissions`,
+      handler: handleRegisteredPermissionsCommand,
     });
   }
 
-  pi.on("session_start", (_event, ctx) => {
-    if (process.env.PI_SUBAGENT_DEBUG === "1" && ctx.hasUI) {
-      ctx.ui.notify(`Subagent debug log: ${subagentDebugPath()}`, "info");
-    }
-  });
+  if (!hasNativeRegistration(nativeRegistration, "session_shutdown")) {
+    pi.on("session_shutdown", (_event, ctx) => handleRegisteredSessionShutdown(ctx));
+  }
 
-  pi.registerCommand("permissions", {
-    description: `Edit user or local tool permissions`,
-    handler: async (args, ctx) => {
-      const target = resolvePermissionEditorTarget(args, ctx.cwd);
-      if ("error" in target) {
-        ctx.ui.notify(target.error, "error");
-        return;
-      }
-      await ctx.waitForIdle();
-      try {
-        await editPermissionsInExternalEditor(ctx, target);
-      } catch (error) {
-        ctx.ui.notify(error instanceof Error ? error.message : String(error), "error");
-      }
-    },
-  });
+  if (!hasNativeRegistration(nativeRegistration, "tool_result")) {
+    pi.on("tool_result", (event) => handleRegisteredToolResult(event));
+  }
 
-  pi.on("session_shutdown", (_event, ctx) => {
-    pendingSteering.clear();
-    promptedPreviews.clear();
-    pendingPreviewReviews.clear();
-    previewReviewOverrides.clear();
-    closePermissionPromptQueue(permissionParentSessionId(ctx));
-  });
-
-  pi.on("tool_result", (event) => {
-    const promptPreview = promptedPreviews.get(event.toolCallId);
-    if (promptPreview) {
-      promptedPreviews.delete(event.toolCallId);
-      pi.appendEntry<PermissionPreview>("permission-preview", promptPreview);
-    }
-    const steering = pendingSteering.get(event.toolCallId);
-    if (!steering) return undefined;
-    pendingSteering.delete(event.toolCallId);
-    return {
-      content: [
-        ...event.content,
-        // Providers may join text blocks into one string, so the marker text
-        // itself must signal this is not part of the tool's own output.
-        { type: "text", text: `\n\n<user-steering source="permission-prompt">\n${steering}\n</user-steering>` },
-      ],
-    };
-  });
-
-  pi.on("tool_call", async (event, extensionContext) => {
-    // Bind the pi tool-call identity to this invocation so prompts and
-    // steering messages can reference the exact call.
-    const ctx = { ...extensionContext, toolCallId: event.toolCallId };
-    // Child sessions expose this bridge as their only tool. Its payload is
-    // authorized by the parent boundary, so the child-side policy must not
-    // intercept it as an unknown standalone tool.
-    if (event.toolName === "subagent-tool-request") {
-      logSubagentDebug("bridge-hook-bypass", {
-        toolName: event.toolName,
-        input: event.input,
-        mode: ctx.mode,
-        hasUI: ctx.hasUI,
-        hasCustomUI: typeof ctx.ui.custom === "function",
-        result: undefined,
-      });
-      // Undefined is the extension hook's allow/no-op result, not a denial.
-      return undefined;
-    }
-
-    if (isToolCallEventType("read", event)) {
-      return handleReadPermission(event.input, ctx, pi);
-    }
-
-    if (isToolCallEventType("grep", event) || isToolCallEventType("find", event) || isToolCallEventType("ls", event)) {
-      return handlePathPermission(event.toolName, event.input, ctx, pi);
-    }
-
-    if (isToolCallEventType("write", event) || isToolCallEventType("edit", event)) {
-      return handleFileEditPermission(event.toolName, event.input, ctx, pi);
-    }
-
-    if (isToolCallEventType("bash", event)) {
-      return handleBashPermission(event.input, ctx, pi);
-    }
-
-    if (isToolCallEventType<"subagent", SubagentInput>("subagent", event)) {
-      return handleSubagentPermission(event.input, ctx, pi);
-    }
-
-    if (event.toolName === "subagent_result") {
-      if (typeof (event.input as Record<string, unknown>)?.full_context === "string") {
-        return handleSubagentResultExportPermission(event.input as SubagentResultExportInput, ctx, pi);
-      }
-      return undefined;
-    }
-
-    return handleUnknownToolPermission(event.toolName, event.input, ctx, pi);
-  });
+  if (!hasNativeRegistration(nativeRegistration, "tool_call")) {
+    pi.on("tool_call", (event, extensionContext) => handleRegisteredToolCall(event, extensionContext, pi));
+  }
 }

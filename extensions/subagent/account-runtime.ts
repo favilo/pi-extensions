@@ -12,7 +12,7 @@ export type PublishedChildRuntimeSelection = {
     modelId: string;
     source: "explicit" | "one-shot" | "inherited";
   }>;
-  installOauth(registry: unknown): void;
+  installOauth(registry: unknown): Promise<void>;
   consume(): Promise<void>;
 };
 
@@ -75,7 +75,7 @@ export async function createChildRuntimeFromSelection(
   selection: PublishedChildRuntimeSelection,
 ): Promise<ChildRuntime> {
   const modelRuntime = await ModelRuntime.create({ modelsPath: null });
-  selection.installOauth(new ModelRegistry(modelRuntime));
+  await selection.installOauth(new ModelRegistry(modelRuntime));
   const model = modelRuntime.getModel(selection.descriptor.provider, selection.descriptor.modelId);
   if (!model) throw new Error(`Selected child model is unavailable: ${selection.descriptor.provider}/${selection.descriptor.modelId}`);
   return { modelRuntime, model, selection };

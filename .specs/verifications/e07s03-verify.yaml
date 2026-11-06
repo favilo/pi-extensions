@@ -1,0 +1,44 @@
+story_id: e07s03
+verified_at: "2026-08-31T14:30:00Z"
+verifier: verify-work
+status: passing
+vcs:
+  kind: jj
+  bookmark: favilo/e07-bash-subcommand-permissions
+phases:
+  task_verification:
+    passed: true
+    tasks: 3
+  typecheck:
+    passed: true
+    command: "npm run typecheck"
+  tests:
+    passed: true
+    command: "node --test extensions/tool-permissions/bash-subcommands.test.ts extensions/tool-permissions/audit.test.ts"
+  terminal_verdict:
+    command: "npm run check:ci"
+    exit_code: 0
+    captured_at: "2026-08-31T14:30:00Z"
+    note: "All 285 tests green across preflight, test guard, plan consistency, and portability checks."
+  security:
+    passed: true
+    report: ".specs/security/epics/e07/THREAT_MODEL.md"
+    note: "Per-subcommand evaluation and audit logging maintain atomic denial boundaries and fail-closed syntax contracts."
+  manual:
+    passed: true
+    confirmed_by_user: true
+    steps:
+      - step: "Evaluate compound command with allowed subcommands"
+        expected: "All subcommands allowed; executes atomically without prompt."
+        actual: "Verified jj status && jj diff --stat passes allow policy."
+        passed: true
+      - step: "Evaluate compound command with denied subcommand"
+        expected: "One subcommand denied; complete command blocked atomically with structured error identifying denied subcommand."
+        actual: "Verified jj status && rm report.txt blocks with agent-facing reason specifying rm report.txt."
+        passed: true
+      - step: "Verify per-subcommand and aggregate audit records"
+        expected: "Audit log records subcommands and aggregate decision."
+        actual: "Verified audit logger receives per-subcommand decision entries and aggregate denial."
+        passed: true
+  gaps:
+    closed: true

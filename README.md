@@ -2,6 +2,8 @@
 
 Personal extensions for the [Pi coding agent](https://pi.dev).
 
+This repository collects small Pi extension experiments and utilities.
+
 ## Install
 
 For active development, install the local checkout. Pi references it directly, so changes become available after `/reload`:
@@ -41,6 +43,7 @@ For active development, install the local checkout of the same fork instead. The
 
 | Extension | Purpose |
 | --- | --- |
+| `activate-skill` | Loads matching Agent Skill instructions through the normal Pi tool and permission pipeline. |
 | `built-in-tool-renderer` | Provides compact custom rendering for Pi's built-in tools. |
 | `clear-reload` | Adds `/clear` to start a fresh session and reload resources. |
 | `enable-extra-tools` | Activates `grep`, `find`, and `ls`, and adds `/tools-debug`. |
@@ -48,7 +51,7 @@ For active development, install the local checkout of the same fork instead. The
 | `focus-aware-cursor` | Keeps terminal cursor visibility synchronized with terminal focus. |
 | `jj-status` | Shows the active Jujutsu bookmark or change ID instead of `detached`. |
 | `local-agent-context` | Loads `AGENTS.local.md` and `AGENTS.override.md` into the system prompt. |
-| `mcp` | Registers independent MCP tool providers and reports their status through `/mcp`. |
+| `mcp` | Registers event-published MCP providers and reports them through `/mcp-providers`; Pi's built-in `/mcp` continues to manage `mcp.json`. |
 | `tool-permissions` | Applies configurable allow and deny rules to tool calls. |
 | `usage` | Displays current provider and account usage information via `/usage`. |
 
@@ -62,6 +65,25 @@ Permission rules and audit entries are stored locally and are not part of this r
 - Audit log: `~/.pi/tool-permissions/audit.log` (a symlink to the current UTC-dated log; the legacy `~/.config/pi/audit.log` is migrated on first write, and logs older than seven days are removed)
 
 Run `/permissions` or `/permissions user` in Pi to edit the user rules. Run `/permissions local` to edit the current trusted project's rules. Permission prompts use Ctrl+A to save a project-scoped rule and Ctrl+Shift+A to save a user-scoped rule. When Pi has a persisted trust decision for the current project, trusted `.pi/permissions.toml` files are also discovered from the current directory up to the nearest Git or Jujutsu repository boundary. The nearest matching project rule overrides user policy; missing or unreadable trust data leaves user policy unchanged.
+
+### Native runtime
+
+The `tool-permissions` bundled native Rust core is enabled by default when its packaged WebAssembly artifact is compatible with the current Node runtime. The extension loads the `wasm32-wasip1-threads` module and does not load a platform `.node` library. Pi shows a startup diagnostic when the native probe is active, or a warning when the bundled native package cannot load and TypeScript fallback is used. To force the TypeScript implementation for diagnosis, start Pi with `PI_TOOL_PERMISSIONS_NATIVE_DISABLE=1`.
+
+For local development, rebuild the bundled WebAssembly artifact after Rust changes. The build compiles tree-sitter with the wasi-sdk `wasm32-wasip1-threads` compiler and needs [wasi-sdk](https://github.com/WebAssembly/wasi-sdk/releases) at `WASI_SDK_PATH` or `~/.local/wasi-sdk`. Output goes to `extensions/tool-permissions/native/generated/`, which is ignored.
+
+```bash
+npm run build:native
+npm run build:clean
+```
+
+Before publishing or testing packaged installs, confirm the native package includes its generated JavaScript entrypoint, type declarations, and WebAssembly artifact:
+
+```bash
+npm pack --dry-run ./extensions/tool-permissions/native
+```
+
+The native package remains a pure computation boundary. Prompt rendering, policy editing and persistence, project trust checks, audit writes, and tool execution stay in the TypeScript host and fall back safely if native loading or output validation fails.
 
 ### Multiline steering & Vim keybindings
 
@@ -90,8 +112,12 @@ npm run check
 
 Each extension owns its implementation and tests under `extensions/<name>/`. Only the explicit `index.ts` files in `package.json` are loaded by Pi.
 
-To create a machine-local MCP provider, see [`extensions/mcp/README.md`](extensions/mcp/README.md) and the self-contained [`examples/mcp-provider/`](examples/mcp-provider/) extension.
+Normal MCP servers belong in `~/.pi/agent/mcp.json` or `.pi/mcp.json` and are managed by Pi's built-in `/mcp` command. Their calls pass through extension `tool_call` hooks, including `tool-permissions`.
+
+The event-published provider registry is also loaded for adapters such as the former Codex MCP proxy. It uses `/mcp-providers`, so it coexists with built-in MCP. See [`extensions/mcp/README.md`](extensions/mcp/README.md) and [`examples/mcp-provider/`](examples/mcp-provider/).
 
 ## Local-only integrations
 
 Environment-specific MCP integrations remain machine-local and are intentionally excluded from this repository.
+
+

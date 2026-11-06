@@ -65,8 +65,8 @@ export default function mcpExtension(pi: ExtensionAPI) {
     pi.setActiveTools(pi.getActiveTools().filter((name) => !removedTools.has(name)));
   });
 
-  pi.registerCommand("mcp", {
-    description: "Show MCP provider status",
+  pi.registerCommand("mcp-providers", {
+    description: "Show event-published MCP provider status",
     handler: async () => {
       const sections = await registry.getStatusSections();
       pi.sendMessage({
