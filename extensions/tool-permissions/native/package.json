@@ -3,8 +3,12 @@
   "version": "0.1.0",
   "private": true,
   "type": "commonjs",
-  "main": "index.js",
-  "types": "index.d.ts",
-  "files": ["index.js", "index.d.ts", "*.node", "wasi/"],
+  "main": "generated/index.js",
+  "types": "generated/index.d.ts",
+  "files": ["generated/"],
+  "napi": {
+    "binaryName": "index",
+    "targets": ["wasm32-wasip1-threads"]
+  },
   "engines": { "node": ">=20" }
 }

@@ -1,7 +1,6 @@
-import { createNativeProbeRequest, decodeNativeProbeResponse, NATIVE_CONTRACT_VERSION, NATIVE_ORCHESTRATION_NONCE } from "./native-contract.ts";
+import { createNativeProbeRequest, decodeNativeProbeResponse, NATIVE_CONTRACT_VERSION, NATIVE_ORCHESTRATION_NONCE, type NativeOperation } from "./native-contract.ts";
 import { requireNativePackage, resolveNativePackagePath } from "./native-package.ts";
 import type { Permissions } from "./config.ts";
-import type { NativeOperation } from "./native/index.d.ts";
 
 export type NativePermissionOrchestrationDecision = {
   permissionKey: string;

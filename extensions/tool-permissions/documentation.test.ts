@@ -24,9 +24,12 @@ test("documents native tool-permissions runtime build, packaging, and fallback b
   assert.match(readme, /npm run build:native/);
   assert.match(readme, /npm pack --dry-run \.\/extensions\/tool-permissions\/native/);
   assert.match(rootPackage, /"build:native"/);
+  assert.match(rootPackage, /wasm32-wasip1-threads/);
+  assert.match(readme, /wasm32-wasip1-threads/);
+  assert.match(readme, /does not load a platform `\.node` library/);
   assert.match(nativePackage, /"files"\s*:/);
-  assert.match(nativePackage, /"\*\.node"/);
-  assert.match(nativePackage, /"index\.js"/);
+  assert.match(nativePackage, /"generated\/"/);
+  assert.match(nativePackage, /"generated\/index\.js"/);
 });
 
 test("documents both scoped save shortcuts in the prompt implementation", () => {

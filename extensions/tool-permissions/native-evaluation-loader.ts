@@ -1,7 +1,6 @@
-import { createNativeProbeRequest, decodeNativeProbeResponse, NATIVE_CONTRACT_VERSION, NATIVE_EVALUATION_NONCE } from "./native-contract.ts";
+import { createNativeProbeRequest, decodeNativeProbeResponse, NATIVE_CONTRACT_VERSION, NATIVE_EVALUATION_NONCE, type NativeOperation } from "./native-contract.ts";
 import { requireNativePackage, resolveNativePackagePath } from "./native-package.ts";
 import type { ToolPermission } from "./config.ts";
-import type { NativeOperation } from "./native/index.d.ts";
 
 export type NativeDecision = "allow" | "deny" | "ask";
 type NativeModule = { evaluatePermission(request: unknown): unknown };

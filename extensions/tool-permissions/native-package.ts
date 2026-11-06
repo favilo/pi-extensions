@@ -4,11 +4,13 @@ import { fileURLToPath } from "node:url";
 export const NATIVE_PACKAGE_ENV = "PI_TOOL_PERMISSIONS_NATIVE_PACKAGE" as const;
 export const NATIVE_DISABLE_ENV = "PI_TOOL_PERMISSIONS_NATIVE_DISABLE" as const;
 export const NAPI_NATIVE_LIBRARY_PATH_ENV = "NAPI_RS_NATIVE_LIBRARY_PATH" as const;
+export const NAPI_WASI_FLAVOR_ENV = "NAPI_RS_WASI_FLAVOR" as const;
+export const BUNDLED_WASI_FLAVOR = "wasm32-wasi" as const;
 
 let testOverridePath: string | undefined;
 
 export function bundledNativePackagePath(): string {
-  return fileURLToPath(new URL("./native/index.js", import.meta.url));
+  return fileURLToPath(new URL("./native/generated/index.js", import.meta.url));
 }
 
 function truthy(value: string | undefined): boolean {
@@ -29,14 +31,21 @@ export function resolveNativePackagePath(environment: NodeJS.ProcessEnv = proces
 
 export function requireNativePackage(packagePath: string): unknown {
   const require = createRequire(import.meta.url);
-  const previous = process.env[NAPI_NATIVE_LIBRARY_PATH_ENV];
-  if (packagePath === bundledNativePackagePath()) delete process.env[NAPI_NATIVE_LIBRARY_PATH_ENV];
+  const bundled = packagePath === bundledNativePackagePath();
+  const previousLibraryPath = process.env[NAPI_NATIVE_LIBRARY_PATH_ENV];
+  const previousFlavor = process.env[NAPI_WASI_FLAVOR_ENV];
+  if (bundled) {
+    delete process.env[NAPI_NATIVE_LIBRARY_PATH_ENV];
+    process.env[NAPI_WASI_FLAVOR_ENV] = BUNDLED_WASI_FLAVOR;
+  }
   try {
     return require(packagePath);
   } finally {
-    if (packagePath === bundledNativePackagePath()) {
-      if (previous === undefined) delete process.env[NAPI_NATIVE_LIBRARY_PATH_ENV];
-      else process.env[NAPI_NATIVE_LIBRARY_PATH_ENV] = previous;
+    if (bundled) {
+      if (previousLibraryPath === undefined) delete process.env[NAPI_NATIVE_LIBRARY_PATH_ENV];
+      else process.env[NAPI_NATIVE_LIBRARY_PATH_ENV] = previousLibraryPath;
+      if (previousFlavor === undefined) delete process.env[NAPI_WASI_FLAVOR_ENV];
+      else process.env[NAPI_WASI_FLAVOR_ENV] = previousFlavor;
     }
   }
 }

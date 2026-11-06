@@ -1,5 +1,13 @@
-import type { NativeOperation, PermissionDecision } from "./native/index.d.ts";
-export type { NativeOperation, PermissionDecision };
+export type NativeOperation =
+  | "health"
+  | "parse"
+  | "policy"
+  | "evaluate"
+  | "evaluate_permission"
+  | "orchestrate_permission"
+  | "register_callbacks";
+
+export type PermissionDecision = "allow" | "deny" | "ask";
 
 export const NATIVE_CONTRACT_VERSION = 1 as const;
 

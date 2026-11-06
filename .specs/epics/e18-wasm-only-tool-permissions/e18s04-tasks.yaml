@@ -1,0 +1,51 @@
+story_id: e18s04
+title: Move the prompt UI, steering editor, and prompt queue into WASM
+status: failing
+bcps: 8
+delta: MODIFIED
+spec: e18s04-wasm-prompt-ui.md
+tasks:
+  - id: 1
+    description: Add failing tests for bound prompt decisions, queue order, steering isolation, and UI failure. No new security findings in affected paths.
+    verify: node --test extensions/tool-permissions/native-prompt-queue.test.ts
+    risk: P0
+    security: high
+    status: failing
+    allure:
+      severity: critical
+      categories:
+        - "Contract Tests"
+        - "Security Review"
+  - id: 2
+    description: Add Rust queue and steering state that calls host Pi UI operations. No new security findings in affected paths.
+    verify: cargo test --manifest-path extensions/tool-permissions/native/Cargo.toml
+    risk: P0
+    security: high
+    status: failing
+    allure:
+      severity: critical
+      categories:
+        - "Native Boundary"
+        - "Security Review"
+  - id: 3
+    description: Route the success-path prompt through WASM. No new security findings in affected paths.
+    verify: node --test extensions/tool-permissions/native-prompt-queue.test.ts
+    risk: P0
+    security: high
+    status: failing
+    allure:
+      severity: critical
+      categories:
+        - "Integration"
+        - "Security Review"
+  - id: 4
+    description: Run the native build and full checks. No new security findings in affected paths.
+    verify: npm run build:native && npm run check
+    risk: P1
+    security: high
+    status: failing
+    allure:
+      severity: high
+      categories:
+        - "Regression"
+        - "Security Review"

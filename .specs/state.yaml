@@ -1,7 +1,7 @@
-active_flow: build_epic
-active_epic_id: e16
-active_story_id: e16s05
-active_story: Establish a native NAPI-RS Node package for tool-permissions
+active_flow: planning
+active_epic_id: e18
+active_story_id: e18s00
+active_story: Re-evaluate pi-oxidized and pi-oxidized-ext
 active_bug_id: null
 git:
   bookmark: favilo/e16-rust-wasm-tool-permissions-core
@@ -19,7 +19,7 @@ planning:
       job_size: 1
       rationale: Exploratory backlog epic. Pilot a hybrid Rust/WASM migration in the
         pure-compute portions of tool-permissions, starting with a supported package/runtime
-        boundary and validating whether pi-oxided is viable.
+        boundary and validating whether pi-oxidized is viable.
   e17:
     status: completed
     story_id: e17s02
@@ -93,25 +93,21 @@ planning:
     constraints:
     - Do not modify the e06 repair flow or child-private bridge catalog.
 handoff:
-  last_step_completed: Completed e16s05 native NAPI package scaffold, validated loader,
-    Pi startup diagnostics, package build, and full automated checks.
-  open_decisions:
-  - Is pi-oxidized-ext (pi_ext) compatible with a narrow tool-permissions NAPI package,
-    or should the project use a standalone NAPI-RS crate and generated package loader?
-  - Can Pi's current ExtensionAPI be registered through a minimal JS entrypoint while
-    keeping parser and permission decisions entirely in Rust?
+  last_step_completed: Wrote e18 story specs and task files. Did not implement them.
+  open_decisions: []
   required_reading:
-  - .specs/epics/e16-rust-wasm-tool-permissions-core/epic.yaml
-  - .specs/epics/e16-rust-wasm-tool-permissions-core/e16s01-rust-wasm-boundary-spike.md
-  - .specs/epics/e16-rust-wasm-tool-permissions-core/e16s01-tasks.yaml
-  - .specs/security/epics/e16/THREAT_MODEL.md
-  next_skill: verify-work
-  context: e16s05 native package tasks and automated gates are complete. Verify the
-    native-only package direction and startup fallback before advancing to Rust parser
-    parity. can own tool-permissions logic while a minimal JS entrypoint only registers
-    Pi hooks. a supported Rust/WASM packaging and host-module contract for tool-permissions
-    before porting parser or permission logic. Preserve fail-closed behavior and keep
-    TypeScript as the authoritative fallback until parity is proven.
+  - .specs/planning-context.yaml
+  - .specs/product/SCOPE-e18-wasm-only-tool-permissions.yaml
+  - .specs/epics/e18-wasm-only-tool-permissions/epic.yaml
+  - .specs/security/epics/e18/THREAT_MODEL.md
+  next_skill: kickoff-branch
+  context: >-
+    e16 stays passing and closed. e18s00 records adopt or reject for pi-oxidized-ext
+    before later stories move path trust, audit writes, rule saves, prompts, and tool
+    execution into WASM and remove the TypeScript permission fallback. index.ts remains
+    the loader. Working copy nqqpvsrt also contains uncommitted WASM packaging changes
+    on top of favilo/e16-rust-wasm-tool-permissions-core. Do not discard those changes.
+    Do not push that bookmark. Specs are not committed.
   blocker: null
   deferred_work:
   - Consolidate safeStringify and JSON formatting helpers into a shared utility module
@@ -165,4 +161,4 @@ metrics:
       calls: 2
       total_seconds: 2.0
       avg_seconds: 1.0
-  story_start: '2026-09-02T00:29:06Z'
+  story_start: '2026-11-06T21:00:00Z'

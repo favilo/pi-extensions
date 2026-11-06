@@ -1,0 +1,60 @@
+feature_name: wasm_only_tool_permissions
+core_value: >-
+  tool-permissions runs from one WASM runtime, so permission behavior has a single implementation.
+summary: |-
+  e16 left a hybrid extension: Rust evaluates pure permission decisions, and TypeScript still owns prompts, saved rules, audit writes, path trust, and tool execution, with a TypeScript fallback. This initiative moves those five host areas into the WASM runtime and then removes the fallback.
+
+  Pi continues to load the package through extensions/tool-permissions/index.ts. That file only instantiates the WASM module. User-visible permission outcomes stay the same: the same prompts, the same permissions.toml rules, the same audit records, and the same allow or deny results.
+
+  SCOPE_LATEST.yaml remains the e03 directory-local permissions PRD. This file is the scope for e18 only.
+in_scope:
+  - future_story_id: e18s00
+    outcome: Record whether e18 adopts pi-oxidized-ext as the extension host or keeps the standalone NAPI package.
+  - future_story_id: e18s01
+    outcome: WASM owns path canonicalization, project trust checks, and .aiignore matching for permission decisions.
+  - future_story_id: e18s02
+    outcome: WASM writes the same audit records the TypeScript logger writes today.
+  - future_story_id: e18s03
+    outcome: WASM saves rules and patches permissions.toml for the existing user and project save actions.
+  - future_story_id: e18s04
+    outcome: WASM owns the permission prompt, the steering editor state, and the prompt queue, using Pi UI callbacks.
+  - future_story_id: e18s05
+    outcome: WASM owns the allow-to-execute sequence and calls Pi to run the permitted tool.
+  - future_story_id: e18s06
+    outcome: The TypeScript permission implementation is no longer a fallback. A missing or invalid WASM module fails closed.
+out_of_scope:
+  - item: Editing passing e16 story specs or removing their recorded non-goals
+    reason: e16 is a completed hybrid migration. e18 supersedes the host boundary in new stories.
+    disposition: excluded
+  - item: Deleting extensions/tool-permissions/index.ts
+    reason: Pi loads this package through the TypeScript entry.
+    disposition: excluded
+  - item: Reimplementing Pi's terminal UI, Vim editor widget, or tool process runtime inside WASM
+    reason: Rust must call those Pi host APIs. A second terminal or shell inside WASM would expand the module's authority.
+    disposition: prohibited
+  - item: Changing rule syntax, key bindings, audit fields, or allow/deny outcomes
+    reason: This epic changes the owner of the behavior, not the behavior users already rely on.
+    disposition: excluded
+  - item: Porting extensions other than tool-permissions
+    reason: The requested runtime change is limited to this extension.
+    disposition: excluded
+  - item: wasm32-unknown-unknown or a non-WASI NAPI target
+    reason: NAPI-RS loads wasm32-wasip1 or wasm32-wasip1-threads only. The current flavor is wasm32-wasi.
+    disposition: prohibited
+constraints:
+  - Keep the current NAPI packaging, including wasm32-wasip1-threads, the wasm32-wasi flavor, and the existing generated loader.
+  - Do not discard uncommitted packaging work already in the working copy.
+  - Fail closed on invalid module output. Never treat a failed WASM call as allow.
+  - Until e18s06, load failure may still use the TypeScript path. After e18s06, it must not.
+  - A failed rule save must not report success or allow the tool call.
+success_criteria:
+  - Every former TypeScript host area in this scope has a passing parity test that shows WASM produced the result.
+  - index.ts loads WASM and contains no permission, prompt, audit, save, trust, or execute implementation.
+  - Disabling or removing the WASM artifact prevents the extension from authorizing a tool call.
+  - npm test and npx tsc --noEmit pass with no TypeScript fallback tests expecting a successful TypeScript engine.
+  - e18s00-pi-oxidized-decision.md records adopt or reject before host-area stories start.
+references:
+  - .specs/planning-context.yaml
+  - .specs/epics/e16-rust-wasm-tool-permissions-core/epic.yaml
+  - .specs/security/epics/e16/THREAT_MODEL.md
+  - .specs/security/epics/e18/THREAT_MODEL.md

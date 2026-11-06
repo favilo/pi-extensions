@@ -1,7 +1,6 @@
-import { createNativeProbeRequest, decodeNativeProbeResponse, NATIVE_CONTRACT_VERSION, NATIVE_POLICY_NONCE } from "./native-contract.ts";
+import { createNativeProbeRequest, decodeNativeProbeResponse, NATIVE_CONTRACT_VERSION, NATIVE_POLICY_NONCE, type NativeOperation } from "./native-contract.ts";
 import { requireNativePackage, resolveNativePackagePath } from "./native-package.ts";
 import type { Permissions } from "./config.ts";
-import type { NativeOperation } from "./native/index.d.ts";
 
 type NativePolicy = { probe(request: unknown): unknown; parsePolicy(request: unknown): unknown };
 let cached: { path: string; module: NativePolicy } | undefined;

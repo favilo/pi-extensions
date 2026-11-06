@@ -1,7 +1,6 @@
-import { createNativeProbeRequest, decodeNativeProbeResponse, NATIVE_CONTRACT_VERSION, NATIVE_PARSER_NONCE } from "./native-contract.ts";
+import { createNativeProbeRequest, decodeNativeProbeResponse, NATIVE_CONTRACT_VERSION, NATIVE_PARSER_NONCE, type NativeOperation } from "./native-contract.ts";
 import { requireNativePackage, resolveNativePackagePath } from "./native-package.ts";
 import type { BashParseResult, ParsedSubcommand } from "./bash-parser.ts";
-import type { NativeOperation } from "./native/index.d.ts";
 
 type NativeParserModule = {
   probe(request: unknown): unknown;

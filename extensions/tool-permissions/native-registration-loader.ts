@@ -1,7 +1,6 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { createNativeProbeRequest, decodeNativeProbeResponse, NATIVE_CONTRACT_VERSION, NATIVE_REGISTRATION_NONCE } from "./native-contract.ts";
+import { createNativeProbeRequest, decodeNativeProbeResponse, NATIVE_CONTRACT_VERSION, NATIVE_REGISTRATION_NONCE, type NativeOperation } from "./native-contract.ts";
 import { requireNativePackage, resolveNativePackagePath } from "./native-package.ts";
-import type { NativeOperation } from "./native/index.d.ts";
 
 export type NativeRegistrationResult =
   | { mode: "native"; registrations: string[] }

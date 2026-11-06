@@ -1,0 +1,51 @@
+story_id: e18s01
+title: Move path canonicalization, project trust, and .aiignore into WASM
+status: failing
+bcps: 5
+delta: MODIFIED
+spec: e18s01-wasm-path-trust-aiignore.md
+tasks:
+  - id: 1
+    description: Add failing parity tests for canonical paths, trust roots, .aiignore denies, and invalid WASM output. No new security findings in affected paths.
+    verify: node --test extensions/tool-permissions/native-path-trust.test.ts extensions/tool-permissions/permission-boundary.test.ts
+    risk: P0
+    security: high
+    status: failing
+    allure:
+      severity: critical
+      categories:
+        - "Contract Tests"
+        - "Security Review"
+  - id: 2
+    description: Add the versioned native path-trust operation and Rust implementation. No new security findings in affected paths.
+    verify: cargo test --manifest-path extensions/tool-permissions/native/Cargo.toml
+    risk: P0
+    security: high
+    status: failing
+    allure:
+      severity: critical
+      categories:
+        - "Native Boundary"
+        - "Security Review"
+  - id: 3
+    description: Route successful path checks through WASM and deny invalid native results. No new security findings in affected paths.
+    verify: node --test extensions/tool-permissions/native-path-trust.test.ts extensions/tool-permissions/permission-boundary.test.ts
+    risk: P0
+    security: high
+    status: failing
+    allure:
+      severity: critical
+      categories:
+        - "Integration"
+        - "Security Review"
+  - id: 4
+    description: Run the native build and full checks. No new security findings in affected paths.
+    verify: npm run build:native && npm run check
+    risk: P1
+    security: high
+    status: failing
+    allure:
+      severity: high
+      categories:
+        - "Regression"
+        - "Security Review"

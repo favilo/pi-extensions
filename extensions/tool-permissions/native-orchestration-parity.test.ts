@@ -116,7 +116,7 @@ test("native permission orchestration matches TypeScript key mapping and decisio
 test("bundled native permission orchestration matches TypeScript key mapping and decisions", (t) => {
   let evaluate: ((request: unknown) => { ok: boolean; operation: string; permissionKey: string; decision: string }) | undefined;
   try {
-    evaluate = (createRequire(import.meta.url)("./native/index.js") as { evaluatePermissionOrchestration?: typeof evaluate }).evaluatePermissionOrchestration;
+    evaluate = (createRequire(import.meta.url)("./native/generated/index.js") as { evaluatePermissionOrchestration?: typeof evaluate }).evaluatePermissionOrchestration;
   } catch {
     t.skip("native artifact is not built; run npm run build:native");
     return;

@@ -1,6 +1,6 @@
 import "../test-support/forbid-fetch.ts";
 import assert from "node:assert/strict";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import test from "node:test";
@@ -269,13 +269,14 @@ test("resolves bare and explicit user permission editor targets", () => {
 test("resolves an eligible local permission editor target", () => {
   const root = mkdtempSync(join(tmpdir(), "pi-permissions-index-"));
   const cwd = join(root, "project");
+  mkdirSync(cwd);
   const userPath = join(root, "user", "permissions.toml");
   assert.deepEqual(resolvePermissionEditorTarget("local", cwd, {
     userPermissionsPath: userPath,
     trustResolver: () => ({ path: root, decision: true }),
   }), {
     scope: "local",
-    path: join(cwd, ".pi", "permissions.toml"),
+    path: join(realpathSync(cwd), ".pi", "permissions.toml"),
   });
 });
 
@@ -569,7 +570,7 @@ test("subagent_result with full_context evaluates under write permission policy"
     });
 
     assert.deepEqual(result, { block: true, reason: "Blocked write: arguments match a configured deny rule." });
-    assert.equal(input.full_context, exportPath);
+    assert.equal(input.full_context, join(realpathSync(exportDir), "output.json"));
   } finally {
     rmSync(exportDir, { recursive: true, force: true });
     if (previousAgentDir === undefined) delete process.env.PI_CODING_AGENT_DIR;

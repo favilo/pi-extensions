@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 test("native parser rejects process-substitution redirects", (t) => {
   let parse: ((request: { version: number; operation: string; nonce: string; command: string }) => { ok: boolean; reason: string }) | undefined;
   try {
-    parse = (createRequire(import.meta.url)("./native/index.js") as { parse?: typeof parse }).parse;
+    parse = (createRequire(import.meta.url)("./native/generated/index.js") as { parse?: typeof parse }).parse;
   } catch {
     t.skip("native artifact is not built; run npm run build:native");
     return;
@@ -32,7 +32,7 @@ test("native parser extracts command substitutions nested inside double quotes",
     subcommands?: Array<{ normalized: string; start: number; end: number }>;
   }) | undefined;
   try {
-    parse = (createRequire(import.meta.url)("./native/index.js") as { parse?: typeof parse }).parse;
+    parse = (createRequire(import.meta.url)("./native/generated/index.js") as { parse?: typeof parse }).parse;
   } catch {
     t.skip("native artifact is not built; run npm run build:native");
     return;

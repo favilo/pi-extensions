@@ -104,9 +104,9 @@ epics:
     title: Rust/WASM core migration for tool-permissions
     capsule_dir: epics/e16-rust-wasm-tool-permissions-core
     wsjf: 0.0
-    bcps: 14
+    bcps: 27
     note: >-
-      Unscored backlog epic. Pilot a hybrid Rust/WASM migration in the security-sensitive, pure-compute portions of `tool-permissions`, starting with a supported package/runtime boundary and using `pi-oxided` if it proves compatible with the required Pi extension shape.
+      Unscored backlog epic. Pilot a hybrid Rust/WASM migration in the security-sensitive, pure-compute portions of `tool-permissions`, starting with a supported package/runtime boundary and using `pi-oxidized` if it proves compatible with the required Pi extension shape. BCP total matches the passing capsule, which records 27.
   - id: e17
     title: Environment-protected YOLO permission mode
     capsule_dir: epics/e17-environment-protected-yolo-mode
@@ -114,6 +114,13 @@ epics:
     bcps: 6
     note: >-
       WSJF = (business value 8 + time criticality 7 + risk reduction 6) / job size 3 = 7.0. Gate YOLO mode behind an environment variable (PI_YOLO_MODE=1) to bypass permission prompts for single-session Docker/automation workflows while preserving audit evidence.
+  - id: e18
+    title: WASM-only tool-permissions runtime
+    capsule_dir: epics/e18-wasm-only-tool-permissions
+    wsjf: 2.1
+    bcps: 35
+    note: >-
+      WSJF = (business value 8 + time criticality 5 + risk reduction 8) / job size 10 = 2.1. First record whether to adopt pi-oxidized-ext. Then move path trust, audit writes, rule saves, prompts, and tool execution into WASM, and remove the TypeScript permission fallback. The package entry still only loads WASM. Passing e16 stories stay closed.
 bugs:
   total: 1
   fixed: 0

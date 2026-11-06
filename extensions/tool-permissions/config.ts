@@ -40,11 +40,13 @@ function parseRules(value: unknown, field: string): PermissionRule[] {
   return value.map((item, index) => {
     const rule = object(item);
     if (!rule) throw new Error(`${field}[${index}] must be a table`);
+    const decoded: PermissionRule = {};
     for (const [path, pattern] of Object.entries(rule)) {
       if (!path || typeof pattern !== "string") throw new Error(`${field}[${index}] must contain string patterns`);
       new RegExp(pattern);
+      decoded[path] = pattern;
     }
-    return rule as PermissionRule;
+    return decoded;
   });
 }
 

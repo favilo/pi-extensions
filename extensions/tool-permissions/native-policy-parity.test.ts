@@ -7,7 +7,7 @@ import { parsePermissionsTypescript } from "./config.ts";
 test("native TOML policy parsing matches the TypeScript policy shape", (t) => {
   let parsePolicy: ((request: unknown) => unknown) | undefined;
   try {
-    parsePolicy = (createRequire(import.meta.url)("./native/index.js") as { parsePolicy?: typeof parsePolicy }).parsePolicy;
+    parsePolicy = (createRequire(import.meta.url)("./native/generated/index.js") as { parsePolicy?: typeof parsePolicy }).parsePolicy;
   } catch {
     t.skip("native artifact is not built; run npm run build:native");
     return;
@@ -22,7 +22,7 @@ test("native TOML policy parsing matches the TypeScript policy shape", (t) => {
 test("native TOML policy parsing handles array-of-table rule formatting", (t) => {
   let parsePolicy: ((request: unknown) => unknown) | undefined;
   try {
-    parsePolicy = (createRequire(import.meta.url)("./native/index.js") as { parsePolicy?: typeof parsePolicy }).parsePolicy;
+    parsePolicy = (createRequire(import.meta.url)("./native/generated/index.js") as { parsePolicy?: typeof parsePolicy }).parsePolicy;
   } catch {
     t.skip("native artifact is not built; run npm run build:native");
     return;

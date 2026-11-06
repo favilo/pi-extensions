@@ -68,15 +68,16 @@ Run `/permissions` or `/permissions user` in Pi to edit the user rules. Run `/pe
 
 ### Native runtime
 
-The `tool-permissions` bundled native Rust core is enabled by default when its packaged NAPI artifact is compatible with the current Node runtime. Pi shows a startup diagnostic when the native probe is active, or a warning when the bundled native package cannot load and TypeScript fallback is used. To force the TypeScript implementation for diagnosis, start Pi with `PI_TOOL_PERMISSIONS_NATIVE_DISABLE=1`.
+The `tool-permissions` bundled native Rust core is enabled by default when its packaged WebAssembly artifact is compatible with the current Node runtime. The extension loads the `wasm32-wasip1-threads` module and does not load a platform `.node` library. Pi shows a startup diagnostic when the native probe is active, or a warning when the bundled native package cannot load and TypeScript fallback is used. To force the TypeScript implementation for diagnosis, start Pi with `PI_TOOL_PERMISSIONS_NATIVE_DISABLE=1`.
 
-For local development, rebuild the bundled artifact after Rust changes:
+For local development, rebuild the bundled WebAssembly artifact after Rust changes. The build compiles tree-sitter with the wasi-sdk `wasm32-wasip1-threads` compiler and needs [wasi-sdk](https://github.com/WebAssembly/wasi-sdk/releases) at `WASI_SDK_PATH` or `~/.local/wasi-sdk`. Output goes to `extensions/tool-permissions/native/generated/`, which is ignored.
 
 ```bash
 npm run build:native
+npm run build:clean
 ```
 
-Before publishing or testing packaged installs, confirm the native package includes its JS entrypoint, type declarations, and generated `.node` artifact:
+Before publishing or testing packaged installs, confirm the native package includes its generated JavaScript entrypoint, type declarations, and WebAssembly artifact:
 
 ```bash
 npm pack --dry-run ./extensions/tool-permissions/native

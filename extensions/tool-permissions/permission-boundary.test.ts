@@ -1,6 +1,6 @@
 import "../test-support/forbid-fetch.ts";
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, symlinkSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, realpathSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -215,7 +215,7 @@ test("executes an allowed nonexistent write through the same canonical parent us
   const result = await executeToolRequest(toolRequest, boundary);
 
   assert.equal(result.status, "allowed");
-  assert.equal(executedPath, join(outside, "new.txt"));
+  assert.equal(executedPath, join(realpathSync(outside), "new.txt"));
 });
 
 test("adapts default policy resolution and audit for a child request cwd", async () => {

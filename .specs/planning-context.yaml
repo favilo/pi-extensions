@@ -1,0 +1,32 @@
+feature_name: wasm_only_tool_permissions
+problem_statement: >-
+  Epic e16 moved pure permission computation into Rust/WASM and left prompts,
+  rule saves, audit writes, filesystem trust, and tool execution in TypeScript,
+  with a TypeScript fallback. The extension should run entirely from the WASM
+  module. Pi still loads this package through a TypeScript entry, so that entry
+  only instantiates WASM.
+constraints:
+  - Pi package entry remains extensions/tool-permissions/index.ts. That file loads the WASM module and does not implement permission behavior.
+  - Do not delete the TypeScript entry. There is no supported path that removes it.
+  - No TypeScript permission fallback after the last story. A missing or invalid WASM module fails closed.
+  - Do not reopen or rewrite passing e16 stories. Their non-goals stay historical.
+  - NAPI-RS target remains wasm32-wasip1-threads. The flavor id remains wasm32-wasi. wasm32-unknown-unknown is not a supported target.
+  - Rust calls Pi for terminal UI, editor widgets, and tool execution. The WASM module does not spawn a shell or open a network of its own.
+  - Version control is Jujutsu. Do not push the active e16 bookmark. Do not discard the uncommitted WASM packaging changes in this working copy.
+out_of_scope:
+  - Rewriting passing e16 stories
+  - Deleting extensions/tool-permissions/index.ts
+  - Porting extensions other than tool-permissions
+  - Changing permission rule syntax, save shortcuts, or user-visible prompt semantics
+  - Replacing Pi's TUI or tool runtime inside the WASM module
+key_decisions:
+  - decision: Add epic e18 after e17 instead of editing e16.
+    rationale: e16 is passing and its non-goals require the TypeScript host boundary this epic removes.
+  - decision: One epic moves all five host areas, then removes the TypeScript fallback.
+    rationale: The user called each missing host area important, and a fallback cannot be removed until those areas have a WASM owner.
+  - decision: Rust owns control flow and calls host-supplied Pi APIs.
+    rationale: A one-line TypeScript loader is the realistic Pi entry. WASM does not reimplement the terminal or process runtime.
+  - decision: Re-evaluate pi-oxidized and pi-oxidized-ext in e18s00 before moving host areas.
+    rationale: crates.io publishes pi-oxidized as the Rust Pi product and pi-oxidized-ext as the extension-host crate that exposes pi_ext. pi-oxided is only a misspelling in older e16 text. e18s00 records adopt or reject. Later stories follow that record.
+  - decision: Earlier stories keep load-failure fallback until e18s06.
+    rationale: Each host area can ship on the WASM success path while the extension still starts if that area's module call fails. e18s06 deletes that fallback.

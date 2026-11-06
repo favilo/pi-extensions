@@ -58,7 +58,7 @@ const assert = require("node:assert/strict");
 test("bundled Rust registration calls pi.on and registerCommand for delegated callbacks", async (t) => {
   let register: ((request: unknown, pi: unknown, bridge?: unknown) => { ok: boolean; operation: string; registrations: string[] }) | undefined;
   try {
-    register = (createRequire(import.meta.url)("./native/index.js") as { registerToolPermissionsCallbacks?: typeof register }).registerToolPermissionsCallbacks;
+    register = (createRequire(import.meta.url)("./native/generated/index.js") as { registerToolPermissionsCallbacks?: typeof register }).registerToolPermissionsCallbacks;
   } catch {
     t.skip("native artifact is not built; run npm run build:native");
     return;

@@ -7,7 +7,7 @@ import { permissionDecision, parsePermissionsTypescript } from "./config.ts";
 test("native policy evaluation matches TypeScript decisions", (t) => {
   let evaluate: ((request: unknown) => { ok: boolean; decision: string }) | undefined;
   try {
-    evaluate = (createRequire(import.meta.url)("./native/index.js") as { evaluatePolicy?: typeof evaluate }).evaluatePolicy;
+    evaluate = (createRequire(import.meta.url)("./native/generated/index.js") as { evaluatePolicy?: typeof evaluate }).evaluatePolicy;
   } catch {
     t.skip("native artifact is not built; run npm run build:native");
     return;

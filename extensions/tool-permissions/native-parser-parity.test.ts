@@ -17,7 +17,7 @@ type NativeParser = (request: {
 function loadNativeParser(): NativeParser | undefined {
   try {
     const require = createRequire(import.meta.url);
-    const native = require("./native/index.js") as { parse?: NativeParser };
+    const native = require("./native/generated/index.js") as { parse?: NativeParser };
     return native.parse;
   } catch {
     return undefined;

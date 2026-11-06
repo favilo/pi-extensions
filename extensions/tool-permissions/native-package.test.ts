@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { bundledNativePackagePath, resolveNativePackagePath } from "./native-package.ts";
+import { bundledNativePackagePath, requireNativePackage, resolveNativePackagePath } from "./native-package.ts";
 import { parseWithNativeFallback } from "./native-parser-loader.ts";
 import type { BashParseResult } from "./bash-parser.ts";
 
@@ -53,6 +53,16 @@ exports.parse = (request) => ({ version: 1, operation: "parse", ok: true, nonce:
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }
+});
+
+test("bundled package loads the WebAssembly core", (t) => {
+  const artifact = new URL("./native/generated/index.wasm32-wasi.wasm", import.meta.url);
+  if (!existsSync(artifact)) {
+    t.skip("wasm artifact is not built; run npm run build:native");
+    return;
+  }
+  const loaded = requireNativePackage(bundledNativePackagePath()) as { __napiBindingTarget?: string };
+  assert.equal(loaded.__napiBindingTarget, "wasm32-wasi");
 });
 
 test("path-valued native package env vars are ignored by runtime adapters", () => {
