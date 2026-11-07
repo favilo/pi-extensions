@@ -15,13 +15,10 @@ import {
   NATIVE_CONTRACT_VERSION,
   NATIVE_PATH_TRUST_NONCE,
 } from "./native-contract.ts";
-import { createToolPermissionBoundary } from "./index.ts";
+import toolPermissionPolicy, { createToolPermissionBoundary } from "./index.ts";
 import { evaluatePathTrust } from "./native-path-trust.ts";
 import { setNativePackagePathForTests } from "./native-package.ts";
-import {
-  executeToolRequest,
-  type ToolRequest,
-} from "./permission-boundary.ts";
+import { executeToolRequest, type ToolRequest } from "./permission-boundary.ts";
 import { resolveScopedPermissionDecision } from "./scope.ts";
 
 test("canonical path and working directory match the current host for an existing read", () => {
@@ -229,5 +226,80 @@ test("a disabled native package keeps the TypeScript path decision", async () =>
     if (previous === undefined)
       delete process.env.PI_TOOL_PERMISSIONS_NATIVE_DISABLE;
     else process.env.PI_TOOL_PERMISSIONS_NATIVE_DISABLE = previous;
+  }
+});
+
+test("a registered read blocks when WASM denies a path the host would allow", async () => {
+  const root = mkdtempSync(join(tmpdir(), "pi-path-trust-handler-"));
+  const cwd = join(root, "project");
+  const agentDir = mkdtempSync(join(tmpdir(), "pi-path-trust-agent-"));
+  mkdirSync(cwd);
+  writeFileSync(join(cwd, "notes.txt"), "hello");
+  const packageDir = mkdtempSync(join(tmpdir(), "pi-path-trust-native-"));
+  const packagePath = join(packageDir, "index.cjs");
+  writeFileSync(
+    packagePath,
+    [
+      "exports.evaluatePathTrust = (request, realpath) => ({",
+      "  version: 1,",
+      "  operation: 'path_trust',",
+      "  ok: true,",
+      "  nonce: request.nonce,",
+      "  path: realpath(request.cwd + '/' + request.requestedPath),",
+      "  cwd: realpath(request.cwd),",
+      "  trustEligible: true,",
+      "  aiignoreMatch: false,",
+      "  decision: 'deny',",
+      "});",
+    ].join("\n"),
+  );
+  const restore = setNativePackagePathForTests(packagePath);
+  const previousAgentDir = process.env.PI_CODING_AGENT_DIR;
+  process.env.PI_CODING_AGENT_DIR = agentDir;
+  const handlers = new Map<
+    string,
+    (
+      event: {
+        toolName: string;
+        toolCallId: string;
+        input: { path: string };
+      },
+      ctx: { cwd: string; hasUI: boolean; ui: { notify: () => void } },
+    ) => Promise<{ block?: boolean } | undefined>
+  >();
+  try {
+    toolPermissionPolicy({
+      registerCommand() {},
+      on(
+        event: string,
+        handler: (
+          event: {
+            toolName: string;
+            toolCallId: string;
+            input: { path: string };
+          },
+          ctx: { cwd: string; hasUI: boolean; ui: { notify: () => void } },
+        ) => Promise<{ block?: boolean } | undefined>,
+      ) {
+        if (event === "tool_call") handlers.set(event, handler);
+      },
+      getAllTools: () => [],
+    } as never);
+    const result = await handlers.get("tool_call")?.(
+      {
+        toolName: "read",
+        toolCallId: "wasm-deny-read",
+        input: { path: "notes.txt" },
+      },
+      { cwd, hasUI: false, ui: { notify() {} } },
+    );
+    assert.equal(result?.block, true);
+  } finally {
+    restore();
+    if (previousAgentDir === undefined) delete process.env.PI_CODING_AGENT_DIR;
+    else process.env.PI_CODING_AGENT_DIR = previousAgentDir;
+    rmSync(root, { recursive: true, force: true });
+    rmSync(agentDir, { recursive: true, force: true });
+    rmSync(packageDir, { recursive: true, force: true });
   }
 });
