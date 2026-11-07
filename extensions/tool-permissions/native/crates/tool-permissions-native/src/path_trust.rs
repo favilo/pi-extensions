@@ -15,7 +15,7 @@ pub fn evaluate(
 
     let cwd = host.realpath(&request.cwd)?;
     let absolute = node_resolve(&cwd, &request.requested_path);
-    let path = host.realpath(&absolute)?;
+    let path = canonicalize_leaf(&request.tool, &absolute, host)?;
     Ok(PathTrustResponse {
         version: CONTRACT_VERSION,
         operation: NativeOperation::PathTrust,
@@ -60,6 +60,48 @@ fn normalize_posix(path: &str) -> String {
         ".".into()
     } else {
         joined
+    }
+}
+
+fn canonicalize_leaf(tool: &str, absolute: &str, host: &impl PathHost) -> Result<String, String> {
+    match host.realpath(absolute) {
+        Ok(path) => Ok(path),
+        Err(error) if missing_leaf(tool, &error) => {
+            let parent = dirname_posix(absolute);
+            let name = basename_posix(absolute);
+            if name.is_empty() {
+                return Err(error);
+            }
+            let canonical_parent = host.realpath(parent)?;
+            if canonical_parent == "/" {
+                Ok(format!("/{name}"))
+            } else {
+                Ok(format!("{canonical_parent}/{name}"))
+            }
+        }
+        Err(error) => Err(error),
+    }
+}
+
+fn missing_leaf(tool: &str, error: &str) -> bool {
+    matches!(tool, "write" | "edit" | "subagent_result")
+        && (error.contains("ENOENT")
+            || error.contains("os error 2")
+            || error.contains("No such file or directory"))
+}
+
+fn dirname_posix(path: &str) -> &str {
+    match path.rfind('/') {
+        Some(0) => "/",
+        Some(index) => &path[..index],
+        None => ".",
+    }
+}
+
+fn basename_posix(path: &str) -> &str {
+    match path.rfind('/') {
+        Some(index) => &path[index + 1..],
+        None => path,
     }
 }
 
@@ -150,7 +192,10 @@ mod tests {
         .unwrap();
 
         let outside_real = FsHost.realpath(&outside.to_string_lossy()).unwrap();
-        assert_eq!(response.cwd, FsHost.realpath(&cwd.to_string_lossy()).unwrap());
+        assert_eq!(
+            response.cwd,
+            FsHost.realpath(&cwd.to_string_lossy()).unwrap()
+        );
         assert_eq!(response.path, format!("{outside_real}/new.txt"));
         let _ = fs::remove_dir_all(root);
     }
