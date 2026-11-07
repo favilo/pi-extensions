@@ -5,9 +5,14 @@ import assert from "node:assert/strict";
 import { permissionDecision, parsePermissionsTypescript } from "./config.ts";
 
 test("native policy evaluation matches TypeScript decisions", (t) => {
-  let evaluate: ((request: unknown) => { ok: boolean; decision: string }) | undefined;
+  let evaluate:
+    ((request: unknown) => { ok: boolean; decision: string }) | undefined;
   try {
-    evaluate = (createRequire(import.meta.url)("./native/generated/index.js") as { evaluatePolicy?: typeof evaluate }).evaluatePolicy;
+    evaluate = (
+      createRequire(import.meta.url)("./native/generated/index.js") as {
+        evaluatePolicy?: typeof evaluate;
+      }
+    ).evaluatePolicy;
   } catch {
     t.skip("native artifact is not built; run npm run build:native");
     return;
@@ -36,15 +41,41 @@ deny = [{ query = 'secret' }]
     { tool: "bash", input: { command: "echo hi" } },
     { tool: "bash", input: { metadata: { mode: "safe" }, enabled: true } },
     { tool: "bash", input: { tags: ["trusted"] } },
-    { tool: "mcp__example_provider__search", input: { query: "public roadmap", filters: { created_date_range: { start_date: "2025-01-01" } } } },
-    { tool: "mcp__example_provider__search", input: { query: "public roadmap", filters: { created_date_range: { start_date: "2024-01-01" } } } },
-    { tool: "mcp__example_provider__search", input: { query: "secret roadmap" } },
+    {
+      tool: "mcp__example_provider__search",
+      input: {
+        query: "public roadmap",
+        filters: { created_date_range: { start_date: "2025-01-01" } },
+      },
+    },
+    {
+      tool: "mcp__example_provider__search",
+      input: {
+        query: "public roadmap",
+        filters: { created_date_range: { start_date: "2024-01-01" } },
+      },
+    },
+    {
+      tool: "mcp__example_provider__search",
+      input: { query: "secret roadmap" },
+    },
     { tool: "mcp__example_provider__search", input: { page_size: 1 } },
     { tool: "mcp__example_provider__search", input: { ids: ["one", "two"] } },
     { tool: "unknown_tool", input: { query: "public roadmap" } },
   ] as const) {
-    const native = evaluate({ version: 1, operation: "evaluate", nonce: "parity", source, tool, inputJson: JSON.stringify(input) });
+    const native = evaluate({
+      version: 1,
+      operation: "evaluate",
+      nonce: "parity",
+      source,
+      tool,
+      inputJson: JSON.stringify(input),
+    });
     assert.equal(native.ok, true);
-    assert.equal(native.decision, permissionDecision(permissions[tool], input), `${tool} ${JSON.stringify(input)}`);
+    assert.equal(
+      native.decision,
+      permissionDecision(permissions[tool], input),
+      `${tool} ${JSON.stringify(input)}`,
+    );
   }
 });

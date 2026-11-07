@@ -40,22 +40,43 @@ function captureEditRenderer(): EditRenderer {
 }
 
 // Identity theme: strip colors/formatting so assertions see plain text.
-const theme = new Proxy({}, {
-  get: () => (...args: unknown[]) => String(args[args.length - 1]),
-});
+const theme = new Proxy(
+  {},
+  {
+    get:
+      () =>
+      (...args: unknown[]) =>
+        String(args[args.length - 1]),
+  },
+);
 
-function renderEdit(renderer: EditRenderer, result: RenderedResult, isError: boolean): string {
+function renderEdit(
+  renderer: EditRenderer,
+  result: RenderedResult,
+  isError: boolean,
+): string {
   return renderer
-    .renderResult(result, { expanded: false, isPartial: false }, theme, { isError })
+    .renderResult(result, { expanded: false, isPartial: false }, theme, {
+      isError,
+    })
     .render(120)
     .join("\n");
 }
 
 test("a failed edit renders its reason, never success text", () => {
   const renderer = captureEditRenderer();
-  const rendered = renderEdit(renderer, {
-    content: [{ type: "text", text: "Could not find the exact text in /tmp/file.txt. The old text must match exactly including all whitespace and newlines." }],
-  }, true);
+  const rendered = renderEdit(
+    renderer,
+    {
+      content: [
+        {
+          type: "text",
+          text: "Could not find the exact text in /tmp/file.txt. The old text must match exactly including all whitespace and newlines.",
+        },
+      ],
+    },
+    true,
+  );
 
   assert.match(rendered, /Could not find the exact text/);
   assert.doesNotMatch(rendered, /No diff supplied/);
@@ -63,9 +84,13 @@ test("a failed edit renders its reason, never success text", () => {
 
 test("a blocked edit renders the block reason, never success text", () => {
   const renderer = captureEditRenderer();
-  const rendered = renderEdit(renderer, {
-    content: [{ type: "text", text: "User denied edit." }],
-  }, true);
+  const rendered = renderEdit(
+    renderer,
+    {
+      content: [{ type: "text", text: "User denied edit." }],
+    },
+    true,
+  );
 
   assert.match(rendered, /User denied edit/);
   assert.doesNotMatch(rendered, /No diff supplied/);
@@ -73,9 +98,13 @@ test("a blocked edit renders the block reason, never success text", () => {
 
 test("a successful edit without a diff renders No diff supplied", () => {
   const renderer = captureEditRenderer();
-  const rendered = renderEdit(renderer, {
-    content: [{ type: "text", text: "Done" }],
-  }, false);
+  const rendered = renderEdit(
+    renderer,
+    {
+      content: [{ type: "text", text: "Done" }],
+    },
+    false,
+  );
 
   assert.match(rendered, /No diff supplied/);
 });
@@ -83,15 +112,27 @@ test("a successful edit without a diff renders No diff supplied", () => {
 test("the edit and bash tool schemas admit an optional reason", () => {
   for (const name of ["edit", "bash", "write"]) {
     const tool = captureTool(name);
-    assert.ok(tool.parameters?.properties?.reason, `${name} schema must admit a reason`);
-    assert.ok(!tool.parameters?.required?.includes("reason"), `${name} reason must be optional`);
+    assert.ok(
+      tool.parameters?.properties?.reason,
+      `${name} schema must admit a reason`,
+    );
+    assert.ok(
+      !tool.parameters?.required?.includes("reason"),
+      `${name} reason must be optional`,
+    );
   }
 });
 
 test("the edit call renders the reason when present", () => {
   const renderer = captureEditRenderer();
-  const rendered = renderer
-    .renderCall!({ path: "/tmp/file.txt", edits: [], reason: "normalize casing before the rename" }, theme)
+  const rendered = renderer.renderCall!(
+    {
+      path: "/tmp/file.txt",
+      edits: [],
+      reason: "normalize casing before the rename",
+    },
+    theme,
+  )
     .render(120)
     .join("\n");
 
@@ -100,8 +141,10 @@ test("the edit call renders the reason when present", () => {
 
 test("the bash call renders the reason when present", () => {
   const renderer = captureTool("bash");
-  const rendered = renderer
-    .renderCall!({ command: "npm test", reason: "verify the refactor is green" }, theme)
+  const rendered = renderer.renderCall!(
+    { command: "npm test", reason: "verify the refactor is green" },
+    theme,
+  )
     .render(120)
     .join("\n");
 
@@ -115,7 +158,10 @@ test("a steered bash result renders the steering annotation at the top", () => {
       {
         content: [
           { type: "text", text: "exit code: 0" },
-          { type: "text", text: '\n\n<user-steering source="permission-prompt">\nonly this once\n</user-steering>' },
+          {
+            type: "text",
+            text: '\n\n<user-steering source="permission-prompt">\nonly this once\n</user-steering>',
+          },
         ],
       },
       { expanded: false, isPartial: false },
@@ -135,7 +181,10 @@ test("a steered edit result renders the steering annotation", () => {
       {
         content: [
           { type: "text", text: "Done" },
-          { type: "text", text: '\n\n<user-steering source="permission-prompt">\nwatch the casing\n</user-steering>' },
+          {
+            type: "text",
+            text: '\n\n<user-steering source="permission-prompt">\nwatch the casing\n</user-steering>',
+          },
         ],
       },
       { expanded: false, isPartial: false },
@@ -156,7 +205,10 @@ test("an expanded bash result renders every non-annotation text part", () => {
         content: [
           { type: "text", text: "exit code: 0\nfirst part" },
           { type: "text", text: "second part from another extension" },
-          { type: "text", text: '\n\n<user-steering source="permission-prompt">\nonly this once\n</user-steering>' },
+          {
+            type: "text",
+            text: '\n\n<user-steering source="permission-prompt">\nonly this once\n</user-steering>',
+          },
         ],
       },
       { expanded: true, isPartial: false },
@@ -169,34 +221,48 @@ test("an expanded bash result renders every non-annotation text part", () => {
   assert.match(rendered, /first part/);
   assert.match(rendered, /second part from another extension/);
   assert.match(rendered, /only this once/);
-  assert.equal(rendered.match(/only this once/g)?.length, 1, "the annotation renders once, via the steering line");
+  assert.equal(
+    rendered.match(/only this once/g)?.length,
+    1,
+    "the annotation renders once, via the steering line",
+  );
 });
 
 test("read, grep, find, and ls results render steering annotations", () => {
   const steered = {
     content: [
       { type: "text", text: "some output" },
-      { type: "text", text: '\n\n<user-steering source="permission-prompt">\nlook closer at this\n</user-steering>' },
+      {
+        type: "text",
+        text: '\n\n<user-steering source="permission-prompt">\nlook closer at this\n</user-steering>',
+      },
     ],
   };
   for (const name of ["read", "grep", "find", "ls"]) {
     const rendered = captureTool(name)
-      .renderResult(steered, { expanded: false, isPartial: false }, theme, { isError: false })
+      .renderResult(steered, { expanded: false, isPartial: false }, theme, {
+        isError: false,
+      })
       .render(120)
       .join("\n");
-    assert.match(rendered, /look closer at this/, `${name} must render the steering annotation`);
+    assert.match(
+      rendered,
+      /look closer at this/,
+      `${name} must render the steering annotation`,
+    );
   }
 });
 
 test("calls without a reason render exactly as before", () => {
-  const edit = captureEditRenderer()
-    .renderCall!({ path: "/tmp/file.txt", edits: [] }, theme)
+  const edit = captureEditRenderer().renderCall!(
+    { path: "/tmp/file.txt", edits: [] },
+    theme,
+  )
     .render(120)
     .join("\n");
   assert.doesNotMatch(edit, /reason/i);
 
-  const bash = captureTool("bash")
-    .renderCall!({ command: "npm test" }, theme)
+  const bash = captureTool("bash").renderCall!({ command: "npm test" }, theme)
     .render(120)
     .join("\n");
   assert.doesNotMatch(bash, /reason/i);
@@ -208,7 +274,10 @@ test("write tool renders line additions and expanded content details", () => {
     .renderResult(
       {
         content: [{ type: "text", text: "Successfully wrote 20 bytes" }],
-        details: { content: "first line\nsecond line\nthird line", linesWritten: 3 },
+        details: {
+          content: "first line\nsecond line\nthird line",
+          linesWritten: 3,
+        },
       },
       { expanded: false, isPartial: false },
       theme,
@@ -223,7 +292,10 @@ test("write tool renders line additions and expanded content details", () => {
     .renderResult(
       {
         content: [{ type: "text", text: "Successfully wrote 20 bytes" }],
-        details: { content: "first line\nsecond line\nthird line", linesWritten: 3 },
+        details: {
+          content: "first line\nsecond line\nthird line",
+          linesWritten: 3,
+        },
       },
       { expanded: true, isPartial: false },
       theme,

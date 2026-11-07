@@ -3,7 +3,14 @@
 // Uses `unbash` (0-dep TypeScript Bash parser) to parse compound Bash commands,
 // subshells, and command substitutions `$(cmd)` / `` `cmd` `` into individual subcommands.
 
-import { parse, type ParsedScript, type Node, type Command, type Word, type WordPart } from "unbash";
+import {
+  parse,
+  type ParsedScript,
+  type Node,
+  type Command,
+  type Word,
+  type WordPart,
+} from "unbash";
 
 export type ParsedSubcommand = {
   /** Normalized text for permission rule matching (e.g., "jj status") */
@@ -35,20 +42,30 @@ const UNSUPPORTED_PART_TYPES = new Set([
 /** Check whether a word contains any non-handled dynamic expansion parts. */
 function hasUnsupportedParts(word: Word): boolean {
   if (!word.parts) return false;
-  return word.parts.some((part: WordPart) => UNSUPPORTED_PART_TYPES.has(part.type));
+  return word.parts.some((part: WordPart) =>
+    UNSUPPORTED_PART_TYPES.has(part.type),
+  );
 }
 
 function hasDynamicCommandName(word: Word): boolean {
   if (!word.parts) return false;
-  return word.parts.some((part: WordPart) =>
-    part.type === "CommandExpansion" ||
-    part.type === "SimpleExpansion" ||
-    part.type === "ParameterExpansion" ||
-    part.type === "ArithmeticExpansion" ||
-    part.type === "ProcessSubstitution" ||
-    (part.type === "DoubleQuoted" && Array.isArray((part as any).parts) && (part as any).parts.some((inner: WordPart) =>
-      inner.type === "CommandExpansion" || inner.type === "SimpleExpansion" || inner.type === "ParameterExpansion" || inner.type === "ArithmeticExpansion" || inner.type === "ProcessSubstitution"
-    ))
+  return word.parts.some(
+    (part: WordPart) =>
+      part.type === "CommandExpansion" ||
+      part.type === "SimpleExpansion" ||
+      part.type === "ParameterExpansion" ||
+      part.type === "ArithmeticExpansion" ||
+      part.type === "ProcessSubstitution" ||
+      (part.type === "DoubleQuoted" &&
+        Array.isArray((part as any).parts) &&
+        (part as any).parts.some(
+          (inner: WordPart) =>
+            inner.type === "CommandExpansion" ||
+            inner.type === "SimpleExpansion" ||
+            inner.type === "ParameterExpansion" ||
+            inner.type === "ArithmeticExpansion" ||
+            inner.type === "ProcessSubstitution",
+        )),
   );
 }
 
@@ -64,7 +81,11 @@ function isShellCommand(command: string): boolean {
 }
 
 function isShellCommandOption(value: string): boolean {
-  return value.startsWith("-") && !value.startsWith("--") && value.slice(1).includes("c");
+  return (
+    value.startsWith("-") &&
+    !value.startsWith("--") &&
+    value.slice(1).includes("c")
+  );
 }
 
 function shellPayloadWord(cmd: Command): Word | undefined {
@@ -153,7 +174,9 @@ function extractSubcommands(
     }
 
     case "Command": {
-      const allWords = [node.name, ...node.suffix].filter((w): w is Word => w !== undefined);
+      const allWords = [node.name, ...node.suffix].filter(
+        (w): w is Word => w !== undefined,
+      );
 
       // Check for unsupported word parts
       const unsafeWord = allWords.find(hasUnsupportedParts);
@@ -167,8 +190,10 @@ function extractSubcommands(
       // Process-substitution redirects execute a nested command but are not
       // represented as command-expansion word parts. Keep them fail-asking
       // until their semantics are modeled explicitly.
-      const processRedirect = (node as any).redirects?.find((redirect: any) =>
-        typeof redirect.content === "string" && /^[<>]\(/.test(redirect.content),
+      const processRedirect = (node as any).redirects?.find(
+        (redirect: any) =>
+          typeof redirect.content === "string" &&
+          /^[<>]\(/.test(redirect.content),
       );
       if (processRedirect) {
         return {
@@ -219,7 +244,11 @@ function extractSubcommands(
             const innerScript = (part as any).script;
             if (innerScript && Array.isArray(innerScript.commands)) {
               for (const innerStmt of innerScript.commands) {
-                const result = extractSubcommands(innerStmt, source, subcommands);
+                const result = extractSubcommands(
+                  innerStmt,
+                  source,
+                  subcommands,
+                );
                 if (!result.ok) return result;
               }
             }

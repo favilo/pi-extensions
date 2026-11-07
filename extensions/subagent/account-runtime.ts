@@ -17,13 +17,24 @@ export type PublishedChildRuntimeSelection = {
 };
 
 export type PublishedChildRuntimeApi = {
-  resolve(input: SubagentRuntimeParameters & { parentModel?: { provider: string; id: string } }): Promise<PublishedChildRuntimeSelection | undefined>;
+  resolve(
+    input: SubagentRuntimeParameters & {
+      parentModel?: { provider: string; id: string };
+    },
+  ): Promise<PublishedChildRuntimeSelection | undefined>;
 };
 
-export const CHILD_RUNTIME_API = Symbol.for("pi-account-switcher.child-runtime.v1");
-const CHILD_RUNTIME_SELECTION = Symbol.for("pi-extensions.subagent.runtime-selection.v1");
+export const CHILD_RUNTIME_API = Symbol.for(
+  "pi-account-switcher.child-runtime.v1",
+);
+const CHILD_RUNTIME_SELECTION = Symbol.for(
+  "pi-extensions.subagent.runtime-selection.v1",
+);
 
-type RuntimeSelectionCarrier = Record<symbol, PublishedChildRuntimeSelection | undefined>;
+type RuntimeSelectionCarrier = Record<
+  symbol,
+  PublishedChildRuntimeSelection | undefined
+>;
 
 /**
  * Resolve a redacted child selection before approval and preserve it on Pi's
@@ -60,8 +71,11 @@ export function childRuntimeSelectionFor(
   return (input as RuntimeSelectionCarrier)[CHILD_RUNTIME_SELECTION];
 }
 
-export function getPublishedChildRuntimeApi(): PublishedChildRuntimeApi | undefined {
-  return (globalThis as Record<symbol, PublishedChildRuntimeApi | undefined>)[CHILD_RUNTIME_API];
+export function getPublishedChildRuntimeApi():
+  PublishedChildRuntimeApi | undefined {
+  return (globalThis as Record<symbol, PublishedChildRuntimeApi | undefined>)[
+    CHILD_RUNTIME_API
+  ];
 }
 
 export type ChildRuntime = {
@@ -76,15 +90,23 @@ export async function createChildRuntimeFromSelection(
 ): Promise<ChildRuntime> {
   const modelRuntime = await ModelRuntime.create({ modelsPath: null });
   await selection.installOauth(new ModelRegistry(modelRuntime));
-  const model = modelRuntime.getModel(selection.descriptor.provider, selection.descriptor.modelId);
-  if (!model) throw new Error(`Selected child model is unavailable: ${selection.descriptor.provider}/${selection.descriptor.modelId}`);
+  const model = modelRuntime.getModel(
+    selection.descriptor.provider,
+    selection.descriptor.modelId,
+  );
+  if (!model)
+    throw new Error(
+      `Selected child model is unavailable: ${selection.descriptor.provider}/${selection.descriptor.modelId}`,
+    );
   return { modelRuntime, model, selection };
 }
 
 export async function createChildSessionWithRuntime<T>(
   input: object,
   createSession: (runtime: ChildRuntime | undefined) => Promise<T>,
-  createRuntime: (selection: PublishedChildRuntimeSelection) => Promise<ChildRuntime> = createChildRuntimeFromSelection,
+  createRuntime: (
+    selection: PublishedChildRuntimeSelection,
+  ) => Promise<ChildRuntime> = createChildRuntimeFromSelection,
 ): Promise<T> {
   const selection = childRuntimeSelectionFor(input);
   const runtime = selection ? await createRuntime(selection) : undefined;
@@ -99,6 +121,10 @@ export async function createChildRuntime(
   api = getPublishedChildRuntimeApi(),
 ): Promise<ChildRuntime | undefined> {
   if (!api) return undefined;
-  const selection = await resolveChildRuntimeSelection(parameters, parentModel, api);
+  const selection = await resolveChildRuntimeSelection(
+    parameters,
+    parentModel,
+    api,
+  );
   return selection ? createChildRuntimeFromSelection(selection) : undefined;
 }

@@ -12,7 +12,8 @@ export type McpToolProvider = {
   name: string;
   tools: McpProviderTool[];
   registerTools?(register: (tool: McpProviderTool) => void): void;
-  getStatusSections(): Promise<McpProviderStatusSection[]> | McpProviderStatusSection[];
+  getStatusSections():
+    Promise<McpProviderStatusSection[]> | McpProviderStatusSection[];
   /** Release provider resources (e.g. spawned MCP server processes). Called on unregister. */
   dispose?(): void;
 };
@@ -23,8 +24,7 @@ export type McpRegistryStatusSection = McpProviderStatusSection & {
 };
 
 export type McpProviderRegistrationResult =
-  | { ok: true }
-  | { ok: false; error: string };
+  { ok: true } | { ok: false; error: string };
 
 export class McpProviderRegistry {
   private readonly providers = new Map<string, McpToolProvider>();
@@ -42,18 +42,25 @@ export class McpProviderRegistry {
     if (existing === provider) return { ok: true };
     if (existing) {
       this.providerFailures.set(provider, provider.name);
-      return { ok: false, error: `MCP provider already registered: ${provider.id}` };
+      return {
+        ok: false,
+        error: `MCP provider already registered: ${provider.id}`,
+      };
     }
 
     if (provider.tools.some((tool) => this.toolOwners.has(tool.name))) {
       this.providerFailures.set(provider, provider.name);
-      return { ok: false, error: `MCP provider failed to register: ${provider.id}` };
+      return {
+        ok: false,
+        error: `MCP provider failed to register: ${provider.id}`,
+      };
     }
 
     this.providers.set(provider.id, provider);
     this.providerFailures.delete(provider);
     this.providerToolNames.set(provider.id, new Set());
-    const contributeTool = (tool: McpProviderTool) => this.registerProviderTool(provider.id, tool);
+    const contributeTool = (tool: McpProviderTool) =>
+      this.registerProviderTool(provider.id, tool);
     try {
       for (const tool of provider.tools) contributeTool(tool);
       provider.registerTools?.(contributeTool);
@@ -61,7 +68,10 @@ export class McpProviderRegistry {
     } catch {
       this.unregister(provider);
       this.providerFailures.set(provider, provider.name);
-      return { ok: false, error: `MCP provider failed to register: ${provider.id}` };
+      return {
+        ok: false,
+        error: `MCP provider failed to register: ${provider.id}`,
+      };
     }
   }
 
@@ -71,7 +81,8 @@ export class McpProviderRegistry {
 
     const toolNames = [...(this.providerToolNames.get(provider.id) ?? [])];
     for (const toolName of toolNames) {
-      if (this.toolOwners.get(toolName) === provider.id) this.toolOwners.delete(toolName);
+      if (this.toolOwners.get(toolName) === provider.id)
+        this.toolOwners.delete(toolName);
     }
     this.providerToolNames.delete(provider.id);
     this.providers.delete(provider.id);
@@ -80,7 +91,9 @@ export class McpProviderRegistry {
   }
 
   unregisterAll(): string[] {
-    const toolNames = [...this.providers.values()].flatMap((provider) => this.unregister(provider));
+    const toolNames = [...this.providers.values()].flatMap((provider) =>
+      this.unregister(provider),
+    );
     this.providerFailures.clear();
     return toolNames;
   }
@@ -107,7 +120,10 @@ export class McpProviderRegistry {
     return sections;
   }
 
-  private failureSection(providerId: string, providerName: string): McpRegistryStatusSection {
+  private failureSection(
+    providerId: string,
+    providerName: string,
+  ): McpRegistryStatusSection {
     return {
       providerId,
       providerName,
@@ -116,11 +132,15 @@ export class McpProviderRegistry {
     };
   }
 
-  private registerProviderTool(providerId: string, tool: McpProviderTool): void {
+  private registerProviderTool(
+    providerId: string,
+    tool: McpProviderTool,
+  ): void {
     const toolNames = this.providerToolNames.get(providerId);
     if (!toolNames || toolNames.has(tool.name)) return;
     const owner = this.toolOwners.get(tool.name);
-    if (owner && owner !== providerId) throw new Error(`MCP tool already registered: ${tool.name}`);
+    if (owner && owner !== providerId)
+      throw new Error(`MCP tool already registered: ${tool.name}`);
     this.registerTool(tool);
     this.toolOwners.set(tool.name, providerId);
     toolNames.add(tool.name);

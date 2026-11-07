@@ -1,5 +1,8 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { publishToolDefinition, unpublishToolDefinition } from "../tool-registry/index.ts";
+import {
+  publishToolDefinition,
+  unpublishToolDefinition,
+} from "../tool-registry/index.ts";
 import {
   McpProviderRegistry,
   type McpRegistryStatusSection,
@@ -29,12 +32,18 @@ function formatSections(sections: McpRegistryStatusSection[]): string {
       lines.push(``, section.providerName);
       previousProvider = providerKey;
     }
-    lines.push(`- ${section.title}`, ...section.lines.map((line) => `  ${line}`));
+    lines.push(
+      `- ${section.title}`,
+      ...section.lines.map((line) => `  ${line}`),
+    );
   }
   return lines.join("\n");
 }
 
-export function registerMcpProvider(pi: ExtensionAPI, provider: McpToolProvider): () => void {
+export function registerMcpProvider(
+  pi: ExtensionAPI,
+  provider: McpToolProvider,
+): () => void {
   let active = true;
   const announce = () => {
     if (active) pi.events.emit(PROVIDER_REGISTER_CHANNEL, provider);
@@ -55,15 +64,25 @@ export default function mcpExtension(pi: ExtensionAPI) {
     publishToolDefinition(tool);
     pi.registerTool(tool);
   });
-  const stopRegistrationListener = pi.events.on(PROVIDER_REGISTER_CHANNEL, (data) => {
-    registry.register(data as McpToolProvider);
-  });
-  const stopUnregistrationListener = pi.events.on(PROVIDER_UNREGISTER_CHANNEL, (data) => {
-    if (!data || typeof data !== "object") return;
-    const removedTools = new Set(registry.unregister(data as McpToolProvider));
-    for (const name of removedTools) unpublishToolDefinition(name);
-    pi.setActiveTools(pi.getActiveTools().filter((name) => !removedTools.has(name)));
-  });
+  const stopRegistrationListener = pi.events.on(
+    PROVIDER_REGISTER_CHANNEL,
+    (data) => {
+      registry.register(data as McpToolProvider);
+    },
+  );
+  const stopUnregistrationListener = pi.events.on(
+    PROVIDER_UNREGISTER_CHANNEL,
+    (data) => {
+      if (!data || typeof data !== "object") return;
+      const removedTools = new Set(
+        registry.unregister(data as McpToolProvider),
+      );
+      for (const name of removedTools) unpublishToolDefinition(name);
+      pi.setActiveTools(
+        pi.getActiveTools().filter((name) => !removedTools.has(name)),
+      );
+    },
+  );
 
   pi.registerCommand("mcp-providers", {
     description: "Show event-published MCP provider status",
@@ -80,7 +99,9 @@ export default function mcpExtension(pi: ExtensionAPI) {
   pi.on("session_shutdown", () => {
     const removedTools = new Set(registry.unregisterAll());
     for (const name of removedTools) unpublishToolDefinition(name);
-    pi.setActiveTools(pi.getActiveTools().filter((name) => !removedTools.has(name)));
+    pi.setActiveTools(
+      pi.getActiveTools().filter((name) => !removedTools.has(name)),
+    );
     stopRegistrationListener();
     stopUnregistrationListener();
   });

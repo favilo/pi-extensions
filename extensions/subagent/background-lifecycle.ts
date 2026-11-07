@@ -1,6 +1,16 @@
-import type { AgentSessionEvent, SessionManager } from "@earendil-works/pi-coding-agent";
-import { createBackgroundEventBuffer, type BackgroundEventLimits, type NormalizedBackgroundEvent } from "./background-events.ts";
-import { createBackgroundTaskRegistry, type BackgroundTaskSnapshot } from "./background-session.ts";
+import type {
+  AgentSessionEvent,
+  SessionManager,
+} from "@earendil-works/pi-coding-agent";
+import {
+  createBackgroundEventBuffer,
+  type BackgroundEventLimits,
+  type NormalizedBackgroundEvent,
+} from "./background-events.ts";
+import {
+  createBackgroundTaskRegistry,
+  type BackgroundTaskSnapshot,
+} from "./background-session.ts";
 import { createSubagentResultExporter } from "./result-export.ts";
 
 export type ManagedSubagentSession = {
@@ -23,24 +33,24 @@ export type BackgroundLaunchOptions = {
 export type BackgroundResult =
   | { found: false; status: "unknown" }
   | (BackgroundTaskSnapshot & {
-    found: true;
-    exported?: false;
-    output?: string;
-    outputBytes?: { original: number; returned: number };
-    outputTruncated?: boolean;
-  })
+      found: true;
+      exported?: false;
+      output?: string;
+      outputBytes?: { original: number; returned: number };
+      outputTruncated?: boolean;
+    })
   | {
-    found: true;
-    id: string;
-    exported: true;
-    destinationPath: string;
-    bytesWritten: number;
-    overwritten: boolean;
-    status: string;
-    terminal: boolean;
-    complete: boolean;
-    schemaVersion: 1;
-  };
+      found: true;
+      id: string;
+      exported: true;
+      destinationPath: string;
+      bytesWritten: number;
+      overwritten: boolean;
+      status: string;
+      terminal: boolean;
+      complete: boolean;
+      schemaVersion: 1;
+    };
 
 export type ExportResultOptions = {
   destinationPath: string;
@@ -51,9 +61,15 @@ export type ExportResultOptions = {
 export type BackgroundSessionController = {
   launch(options: BackgroundLaunchOptions): Promise<BackgroundTaskSnapshot>;
   result(id: string): BackgroundResult;
-  exportResult(id: string, options: ExportResultOptions): Promise<BackgroundResult>;
+  exportResult(
+    id: string,
+    options: ExportResultOptions,
+  ): Promise<BackgroundResult>;
   getEvents(id: string): NormalizedBackgroundEvent[];
-  setStatus(id: string, status: "running" | "waiting-for-permission"): BackgroundTaskSnapshot | undefined;
+  setStatus(
+    id: string,
+    status: "running" | "waiting-for-permission",
+  ): BackgroundTaskSnapshot | undefined;
   close(): Promise<void>;
 };
 
@@ -65,7 +81,10 @@ export type BackgroundCompletionSignal = {
 };
 
 export type BackgroundControllerOptions = {
-  notify?: (message: BackgroundCompletionSignal, options: { deliverAs: "steer"; triggerTurn: true }) => void;
+  notify?: (
+    message: BackgroundCompletionSignal,
+    options: { deliverAs: "steer"; triggerTurn: true },
+  ) => void;
   cleanupTimeoutMs?: number;
   maxRetainedResults?: number;
   maxOutputBytes?: number;
@@ -82,7 +101,10 @@ const DEFAULT_CLEANUP_TIMEOUT_MS = 2_000;
 const DEFAULT_MAX_OUTPUT_BYTES = 8 * 1_024;
 const DEFAULT_MAX_RETAINED_RESULTS = 20;
 
-function truncateUtf8(value: string, maximum: number): { value: string; truncated: boolean } {
+function truncateUtf8(
+  value: string,
+  maximum: number,
+): { value: string; truncated: boolean } {
   const encoded = Buffer.byteLength(value, "utf8");
   if (encoded <= maximum) return { value, truncated: false };
   let bounded = "";
@@ -105,22 +127,28 @@ export function createBackgroundSessionController(
   controllerOptions: BackgroundControllerOptions = {},
 ): BackgroundSessionController {
   const registry = createBackgroundTaskRegistry();
-  const runtimes = new Map<string, {
-    session: ManagedSubagentSession;
-    events: ReturnType<typeof createBackgroundEventBuffer>;
-    cancellation: AbortController;
-    unsubscribe: () => void;
-    output?: string;
-    outputBytes?: { original: number; returned: number };
-    outputTruncated?: boolean;
-    cleaned: boolean;
-    detachInvocationAbort: () => void;
-  }>();
-  const pendingConstructions = new Map<string, {
-    settled: Promise<void>;
-    detachInvocationAbort: () => void;
-    interruptLaunch: (error: Error) => void;
-  }>();
+  const runtimes = new Map<
+    string,
+    {
+      session: ManagedSubagentSession;
+      events: ReturnType<typeof createBackgroundEventBuffer>;
+      cancellation: AbortController;
+      unsubscribe: () => void;
+      output?: string;
+      outputBytes?: { original: number; returned: number };
+      outputTruncated?: boolean;
+      cleaned: boolean;
+      detachInvocationAbort: () => void;
+    }
+  >();
+  const pendingConstructions = new Map<
+    string,
+    {
+      settled: Promise<void>;
+      detachInvocationAbort: () => void;
+      interruptLaunch: (error: Error) => void;
+    }
+  >();
   let closed = false;
   const terminalOrder: string[] = [];
 
@@ -128,7 +156,8 @@ export function createBackgroundSessionController(
     if (!terminalOrder.includes(id)) {
       terminalOrder.push(id);
     }
-    const maximum = controllerOptions.maxRetainedResults ?? DEFAULT_MAX_RETAINED_RESULTS;
+    const maximum =
+      controllerOptions.maxRetainedResults ?? DEFAULT_MAX_RETAINED_RESULTS;
     while (terminalOrder.length > maximum) {
       const evicted = terminalOrder.shift();
       if (!evicted) return;
@@ -137,35 +166,56 @@ export function createBackgroundSessionController(
     }
   }
 
-  function finish(id: string, status: "completed" | "failed" | "cancelled"): void {
+  function finish(
+    id: string,
+    status: "completed" | "failed" | "cancelled",
+  ): void {
     const current = registry.get(id);
     if (!current || current.terminal) return;
     registry.transition(id, status);
     retainTerminal(id);
     if (!closed) {
-      controllerOptions.notify?.({
-        customType: "subagent_finished",
-        content: `Subagent background task ${id} finished with status "${status}". Call subagent_result({ id: "${id}" }) to retrieve its result.`,
-        display: false,
-        details: { id, status },
-      }, { deliverAs: "steer", triggerTurn: true });
+      controllerOptions.notify?.(
+        {
+          customType: "subagent_finished",
+          content: `Subagent background task ${id} finished with status "${status}". Call subagent_result({ id: "${id}" }) to retrieve its result.`,
+          display: false,
+          details: { id, status },
+        },
+        { deliverAs: "steer", triggerTurn: true },
+      );
     }
   }
 
-  async function waitWithinCleanupBound(operation: Promise<unknown>): Promise<void> {
+  async function waitWithinCleanupBound(
+    operation: Promise<unknown>,
+  ): Promise<void> {
     let timer: ReturnType<typeof setTimeout> | undefined;
     const timeout = new Promise<void>((resolve) => {
-      timer = setTimeout(resolve, controllerOptions.cleanupTimeoutMs ?? DEFAULT_CLEANUP_TIMEOUT_MS);
+      timer = setTimeout(
+        resolve,
+        controllerOptions.cleanupTimeoutMs ?? DEFAULT_CLEANUP_TIMEOUT_MS,
+      );
     });
-    await Promise.race([operation.then(() => undefined, () => undefined), timeout]);
+    await Promise.race([
+      operation.then(
+        () => undefined,
+        () => undefined,
+      ),
+      timeout,
+    ]);
     if (timer) clearTimeout(timer);
   }
 
   async function waitForAbort(session: ManagedSubagentSession): Promise<void> {
-    await waitWithinCleanupBound(Promise.resolve().then(() => session.abort?.()));
+    await waitWithinCleanupBound(
+      Promise.resolve().then(() => session.abort?.()),
+    );
   }
 
-  async function disposeStaleSession(session: ManagedSubagentSession): Promise<void> {
+  async function disposeStaleSession(
+    session: ManagedSubagentSession,
+  ): Promise<void> {
     await waitForAbort(session);
     try {
       session.dispose();
@@ -204,9 +254,15 @@ export function createBackgroundSessionController(
       const constructions = [...pendingConstructions.values()];
       for (const construction of constructions) {
         construction.detachInvocationAbort();
-        construction.interruptLaunch(new Error("Background child registry closed during session construction."));
+        construction.interruptLaunch(
+          new Error(
+            "Background child registry closed during session construction.",
+          ),
+        );
       }
-      await waitWithinCleanupBound(Promise.all(constructions.map(({ settled }) => settled)));
+      await waitWithinCleanupBound(
+        Promise.all(constructions.map(({ settled }) => settled)),
+      );
 
       for (const [id, runtime] of runtimes) {
         if (!registry.get(id)?.terminal) {
@@ -225,11 +281,13 @@ export function createBackgroundSessionController(
       return {
         found: true,
         ...task,
-        ...(task.terminal && runtime.output !== undefined ? {
-          output: runtime.output,
-          outputBytes: runtime.outputBytes,
-          outputTruncated: runtime.outputTruncated,
-        } : {}),
+        ...(task.terminal && runtime.output !== undefined
+          ? {
+              output: runtime.output,
+              outputBytes: runtime.outputBytes,
+              outputTruncated: runtime.outputTruncated,
+            }
+          : {}),
       };
     },
 
@@ -278,13 +336,19 @@ export function createBackgroundSessionController(
       if (options.invocationSignal?.aborted) {
         cancellation.abort();
         registry.transition(task.id, "cancelled");
-        throw new Error("Background child launch was cancelled before session construction.");
+        throw new Error(
+          "Background child launch was cancelled before session construction.",
+        );
       }
 
       let markConstructionSettled: (() => void) | undefined;
-      const settled = new Promise<void>((resolve) => { markConstructionSettled = resolve; });
+      const settled = new Promise<void>((resolve) => {
+        markConstructionSettled = resolve;
+      });
       let rejectInterruptedLaunch: ((error: Error) => void) | undefined;
-      const interruptedLaunch = new Promise<never>((_resolve, reject) => { rejectInterruptedLaunch = reject; });
+      const interruptedLaunch = new Promise<never>((_resolve, reject) => {
+        rejectInterruptedLaunch = reject;
+      });
       let launchInterrupted = false;
       const finishPendingConstruction = (): void => {
         if (pendingConstructions.get(task.id)?.settled !== settled) return;
@@ -298,28 +362,54 @@ export function createBackgroundSessionController(
         rejectInterruptedLaunch?.(error);
       };
       const onInvocationAbort = (): void => {
-        interruptLaunch(new Error("Background child launch was cancelled during session construction."));
+        interruptLaunch(
+          new Error(
+            "Background child launch was cancelled during session construction.",
+          ),
+        );
         if (runtimes.has(task.id)) void cancelRuntime(task.id);
       };
       const detachInvocationAbort = options.invocationSignal
-        ? () => options.invocationSignal?.removeEventListener("abort", onInvocationAbort)
+        ? () =>
+            options.invocationSignal?.removeEventListener(
+              "abort",
+              onInvocationAbort,
+            )
         : () => {};
-      options.invocationSignal?.addEventListener("abort", onInvocationAbort, { once: true });
-      pendingConstructions.set(task.id, { settled, detachInvocationAbort, interruptLaunch });
+      options.invocationSignal?.addEventListener("abort", onInvocationAbort, {
+        once: true,
+      });
+      pendingConstructions.set(task.id, {
+        settled,
+        detachInvocationAbort,
+        interruptLaunch,
+      });
       if (options.invocationSignal?.aborted) onInvocationAbort();
 
       const construction = Promise.resolve()
-        .then(() => (options.createSession ?? createSession)({ childId: task.id, cwd: options.cwd, signal: cancellation.signal }))
+        .then(() =>
+          (options.createSession ?? createSession)({
+            childId: task.id,
+            cwd: options.cwd,
+            signal: cancellation.signal,
+          }),
+        )
         .then(async (session) => {
           if (!closed && !cancellation.signal.aborted) return session;
           await disposeStaleSession(session);
-          throw new Error(closed
-            ? "Background child registry closed during session construction."
-            : "Background child launch was cancelled during session construction.");
+          throw new Error(
+            closed
+              ? "Background child registry closed during session construction."
+              : "Background child launch was cancelled during session construction.",
+          );
         });
       void construction.then(
-        () => { if (launchInterrupted) finishPendingConstruction(); },
-        () => { if (launchInterrupted) finishPendingConstruction(); },
+        () => {
+          if (launchInterrupted) finishPendingConstruction();
+        },
+        () => {
+          if (launchInterrupted) finishPendingConstruction();
+        },
       );
 
       let session: ManagedSubagentSession;
@@ -330,8 +420,14 @@ export function createBackgroundSessionController(
         registry.transition(task.id, cancelled ? "cancelled" : "failed");
         detachInvocationAbort();
         if (!launchInterrupted) finishPendingConstruction();
-        if (closed) throw new Error("Background child registry closed during session construction.");
-        if (cancelled) throw new Error("Background child launch was cancelled during session construction.");
+        if (closed)
+          throw new Error(
+            "Background child registry closed during session construction.",
+          );
+        if (cancelled)
+          throw new Error(
+            "Background child launch was cancelled during session construction.",
+          );
         throw error;
       }
 
@@ -340,9 +436,11 @@ export function createBackgroundSessionController(
         await disposeStaleSession(session);
         detachInvocationAbort();
         finishPendingConstruction();
-        throw new Error(closed
-          ? "Background child registry closed during session construction."
-          : "Background child launch was cancelled during session construction.");
+        throw new Error(
+          closed
+            ? "Background child registry closed during session construction."
+            : "Background child launch was cancelled during session construction.",
+        );
       }
 
       const events = createBackgroundEventBuffer(task.id, DEFAULT_EVENT_LIMITS);
@@ -352,7 +450,8 @@ export function createBackgroundSessionController(
         cancellation,
         unsubscribe: () => {},
         output: undefined as string | undefined,
-        outputBytes: undefined as { original: number; returned: number } | undefined,
+        outputBytes: undefined as
+          { original: number; returned: number } | undefined,
         outputTruncated: undefined as boolean | undefined,
         cleaned: false,
         detachInvocationAbort,
@@ -360,7 +459,10 @@ export function createBackgroundSessionController(
       runtimes.set(task.id, runtime);
       finishPendingConstruction();
       runtime.unsubscribe = session.subscribe((event) => {
-        controllerOptions.debug?.("child-session-event", { childId: task.id, eventType: event.type });
+        controllerOptions.debug?.("child-session-event", {
+          childId: task.id,
+          eventType: event.type,
+        });
         events.append(event);
       });
       registry.transition(task.id, "running");
@@ -368,7 +470,10 @@ export function createBackgroundSessionController(
         if (cancellation.signal.aborted || runtime.cleaned) return;
         const output = session.getLastAssistantText?.();
         if (output === undefined) return;
-        const bounded = truncateUtf8(output, controllerOptions.maxOutputBytes ?? DEFAULT_MAX_OUTPUT_BYTES);
+        const bounded = truncateUtf8(
+          output,
+          controllerOptions.maxOutputBytes ?? DEFAULT_MAX_OUTPUT_BYTES,
+        );
         runtime.output = bounded.value;
         runtime.outputBytes = {
           original: Buffer.byteLength(output, "utf8"),
@@ -377,16 +482,25 @@ export function createBackgroundSessionController(
         runtime.outputTruncated = bounded.truncated;
       };
       controllerOptions.debug?.("child-prompt-start", { childId: task.id });
-      void session.prompt(`${options.parentContext}\n\n${options.task}`)
+      void session
+        .prompt(`${options.parentContext}\n\n${options.task}`)
         .then(
           () => {
-            controllerOptions.debug?.("child-prompt-resolved", { childId: task.id });
+            controllerOptions.debug?.("child-prompt-resolved", {
+              childId: task.id,
+            });
             captureFinalOutput();
-            finish(task.id, cancellation.signal.aborted ? "cancelled" : "completed");
+            finish(
+              task.id,
+              cancellation.signal.aborted ? "cancelled" : "completed",
+            );
           },
           () => {
             const status = cancellation.signal.aborted ? "cancelled" : "failed";
-            controllerOptions.debug?.("child-prompt-rejected", { childId: task.id, status });
+            controllerOptions.debug?.("child-prompt-rejected", {
+              childId: task.id,
+              status,
+            });
             captureFinalOutput();
             finish(task.id, status);
           },

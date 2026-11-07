@@ -155,7 +155,10 @@ test("source spans stay relative to the original text with leading whitespace", 
   assert.equal(result.ok, true);
   if (!result.ok) return;
   assert.equal(result.subcommands.length, 1);
-  assert.equal(cmd.slice(result.subcommands[0].span.start, result.subcommands[0].span.end), "jj status");
+  assert.equal(
+    cmd.slice(result.subcommands[0].span.start, result.subcommands[0].span.end),
+    "jj status",
+  );
 });
 
 test("source spans stay relative to the original text with a leading tab", () => {
@@ -163,5 +166,8 @@ test("source spans stay relative to the original text with a leading tab", () =>
   const result = parseBashCommand(cmd);
   assert.equal(result.ok, true);
   if (!result.ok) return;
-  assert.equal(cmd.slice(result.subcommands[0].span.start, result.subcommands[0].span.end), "jj status");
+  assert.equal(
+    cmd.slice(result.subcommands[0].span.start, result.subcommands[0].span.end),
+    "jj status",
+  );
 });

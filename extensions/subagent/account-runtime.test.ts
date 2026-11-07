@@ -32,7 +32,9 @@ test("creates an isolated runtime using the account-switcher selection capabilit
         modelId: "gpt-5.6-terra",
         source: "explicit" as const,
       }),
-      installOauth: async (registry: unknown) => { installed.registry = registry; },
+      installOauth: async (registry: unknown) => {
+        installed.registry = registry;
+      },
       consume: async () => {},
     }),
   };
@@ -59,14 +61,20 @@ test("consumes a one-shot selection only after child session construction succee
       source: "one-shot" as const,
     }),
     async installOauth() {},
-    consume: async () => { consumes += 1; order.push("consume"); },
+    consume: async () => {
+      consumes += 1;
+      order.push("consume");
+    },
   };
   const input = {};
   attachChildRuntimeSelection(input, selection);
 
   const result = await createChildSessionWithRuntime(
     input,
-    async () => { order.push("session"); return "child-session"; },
+    async () => {
+      order.push("session");
+      return "child-session";
+    },
     async (approved) => {
       order.push("runtime");
       return { modelRuntime: {} as never, model: {}, selection: approved };
@@ -82,19 +90,37 @@ test("consumes a one-shot selection only after child session construction succee
   await assert.rejects(
     createChildSessionWithRuntime(
       failedInput,
-      async () => { throw new Error("session construction failed"); },
-      async (approved) => ({ modelRuntime: {} as never, model: {}, selection: approved }),
+      async () => {
+        throw new Error("session construction failed");
+      },
+      async (approved) => ({
+        modelRuntime: {} as never,
+        model: {},
+        selection: approved,
+      }),
     ),
     /session construction failed/,
   );
-  assert.equal(consumes, 1, "a failed child construction must retain the one-shot selection");
+  assert.equal(
+    consumes,
+    1,
+    "a failed child construction must retain the one-shot selection",
+  );
 });
 
 test("constructs a child runtime from any published provider selection (antigravity, openai-compat, anthropic, etc.)", async () => {
   const cases = [
-    { accountId: "gemini-acc", provider: "antigravity", modelId: "gemini-2.5-pro" },
+    {
+      accountId: "gemini-acc",
+      provider: "antigravity",
+      modelId: "gemini-2.5-pro",
+    },
     { accountId: "compat-acc", provider: "openai-compat", modelId: "gpt-4o" },
-    { accountId: "claude-acc", provider: "anthropic", modelId: "claude-3-7-sonnet" },
+    {
+      accountId: "claude-acc",
+      provider: "anthropic",
+      modelId: "claude-3-7-sonnet",
+    },
   ];
 
   for (const c of cases) {
@@ -108,12 +134,28 @@ test("constructs a child runtime from any published provider selection (antigrav
       }),
       installOauth: async (registry: unknown) => {
         installedRegistry = registry;
-        if (registry && typeof (registry as Record<string, unknown>).registerProvider === "function") {
-          (registry as { registerProvider: (id: string, def: unknown) => void }).registerProvider(c.provider, {
+        if (
+          registry &&
+          typeof (registry as Record<string, unknown>).registerProvider ===
+            "function"
+        ) {
+          (
+            registry as { registerProvider: (id: string, def: unknown) => void }
+          ).registerProvider(c.provider, {
             name: c.provider,
             baseUrl: "https://example.invalid",
             api: "openai-completions",
-            models: [{ id: c.modelId, name: c.modelId, reasoning: false, input: ["text"], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 128000, maxTokens: 4096 }],
+            models: [
+              {
+                id: c.modelId,
+                name: c.modelId,
+                reasoning: false,
+                input: ["text"],
+                cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+                contextWindow: 128000,
+                maxTokens: 4096,
+              },
+            ],
           });
         }
       },
@@ -130,4 +172,3 @@ test("constructs a child runtime from any published provider selection (antigrav
     assert.notEqual(runtime.model, undefined);
   }
 });
-

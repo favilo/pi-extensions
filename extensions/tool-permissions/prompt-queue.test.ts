@@ -16,15 +16,24 @@ import {
 } from "./prompt-queue.ts";
 import type { ToolRequest } from "./permission-boundary.ts";
 
-type InputComponent = { handleInput(data: string): void; render(width: number): string[] };
+type InputComponent = {
+  handleInput(data: string): void;
+  render(width: number): string[];
+};
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
-  const promise = new Promise<T>((settle) => { resolve = settle; });
+  const promise = new Promise<T>((settle) => {
+    resolve = settle;
+  });
   return { promise, resolve };
 }
 
-function request(actor: ToolRequest["actor"], toolName = "read", input: unknown = { path: "notes.md" }): ToolRequest {
+function request(
+  actor: ToolRequest["actor"],
+  toolName = "read",
+  input: unknown = { path: "notes.md" },
+): ToolRequest {
   return { actor, toolName, input, cwd: "/workspace/project" };
 }
 
@@ -37,16 +46,25 @@ function promptHarness() {
     sessionId: "parent-session",
     ui: {
       confirm: async () => false,
-      custom<T>(factory: (
-        tui: { requestRender(force?: boolean): void; stop(): void; start(): void },
-        theme: unknown,
-        keybindings: unknown,
-        done: (value: T) => void,
-      ) => unknown): Promise<T> {
+      custom<T>(
+        factory: (
+          tui: {
+            requestRender(force?: boolean): void;
+            stop(): void;
+            start(): void;
+          },
+          theme: unknown,
+          keybindings: unknown,
+          done: (value: T) => void,
+        ) => unknown,
+      ): Promise<T> {
         return new Promise<T>((resolve) => {
           const component = factory(
             { requestRender() {}, stop() {}, start() {} },
-            { fg: (_color: string, text: string) => text, bold: (text: string) => text },
+            {
+              fg: (_color: string, text: string) => text,
+              bold: (text: string) => text,
+            },
             {},
             resolve,
           );
@@ -65,7 +83,13 @@ function promptHarness() {
 
 test("renders child permission details with actual line breaks", async () => {
   const { components, context, childPi } = promptHarness();
-  const pending = promptToolPermissionRequest(childPi, context, request({ kind: "child", childId: "amber-otter" }, "bash", { command: "pwd" }));
+  const pending = promptToolPermissionRequest(
+    childPi,
+    context,
+    request({ kind: "child", childId: "amber-otter" }, "bash", {
+      command: "pwd",
+    }),
+  );
 
   try {
     const text = components[0].render(100).join("\n");
@@ -78,17 +102,39 @@ test("renders child permission details with actual line breaks", async () => {
 });
 
 for (const actors of [
-  [{ kind: "main" } as const, { kind: "child", childId: "amber-otter" } as const],
-  [{ kind: "child", childId: "amber-otter" } as const, { kind: "main" } as const],
+  [
+    { kind: "main" } as const,
+    { kind: "child", childId: "amber-otter" } as const,
+  ],
+  [
+    { kind: "child", childId: "amber-otter" } as const,
+    { kind: "main" } as const,
+  ],
 ]) {
   test(`presents ${actors[0].kind} then ${actors[1].kind} prompts FIFO and requires independent decisions`, async () => {
     const { components, context, mainPi, childPi } = promptHarness();
-    const piFor = (actor: ToolRequest["actor"]) => actor.kind === "main" ? mainPi : childPi;
-    const first = promptToolPermissionRequest(piFor(actors[0]), context, request(actors[0]));
-    const second = promptToolPermissionRequest(piFor(actors[1]), context, request(actors[1], "write", { path: "report.md" }));
+    const piFor = (actor: ToolRequest["actor"]) =>
+      actor.kind === "main" ? mainPi : childPi;
+    const first = promptToolPermissionRequest(
+      piFor(actors[0]),
+      context,
+      request(actors[0]),
+    );
+    const second = promptToolPermissionRequest(
+      piFor(actors[1]),
+      context,
+      request(actors[1], "write", { path: "report.md" }),
+    );
 
-    assert.equal(components.length, 1, "a later prompt must not replace the visible prompt");
-    assert.match(components[0].render(100).join("\n"), new RegExp(actors[0].kind === "main" ? "main agent" : "amber-otter"));
+    assert.equal(
+      components.length,
+      1,
+      "a later prompt must not replace the visible prompt",
+    );
+    assert.match(
+      components[0].render(100).join("\n"),
+      new RegExp(actors[0].kind === "main" ? "main agent" : "amber-otter"),
+    );
     components[0].handleInput("\x19");
     assert.equal(await first, "allow");
     await new Promise((resolve) => setImmediate(resolve));
@@ -96,9 +142,15 @@ for (const actors of [
     assert.equal(components.length, 2);
     const pending = await Promise.race([
       second.then(() => "settled"),
-      new Promise<"pending">((resolve) => setImmediate(() => resolve("pending"))),
+      new Promise<"pending">((resolve) =>
+        setImmediate(() => resolve("pending")),
+      ),
     ]);
-    assert.equal(pending, "pending", "the first decision must not settle the second request");
+    assert.equal(
+      pending,
+      "pending",
+      "the first decision must not settle the second request",
+    );
     components[1].handleInput("\x04");
     assert.equal(await second, "deny");
   });
@@ -109,7 +161,11 @@ test("binds immutable safe identity and cancels only the targeted queued request
   const active = deferred<string>();
   const queuedController = new AbortController();
   let queuedPresented = false;
-  const sensitiveRequest = request({ kind: "child", childId: "amber-otter" }, "read", { token: "must-not-leak" });
+  const sensitiveRequest = request(
+    { kind: "child", childId: "amber-otter" },
+    "read",
+    { token: "must-not-leak" },
+  );
   const identity = createPermissionPromptIdentity(sensitiveRequest);
 
   assert.equal(Object.isFrozen(identity), true);
@@ -122,8 +178,13 @@ test("binds immutable safe identity and cancels only the targeted queued request
     cancel: "cancel",
   });
   const second = queue.enqueue({
-    identity: createPermissionPromptIdentity(request({ kind: "main" }, "bash", { command: "pwd" })),
-    present: async () => { queuedPresented = true; return "allow"; },
+    identity: createPermissionPromptIdentity(
+      request({ kind: "main" }, "bash", { command: "pwd" }),
+    ),
+    present: async () => {
+      queuedPresented = true;
+      return "allow";
+    },
     cancel: "cancel",
     signal: queuedController.signal,
   });
@@ -141,18 +202,24 @@ test("binds immutable safe identity and cancels only the targeted queued request
 test("closing the queue cancels active and queued prompts exactly once", async () => {
   const queue = new PermissionPromptQueue();
   const settlements: string[] = [];
-  const enqueue = (actor: ToolRequest["actor"]) => queue.enqueue({
-    identity: createPermissionPromptIdentity(request(actor)),
-    present: (signal) => new Promise<string>((resolve) => {
-      const timeout = setTimeout(() => resolve("timed-out"), 25);
-      signal.addEventListener("abort", () => {
-        clearTimeout(timeout);
-        settlements.push(actor.kind);
-        resolve("cancel");
-      }, { once: true });
-    }),
-    cancel: "cancel",
-  });
+  const enqueue = (actor: ToolRequest["actor"]) =>
+    queue.enqueue({
+      identity: createPermissionPromptIdentity(request(actor)),
+      present: (signal) =>
+        new Promise<string>((resolve) => {
+          const timeout = setTimeout(() => resolve("timed-out"), 25);
+          signal.addEventListener(
+            "abort",
+            () => {
+              clearTimeout(timeout);
+              settlements.push(actor.kind);
+              resolve("cancel");
+            },
+            { once: true },
+          );
+        }),
+      cancel: "cancel",
+    });
 
   const first = enqueue({ kind: "main" });
   const second = enqueue({ kind: "child", childId: "amber-otter" });
@@ -168,12 +235,20 @@ test("advances after prompt errors without settling another request", async () =
   const presentations: string[] = [];
   const first = queue.enqueue({
     identity: createPermissionPromptIdentity(request({ kind: "main" })),
-    present: async () => { presentations.push("main"); throw new Error("prompt failed"); },
+    present: async () => {
+      presentations.push("main");
+      throw new Error("prompt failed");
+    },
     cancel: "cancel",
   });
   const second = queue.enqueue({
-    identity: createPermissionPromptIdentity(request({ kind: "child", childId: "amber-otter" })),
-    present: async () => { presentations.push("child"); return "deny"; },
+    identity: createPermissionPromptIdentity(
+      request({ kind: "child", childId: "amber-otter" }),
+    ),
+    present: async () => {
+      presentations.push("child");
+      return "deny";
+    },
     cancel: "cancel",
   });
 
@@ -194,25 +269,40 @@ test("an active cancellation cannot be overwritten by a late prompt result", asy
   });
   let secondPresented = false;
   const second = queue.enqueue({
-    identity: createPermissionPromptIdentity(request({ kind: "child", childId: "amber-otter" })),
-    present: async () => { secondPresented = true; return "deny"; },
+    identity: createPermissionPromptIdentity(
+      request({ kind: "child", childId: "amber-otter" }),
+    ),
+    present: async () => {
+      secondPresented = true;
+      return "deny";
+    },
     cancel: "cancel",
   });
 
   controller.abort();
   assert.equal(await first, "cancel");
-  assert.equal(secondPresented, false, "the next prompt waits for active UI teardown");
+  assert.equal(
+    secondPresented,
+    false,
+    "the next prompt waits for active UI teardown",
+  );
   presentation.resolve("allow");
   assert.equal(await second, "deny");
   assert.equal(await first, "cancel");
 });
 
 test("shares one queue across separately loaded extension module graphs", async () => {
-  const firstModule = await import(new URL("./prompt-queue.ts?extension=main", import.meta.url).href);
-  const secondModule = await import(new URL("./prompt-queue.ts?extension=child", import.meta.url).href);
+  const firstModule = await import(
+    new URL("./prompt-queue.ts?extension=main", import.meta.url).href
+  );
+  const secondModule = await import(
+    new URL("./prompt-queue.ts?extension=child", import.meta.url).href
+  );
   const first = firstModule.permissionPromptQueueFor("parent-session");
   const second = secondModule.permissionPromptQueueFor("parent-session");
-  const unrelated = secondModule.permissionPromptQueueFor("other-parent-session");
+  const unrelated = secondModule.permissionPromptQueueFor(
+    "other-parent-session",
+  );
 
   try {
     assert.equal(first, second);
@@ -234,23 +324,70 @@ test("uses main-agent cwd and configured policy semantics for child requests", (
   writeFileSync(join(cwd, "denied.txt"), "denied", "utf8");
   writeFileSync(join(cwd, "private", "secret.txt"), "secret", "utf8");
   writeFileSync(join(cwd, ".aiignore"), "private/**\n", "utf8");
-  writeFileSync(policy, stringifyToml({
-    permissions: {
-      read: {
-        allow: [{ path: `^${join(cwd, "allow-listed.txt").replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$` }],
-        deny: [{ path: "denied\\.txt$" }],
+  writeFileSync(
+    policy,
+    stringifyToml({
+      permissions: {
+        read: {
+          allow: [
+            {
+              path: `^${join(cwd, "allow-listed.txt").replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`,
+            },
+          ],
+          deny: [{ path: "denied\\.txt$" }],
+        },
+        bash: { allow: [{ command: "^pwd$" }], deny: [{ command: "^rm " }] },
       },
-      bash: { allow: [{ command: "^pwd$" }], deny: [{ command: "^rm " }] },
-    },
-  }), "utf8");
+    }),
+    "utf8",
+  );
   const options = { userPermissionsPath: policy, trustResolver: () => null };
   const child = { kind: "child", childId: "amber-otter" } as const;
 
-  assert.equal(resolvePermissionDecisionForRequest({ ...request(child), cwd }, options), "allow");
-  assert.equal(resolvePermissionDecisionForRequest({ ...request(child, "read", { path: "allow-listed.txt" }), cwd }, options), "allow");
-  assert.equal(resolvePermissionDecisionForRequest({ ...request(child, "read", { path: "denied.txt" }), cwd }, options), "deny");
-  assert.equal(resolvePermissionDecisionForRequest({ ...request(child, "read", { path: "private/secret.txt" }), cwd }, options), "deny");
-  assert.equal(resolvePermissionDecisionForRequest({ ...request(child, "bash", { command: "pwd" }), cwd }, options), "allow");
-  assert.equal(resolvePermissionDecisionForRequest({ ...request(child, "bash", { command: "rm report.md" }), cwd }, options), "deny");
-  assert.equal(resolvePermissionDecisionForRequest({ ...request(child, "write", { path: "report.md", content: "x" }), cwd }, options), "ask");
+  assert.equal(
+    resolvePermissionDecisionForRequest({ ...request(child), cwd }, options),
+    "allow",
+  );
+  assert.equal(
+    resolvePermissionDecisionForRequest(
+      { ...request(child, "read", { path: "allow-listed.txt" }), cwd },
+      options,
+    ),
+    "allow",
+  );
+  assert.equal(
+    resolvePermissionDecisionForRequest(
+      { ...request(child, "read", { path: "denied.txt" }), cwd },
+      options,
+    ),
+    "deny",
+  );
+  assert.equal(
+    resolvePermissionDecisionForRequest(
+      { ...request(child, "read", { path: "private/secret.txt" }), cwd },
+      options,
+    ),
+    "deny",
+  );
+  assert.equal(
+    resolvePermissionDecisionForRequest(
+      { ...request(child, "bash", { command: "pwd" }), cwd },
+      options,
+    ),
+    "allow",
+  );
+  assert.equal(
+    resolvePermissionDecisionForRequest(
+      { ...request(child, "bash", { command: "rm report.md" }), cwd },
+      options,
+    ),
+    "deny",
+  );
+  assert.equal(
+    resolvePermissionDecisionForRequest(
+      { ...request(child, "write", { path: "report.md", content: "x" }), cwd },
+      options,
+    ),
+    "ask",
+  );
 });

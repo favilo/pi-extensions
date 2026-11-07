@@ -3,7 +3,11 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { visibleWidth } from "@earendil-works/pi-tui";
 import type { NormalizedBackgroundEvent } from "./background-events.ts";
-import { createPanelManager, createSubagentTranscriptPanel, type SubagentTranscriptPanelOptions } from "./transcript-panel.ts";
+import {
+  createPanelManager,
+  createSubagentTranscriptPanel,
+  type SubagentTranscriptPanelOptions,
+} from "./transcript-panel.ts";
 
 const dummyTheme = {
   fg: (_color: string, text: string) => text,
@@ -31,14 +35,23 @@ test("renders a read-only child transcript component from normalized events with
       childId: "child-9999",
       sequence: 2,
       type: "tool-call",
-      payload: { toolCallId: "call-1", toolName: "read", input: { path: "package.json" } },
+      payload: {
+        toolCallId: "call-1",
+        toolName: "read",
+        input: { path: "package.json" },
+      },
       truncated: false,
     },
     {
       childId: "child-9999",
       sequence: 3,
       type: "tool-result",
-      payload: { toolCallId: "call-1", toolName: "read", result: { content: '{"name":"demo"}' }, isError: false },
+      payload: {
+        toolCallId: "call-1",
+        toolName: "read",
+        result: { content: '{"name":"demo"}' },
+        isError: false,
+      },
       truncated: false,
     },
   ];

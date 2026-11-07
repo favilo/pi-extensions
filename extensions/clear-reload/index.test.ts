@@ -57,7 +57,11 @@ test("clear waits for idle, replaces the session, and reloads the replacement co
 
   await handler("", context);
 
-  assert.deepEqual(calls, ["waitForIdle", "newSession:/sessions/current.jsonl", "reload"]);
+  assert.deepEqual(calls, [
+    "waitForIdle",
+    "newSession:/sessions/current.jsonl",
+    "reload",
+  ]);
   assert.deepEqual(notifications, [
     { message: "Context cleared. Reloading plugins…", level: "info" },
   ]);

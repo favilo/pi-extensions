@@ -12,7 +12,7 @@
     "pi-package"
   ],
   "scripts": {
-    "check": "npm run typecheck && npm run test:preflight && npm run check:test-guard",
+    "check": "npm run typecheck && npm run test:native && npm run test:preflight && npm run check:test-guard",
     "check:test-guard": "bash .github/scripts/check-test-guard.sh",
     "check:ci": "npm run check && npm run check:plans && npm run check:portability",
     "check:plans": "bash .github/scripts/check-active-plans.sh",
@@ -20,7 +20,11 @@
     "prepare": "npm run build:native",
     "build:native": "WASI_SDK_PATH=\"${WASI_SDK_PATH:-$HOME/.local/wasi-sdk}\" napi build --cwd extensions/tool-permissions/native --package tool-permissions-native --release --platform --target wasm32-wasip1-threads --output-dir generated && node scripts/patch-wasi-init-tp.mjs && rm -f extensions/tool-permissions/native/generated/*.node",
     "build:clean": "rm -rf extensions/tool-permissions/native/generated extensions/tool-permissions/native/target",
-    "test": "node --test extensions/*/*.test.ts examples/*/*.test.ts",
+    "fmt": "npm run fmt:rust && npm run fmt:ts",
+    "fmt:rust": "cargo fmt --all --manifest-path extensions/tool-permissions/native/Cargo.toml",
+    "fmt:ts": "prettier --write \"extensions/**/*.ts\" \"examples/**/*.ts\"",
+    "test": "npm run test:native && node --test extensions/*/*.test.ts examples/*/*.test.ts",
+    "test:native": "cargo test --manifest-path extensions/tool-permissions/native/Cargo.toml",
     "test:preflight": "node --test extensions/*/*.test.ts",
     "typecheck": "tsc --noEmit"
   },
@@ -59,6 +63,7 @@
     "@earendil-works/pi-tui": "^0.82.1",
     "@napi-rs/cli": "^3.10.12",
     "@types/node": "^24.0.0",
+    "prettier": "^3.9.10",
     "typescript": "^7.0.2",
     "unbash": "^4.0.10"
   }

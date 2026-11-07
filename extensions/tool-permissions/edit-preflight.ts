@@ -14,7 +14,10 @@ export type EditPreflightResult = { ok: true } | { ok: false; reason: string };
  * tool itself instead of a forked copy. A doomed edit fails here, before any
  * permission prompt is shown, with the exact reason the tool would produce.
  */
-export async function preflightEdit(path: string, edits: EditPair[]): Promise<EditPreflightResult> {
+export async function preflightEdit(
+  path: string,
+  edits: EditPair[],
+): Promise<EditPreflightResult> {
   const tool = createEditTool(dirname(path), {
     operations: {
       readFile: (target) => readFile(target),
@@ -26,6 +29,9 @@ export async function preflightEdit(path: string, edits: EditPair[]): Promise<Ed
     await tool.execute("edit-preflight", { path, edits }, undefined);
     return { ok: true };
   } catch (error) {
-    return { ok: false, reason: error instanceof Error ? error.message : String(error) };
+    return {
+      ok: false,
+      reason: error instanceof Error ? error.message : String(error),
+    };
   }
 }

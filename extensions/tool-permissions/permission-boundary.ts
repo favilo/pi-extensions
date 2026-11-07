@@ -25,18 +25,49 @@ export type ToolExecutionResult = {
 
 export type ToolPermissionBoundary = {
   evaluate(request: ToolRequest): Promise<PermissionDecision>;
-  prompt?(request: ToolRequest, signal?: AbortSignal): Promise<PermissionPromptResult>;
+  prompt?(
+    request: ToolRequest,
+    signal?: AbortSignal,
+  ): Promise<PermissionPromptResult>;
   execute(request: ToolRequest): Promise<unknown>;
   validate?(request: ToolRequest): string | undefined;
-  audit?(entry: { actor: ToolActor; toolName: string; cwd: string; decision: string; reason?: string }): void;
+  audit?(entry: {
+    actor: ToolActor;
+    toolName: string;
+    cwd: string;
+    decision: string;
+    reason?: string;
+  }): void;
 };
 
-function result(request: ToolRequest, status: ToolExecutionResult["status"], reason?: string, value?: unknown): ToolExecutionResult {
-  return { status, actor: request.actor, toolName: request.toolName, ...(reason ? { reason } : {}), ...(value !== undefined ? { value } : {}) };
+function result(
+  request: ToolRequest,
+  status: ToolExecutionResult["status"],
+  reason?: string,
+  value?: unknown,
+): ToolExecutionResult {
+  return {
+    status,
+    actor: request.actor,
+    toolName: request.toolName,
+    ...(reason ? { reason } : {}),
+    ...(value !== undefined ? { value } : {}),
+  };
 }
 
-function audit(boundary: ToolPermissionBoundary, request: ToolRequest, decision: string, reason?: string): void {
-  boundary.audit?.({ actor: request.actor, toolName: request.toolName, cwd: request.cwd, decision, ...(reason ? { reason } : {}) });
+function audit(
+  boundary: ToolPermissionBoundary,
+  request: ToolRequest,
+  decision: string,
+  reason?: string,
+): void {
+  boundary.audit?.({
+    actor: request.actor,
+    toolName: request.toolName,
+    cwd: request.cwd,
+    decision,
+    ...(reason ? { reason } : {}),
+  });
 }
 
 function unavailableUiResult(request: ToolRequest): ToolExecutionResult {
@@ -56,7 +87,12 @@ export async function executeToolRequest(
   boundary: ToolPermissionBoundary,
   signal?: AbortSignal,
 ): Promise<ToolExecutionResult> {
-  if (signal?.aborted) return result(request, "cancelled", "Tool action was cancelled before authorization.");
+  if (signal?.aborted)
+    return result(
+      request,
+      "cancelled",
+      "Tool action was cancelled before authorization.",
+    );
 
   const validationError = boundary.validate?.(request);
   if (validationError) {
@@ -81,13 +117,23 @@ export async function executeToolRequest(
 
   if (decision === "ask") {
     if (!boundary.prompt) {
-      audit(boundary, request, "deny_no_ui", "Interactive approval is unavailable.");
+      audit(
+        boundary,
+        request,
+        "deny_no_ui",
+        "Interactive approval is unavailable.",
+      );
       return unavailableUiResult(request);
     }
     try {
       const prompted = await boundary.prompt(request, signal);
       if (prompted === "cancel") {
-        audit(boundary, request, "cancel_prompt", "Permission prompt was cancelled.");
+        audit(
+          boundary,
+          request,
+          "cancel_prompt",
+          "Permission prompt was cancelled.",
+        );
         return result(request, "cancelled", "permission_prompt_cancelled");
       }
       if (prompted === "deny") {
@@ -103,7 +149,12 @@ export async function executeToolRequest(
     }
   }
 
-  if (signal?.aborted) return result(request, "cancelled", "Tool action was cancelled before execution.");
+  if (signal?.aborted)
+    return result(
+      request,
+      "cancelled",
+      "Tool action was cancelled before execution.",
+    );
   audit(boundary, request, decision);
   try {
     const value = await boundary.execute(request);

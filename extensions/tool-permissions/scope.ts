@@ -1,7 +1,16 @@
 import { existsSync, realpathSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
-import { CONFIG_DIR_NAME, getAgentDir, ProjectTrustStore } from "@earendil-works/pi-coding-agent";
-import { loadPermissions, permissionDecision, permissionKeyForTool, type Permissions } from "./config.ts";
+import {
+  CONFIG_DIR_NAME,
+  getAgentDir,
+  ProjectTrustStore,
+} from "@earendil-works/pi-coding-agent";
+import {
+  loadPermissions,
+  permissionDecision,
+  permissionKeyForTool,
+  type Permissions,
+} from "./config.ts";
 import { evaluatePermissionOrchestrationWithNative } from "./native-orchestration-loader.ts";
 import { isYoloModeEnabled } from "./yolo-mode.ts";
 
@@ -20,7 +29,11 @@ export type ScopedPermissionDecision = {
   diagnostic?: string;
 };
 
-const defaultFileSystem: ScopeFileSystem = { existsSync, realpathSync, loadPermissions };
+const defaultFileSystem: ScopeFileSystem = {
+  existsSync,
+  realpathSync,
+  loadPermissions,
+};
 
 function canonical(path: string, fs: ScopeFileSystem): string {
   try {
@@ -32,7 +45,10 @@ function canonical(path: string, fs: ScopeFileSystem): string {
 
 function isInside(path: string, directory: string): boolean {
   const rel = relative(directory, path);
-  return rel === "" || (!rel.startsWith("..") && !rel.startsWith("/") && !/^[A-Za-z]:/.test(rel));
+  return (
+    rel === "" ||
+    (!rel.startsWith("..") && !rel.startsWith("/") && !/^[A-Za-z]:/.test(rel))
+  );
 }
 
 function ancestors(cwd: string): string[] {
@@ -53,14 +69,23 @@ export function discoverProjectPolicyPaths(
 ): string[] {
   const current = canonical(cwd, fileSystem);
   const directories = ancestors(current);
-  const boundary = directories.find((directory) =>
-    fileSystem.existsSync(join(directory, ".git")) || fileSystem.existsSync(join(directory, ".jj")),
+  const boundary = directories.find(
+    (directory) =>
+      fileSystem.existsSync(join(directory, ".git")) ||
+      fileSystem.existsSync(join(directory, ".jj")),
   );
-  const eligible = boundary ? directories.slice(0, directories.indexOf(boundary) + 1) : [current];
-  return eligible.map((directory) => join(directory, configDirName, "permissions.toml"));
+  const eligible = boundary
+    ? directories.slice(0, directories.indexOf(boundary) + 1)
+    : [current];
+  return eligible.map((directory) =>
+    join(directory, configDirName, "permissions.toml"),
+  );
 }
 
-export function resolveTrustEligibility(cwd: string, trustResolver: TrustResolver): TrustEntry | null {
+export function resolveTrustEligibility(
+  cwd: string,
+  trustResolver: TrustResolver,
+): TrustEntry | null {
   try {
     const entry = trustResolver(cwd);
     if (!entry || !entry.decision) return null;
@@ -70,7 +95,9 @@ export function resolveTrustEligibility(cwd: string, trustResolver: TrustResolve
   }
 }
 
-export function createPersistedTrustResolver(agentDir = getAgentDir()): TrustResolver {
+export function createPersistedTrustResolver(
+  agentDir = getAgentDir(),
+): TrustResolver {
   const store = new ProjectTrustStore(agentDir);
   return (cwd) => {
     const entry = store.getEntry(cwd);
@@ -86,17 +113,35 @@ export function resolveCurrentProjectPolicyPath(options: {
 }): string | undefined {
   const fs = options.fileSystem ?? defaultFileSystem;
   const current = canonical(options.cwd, fs);
-  const trust = resolveTrustEligibility(current, options.trustResolver ?? createPersistedTrustResolver());
+  const trust = resolveTrustEligibility(
+    current,
+    options.trustResolver ?? createPersistedTrustResolver(),
+  );
   if (!trust) return undefined;
   const trustedPath = canonical(trust.path, fs);
-  const projectPath = discoverProjectPolicyPaths(current, options.configDirName, fs)[0];
-  return isInside(canonical(projectPath, fs), trustedPath) ? projectPath : undefined;
+  const projectPath = discoverProjectPolicyPaths(
+    current,
+    options.configDirName,
+    fs,
+  )[0];
+  return isInside(canonical(projectPath, fs), trustedPath)
+    ? projectPath
+    : undefined;
 }
 
-function orchestratedPermissionDecision(toolName: string, permissions: Permissions, input: unknown): "allow" | "deny" | "ask" {
+function orchestratedPermissionDecision(
+  toolName: string,
+  permissions: Permissions,
+  input: unknown,
+): "allow" | "deny" | "ask" {
   const permissionKey = permissionKeyForTool(toolName);
-  const nativeDecision = evaluatePermissionOrchestrationWithNative(toolName, permissions, input);
-  if (nativeDecision?.permissionKey === permissionKey) return nativeDecision.decision;
+  const nativeDecision = evaluatePermissionOrchestrationWithNative(
+    toolName,
+    permissions,
+    input,
+  );
+  if (nativeDecision?.permissionKey === permissionKey)
+    return nativeDecision.decision;
   return permissionDecision(permissions[permissionKey], input);
 }
 
@@ -111,10 +156,17 @@ export function resolveScopedPermissionDecision(options: {
 }): ScopedPermissionDecision {
   const fs = options.fileSystem ?? defaultFileSystem;
   const current = canonical(options.cwd, fs);
-  const trust = resolveTrustEligibility(current, options.trustResolver ?? createPersistedTrustResolver());
+  const trust = resolveTrustEligibility(
+    current,
+    options.trustResolver ?? createPersistedTrustResolver(),
+  );
   if (trust) {
     const trustedPath = canonical(trust.path, fs);
-    for (const policyPath of discoverProjectPolicyPaths(current, options.configDirName, fs)) {
+    for (const policyPath of discoverProjectPolicyPaths(
+      current,
+      options.configDirName,
+      fs,
+    )) {
       if (!fs.existsSync(policyPath)) continue;
       const canonicalPolicyPath = canonical(policyPath, fs);
       if (!isInside(canonicalPolicyPath, trustedPath)) continue;
@@ -124,7 +176,8 @@ export function resolveScopedPermissionDecision(options: {
           fs.loadPermissions(canonicalPolicyPath),
           options.input,
         );
-        if (decision !== "ask") return { decision, source: "project", path: canonicalPolicyPath };
+        if (decision !== "ask")
+          return { decision, source: "project", path: canonicalPolicyPath };
       } catch (error) {
         return {
           decision: "ask",
@@ -142,7 +195,8 @@ export function resolveScopedPermissionDecision(options: {
       loadPermissions(options.userPermissionsPath),
       options.input,
     );
-    if (decision !== "ask") return { decision, source: "user", path: options.userPermissionsPath };
+    if (decision !== "ask")
+      return { decision, source: "user", path: options.userPermissionsPath };
   } catch (error) {
     return {
       decision: "ask",

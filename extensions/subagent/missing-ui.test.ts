@@ -1,12 +1,25 @@
 import "../test-support/forbid-fetch.ts";
 import assert from "node:assert/strict";
 import test from "node:test";
-import { promptToolPermissionRequest, type PermissionContext } from "../tool-permissions/index.ts";
+import {
+  promptToolPermissionRequest,
+  type PermissionContext,
+} from "../tool-permissions/index.ts";
 import { createParentPermissionPrompt } from "./index.ts";
-import { executeToolRequest, type ToolPermissionBoundary } from "../tool-permissions/permission-boundary.ts";
+import {
+  executeToolRequest,
+  type ToolPermissionBoundary,
+} from "../tool-permissions/permission-boundary.ts";
 
-function isInputComponent(value: unknown): value is { handleInput(data: string): void } {
-  return typeof value === "object" && value !== null && "handleInput" in value && typeof value.handleInput === "function";
+function isInputComponent(
+  value: unknown,
+): value is { handleInput(data: string): void } {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "handleInput" in value &&
+    typeof value.handleInput === "function"
+  );
 }
 
 test("omits the parent prompt adapter when the main UI is unavailable", () => {
@@ -34,13 +47,16 @@ test("returns a structured unavailable-UI denial without executing", async () =>
     },
   };
 
-  const result = await executeToolRequest({
-    actor: { kind: "child", childId: "amber-otter" },
-    toolName: "read",
-    input: { path: "private-notes.md", token: "must-not-leak" },
-    cwd: "/workspace/project",
-    steering: "Inspect the notes.",
-  }, boundary);
+  const result = await executeToolRequest(
+    {
+      actor: { kind: "child", childId: "amber-otter" },
+      toolName: "read",
+      input: { path: "private-notes.md", token: "must-not-leak" },
+      cwd: "/workspace/project",
+      steering: "Inspect the notes.",
+    },
+    boundary,
+  );
 
   assert.deepEqual(result, {
     status: "denied",
@@ -68,7 +84,10 @@ test("attributes the visible prompt while marking only the requesting child as w
       mode: "tui",
       sessionId: "parent-session",
       ui: {
-        confirm: () => new Promise<boolean>((resolve) => { resolvePrompt = resolve; }),
+        confirm: () =>
+          new Promise<boolean>((resolve) => {
+            resolvePrompt = resolve;
+          }),
         notify: (message) => notifications.push(message),
       },
     },
@@ -82,7 +101,9 @@ test("attributes the visible prompt while marking only the requesting child as w
     cwd: "/workspace/project",
   });
   assert.deepEqual(statuses, ["waiting-for-permission"]);
-  assert.deepEqual(notifications, ["Subagent amber-otter → read: permission required"]);
+  assert.deepEqual(notifications, [
+    "Subagent amber-otter → read: permission required",
+  ]);
   resolvePrompt?.(false);
   await pending;
   assert.deepEqual(statuses, ["waiting-for-permission", "running"]);
@@ -97,16 +118,25 @@ test("Escape cancels an available main UI permission prompt", async () => {
     sessionId: "parent-session",
     ui: {
       confirm: async () => false,
-      custom<T>(factory: (
-        tui: { requestRender(force?: boolean): void; stop(): void; start(): void },
-        theme: unknown,
-        keybindings: unknown,
-        done: (value: T) => void,
-      ) => unknown): Promise<T> {
+      custom<T>(
+        factory: (
+          tui: {
+            requestRender(force?: boolean): void;
+            stop(): void;
+            start(): void;
+          },
+          theme: unknown,
+          keybindings: unknown,
+          done: (value: T) => void,
+        ) => unknown,
+      ): Promise<T> {
         return new Promise<T>((resolve) => {
           promptComponent = factory(
             { requestRender() {}, stop() {}, start() {} },
-            { fg: (_color: string, text: string) => text, bold: (text: string) => text },
+            {
+              fg: (_color: string, text: string) => text,
+              bold: (text: string) => text,
+            },
             {},
             resolve,
           );
@@ -131,7 +161,9 @@ test("Escape cancels an available main UI permission prompt", async () => {
 
   const result = await Promise.race([
     pendingResult.then((value) => ({ settled: true, value })),
-    new Promise<{ settled: false }>((resolve) => setImmediate(() => resolve({ settled: false }))),
+    new Promise<{ settled: false }>((resolve) =>
+      setImmediate(() => resolve({ settled: false })),
+    ),
   ]);
   assert.deepEqual(result, { settled: true, value: "cancel" });
 });
@@ -148,13 +180,16 @@ test("reports prompt cancellation distinctly without executing", async () => {
     audit: (entry: { decision: string }) => decisions.push(entry.decision),
   };
 
-  const result = await executeToolRequest({
-    actor: { kind: "child", childId: "amber-otter" },
-    toolName: "write",
-    input: { path: "report.md" },
-    cwd: "/workspace/project",
-    steering: "Update the report.",
-  }, boundary);
+  const result = await executeToolRequest(
+    {
+      actor: { kind: "child", childId: "amber-otter" },
+      toolName: "write",
+      input: { path: "report.md" },
+      cwd: "/workspace/project",
+      steering: "Update the report.",
+    },
+    boundary,
+  );
 
   assert.equal(result.status, "cancelled");
   assert.equal(result.reason, "permission_prompt_cancelled");

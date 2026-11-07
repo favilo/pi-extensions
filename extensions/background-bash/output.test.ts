@@ -15,7 +15,10 @@ test("captures stdout and stderr separately without truncation inside the limits
   assert.equal(snapshot.stdout.truncated, false);
   assert.equal(snapshot.stderr.truncated, false);
   assert.equal(snapshot.stdout.totalLines, 3);
-  assert.equal(snapshot.stdout.totalBytes, Buffer.byteLength("out-1\nout-2\nout-3\n", "utf8"));
+  assert.equal(
+    snapshot.stdout.totalBytes,
+    Buffer.byteLength("out-1\nout-2\nout-3\n", "utf8"),
+  );
 });
 
 test("bounds captured output by line count with visible truncation metadata", () => {

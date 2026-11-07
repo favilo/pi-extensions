@@ -15,8 +15,10 @@ export const NATIVE_CONTRACT_VERSION = 1 as const;
 export const NATIVE_POLICY_NONCE = "tool-permissions-policy" as const;
 export const NATIVE_PARSER_NONCE = "tool-permissions-parser" as const;
 export const NATIVE_EVALUATION_NONCE = "tool-permissions-evaluation" as const;
-export const NATIVE_ORCHESTRATION_NONCE = "tool-permissions-orchestration" as const;
-export const NATIVE_REGISTRATION_NONCE = "tool-permissions-registration" as const;
+export const NATIVE_ORCHESTRATION_NONCE =
+  "tool-permissions-orchestration" as const;
+export const NATIVE_REGISTRATION_NONCE =
+  "tool-permissions-registration" as const;
 export const NATIVE_PATH_TRUST_NONCE = "tool-permissions-path-trust" as const;
 
 export type PathTrustRequest = {
@@ -56,7 +58,8 @@ export type NativeProbeResponse = {
 };
 
 export function createNativeProbeRequest(nonce: string): NativeProbeRequest {
-  if (!nonce || nonce.length > 256) throw new Error("native probe nonce must be 1-256 characters");
+  if (!nonce || nonce.length > 256)
+    throw new Error("native probe nonce must be 1-256 characters");
   return { version: NATIVE_CONTRACT_VERSION, operation: "health", nonce };
 }
 
@@ -66,12 +69,18 @@ export function decodeNativeProbeResponse(value: unknown): NativeProbeResponse {
   }
   const response = value as Record<string, unknown>;
   if (response.version !== NATIVE_CONTRACT_VERSION) {
-    throw new Error(`native contract version mismatch: expected ${NATIVE_CONTRACT_VERSION}`);
+    throw new Error(
+      `native contract version mismatch: expected ${NATIVE_CONTRACT_VERSION}`,
+    );
   }
   if (response.operation !== "health" || response.ok !== true) {
     throw new Error("native contract response is invalid");
   }
-  if (typeof response.nonce !== "string" || !response.nonce || response.nonce.length > 256) {
+  if (
+    typeof response.nonce !== "string" ||
+    !response.nonce ||
+    response.nonce.length > 256
+  ) {
     throw new Error("native contract response nonce is invalid");
   }
   return {

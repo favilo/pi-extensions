@@ -3,7 +3,8 @@ import { fileURLToPath } from "node:url";
 
 export const NATIVE_PACKAGE_ENV = "PI_TOOL_PERMISSIONS_NATIVE_PACKAGE" as const;
 export const NATIVE_DISABLE_ENV = "PI_TOOL_PERMISSIONS_NATIVE_DISABLE" as const;
-export const NAPI_NATIVE_LIBRARY_PATH_ENV = "NAPI_RS_NATIVE_LIBRARY_PATH" as const;
+export const NAPI_NATIVE_LIBRARY_PATH_ENV =
+  "NAPI_RS_NATIVE_LIBRARY_PATH" as const;
 export const NAPI_WASI_FLAVOR_ENV = "NAPI_RS_WASI_FLAVOR" as const;
 export const BUNDLED_WASI_FLAVOR = "wasm32-wasi" as const;
 
@@ -24,7 +25,9 @@ function nativeEnabled(environment: NodeJS.ProcessEnv): boolean {
   return truthy(value);
 }
 
-export function resolveNativePackagePath(environment: NodeJS.ProcessEnv = process.env): string | undefined {
+export function resolveNativePackagePath(
+  environment: NodeJS.ProcessEnv = process.env,
+): string | undefined {
   if (!nativeEnabled(environment)) return undefined;
   return testOverridePath ?? bundledNativePackagePath();
 }
@@ -42,15 +45,19 @@ export function requireNativePackage(packagePath: string): unknown {
     return require(packagePath);
   } finally {
     if (bundled) {
-      if (previousLibraryPath === undefined) delete process.env[NAPI_NATIVE_LIBRARY_PATH_ENV];
+      if (previousLibraryPath === undefined)
+        delete process.env[NAPI_NATIVE_LIBRARY_PATH_ENV];
       else process.env[NAPI_NATIVE_LIBRARY_PATH_ENV] = previousLibraryPath;
-      if (previousFlavor === undefined) delete process.env[NAPI_WASI_FLAVOR_ENV];
+      if (previousFlavor === undefined)
+        delete process.env[NAPI_WASI_FLAVOR_ENV];
       else process.env[NAPI_WASI_FLAVOR_ENV] = previousFlavor;
     }
   }
 }
 
-export function setNativePackagePathForTests(packagePath: string | undefined): () => void {
+export function setNativePackagePathForTests(
+  packagePath: string | undefined,
+): () => void {
   const previous = testOverridePath;
   testOverridePath = packagePath;
   return () => {

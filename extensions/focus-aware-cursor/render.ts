@@ -7,6 +7,9 @@ export function terminalFocusFromInput(data: string): boolean | undefined {
   return undefined;
 }
 
-export function hardwareCursorVisibility(terminalFocused: boolean, focusedVisibility: boolean): boolean {
+export function hardwareCursorVisibility(
+  terminalFocused: boolean,
+  focusedVisibility: boolean,
+): boolean {
   return terminalFocused && focusedVisibility;
 }

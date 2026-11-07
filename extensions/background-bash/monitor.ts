@@ -14,7 +14,10 @@ export type BackgroundBashMonitor = {
 export function createBackgroundBashMonitor(
   onEvent: (event: BackgroundBashMonitorEvent) => void,
 ): BackgroundBashMonitor {
-  const pending: Record<"stdout" | "stderr", string> = { stdout: "", stderr: "" };
+  const pending: Record<"stdout" | "stderr", string> = {
+    stdout: "",
+    stderr: "",
+  };
   let sequence = 0;
   let closed = false;
 

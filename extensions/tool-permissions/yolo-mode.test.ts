@@ -8,12 +8,18 @@ import { stringify as stringifyToml } from "smol-toml";
 import { isYoloModeEnabled } from "./yolo-mode.ts";
 import { resolveToolPermissionDecision } from "./index.ts";
 
-function createPolicyDir(policyObj: unknown): { tmpDir: string; userPermissionsPath: string } {
+function createPolicyDir(policyObj: unknown): {
+  tmpDir: string;
+  userPermissionsPath: string;
+} {
   const tmpDir = mkdtempSync(join(tmpdir(), "yolo-mode-test-"));
   const configDir = join(tmpDir, ".config", "pi");
   mkdirSync(configDir, { recursive: true });
   const userPermissionsPath = join(configDir, "permissions.toml");
-  writeFileSync(userPermissionsPath, stringifyToml({ permissions: policyObj as any }));
+  writeFileSync(
+    userPermissionsPath,
+    stringifyToml({ permissions: policyObj as any }),
+  );
   return { tmpDir, userPermissionsPath };
 }
 
@@ -35,7 +41,12 @@ test("bypasses prompts and allows unlisted tools when YOLO mode environment vari
   const previousEnv = process.env.PI_YOLO_MODE;
   process.env.PI_YOLO_MODE = "1";
   try {
-    const decision = resolveToolPermissionDecision("bash", { command: "npm run build" }, tmpDir, { userPermissionsPath });
+    const decision = resolveToolPermissionDecision(
+      "bash",
+      { command: "npm run build" },
+      tmpDir,
+      { userPermissionsPath },
+    );
     assert.equal(decision.decision, "allow");
     assert.equal(decision.source, "yolo_mode");
   } finally {
@@ -52,7 +63,12 @@ test("explicit deny rules still take precedence over YOLO mode", () => {
   const previousEnv = process.env.PI_YOLO_MODE;
   process.env.PI_YOLO_MODE = "1";
   try {
-    const decision = resolveToolPermissionDecision("bash", { command: "rm -rf /" }, tmpDir, { userPermissionsPath });
+    const decision = resolveToolPermissionDecision(
+      "bash",
+      { command: "rm -rf /" },
+      tmpDir,
+      { userPermissionsPath },
+    );
     assert.equal(decision.decision, "deny");
   } finally {
     if (previousEnv === undefined) delete process.env.PI_YOLO_MODE;

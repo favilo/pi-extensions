@@ -4,7 +4,10 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 
 test("documents user and project permission policy locations and trust behavior", () => {
-  const readme = readFileSync(new URL("../../README.md", import.meta.url), "utf8");
+  const readme = readFileSync(
+    new URL("../../README.md", import.meta.url),
+    "utf8",
+  );
   assert.match(readme, /~\/\.pi\/agent\/permissions\.toml/);
   assert.match(readme, /\.pi\/permissions\.toml/);
   assert.match(readme, /persisted trust decision/);
@@ -15,14 +18,26 @@ test("documents user and project permission policy locations and trust behavior"
 });
 
 test("documents native tool-permissions runtime build, packaging, and fallback behavior", () => {
-  const readme = readFileSync(new URL("../../README.md", import.meta.url), "utf8");
-  const rootPackage = readFileSync(new URL("../../package.json", import.meta.url), "utf8");
-  const nativePackage = readFileSync(new URL("./native/package.json", import.meta.url), "utf8");
+  const readme = readFileSync(
+    new URL("../../README.md", import.meta.url),
+    "utf8",
+  );
+  const rootPackage = readFileSync(
+    new URL("../../package.json", import.meta.url),
+    "utf8",
+  );
+  const nativePackage = readFileSync(
+    new URL("./native/package.json", import.meta.url),
+    "utf8",
+  );
 
   assert.match(readme, /bundled native Rust core is enabled by default/);
   assert.match(readme, /PI_TOOL_PERMISSIONS_NATIVE_DISABLE=1/);
   assert.match(readme, /npm run build:native/);
-  assert.match(readme, /npm pack --dry-run \.\/extensions\/tool-permissions\/native/);
+  assert.match(
+    readme,
+    /npm pack --dry-run \.\/extensions\/tool-permissions\/native/,
+  );
   assert.match(rootPackage, /"build:native"/);
   assert.match(rootPackage, /wasm32-wasip1-threads/);
   assert.match(readme, /wasm32-wasip1-threads/);
@@ -39,5 +54,8 @@ test("documents both scoped save shortcuts in the prompt implementation", () => 
   assert.match(source, /matchesKey\(data, "ctrl\+shift\+a"\)/);
   const shifted = source.indexOf('matchesKey(data, "ctrl+shift+a")');
   const plain = source.indexOf('matchesKey(data, "ctrl+a")');
-  assert.ok(shifted >= 0 && plain >= 0 && shifted < plain, "shifted shortcut must be handled before plain Ctrl+A");
+  assert.ok(
+    shifted >= 0 && plain >= 0 && shifted < plain,
+    "shifted shortcut must be handled before plain Ctrl+A",
+  );
 });

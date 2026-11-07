@@ -26,33 +26,55 @@ export type BackgroundEventLimits = {
   maxTotalBytes: number;
 };
 
-type Candidate = Omit<NormalizedBackgroundEvent, "childId" | "sequence" | "truncated"> & {
+type Candidate = Omit<
+  NormalizedBackgroundEvent,
+  "childId" | "sequence" | "truncated"
+> & {
   toolCallId?: string;
 };
 
 function candidate(event: AgentSessionEvent): Candidate | undefined {
-  if (event.type === "message_update" && event.assistantMessageEvent.type === "text_delta") {
-    return { type: "assistant-text", payload: { text: event.assistantMessageEvent.delta } };
+  if (
+    event.type === "message_update" &&
+    event.assistantMessageEvent.type === "text_delta"
+  ) {
+    return {
+      type: "assistant-text",
+      payload: { text: event.assistantMessageEvent.delta },
+    };
   }
   if (event.type === "tool_execution_start") {
     return {
       type: "tool-call",
       toolCallId: event.toolCallId,
-      payload: { toolCallId: event.toolCallId, toolName: event.toolName, input: event.args },
+      payload: {
+        toolCallId: event.toolCallId,
+        toolName: event.toolName,
+        input: event.args,
+      },
     };
   }
   if (event.type === "tool_execution_update") {
     return {
       type: "tool-update",
       toolCallId: event.toolCallId,
-      payload: { toolCallId: event.toolCallId, toolName: event.toolName, update: event.partialResult },
+      payload: {
+        toolCallId: event.toolCallId,
+        toolName: event.toolName,
+        update: event.partialResult,
+      },
     };
   }
   if (event.type === "tool_execution_end") {
     return {
       type: "tool-result",
       toolCallId: event.toolCallId,
-      payload: { toolCallId: event.toolCallId, toolName: event.toolName, result: event.result, isError: event.isError },
+      payload: {
+        toolCallId: event.toolCallId,
+        toolName: event.toolName,
+        result: event.result,
+        isError: event.isError,
+      },
     };
   }
   return undefined;
@@ -60,7 +82,11 @@ function candidate(event: AgentSessionEvent): Candidate | undefined {
 
 function serialize(payload: unknown): string {
   try {
-    return JSON.stringify(payload, (_key, value) => typeof value === "bigint" ? value.toString() : value) ?? "null";
+    return (
+      JSON.stringify(payload, (_key, value) =>
+        typeof value === "bigint" ? value.toString() : value,
+      ) ?? "null"
+    );
   } catch {
     return JSON.stringify({ unavailable: true });
   }
@@ -70,7 +96,10 @@ function payloadBytes(payload: unknown): number {
   return Buffer.byteLength(serialize(payload), "utf8");
 }
 
-function boundedPayload(payload: unknown, maximum: number): { payload: unknown; bytes: number; truncated: boolean } {
+function boundedPayload(
+  payload: unknown,
+  maximum: number,
+): { payload: unknown; bytes: number; truncated: boolean } {
   const serialized = serialize(payload);
   const bytes = Buffer.byteLength(serialized, "utf8");
   if (bytes <= maximum) return { payload, bytes, truncated: false };
@@ -81,7 +110,11 @@ function boundedPayload(payload: unknown, maximum: number): { payload: unknown; 
     if (Buffer.byteLength(JSON.stringify(candidate), "utf8") > maximum) break;
     value = candidate;
   }
-  return { payload: value, bytes: Buffer.byteLength(JSON.stringify(value), "utf8"), truncated: true };
+  return {
+    payload: value,
+    bytes: Buffer.byteLength(JSON.stringify(value), "utf8"),
+    truncated: true,
+  };
 }
 
 /** Creates a session-memory adapter for exposed, non-reasoning child events. */
@@ -89,7 +122,9 @@ export function createBackgroundEventBuffer(
   childId: string,
   limits: BackgroundEventLimits,
 ): BackgroundEventBuffer {
-  const events: Array<NormalizedBackgroundEvent & { bytes: number; toolCallId?: string }> = [];
+  const events: Array<
+    NormalizedBackgroundEvent & { bytes: number; toolCallId?: string }
+  > = [];
   let sequence = 0;
   let bytes = 0;
   let sealed = false;
@@ -108,12 +143,22 @@ export function createBackgroundEventBuffer(
       sequence += 1;
 
       if (normalized.type === "tool-update") {
-        const previous = events.findIndex((item) => item.type === "tool-update" && item.toolCallId === normalized.toolCallId);
+        const previous = events.findIndex(
+          (item) =>
+            item.type === "tool-update" &&
+            item.toolCallId === normalized.toolCallId,
+        );
         if (previous >= 0) remove(previous);
       }
 
-      const bounded = boundedPayload(normalized.payload, Math.min(limits.maxEventBytes, limits.maxTotalBytes));
-      while (events.length >= limits.maxEvents || bytes + bounded.bytes > limits.maxTotalBytes) {
+      const bounded = boundedPayload(
+        normalized.payload,
+        Math.min(limits.maxEventBytes, limits.maxTotalBytes),
+      );
+      while (
+        events.length >= limits.maxEvents ||
+        bytes + bounded.bytes > limits.maxTotalBytes
+      ) {
         if (events.length === 0) break;
         remove(0);
         truncated = true;
@@ -137,7 +182,10 @@ export function createBackgroundEventBuffer(
 
     snapshot() {
       return {
-        events: events.map(({ bytes: _bytes, toolCallId: _toolCallId, ...event }) => structuredClone(event)),
+        events: events.map(
+          ({ bytes: _bytes, toolCallId: _toolCallId, ...event }) =>
+            structuredClone(event),
+        ),
         bytes,
         truncated,
       };

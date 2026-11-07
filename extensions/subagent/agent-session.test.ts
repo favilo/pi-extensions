@@ -79,7 +79,9 @@ test("aborts and disposes a child session when cancellation occurs", async () =>
     prompt: async () => {
       if (!controller.signal.aborted) {
         await new Promise<void>((resolve) => {
-          controller.signal.addEventListener("abort", () => resolve(), { once: true });
+          controller.signal.addEventListener("abort", () => resolve(), {
+            once: true,
+          });
         });
       }
       throw new Error("cancelled");
@@ -115,7 +117,11 @@ test("routes a child tool call through the permission interceptor", async () => 
     },
   });
 
-  assert.deepEqual(result, { intercepted: true, executed: true, decision: "allow" });
+  assert.deepEqual(result, {
+    intercepted: true,
+    executed: true,
+    decision: "allow",
+  });
   assert.deepEqual(calls, ["read"]);
 });
 
@@ -125,17 +131,29 @@ test("routes child authorization through the existing tool-permissions resolver"
   const target = join(root, "notes.md");
   const escapedTarget = target.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const serializedPattern = JSON.stringify(`^${escapedTarget}$`);
-  writeFileSync(userPermissionsPath, `[[permissions.read.allow]]\npath = ${serializedPattern}\n`);
+  writeFileSync(
+    userPermissionsPath,
+    `[[permissions.read.allow]]\npath = ${serializedPattern}\n`,
+  );
 
   const result = await runToolInterceptionProbe({
     call: { toolName: "read", input: { path: target } },
     authorize: async (call) => {
-      const decision = resolveToolPermissionDecision(call.toolName, call.input, root, { userPermissionsPath });
+      const decision = resolveToolPermissionDecision(
+        call.toolName,
+        call.input,
+        root,
+        { userPermissionsPath },
+      );
       return decision.decision === "allow" ? "allow" : "deny";
     },
   });
 
-  assert.deepEqual(result, { intercepted: true, executed: true, decision: "allow" });
+  assert.deepEqual(result, {
+    intercepted: true,
+    executed: true,
+    decision: "allow",
+  });
 });
 
 test("rejects nested agents beyond the configured depth", () => {

@@ -1,10 +1,19 @@
 import "../test-support/forbid-fetch.ts";
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, realpathSync, symlinkSync, writeFileSync } from "node:fs";
+import {
+  mkdtempSync,
+  mkdirSync,
+  realpathSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { NATIVE_CONTRACT_VERSION, NATIVE_PATH_TRUST_NONCE } from "./native-contract.ts";
+import {
+  NATIVE_CONTRACT_VERSION,
+  NATIVE_PATH_TRUST_NONCE,
+} from "./native-contract.ts";
 import { evaluatePathTrust } from "./native-path-trust.ts";
 import { resolveScopedPermissionDecision } from "./scope.ts";
 
@@ -35,7 +44,11 @@ test("missing write under a symlink parent matches the host canonical path", () 
   const outside = join(root, "outside");
   mkdirSync(cwd);
   mkdirSync(outside);
-  symlinkSync(outside, join(cwd, "escape"), process.platform === "win32" ? "junction" : "dir");
+  symlinkSync(
+    outside,
+    join(cwd, "escape"),
+    process.platform === "win32" ? "junction" : "dir",
+  );
 
   const result = evaluatePathTrust({
     version: NATIVE_CONTRACT_VERSION,
@@ -83,8 +96,14 @@ test("a nearer project denial inside the trusted root matches the host", () => {
   mkdirSync(join(repo, ".pi"), { recursive: true });
   mkdirSync(join(cwd, ".pi"), { recursive: true });
   writeFileSync(join(cwd, "notes.txt"), "hello");
-  writeFileSync(join(repo, ".pi", "permissions.toml"), "[permissions.read]\nallow = [{ path = '.*' }]\ndeny = []\n");
-  writeFileSync(join(cwd, ".pi", "permissions.toml"), "[permissions.read]\nallow = []\ndeny = [{ path = '.*' }]\n");
+  writeFileSync(
+    join(repo, ".pi", "permissions.toml"),
+    "[permissions.read]\nallow = [{ path = '.*' }]\ndeny = []\n",
+  );
+  writeFileSync(
+    join(cwd, ".pi", "permissions.toml"),
+    "[permissions.read]\nallow = []\ndeny = [{ path = '.*' }]\n",
+  );
   const canonicalPath = realpathSync(join(cwd, "notes.txt"));
   const host = resolveScopedPermissionDecision({
     cwd,
@@ -118,7 +137,10 @@ test("a project policy outside the trusted root is not honored", () => {
   mkdirSync(join(repo, ".pi"), { recursive: true });
   mkdirSync(cwd, { recursive: true });
   writeFileSync(join(cwd, "notes.txt"), "hello");
-  writeFileSync(join(repo, ".pi", "permissions.toml"), "[permissions.read]\nallow = []\ndeny = [{ path = '.*' }]\n");
+  writeFileSync(
+    join(repo, ".pi", "permissions.toml"),
+    "[permissions.read]\nallow = []\ndeny = [{ path = '.*' }]\n",
+  );
   const canonicalPath = realpathSync(join(cwd, "notes.txt"));
   const host = resolveScopedPermissionDecision({
     cwd,

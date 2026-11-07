@@ -17,7 +17,10 @@ function fixture(content: string): { path: string; cleanup: () => void } {
 test("a valid unique edit passes preflight", async () => {
   const { path, cleanup } = fixture("alpha\nbeta\ngamma\n");
   try {
-    assert.deepEqual(await preflightEdit(path, [{ oldText: "beta", newText: "BETA" }]), { ok: true });
+    assert.deepEqual(
+      await preflightEdit(path, [{ oldText: "beta", newText: "BETA" }]),
+      { ok: true },
+    );
   } finally {
     cleanup();
   }
@@ -26,9 +29,12 @@ test("a valid unique edit passes preflight", async () => {
 test("an edit whose oldText is absent fails with the not-found reason", async () => {
   const { path, cleanup } = fixture("alpha\nbeta\ngamma\n");
   try {
-    const result = await preflightEdit(path, [{ oldText: "delta", newText: "DELTA" }]);
+    const result = await preflightEdit(path, [
+      { oldText: "delta", newText: "DELTA" },
+    ]);
     assert.equal(result.ok, false);
-    if (!result.ok) assert.match(result.reason, /Could not find the exact text/);
+    if (!result.ok)
+      assert.match(result.reason, /Could not find the exact text/);
   } finally {
     cleanup();
   }
@@ -37,7 +43,9 @@ test("an edit whose oldText is absent fails with the not-found reason", async ()
 test("an edit whose oldText matches more than once fails with the duplicate reason", async () => {
   const { path, cleanup } = fixture("beta\nalpha\nbeta\n");
   try {
-    const result = await preflightEdit(path, [{ oldText: "beta", newText: "BETA" }]);
+    const result = await preflightEdit(path, [
+      { oldText: "beta", newText: "BETA" },
+    ]);
     assert.equal(result.ok, false);
     if (!result.ok) assert.match(result.reason, /Found 2 occurrences/);
   } finally {
@@ -73,7 +81,9 @@ test("an empty oldText fails with the empty-text reason", async () => {
 test("an edit that changes nothing fails with the no-change reason", async () => {
   const { path, cleanup } = fixture("alpha\n");
   try {
-    const result = await preflightEdit(path, [{ oldText: "alpha", newText: "alpha" }]);
+    const result = await preflightEdit(path, [
+      { oldText: "alpha", newText: "alpha" },
+    ]);
     assert.equal(result.ok, false);
     if (!result.ok) assert.match(result.reason, /No changes made/);
   } finally {
@@ -84,7 +94,9 @@ test("an edit that changes nothing fails with the no-change reason", async () =>
 test("an unreadable target file fails instead of prompting", async () => {
   const dir = mkdtempSync(join(tmpdir(), "pi-edit-preflight-"));
   try {
-    const result = await preflightEdit(join(dir, "missing.txt"), [{ oldText: "a", newText: "b" }]);
+    const result = await preflightEdit(join(dir, "missing.txt"), [
+      { oldText: "a", newText: "b" },
+    ]);
     assert.equal(result.ok, false);
   } finally {
     rmSync(dir, { recursive: true, force: true });
@@ -94,7 +106,10 @@ test("an unreadable target file fails instead of prompting", async () => {
 test("fuzzy whitespace differences still pass, matching edit tool semantics", async () => {
   const { path, cleanup } = fixture("alpha  \nbeta\n");
   try {
-    assert.deepEqual(await preflightEdit(path, [{ oldText: "alpha\nbeta", newText: "x" }]), { ok: true });
+    assert.deepEqual(
+      await preflightEdit(path, [{ oldText: "alpha\nbeta", newText: "x" }]),
+      { ok: true },
+    );
   } finally {
     cleanup();
   }
@@ -102,7 +117,10 @@ test("fuzzy whitespace differences still pass, matching edit tool semantics", as
 
 test("a doomed edit is blocked before the permission prompt is shown", async () => {
   const agentDir = mkdtempSync(join(tmpdir(), "pi-edit-preflight-agent-"));
-  writeFileSync(join(agentDir, "permissions.toml"), stringifyToml({ permissions: {} }));
+  writeFileSync(
+    join(agentDir, "permissions.toml"),
+    stringifyToml({ permissions: {} }),
+  );
   const project = mkdtempSync(join(tmpdir(), "pi-edit-preflight-project-"));
   writeFileSync(join(project, "file.txt"), "alpha\nbeta\n");
 
@@ -110,19 +128,39 @@ test("a doomed edit is blocked before the permission prompt is shown", async () 
   process.env.PI_CODING_AGENT_DIR = agentDir;
 
   let promptShown = false;
-  const handlers = new Map<string, (event: { toolName: string; input: Record<string, unknown> }, ctx: unknown) => Promise<unknown>>();
+  const handlers = new Map<
+    string,
+    (
+      event: { toolName: string; input: Record<string, unknown> },
+      ctx: unknown,
+    ) => Promise<unknown>
+  >();
   try {
-    const { default: toolPermissionPolicy } = await import(`./index.ts?edit-preflight=${encodeURIComponent(agentDir)}`);
+    const { default: toolPermissionPolicy } = await import(
+      `./index.ts?edit-preflight=${encodeURIComponent(agentDir)}`
+    );
     toolPermissionPolicy({
       registerCommand() {},
-      on(event: string, handler: (event: { toolName: string; input: Record<string, unknown> }, ctx: unknown) => Promise<unknown>) {
+      on(
+        event: string,
+        handler: (
+          event: { toolName: string; input: Record<string, unknown> },
+          ctx: unknown,
+        ) => Promise<unknown>,
+      ) {
         if (event === "tool_call") handlers.set(event, handler);
       },
       getAllTools: () => [],
     } as never);
 
     const result = await handlers.get("tool_call")!(
-      { toolName: "edit", input: { path: join(project, "file.txt"), edits: [{ oldText: "delta", newText: "DELTA" }] } },
+      {
+        toolName: "edit",
+        input: {
+          path: join(project, "file.txt"),
+          edits: [{ oldText: "delta", newText: "DELTA" }],
+        },
+      },
       {
         cwd: project,
         hasUI: true,
@@ -136,9 +174,16 @@ test("a doomed edit is blocked before the permission prompt is shown", async () 
       },
     );
 
-    assert.equal(promptShown, false, "permission prompt must not be shown for a deterministically failing edit");
+    assert.equal(
+      promptShown,
+      false,
+      "permission prompt must not be shown for a deterministically failing edit",
+    );
     assert.equal((result as { block?: boolean }).block, true);
-    assert.match((result as { reason?: string }).reason ?? "", /Could not find the exact text/);
+    assert.match(
+      (result as { reason?: string }).reason ?? "",
+      /Could not find the exact text/,
+    );
   } finally {
     if (previousAgentDir === undefined) delete process.env.PI_CODING_AGENT_DIR;
     else process.env.PI_CODING_AGENT_DIR = previousAgentDir;

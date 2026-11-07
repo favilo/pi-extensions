@@ -13,9 +13,14 @@ import { setNativePackagePathForTests } from "./native-package.ts";
 import type { BashParseResult } from "./bash-parser.ts";
 import type { Permissions, ToolPermission } from "./config.ts";
 
-function withNativeModule(source: string, run: (packagePath: string) => void): void {
+function withNativeModule(
+  source: string,
+  run: (packagePath: string) => void,
+): void {
   const previous = process.env.PI_TOOL_PERMISSIONS_NATIVE_PACKAGE;
-  const directory = mkdtempSync(join(tmpdir(), "tool-permissions-native-fallback-"));
+  const directory = mkdtempSync(
+    join(tmpdir(), "tool-permissions-native-fallback-"),
+  );
   const packagePath = join(directory, "index.cjs");
   writeFileSync(packagePath, source);
   process.env.PI_TOOL_PERMISSIONS_NATIVE_PACKAGE = "1";
@@ -24,7 +29,8 @@ function withNativeModule(source: string, run: (packagePath: string) => void): v
     run(packagePath);
   } finally {
     restoreOverride();
-    if (previous === undefined) delete process.env.PI_TOOL_PERMISSIONS_NATIVE_PACKAGE;
+    if (previous === undefined)
+      delete process.env.PI_TOOL_PERMISSIONS_NATIVE_PACKAGE;
     else process.env.PI_TOOL_PERMISSIONS_NATIVE_PACKAGE = previous;
     rmSync(directory, { recursive: true, force: true });
   }
@@ -37,40 +43,85 @@ exports.probe = (request) => ({ version: ${NATIVE_CONTRACT_VERSION}, operation: 
 test("operation loaders reject a compatible probe response with the wrong nonce", () => {
   const wrongProbe = `exports.probe = (request) => ({ version: ${NATIVE_CONTRACT_VERSION}, operation: request.operation, ok: true, nonce: "wrong-probe" });`;
 
-  withNativeModule(`${wrongProbe}
+  withNativeModule(
+    `${wrongProbe}
 exports.parse = (request) => ({ version: ${NATIVE_CONTRACT_VERSION}, operation: "parse", ok: true, nonce: request.nonce, reason: "", detail: "", subcommands: [{ normalized: "native", command: "native", args: [], start: 0, end: 6 }] });
-`, () => {
-    const fallback = (): BashParseResult => ({ ok: true, subcommands: [{ normalized: "fallback", command: "fallback", args: [], span: { start: 0, end: 8 } }] });
-    assert.deepEqual(parseWithNativeFallback("native", fallback), fallback());
-  });
+`,
+    () => {
+      const fallback = (): BashParseResult => ({
+        ok: true,
+        subcommands: [
+          {
+            normalized: "fallback",
+            command: "fallback",
+            args: [],
+            span: { start: 0, end: 8 },
+          },
+        ],
+      });
+      assert.deepEqual(parseWithNativeFallback("native", fallback), fallback());
+    },
+  );
 
-  withNativeModule(`${wrongProbe}
+  withNativeModule(
+    `${wrongProbe}
 exports.parsePolicy = (request) => ({ version: ${NATIVE_CONTRACT_VERSION}, operation: "policy", ok: true, nonce: request.nonce, permissions: { bash: { allow: [{ command: "^native$" }], deny: [] } } });
-`, () => {
-    const fallbackPermissions: Permissions = { bash: { allow: [{ command: "^fallback$" }], deny: [] } };
-    assert.deepEqual(parsePolicyWithNativeFallback("[permissions.bash]", () => fallbackPermissions), fallbackPermissions);
-  });
+`,
+    () => {
+      const fallbackPermissions: Permissions = {
+        bash: { allow: [{ command: "^fallback$" }], deny: [] },
+      };
+      assert.deepEqual(
+        parsePolicyWithNativeFallback(
+          "[permissions.bash]",
+          () => fallbackPermissions,
+        ),
+        fallbackPermissions,
+      );
+    },
+  );
 
-  withNativeModule(`${wrongProbe}
+  withNativeModule(
+    `${wrongProbe}
 exports.evaluatePermission = (request) => ({ version: ${NATIVE_CONTRACT_VERSION}, operation: "evaluate_permission", ok: true, nonce: request.nonce, decision: "allow" });
-`, () => {
-    assert.equal(evaluatePermissionWithNative({ allow: [{}], deny: [] }, { command: "native" }), undefined);
-  });
+`,
+    () => {
+      assert.equal(
+        evaluatePermissionWithNative(
+          { allow: [{}], deny: [] },
+          { command: "native" },
+        ),
+        undefined,
+      );
+    },
+  );
 });
 
 test("evaluation adapter accepts only evaluate_permission responses from evaluatePermission", () => {
   const permission: ToolPermission = { allow: [{}], deny: [] };
-  withNativeModule(`${compatibleProbe}
+  withNativeModule(
+    `${compatibleProbe}
 exports.evaluatePermission = (request) => ({ version: ${NATIVE_CONTRACT_VERSION}, operation: "evaluate_permission", ok: true, nonce: request.nonce, decision: "allow" });
-`, () => {
-    assert.equal(evaluatePermissionWithNative(permission, { command: "native" }), "allow");
-  });
+`,
+    () => {
+      assert.equal(
+        evaluatePermissionWithNative(permission, { command: "native" }),
+        "allow",
+      );
+    },
+  );
 
-  withNativeModule(`${compatibleProbe}
+  withNativeModule(
+    `${compatibleProbe}
 exports.evaluatePermission = (request) => ({ version: ${NATIVE_CONTRACT_VERSION}, operation: "evaluate", ok: true, nonce: request.nonce, decision: "allow" });
-`, () => {
-    assert.equal(evaluatePermissionWithNative(permission, { command: "native" }), undefined);
-  });
+`,
+    () => {
+      assert.equal(
+        evaluatePermissionWithNative(permission, { command: "native" }),
+        undefined,
+      );
+    },
+  );
 });
 
 test("parser adapter falls back when native parse throws or returns incompatible output", () => {
@@ -79,20 +130,37 @@ test("parser adapter falls back when native parse throws or returns incompatible
     `return { version: ${NATIVE_CONTRACT_VERSION}, operation: "parse", ok: true, nonce: "wrong", subcommands: [] }`,
     `return { version: ${NATIVE_CONTRACT_VERSION}, operation: "parse", ok: true, nonce: request.nonce, subcommands: [{ normalized: "jj status", command: "jj", args: ["status"], start: 4, end: 2 }] }`,
   ]) {
-    withNativeModule(`${compatibleProbe}\nexports.parse = (request) => { ${parseBody}; };`, () => {
-      let fallbackCalls = 0;
-      const fallback = (): BashParseResult => {
-        fallbackCalls += 1;
-        return { ok: true, subcommands: [{ normalized: "fallback", command: "fallback", args: [], span: { start: 0, end: 8 } }] };
-      };
-      assert.deepEqual(parseWithNativeFallback("jj status", fallback), fallback());
-      assert.equal(fallbackCalls, 2);
-    });
+    withNativeModule(
+      `${compatibleProbe}\nexports.parse = (request) => { ${parseBody}; };`,
+      () => {
+        let fallbackCalls = 0;
+        const fallback = (): BashParseResult => {
+          fallbackCalls += 1;
+          return {
+            ok: true,
+            subcommands: [
+              {
+                normalized: "fallback",
+                command: "fallback",
+                args: [],
+                span: { start: 0, end: 8 },
+              },
+            ],
+          };
+        };
+        assert.deepEqual(
+          parseWithNativeFallback("jj status", fallback),
+          fallback(),
+        );
+        assert.equal(fallbackCalls, 2);
+      },
+    );
   }
 });
 
 test("policy adapter falls back when native policy output has a mismatched nonce", () => {
-  withNativeModule(`${compatibleProbe}
+  withNativeModule(
+    `${compatibleProbe}
 exports.parsePolicy = () => ({
   version: ${NATIVE_CONTRACT_VERSION},
   operation: "policy",
@@ -100,10 +168,20 @@ exports.parsePolicy = () => ({
   nonce: "wrong-nonce",
   permissions: { bash: { allow: [{ command: "^native$" }], deny: [] } },
 });
-`, () => {
-    const fallbackPermissions: Permissions = { bash: { allow: [{ command: "^fallback$" }], deny: [] } };
-    assert.deepEqual(parsePolicyWithNativeFallback("[permissions.bash]", () => fallbackPermissions), fallbackPermissions);
-  });
+`,
+    () => {
+      const fallbackPermissions: Permissions = {
+        bash: { allow: [{ command: "^fallback$" }], deny: [] },
+      };
+      assert.deepEqual(
+        parsePolicyWithNativeFallback(
+          "[permissions.bash]",
+          () => fallbackPermissions,
+        ),
+        fallbackPermissions,
+      );
+    },
+  );
 });
 
 test("policy adapter falls back when native policy throws or returns malformed permissions", () => {
@@ -111,10 +189,21 @@ test("policy adapter falls back when native policy throws or returns malformed p
     `throw new Error("boom")`,
     `return { version: ${NATIVE_CONTRACT_VERSION}, operation: "policy", ok: true, nonce: request.nonce, permissions: { bash: { allow: [{ command: 42 }], deny: [] } } }`,
   ]) {
-    withNativeModule(`${compatibleProbe}\nexports.parsePolicy = (request) => { ${parsePolicyBody}; };`, () => {
-      const fallbackPermissions: Permissions = { bash: { allow: [{ command: "^fallback$" }], deny: [] } };
-      assert.deepEqual(parsePolicyWithNativeFallback("[permissions.bash]", () => fallbackPermissions), fallbackPermissions);
-    });
+    withNativeModule(
+      `${compatibleProbe}\nexports.parsePolicy = (request) => { ${parsePolicyBody}; };`,
+      () => {
+        const fallbackPermissions: Permissions = {
+          bash: { allow: [{ command: "^fallback$" }], deny: [] },
+        };
+        assert.deepEqual(
+          parsePolicyWithNativeFallback(
+            "[permissions.bash]",
+            () => fallbackPermissions,
+          ),
+          fallbackPermissions,
+        );
+      },
+    );
   }
 });
 
@@ -126,21 +215,38 @@ test("orchestration adapter declines malformed or throwing native orchestration 
     `return { version: ${NATIVE_CONTRACT_VERSION}, operation: "orchestrate_permission", ok: true, nonce: request.nonce, permissionKey: "read", decision: "maybe" }`,
     `return { version: ${NATIVE_CONTRACT_VERSION}, operation: "evaluate_permission", ok: true, nonce: request.nonce, permissionKey: "read", decision: "allow" }`,
   ]) {
-    withNativeModule(`${compatibleProbe}\nexports.evaluatePermissionOrchestration = (request) => { ${evaluateBody}; };`, () => {
-      assert.equal(evaluatePermissionOrchestrationWithNative("read", permissions, { path: "/workspace" }), undefined);
-    });
+    withNativeModule(
+      `${compatibleProbe}\nexports.evaluatePermissionOrchestration = (request) => { ${evaluateBody}; };`,
+      () => {
+        assert.equal(
+          evaluatePermissionOrchestrationWithNative("read", permissions, {
+            path: "/workspace",
+          }),
+          undefined,
+        );
+      },
+    );
   }
 });
 
 test("evaluation adapter declines malformed or throwing native evaluator results", () => {
-  const permission: ToolPermission = { allow: [{ command: "^native$" }], deny: [] };
+  const permission: ToolPermission = {
+    allow: [{ command: "^native$" }],
+    deny: [],
+  };
   for (const evaluateBody of [
     `throw new Error("boom")`,
     `return { version: ${NATIVE_CONTRACT_VERSION}, operation: "evaluate", ok: true, nonce: "wrong", decision: "allow" }`,
     `return { version: ${NATIVE_CONTRACT_VERSION}, operation: "evaluate", ok: true, nonce: request.nonce, decision: "maybe" }`,
   ]) {
-    withNativeModule(`${compatibleProbe}\nexports.evaluatePermission = (request) => { ${evaluateBody}; };`, () => {
-      assert.equal(evaluatePermissionWithNative(permission, { command: "native" }), undefined);
-    });
+    withNativeModule(
+      `${compatibleProbe}\nexports.evaluatePermission = (request) => { ${evaluateBody}; };`,
+      () => {
+        assert.equal(
+          evaluatePermissionWithNative(permission, { command: "native" }),
+          undefined,
+        );
+      },
+    );
   }
 });

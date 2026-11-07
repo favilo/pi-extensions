@@ -27,23 +27,35 @@ import {
 import { Text } from "@earendil-works/pi-tui";
 import { registerPublishedTool } from "../tool-registry/index.ts";
 import { registerBackgroundBash } from "../background-bash/index.ts";
-import { steeringAnnotation, toolErrorText, toolOutputTexts } from "./result.ts";
+import {
+  steeringAnnotation,
+  toolErrorText,
+  toolOutputTexts,
+} from "./result.ts";
 
 const reasonParameterSchema = {
   type: "string",
-  description: "One sentence on why you are calling this tool; shown to the user in the permission prompt and history.",
+  description:
+    "One sentence on why you are calling this tool; shown to the user in the permission prompt and history.",
 } as const;
 
 /** Admit an optional agent-supplied reason into a built-in tool's parameter schema. */
 function withReasonParameter<T>(parameters: T): T {
-  const schema = parameters as { type?: string; properties?: Record<string, unknown> };
+  const schema = parameters as {
+    type?: string;
+    properties?: Record<string, unknown>;
+  };
   if (schema?.type !== "object" || !schema.properties) return parameters;
-  return { ...schema, properties: { ...schema.properties, reason: reasonParameterSchema } } as T;
+  return {
+    ...schema,
+    properties: { ...schema.properties, reason: reasonParameterSchema },
+  } as T;
 }
 
 /** Strip the renderer-owned reason before delegating to the original tool. */
 function withoutReason<T>(params: T): T {
-  if (!params || typeof params !== "object" || !("reason" in params)) return params;
+  if (!params || typeof params !== "object" || !("reason" in params))
+    return params;
   const { reason: _reason, ...rest } = params as Record<string, unknown>;
   return rest as T;
 }
@@ -51,19 +63,27 @@ function withoutReason<T>(params: T): T {
 /** History suffix surfacing the agent-supplied call reason, when present. */
 function reasonSuffix(args: Record<string, unknown>, theme: Theme): string {
   const reason = args.reason;
-  return typeof reason === "string" && reason.trim() ? `\n${theme.fg("dim", `reason: ${reason.trim()}`)}` : "";
+  return typeof reason === "string" && reason.trim()
+    ? `\n${theme.fg("dim", `reason: ${reason.trim()}`)}`
+    : "";
 }
 
 type RenderableResult = { content: Array<{ type: string; text?: string }> };
 
 /** Finalize a rendered result, prepending the steering line when the result carries an annotation. */
-function withSteering(text: string, result: RenderableResult, theme: Theme): Text {
+function withSteering(
+  text: string,
+  result: RenderableResult,
+  theme: Theme,
+): Text {
   const steering = steeringAnnotation(result);
-  const leading = steering ? `${theme.fg("warning", `steering: ${steering}`)}\n` : "";
+  const leading = steering
+    ? `${theme.fg("warning", `steering: ${steering}`)}\n`
+    : "";
   return new Text(leading + text, 0, 0);
 }
 
-export default function(pi: ExtensionAPI) {
+export default function (pi: ExtensionAPI) {
   const cwd = process.cwd();
 
   const originalRead = createReadTool(cwd);
@@ -95,20 +115,26 @@ export default function(pi: ExtensionAPI) {
       const details = result.details as ReadToolDetails | undefined;
       const content = result.content[0];
 
-      if (content?.type === "image") return new Text(theme.fg("success", "Image loaded"), 0, 0);
-      if (content?.type !== "text") return new Text(theme.fg("error", "No content"), 0, 0);
+      if (content?.type === "image")
+        return new Text(theme.fg("success", "Image loaded"), 0, 0);
+      if (content?.type !== "text")
+        return new Text(theme.fg("error", "No content"), 0, 0);
 
       const lineCount = content.text.split("\n").length;
       let text = theme.fg("success", `${lineCount} lines`);
 
       if (details?.truncation?.truncated) {
-        text += theme.fg("warning", ` (truncated from ${details.truncation.totalLines})`);
+        text += theme.fg(
+          "warning",
+          ` (truncated from ${details.truncation.totalLines})`,
+        );
       }
 
       if (expanded) {
         const lines = content.text.split("\n").slice(0, 15);
         for (const line of lines) text += `\n${theme.fg("dim", line)}`;
-        if (lineCount > 15) text += `\n${theme.fg("muted", `... ${lineCount - 15} more lines`)}`;
+        if (lineCount > 15)
+          text += `\n${theme.fg("muted", `... ${lineCount - 15} more lines`)}`;
       }
 
       return withSteering(text, result, theme);
@@ -123,7 +149,12 @@ export default function(pi: ExtensionAPI) {
     parameters: withReasonParameter(originalBash.parameters),
 
     async execute(toolCallId, params, signal, onUpdate) {
-      return originalBash.execute(toolCallId, withoutReason(params), signal, onUpdate);
+      return originalBash.execute(
+        toolCallId,
+        withoutReason(params),
+        signal,
+        onUpdate,
+      );
     },
 
     renderCall(args, theme, context) {
@@ -135,7 +166,10 @@ export default function(pi: ExtensionAPI) {
       if (context?.expanded) {
         cmdDisplay = fullCmd;
       } else if (isMultiline || firstLine.length > 80) {
-        cmdDisplay = firstLine.length > 77 ? `${firstLine.slice(0, 77)}...` : `${firstLine}...`;
+        cmdDisplay =
+          firstLine.length > 77
+            ? `${firstLine.slice(0, 77)}...`
+            : `${firstLine}...`;
       } else {
         cmdDisplay = firstLine;
       }
@@ -162,7 +196,8 @@ export default function(pi: ExtensionAPI) {
 
       let text = "";
       if (context.isError || (exitCode !== null && exitCode !== 0)) {
-        const statusText = exitCode !== null ? `exit ${exitCode}` : "Bash failed";
+        const statusText =
+          exitCode !== null ? `exit ${exitCode}` : "Bash failed";
         text += theme.fg("error", statusText);
       } else {
         text += theme.fg("success", "done");
@@ -171,10 +206,12 @@ export default function(pi: ExtensionAPI) {
         text += theme.fg("dim", ` (${lineCount} lines)`);
       }
 
-      if (details?.truncation?.truncated) text += theme.fg("warning", " [truncated]");
+      if (details?.truncation?.truncated)
+        text += theme.fg("warning", " [truncated]");
 
       if (expanded) {
-        for (const line of lines) text += `\n${theme.fg(context.isError ? "error" : "dim", line)}`;
+        for (const line of lines)
+          text += `\n${theme.fg(context.isError ? "error" : "dim", line)}`;
       } else if (firstLine) {
         text += `\n${theme.fg(context.isError ? "error" : "dim", firstLine.slice(0, 100))}`;
       }
@@ -213,13 +250,18 @@ export default function(pi: ExtensionAPI) {
       const lines = output.split("\n").filter((line) => line.trim());
 
       let text = theme.fg("success", `${lines.length} matches`);
-      if (details?.matchLimitReached) text += theme.fg("warning", ` (limit ${details.matchLimitReached})`);
-      if (details?.truncation?.truncated) text += theme.fg("warning", " [truncated]");
-      if (details?.linesTruncated) text += theme.fg("warning", " [long lines truncated]");
+      if (details?.matchLimitReached)
+        text += theme.fg("warning", ` (limit ${details.matchLimitReached})`);
+      if (details?.truncation?.truncated)
+        text += theme.fg("warning", " [truncated]");
+      if (details?.linesTruncated)
+        text += theme.fg("warning", " [long lines truncated]");
 
       if (expanded) {
-        for (const line of lines.slice(0, 20)) text += `\n${theme.fg("dim", line)}`;
-        if (lines.length > 20) text += `\n${theme.fg("muted", `... ${lines.length - 20} more matches`)}`;
+        for (const line of lines.slice(0, 20))
+          text += `\n${theme.fg("dim", line)}`;
+        if (lines.length > 20)
+          text += `\n${theme.fg("muted", `... ${lines.length - 20} more matches`)}`;
       }
 
       return withSteering(text, result, theme);
@@ -254,12 +296,16 @@ export default function(pi: ExtensionAPI) {
       const lines = output.split("\n").filter((line) => line.trim());
 
       let text = theme.fg("success", `${lines.length} paths`);
-      if (details?.resultLimitReached) text += theme.fg("warning", ` (limit ${details.resultLimitReached})`);
-      if (details?.truncation?.truncated) text += theme.fg("warning", " [truncated]");
+      if (details?.resultLimitReached)
+        text += theme.fg("warning", ` (limit ${details.resultLimitReached})`);
+      if (details?.truncation?.truncated)
+        text += theme.fg("warning", " [truncated]");
 
       if (expanded) {
-        for (const line of lines.slice(0, 20)) text += `\n${theme.fg("dim", line)}`;
-        if (lines.length > 20) text += `\n${theme.fg("muted", `... ${lines.length - 20} more paths`)}`;
+        for (const line of lines.slice(0, 20))
+          text += `\n${theme.fg("dim", line)}`;
+        if (lines.length > 20)
+          text += `\n${theme.fg("muted", `... ${lines.length - 20} more paths`)}`;
       }
 
       return withSteering(text, result, theme);
@@ -293,12 +339,16 @@ export default function(pi: ExtensionAPI) {
       const lines = output.split("\n").filter((line) => line.trim());
 
       let text = theme.fg("success", `${lines.length} entries`);
-      if (details?.entryLimitReached) text += theme.fg("warning", ` (limit ${details.entryLimitReached})`);
-      if (details?.truncation?.truncated) text += theme.fg("warning", " [truncated]");
+      if (details?.entryLimitReached)
+        text += theme.fg("warning", ` (limit ${details.entryLimitReached})`);
+      if (details?.truncation?.truncated)
+        text += theme.fg("warning", " [truncated]");
 
       if (expanded) {
-        for (const line of lines.slice(0, 20)) text += `\n${theme.fg("dim", line)}`;
-        if (lines.length > 20) text += `\n${theme.fg("muted", `... ${lines.length - 20} more entries`)}`;
+        for (const line of lines.slice(0, 20))
+          text += `\n${theme.fg("dim", line)}`;
+        if (lines.length > 20)
+          text += `\n${theme.fg("muted", `... ${lines.length - 20} more entries`)}`;
       }
 
       return withSteering(text, result, theme);
@@ -314,7 +364,12 @@ export default function(pi: ExtensionAPI) {
     renderShell: "self",
 
     async execute(toolCallId, params, signal, onUpdate) {
-      return originalEdit.execute(toolCallId, withoutReason(params), signal, onUpdate);
+      return originalEdit.execute(
+        toolCallId,
+        withoutReason(params),
+        signal,
+        onUpdate,
+      );
     },
 
     renderCall(args, theme, _context) {
@@ -336,7 +391,12 @@ export default function(pi: ExtensionAPI) {
         return new Text(theme.fg("error", content.text.split("\n")[0]), 0, 0);
       }
 
-      if (!details?.diff) return withSteering(theme.fg("warning", "No diff supplied"), result, theme);
+      if (!details?.diff)
+        return withSteering(
+          theme.fg("warning", "No diff supplied"),
+          result,
+          theme,
+        );
 
       const diffLines = details.diff.split("\n");
       let additions = 0;
@@ -352,11 +412,14 @@ export default function(pi: ExtensionAPI) {
 
       if (expanded) {
         for (const line of diffLines.slice(0, 30)) {
-          if (line.startsWith("+") && !line.startsWith("+++")) text += `\n${theme.fg("success", line)}`;
-          else if (line.startsWith("-") && !line.startsWith("---")) text += `\n${theme.fg("error", line)}`;
+          if (line.startsWith("+") && !line.startsWith("+++"))
+            text += `\n${theme.fg("success", line)}`;
+          else if (line.startsWith("-") && !line.startsWith("---"))
+            text += `\n${theme.fg("error", line)}`;
           else text += `\n${theme.fg("dim", line)}`;
         }
-        if (diffLines.length > 30) text += `\n${theme.fg("muted", `... ${diffLines.length - 30} more diff lines`)}`;
+        if (diffLines.length > 30)
+          text += `\n${theme.fg("muted", `... ${diffLines.length - 30} more diff lines`)}`;
       }
 
       return withSteering(text, result, theme);
@@ -372,11 +435,19 @@ export default function(pi: ExtensionAPI) {
 
     async execute(toolCallId, params, signal, onUpdate) {
       const cleanParams = withoutReason(params);
-      const res = await originalWrite.execute(toolCallId, cleanParams, signal, onUpdate);
+      const res = await originalWrite.execute(
+        toolCallId,
+        cleanParams,
+        signal,
+        onUpdate,
+      );
       if (cleanParams && typeof cleanParams.content === "string") {
         return {
           ...res,
-          details: { content: cleanParams.content, linesWritten: cleanParams.content.split("\n").length },
+          details: {
+            content: cleanParams.content,
+            linesWritten: cleanParams.content.split("\n").length,
+          },
         };
       }
       return res;
@@ -385,7 +456,8 @@ export default function(pi: ExtensionAPI) {
     renderCall(args, theme, _context) {
       let text = theme.fg("toolTitle", theme.bold("write "));
       text += theme.fg("accent", args.path);
-      const lineCount = typeof args.content === "string" ? args.content.split("\n").length : 0;
+      const lineCount =
+        typeof args.content === "string" ? args.content.split("\n").length : 0;
       text += theme.fg("dim", ` (${lineCount} lines)`);
       text += reasonSuffix(args, theme);
       return new Text(text, 0, 0);
@@ -397,7 +469,8 @@ export default function(pi: ExtensionAPI) {
       const errorText = toolErrorText(result, context.isError, "Write failed");
       if (errorText) return new Text(theme.fg("error", errorText), 0, 0);
 
-      const details = result.details as { content?: string; linesWritten?: number } | undefined;
+      const details = result.details as
+        { content?: string; linesWritten?: number } | undefined;
       const content = details?.content ?? "";
       const diffLines = content ? content.split("\n") : [];
       const linesCount = details?.linesWritten ?? diffLines.length;
@@ -408,7 +481,8 @@ export default function(pi: ExtensionAPI) {
         for (const line of diffLines.slice(0, 30)) {
           text += `\n${theme.fg("success", `+${line}`)}`;
         }
-        if (diffLines.length > 30) text += `\n${theme.fg("muted", `... ${diffLines.length - 30} more written lines`)}`;
+        if (diffLines.length > 30)
+          text += `\n${theme.fg("muted", `... ${diffLines.length - 30} more written lines`)}`;
       }
 
       return withSteering(text, result, theme);

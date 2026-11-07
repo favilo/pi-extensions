@@ -1,8 +1,14 @@
 import "../test-support/forbid-fetch.ts";
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createSubagentSession, executeChildToolRequest } from "./agent-session.ts";
-import type { ToolPermissionBoundary, ToolRequest } from "../tool-permissions/permission-boundary.ts";
+import {
+  createSubagentSession,
+  executeChildToolRequest,
+} from "./agent-session.ts";
+import type {
+  ToolPermissionBoundary,
+  ToolRequest,
+} from "../tool-permissions/permission-boundary.ts";
 
 function childRequest(overrides: Partial<Omit<ToolRequest, "actor">> = {}) {
   return {
@@ -41,10 +47,13 @@ test("routes process-shaped child requests through the boundary instead of execu
     },
   };
 
-  const result = await executeChildToolRequest(childRequest({
-    toolName: "bash",
-    input: { command: "cat notes.md" },
-  }), boundary);
+  const result = await executeChildToolRequest(
+    childRequest({
+      toolName: "bash",
+      input: { command: "cat notes.md" },
+    }),
+    boundary,
+  );
 
   assert.equal(result.status, "denied");
   assert.equal(executed, false);

@@ -36,7 +36,10 @@ test("SteeringEditor Vim mode toggles between normal and insert modes via Escape
 });
 
 test("SteeringEditor Vim normal mode supports motions (0, $, w, b) and deletion (x)", () => {
-  const editor = new SteeringEditor({ vimMode: true, initialText: "hello world" });
+  const editor = new SteeringEditor({
+    vimMode: true,
+    initialText: "hello world",
+  });
   editor.handleInput("\x1b"); // Normal mode
 
   // 0 moves to start
@@ -66,7 +69,10 @@ test("SteeringEditor renders mode indicator and cursor marker when focused", () 
 });
 
 test("SteeringEditor renders boxed Editor.render output for editor box display", () => {
-  const editor = new SteeringEditor({ vimMode: true, initialText: "clean line" });
+  const editor = new SteeringEditor({
+    vimMode: true,
+    initialText: "clean line",
+  });
   const lines = editor.render(80);
   assert.equal(lines.length, 3);
   assert.match(lines[0], /^─+$/);
@@ -79,4 +85,3 @@ test("SteeringEditor inserts newline on Enter without clearing buffer", () => {
   editor.handleInput("line2");
   assert.equal(editor.getValue(), "line1\nline2");
 });
-

@@ -13,7 +13,10 @@ test("DefaultProviderUsageAdapter returns unsupported state for unknown provider
   const adapter = new DefaultProviderUsageAdapter();
   const result = await adapter.getUsage("unknown-provider", "work-account");
   assert.equal(result.supported, false);
-  assert.equal((result as any).reason, 'Usage information is unsupported for provider "unknown-provider".');
+  assert.equal(
+    (result as any).reason,
+    'Usage information is unsupported for provider "unknown-provider".',
+  );
 });
 
 test("formatUsageSummary formats all supported usage fields without inventing missing values", () => {
@@ -53,7 +56,10 @@ test("formatUsageSummary handles safe provider failure messages without exposing
   };
 
   const formatted = formatUsageSummary(result);
-  assert.match(formatted, /Could not fetch usage for provider "openai-compat": Authentication failed/);
+  assert.match(
+    formatted,
+    /Could not fetch usage for provider "openai-compat": Authentication failed/,
+  );
   assert.doesNotMatch(formatted, /sk-/);
   assert.doesNotMatch(formatted, /Bearer/);
 });
@@ -63,7 +69,10 @@ test("/usage command resolves current provider and active account from Pi contex
   let commandHandler: ((args: string, ctx: any) => Promise<void>) | undefined;
 
   const mockAdapter: ProviderUsageAdapter = {
-    async getUsage(provider: string, account?: string): Promise<ProviderUsageResult> {
+    async getUsage(
+      provider: string,
+      account?: string,
+    ): Promise<ProviderUsageResult> {
       return {
         supported: true,
         usage: {
@@ -110,7 +119,10 @@ test("/usage command reflects active account after /accounts:* switching", async
   const requestedAccounts: string[] = [];
 
   const mockAdapter: ProviderUsageAdapter = {
-    async getUsage(provider: string, account?: string): Promise<ProviderUsageResult> {
+    async getUsage(
+      provider: string,
+      account?: string,
+    ): Promise<ProviderUsageResult> {
       requestedAccounts.push(account ?? "none");
       return {
         supported: true,

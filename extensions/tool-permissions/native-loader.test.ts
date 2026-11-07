@@ -33,7 +33,10 @@ test("loads a compatible native module and validates its handshake", async () =>
 test("loads a generated native package by path through the host seam", async () => {
   const directory = mkdtempSync(join(tmpdir(), "tool-permissions-native-"));
   const packagePath = join(directory, "index.cjs");
-  writeFileSync(packagePath, `module.exports = { probe(request) { return { version: 1, operation: request.operation, ok: true, nonce: request.nonce }; } };`);
+  writeFileSync(
+    packagePath,
+    `module.exports = { probe(request) { return { version: 1, operation: request.operation, ok: true, nonce: request.nonce }; } };`,
+  );
   try {
     const result = await loadNativePackageProbe(packagePath, "package-1");
     assert.equal(result.engine, "native");
@@ -45,7 +48,9 @@ test("loads a generated native package by path through the host seam", async () 
 
 test("falls back when the native package cannot load or returns invalid output", async () => {
   for (const load of [
-    async () => { throw new Error("package missing"); },
+    async () => {
+      throw new Error("package missing");
+    },
     async () => ({ probe: () => ({ version: NATIVE_CONTRACT_VERSION + 1 }) }),
   ]) {
     const result = await loadNativeProbe({ load });
