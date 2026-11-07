@@ -28,7 +28,7 @@ A tool request is allowed, denied, or asked. WASM appends one audit record with 
 
 ## 7. Preconditions
 - e16 native registration and orchestration are passing.
-- e18s00 has recorded adopt or reject for `pi-oxidized-ext`. This story uses that host.
+- e18s00 recorded `decision: reject` for `pi-oxidized-ext`. This story stays on the standalone NAPI package and calls Pi through `pi-api`.
 - The current audit logger and its fixtures describe the record shape.
 
 ## 8. Inputs

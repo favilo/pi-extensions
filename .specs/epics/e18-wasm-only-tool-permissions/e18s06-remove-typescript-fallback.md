@@ -28,7 +28,7 @@ Pi starts and loads `index.ts`. That file instantiates the WASM module and regis
 
 ## 7. Preconditions
 - e18s01 through e18s05 are passing, so path trust, audit writes, rule saves, prompts, and execution have WASM owners.
-- e18s00 has recorded adopt or reject for `pi-oxidized-ext`. This story uses that host.
+- e18s00 recorded `decision: reject` for `pi-oxidized-ext`. This story stays on the standalone NAPI package and calls Pi through `pi-api`.
 - The current package still builds `wasm32-wasip1-threads` with flavor `wasm32-wasi`.
 
 ## 8. Inputs
@@ -44,6 +44,9 @@ A loader-only TypeScript entry. Startup diagnostics that name WASM as the only e
 
 #### ADDED: The package entry only loads WASM
 `extensions/tool-permissions/index.ts` instantiates the WASM module and does not contain prompt, policy, audit, trust, or execution logic.
+
+#### ADDED: Rust owns `pi.on`
+The JavaScript bridge properties `handleSessionStart`, `handleToolCall`, `handleToolResult`, and `handleSessionShutdown` are gone. Rust handlers register those events through `pi-api`. Prompt UI and tool execution still cross back to JavaScript through host callbacks.
 
 ## 11. Quality attributes
 One engine, truthful diagnostics, and fail closed.

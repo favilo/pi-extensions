@@ -29,7 +29,7 @@ A permission decision is allow. WASM calls the Pi host execution callback once w
 
 ## 7. Preconditions
 - e18s01 through e18s04 define the WASM owners for trust, audit, saves, and prompts. This story can call those results. It does not reimplement them.
-- e18s00 has recorded adopt or reject for `pi-oxidized-ext`. This story uses that host.
+- e18s00 recorded `decision: reject` for `pi-oxidized-ext`. This story stays on the standalone NAPI package and calls Pi through `pi-api`.
 - Pi still exposes the tool execution callback the extension uses today.
 
 ## 8. Inputs

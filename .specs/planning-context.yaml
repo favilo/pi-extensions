@@ -28,5 +28,7 @@ key_decisions:
     rationale: A one-line TypeScript loader is the realistic Pi entry. WASM does not reimplement the terminal or process runtime.
   - decision: Re-evaluate pi-oxidized and pi-oxidized-ext in e18s00 before moving host areas.
     rationale: crates.io publishes pi-oxidized as the Rust Pi product and pi-oxidized-ext as the extension-host crate that exposes pi_ext. pi-oxided is only a misspelling in older e16 text. e18s00 records adopt or reject. Later stories follow that record.
+  - decision: Reject pi-oxidized-ext and keep the standalone NAPI package, with private pi-api as the ExtensionAPI helper.
+    rationale: pi-oxidized 0.1.1 is the product runtime. pi-oxidized-ext 0.1.1 is a Bun JSONL host client and cannot register pi.on from Rust. .specs/epics/e18-wasm-only-tool-permissions/e18s00-pi-oxidized-decision.md records decision reject. Later stories call Pi through extensions/tool-permissions/native/crates/pi-api.
   - decision: Earlier stories keep load-failure fallback until e18s06.
     rationale: Each host area can ship on the WASM success path while the extension still starts if that area's module call fails. e18s06 deletes that fallback.

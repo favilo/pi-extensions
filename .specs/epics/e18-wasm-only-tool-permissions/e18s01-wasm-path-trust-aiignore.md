@@ -29,7 +29,7 @@ An agent requests a path-sensitive tool. WASM canonicalizes the path, checks the
 
 ## 7. Preconditions
 - e16s01 through e16s07 are passing.
-- e18s00 has recorded adopt or reject for `pi-oxidized-ext`. This story uses that host.
+- e18s00 recorded `decision: reject` for `pi-oxidized-ext`. This story stays on the standalone NAPI package and calls Pi through `pi-api`.
 - The NAPI package loads `wasm32-wasip1-threads` with flavor `wasm32-wasi`.
 - Current path, trust, and `.aiignore` tests describe the oracle.
 

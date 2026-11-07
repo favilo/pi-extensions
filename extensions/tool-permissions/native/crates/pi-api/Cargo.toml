@@ -1,0 +1,9 @@
+[package]
+name = "pi-api"
+version = "0.1.0"
+edition.workspace = true
+publish.workspace = true
+description = "Typed helpers for the Pi JavaScript extension object"
+
+[dependencies]
+napi.workspace = true

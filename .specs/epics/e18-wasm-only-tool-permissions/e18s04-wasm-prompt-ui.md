@@ -29,7 +29,7 @@ An agent requests a protected tool and the decision is ask. WASM opens the exist
 
 ## 7. Preconditions
 - e10 steering behavior and e09 invocation binding remain the user-visible contract.
-- e18s00 has recorded adopt or reject for `pi-oxidized-ext`. This story uses that host.
+- e18s00 recorded `decision: reject` for `pi-oxidized-ext`. This story stays on the standalone NAPI package and calls Pi through `pi-api`.
 - Pi still exposes the prompt and editor widgets the extension uses today.
 
 ## 8. Inputs

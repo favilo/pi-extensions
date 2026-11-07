@@ -1,7 +1,7 @@
 active_flow: planning
 active_epic_id: e18
-active_story_id: e18s00
-active_story: Re-evaluate pi-oxidized and pi-oxidized-ext
+active_story_id: e18s01
+active_story: Move path canonicalization, project trust, and .aiignore into WASM
 active_bug_id: null
 git:
   bookmark: favilo/e18s00-pi-oxidized-host
@@ -93,23 +93,28 @@ planning:
     constraints:
     - Do not modify the e06 repair flow or child-private bridge catalog.
 handoff:
-  last_step_completed: Kickoff ready in the current workspace. Preflight green. Did not implement e18s00.
+  last_step_completed: e18s00 decision is reject. pi-api is the implemented ExtensionAPI helper. The decision test passed.
   open_decisions: []
   required_reading:
   - .specs/planning-context.yaml
   - .specs/product/SCOPE-e18-wasm-only-tool-permissions.yaml
   - .specs/epics/e18-wasm-only-tool-permissions/epic.yaml
+  - .specs/epics/e18-wasm-only-tool-permissions/e18s00-pi-oxidized-decision.md
+  - .specs/epics/e18-wasm-only-tool-permissions/e18s01-wasm-path-trust-aiignore.md
+  - .specs/epics/e18-wasm-only-tool-permissions/e18s01-tasks.yaml
   - .specs/security/epics/e18/THREAT_MODEL.md
-  - .specs/epics/e18-wasm-only-tool-permissions/e18s00-pi-oxidized-host.md
-  - .specs/epics/e18-wasm-only-tool-permissions/e18s00-tasks.yaml
   next_skill: develop-tdd
   context: >-
-    e16 stays passing and closed. Workspace is /Users/kevin.oberlies/git/agents/pi-extensions
-    on favilo/e18s00-pi-oxidized-host, parent main (vmyzxzpk). e18s00 records adopt or
-    reject for pi-oxidized-ext before later stories move path trust, audit writes, rule
-    saves, prompts, and tool execution into WASM and remove the TypeScript permission
-    fallback. index.ts remains the loader. Do not push. Do not delete
-    extensions/tool-permissions/index.ts.
+    e18s00 is passing and committed on top of favilo/e18s00-pi-oxidized-host.
+    Do not create a new bookmark. pi-oxidized 0.1.1 is the product runtime.
+    pi-oxidized-ext 0.1.1 is a Bun JSONL host client and cannot register pi.on.
+    The decision record is
+    .specs/epics/e18-wasm-only-tool-permissions/e18s00-pi-oxidized-decision.md
+    with decision reject. The implemented alternative is the private pi-api crate
+    at extensions/tool-permissions/native/crates/pi-api, in the Cargo workspace at
+    extensions/tool-permissions/native. e18s01 stays on the standalone NAPI
+    package (wasm32-wasip1-threads, flavor wasm32-wasi) and calls Pi through
+    pi-api. Do not push. Do not delete extensions/tool-permissions/index.ts.
   blocker: null
   deferred_work:
   - Consolidate safeStringify and JSON formatting helpers into a shared utility module
@@ -128,7 +133,7 @@ release:
 epic_cycle:
   step: 1
   current_step: 1
-  story_bcps: 3
+  story_bcps: 5
   security_review: pending
   plan_consistency: pass
 metrics:
@@ -163,4 +168,4 @@ metrics:
       calls: 2
       total_seconds: 2.0
       avg_seconds: 1.0
-  story_start: '2026-11-06T21:00:00Z'
+  story_start: '2026-11-07T01:56:00Z'

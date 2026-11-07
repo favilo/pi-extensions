@@ -9,7 +9,7 @@ summary: |-
   SCOPE_LATEST.yaml remains the e03 directory-local permissions PRD. This file is the scope for e18 only.
 in_scope:
   - future_story_id: e18s00
-    outcome: Record whether e18 adopts pi-oxidized-ext as the extension host or keeps the standalone NAPI package.
+    outcome: Rejected pi-oxidized-ext 0.1.1. Later stories keep the standalone NAPI package and call Pi through private pi-api.
   - future_story_id: e18s01
     outcome: WASM owns path canonicalization, project trust checks, and .aiignore matching for permission decisions.
   - future_story_id: e18s02

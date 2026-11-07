@@ -8,7 +8,7 @@ stories:
   - id: e18s00
     title: Re-evaluate pi-oxidized and pi-oxidized-ext
     bcps: 3
-    status: failing
+    status: passing
     delta: ADDED
     spec: e18s00-pi-oxidized-host.md
     tasks: e18s00-tasks.yaml
