@@ -4,6 +4,7 @@ import {
   mkdtempSync,
   mkdirSync,
   realpathSync,
+  rmSync,
   symlinkSync,
   writeFileSync,
 } from "node:fs";
@@ -14,7 +15,13 @@ import {
   NATIVE_CONTRACT_VERSION,
   NATIVE_PATH_TRUST_NONCE,
 } from "./native-contract.ts";
+import { createToolPermissionBoundary } from "./index.ts";
 import { evaluatePathTrust } from "./native-path-trust.ts";
+import { setNativePackagePathForTests } from "./native-package.ts";
+import {
+  executeToolRequest,
+  type ToolRequest,
+} from "./permission-boundary.ts";
 import { resolveScopedPermissionDecision } from "./scope.ts";
 
 test("canonical path and working directory match the current host for an existing read", () => {
@@ -164,4 +171,37 @@ test("a project policy outside the trusted root is not honored", () => {
   assert.equal(host.decision, "ask");
   assert.equal(result.decision, host.decision);
   assert.equal(result.trustEligible, true);
+});
+
+test("invalid WASM path output denies and is not recorded as an allow", async () => {
+  const root = mkdtempSync(join(tmpdir(), "pi-path-trust-invalid-"));
+  const cwd = join(root, "project");
+  mkdirSync(cwd);
+  writeFileSync(join(cwd, "notes.txt"), "hello");
+  const packageDir = mkdtempSync(join(tmpdir(), "pi-path-trust-native-"));
+  const packagePath = join(packageDir, "index.cjs");
+  writeFileSync(
+    packagePath,
+    "exports.evaluatePathTrust = () => ({ ok: true, decision: 'allow' });\n",
+  );
+  const restore = setNativePackagePathForTests(packagePath);
+  const audits: string[] = [];
+  try {
+    const boundary = createToolPermissionBoundary({
+      audit: (entry) => audits.push(entry.decision),
+      execute: async () => "ran",
+    });
+    const request: ToolRequest = {
+      actor: { kind: "main" },
+      toolName: "read",
+      input: { path: "notes.txt" },
+      cwd,
+    };
+    const result = await executeToolRequest(request, boundary);
+    assert.equal(result.status, "denied");
+    assert.equal(audits.includes("allow"), false);
+  } finally {
+    restore();
+    rmSync(packageDir, { recursive: true, force: true });
+  }
 });
