@@ -11,6 +11,7 @@ pub enum NativeOperation {
     EvaluatePermission,
     OrchestratePermission,
     RegisterCallbacks,
+    PathTrust,
 }
 
 #[derive(derive_more::FromStr)]
@@ -149,4 +150,29 @@ pub struct NativeRegistrationResponse {
     pub ok: bool,
     pub nonce: String,
     pub registrations: Vec<String>,
+}
+
+#[napi(object)]
+pub struct PathTrustRequest {
+    pub version: i64,
+    pub operation: String,
+    pub nonce: String,
+    pub tool: String,
+    pub requested_path: String,
+    pub cwd: String,
+    pub trust_path: Option<String>,
+    pub trust_decision: bool,
+}
+
+#[napi(object)]
+pub struct PathTrustResponse {
+    pub version: i64,
+    pub operation: NativeOperation,
+    pub ok: bool,
+    pub nonce: String,
+    pub path: String,
+    pub cwd: String,
+    pub trust_eligible: bool,
+    pub aiignore_match: bool,
+    pub decision: PermissionDecision,
 }

@@ -1,13 +1,15 @@
-//! Typed calls into the JavaScript `ExtensionAPI` object.
+//! Typed calls into the JavaScript host.
 //!
-//! The methods still cross into Node through napi. They hide property lookup
-//! and `.call` for the Pi methods this package uses.
+//! ExtensionAPI methods hide property lookup and `.call`. Narrow host
+//! callbacks, such as path canonicalization, live here too.
 
 mod bridge;
 mod on_callback;
+mod path_host;
 
 pub use bridge::{Bridge, CallbackPresence};
 pub use on_callback::OnCallback;
+pub use path_host::{PathHost, RealpathCallback};
 
 use napi::bindgen_prelude::{
     FnArgs, FromNapiValue, Function, JsObjectValue, JsValue, Object, Unknown,

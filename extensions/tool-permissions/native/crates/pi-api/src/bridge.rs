@@ -22,7 +22,11 @@ pub struct Bridge<'scope> {
 type EventCallback = FunctionRef<FnArgs<(Unknown<'static>, Unknown<'static>)>, Unknown<'static>>;
 
 impl<'scope> Bridge<'scope> {
-    pub fn new(env: &'scope Env, pi: Object<'scope>, source: Option<Object<'scope>>) -> Result<Self> {
+    pub fn new(
+        env: &'scope Env,
+        pi: Object<'scope>,
+        source: Option<Object<'scope>>,
+    ) -> Result<Self> {
         Ok(Self {
             env,
             pi: Pi::new(env, pi)?,
@@ -58,7 +62,9 @@ impl<'scope> Bridge<'scope> {
             Some(callback) => Some(callback),
             None => match presence {
                 CallbackPresence::Required => {
-                    return Err(Error::from_reason(format!("{property} bridge is unavailable")));
+                    return Err(Error::from_reason(format!(
+                        "{property} bridge is unavailable"
+                    )));
                 }
                 CallbackPresence::IfPresent => return Ok(false),
                 CallbackPresence::Always => None,
@@ -66,23 +72,27 @@ impl<'scope> Bridge<'scope> {
         };
 
         if let Some(callback) = callback {
-            let handler = self.env.create_function_from_closure(event.as_str(), move |ctx| {
-                let event_value: Unknown = ctx.get(0)?;
-                let extension_context: Unknown = ctx.get(1)?;
-                if let (Some(before), Ok(session_context)) = (before, ctx.get::<Object>(1)) {
-                    before(&session_context)?;
-                }
-                let callback = callback.borrow_back(ctx.env)?;
-                callback.call(FnArgs::from((event_value, extension_context)))
-            })?;
+            let handler = self
+                .env
+                .create_function_from_closure(event.as_str(), move |ctx| {
+                    let event_value: Unknown = ctx.get(0)?;
+                    let extension_context: Unknown = ctx.get(1)?;
+                    if let (Some(before), Ok(session_context)) = (before, ctx.get::<Object>(1)) {
+                        before(&session_context)?;
+                    }
+                    let callback = callback.borrow_back(ctx.env)?;
+                    callback.call(FnArgs::from((event_value, extension_context)))
+                })?;
             self.pi.on(event, handler)?;
         } else {
-            let handler = self.env.create_function_from_closure(event.as_str(), move |ctx| {
-                if let (Some(before), Ok(session_context)) = (before, ctx.get::<Object>(1)) {
-                    before(&session_context)?;
-                }
-                Ok(())
-            })?;
+            let handler = self
+                .env
+                .create_function_from_closure(event.as_str(), move |ctx| {
+                    if let (Some(before), Ok(session_context)) = (before, ctx.get::<Object>(1)) {
+                        before(&session_context)?;
+                    }
+                    Ok(())
+                })?;
             self.pi.on(event, handler)?;
         }
         Ok(true)

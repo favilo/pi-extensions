@@ -1,16 +1,20 @@
 mod contract;
 mod parser;
+mod path_trust;
 mod policy;
 mod registration;
 
 pub use contract::{
     EvaluateRequest, EvaluateResponse, NativeOperation, NativeRegistrationRequest,
-    NativeRegistrationResponse, ParseRequest, ParseResponse, ParsedSubcommand, PermissionDecision,
-    PermissionEvaluationRequest, PermissionOrchestrationRequest, PermissionOrchestrationResponse,
-    PolicyPermission, PolicyRequest, PolicyResponse, ProbeRequest, ProbeResponse,
+    NativeRegistrationResponse, ParseRequest, ParseResponse, ParsedSubcommand, PathTrustRequest,
+    PathTrustResponse, PermissionDecision, PermissionEvaluationRequest,
+    PermissionOrchestrationRequest, PermissionOrchestrationResponse, PolicyPermission,
+    PolicyRequest, PolicyResponse, ProbeRequest, ProbeResponse,
 };
+use napi::bindgen_prelude::Function;
 use napi::{Env, Error, Result};
 use napi_derive::napi;
+use pi_api::RealpathCallback;
 
 pub(crate) const CONTRACT_VERSION: i64 = 1;
 
@@ -98,11 +102,19 @@ pub fn evaluate_permission(request: PermissionEvaluationRequest) -> Result<Evalu
     Ok(policy::evaluate_permission(request))
 }
 
+#[napi]
+pub fn evaluate_path_trust(
+    request: PathTrustRequest,
+    realpath: Function<String, String>,
+) -> Result<PathTrustResponse> {
+    path_trust::evaluate(request, &RealpathCallback::new(&realpath)).map_err(Error::from_reason)
+}
+
 #[cfg(test)]
 mod tests {
     use super::{
-        evaluate_permission_orchestration, evaluate_policy, parse, parse_policy, probe,
         EvaluateRequest, ParseRequest, PermissionOrchestrationRequest, PolicyRequest, ProbeRequest,
+        evaluate_permission_orchestration, evaluate_policy, parse, parse_policy, probe,
     };
     #[test]
     fn probe_returns_a_distinct_typed_response() {
