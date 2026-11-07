@@ -18,10 +18,12 @@ pub fn evaluate(
     let absolute = node_resolve(&cwd, &request.requested_path);
     let path = canonicalize_leaf(&request.tool, &absolute, host)?;
     let aiignore_match = aiignore_matches(&cwd, &path, host);
-    let decision = if aiignore_match {
-        PermissionDecision::Deny
-    } else {
-        PermissionDecision::Ask
+    let (trust_eligible, project_decision) = project_decision(&request, &cwd, &path, host)?;
+    let decision = match project_decision {
+        Some(PermissionDecision::Deny) => PermissionDecision::Deny,
+        _ if aiignore_match => PermissionDecision::Deny,
+        Some(decision) => decision,
+        None => PermissionDecision::Ask,
     };
     Ok(PathTrustResponse {
         version: CONTRACT_VERSION,
@@ -30,10 +32,70 @@ pub fn evaluate(
         nonce: request.nonce,
         path,
         cwd,
-        trust_eligible: false,
+        trust_eligible,
         aiignore_match,
         decision,
     })
+}
+
+fn project_decision(
+    request: &PathTrustRequest,
+    cwd: &str,
+    path: &str,
+    host: &impl PathHost,
+) -> Result<(bool, Option<PermissionDecision>), String> {
+    let Some(trust_path) = request.trust_path.as_deref() else {
+        return Ok((false, None));
+    };
+    if !request.trust_decision {
+        return Ok((false, None));
+    }
+    let trusted = host.realpath(trust_path)?;
+    for policy_path in project_policy_paths(cwd, host) {
+        let Ok(source) = host.read_to_string(&policy_path) else {
+            continue;
+        };
+        let canonical_policy = host.realpath(&policy_path).unwrap_or(policy_path);
+        if !is_inside(&canonical_policy, &trusted) {
+            continue;
+        }
+        match crate::policy::decision_for_tool_path(&request.tool, &source, path) {
+            Ok(PermissionDecision::Ask) => continue,
+            Ok(decision) => return Ok((true, Some(decision))),
+            Err(_) => return Ok((true, Some(PermissionDecision::Ask))),
+        }
+    }
+    Ok((true, None))
+}
+
+fn project_policy_paths(cwd: &str, host: &impl PathHost) -> Vec<String> {
+    let directories = ancestors(cwd);
+    let boundary = directories.iter().position(|directory| {
+        host.realpath(&format!("{directory}/.git")).is_ok()
+            || host.realpath(&format!("{directory}/.jj")).is_ok()
+    });
+    let eligible: Vec<&String> = match boundary {
+        Some(index) => directories.iter().take(index + 1).collect(),
+        None => directories.iter().take(1).collect(),
+    };
+    eligible
+        .into_iter()
+        .map(|directory| format!("{directory}/.pi/permissions.toml"))
+        .collect()
+}
+
+fn ancestors(start: &str) -> Vec<String> {
+    let mut directories = Vec::new();
+    let mut current = start.to_string();
+    loop {
+        directories.push(current.clone());
+        let parent = dirname_posix(&current).to_string();
+        if parent == current {
+            break;
+        }
+        current = parent;
+    }
+    directories
 }
 
 fn aiignore_matches(cwd: &str, path: &str, host: &impl PathHost) -> bool {
@@ -148,7 +210,7 @@ fn basename_posix(path: &str) -> &str {
 #[cfg(test)]
 mod tests {
     use super::evaluate;
-    use crate::contract::PathTrustRequest;
+    use crate::contract::{PathTrustRequest, PermissionDecision};
     use pi_api::PathHost;
     use std::fs;
     use std::time::{SystemTime, UNIX_EPOCH};
@@ -241,6 +303,50 @@ mod tests {
             FsHost.realpath(&cwd.to_string_lossy()).unwrap()
         );
         assert_eq!(response.path, format!("{outside_real}/new.txt"));
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn nearer_project_denial_inside_the_trusted_root_wins() {
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!("pi-path-trust-trust-{nanos}"));
+        let repo = root.join("project");
+        let cwd = repo.join("child");
+        fs::create_dir_all(repo.join(".git")).unwrap();
+        fs::create_dir_all(cwd.join(".pi")).unwrap();
+        fs::create_dir_all(repo.join(".pi")).unwrap();
+        fs::write(cwd.join("notes.txt"), "hello").unwrap();
+        fs::write(
+            repo.join(".pi/permissions.toml"),
+            "[permissions.read]\nallow = [{ path = '.*' }]\ndeny = []\n",
+        )
+        .unwrap();
+        fs::write(
+            cwd.join(".pi/permissions.toml"),
+            "[permissions.read]\nallow = []\ndeny = [{ path = '.*' }]\n",
+        )
+        .unwrap();
+
+        let response = evaluate(
+            PathTrustRequest {
+                version: 1,
+                operation: "path_trust".into(),
+                nonce: "tool-permissions-path-trust".into(),
+                tool: "read".into(),
+                requested_path: "notes.txt".into(),
+                cwd: cwd.to_string_lossy().into_owned(),
+                trust_path: Some(repo.to_string_lossy().into_owned()),
+                trust_decision: true,
+            },
+            &FsHost,
+        )
+        .unwrap();
+
+        assert!(response.trust_eligible);
+        assert!(matches!(response.decision, PermissionDecision::Deny));
         let _ = fs::remove_dir_all(root);
     }
 }

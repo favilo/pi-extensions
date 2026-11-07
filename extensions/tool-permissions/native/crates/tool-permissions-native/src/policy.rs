@@ -215,6 +215,18 @@ pub fn evaluate(request: EvaluateRequest) -> EvaluateResponse {
     }
 }
 
+pub(crate) fn decision_for_tool_path(
+    tool: &str,
+    source: &str,
+    path: &str,
+) -> Result<PermissionDecision, String> {
+    let permissions = decode(source)?;
+    let Some(permission) = permissions.get(&permission_key_for_tool(tool)) else {
+        return Ok(PermissionDecision::Ask);
+    };
+    permission_decision(permission, &serde_json::json!({ "path": path }))
+}
+
 fn permission_key_for_tool(tool_name: &str) -> String {
     match tool_name {
         "read" | "ls" | "grep" | "find" => "read".into(),

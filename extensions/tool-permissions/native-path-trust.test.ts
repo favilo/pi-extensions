@@ -109,3 +109,37 @@ test("a nearer project denial inside the trusted root matches the host", () => {
   assert.equal(result.decision, host.decision);
   assert.equal(result.trustEligible, true);
 });
+
+test("a project policy outside the trusted root is not honored", () => {
+  const root = mkdtempSync(join(tmpdir(), "pi-path-trust-outside-"));
+  const repo = join(root, "project");
+  const cwd = join(repo, "child");
+  mkdirSync(join(repo, ".git"), { recursive: true });
+  mkdirSync(join(repo, ".pi"), { recursive: true });
+  mkdirSync(cwd, { recursive: true });
+  writeFileSync(join(cwd, "notes.txt"), "hello");
+  writeFileSync(join(repo, ".pi", "permissions.toml"), "[permissions.read]\nallow = []\ndeny = [{ path = '.*' }]\n");
+  const canonicalPath = realpathSync(join(cwd, "notes.txt"));
+  const host = resolveScopedPermissionDecision({
+    cwd,
+    toolName: "read",
+    input: { path: canonicalPath },
+    userPermissionsPath: join(root, "missing-user.toml"),
+    trustResolver: () => ({ path: cwd, decision: true }),
+  });
+
+  const result = evaluatePathTrust({
+    version: NATIVE_CONTRACT_VERSION,
+    operation: "path_trust",
+    nonce: NATIVE_PATH_TRUST_NONCE,
+    tool: "read",
+    requestedPath: "notes.txt",
+    cwd,
+    trustPath: cwd,
+    trustDecision: true,
+  });
+
+  assert.equal(host.decision, "ask");
+  assert.equal(result.decision, host.decision);
+  assert.equal(result.trustEligible, true);
+});
