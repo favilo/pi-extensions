@@ -50,3 +50,25 @@ test("missing write under a symlink parent matches the host canonical path", () 
   assert.equal(result.cwd, realpathSync(cwd));
   assert.equal(result.path, join(realpathSync(outside), "new.txt"));
 });
+
+test("a path matched by .aiignore is denied", () => {
+  const root = mkdtempSync(join(tmpdir(), "pi-path-trust-aiignore-"));
+  const cwd = join(root, "project");
+  mkdirSync(cwd);
+  writeFileSync(join(cwd, ".aiignore"), "secret.txt\n");
+  writeFileSync(join(cwd, "secret.txt"), "nope");
+
+  const result = evaluatePathTrust({
+    version: NATIVE_CONTRACT_VERSION,
+    operation: "path_trust",
+    nonce: NATIVE_PATH_TRUST_NONCE,
+    tool: "read",
+    requestedPath: "secret.txt",
+    cwd,
+    trustPath: null,
+    trustDecision: false,
+  });
+
+  assert.equal(result.aiignoreMatch, true);
+  assert.equal(result.decision, "deny");
+});
