@@ -5,7 +5,8 @@ export type NativeOperation =
   | "evaluate"
   | "evaluate_permission"
   | "orchestrate_permission"
-  | "register_callbacks";
+  | "register_callbacks"
+  | "path_trust";
 
 export type PermissionDecision = "allow" | "deny" | "ask";
 
@@ -16,6 +17,30 @@ export const NATIVE_PARSER_NONCE = "tool-permissions-parser" as const;
 export const NATIVE_EVALUATION_NONCE = "tool-permissions-evaluation" as const;
 export const NATIVE_ORCHESTRATION_NONCE = "tool-permissions-orchestration" as const;
 export const NATIVE_REGISTRATION_NONCE = "tool-permissions-registration" as const;
+export const NATIVE_PATH_TRUST_NONCE = "tool-permissions-path-trust" as const;
+
+export type PathTrustRequest = {
+  version: typeof NATIVE_CONTRACT_VERSION;
+  operation: "path_trust";
+  nonce: string;
+  tool: string;
+  requestedPath: string;
+  cwd: string;
+  trustPath: string | null;
+  trustDecision: boolean;
+};
+
+export type PathTrustResult = {
+  version: typeof NATIVE_CONTRACT_VERSION;
+  operation: "path_trust";
+  ok: boolean;
+  nonce: string;
+  path: string;
+  cwd: string;
+  trustEligible: boolean;
+  aiignoreMatch: boolean;
+  decision: PermissionDecision;
+};
 
 export type NativeProbeRequest = {
   version: typeof NATIVE_CONTRACT_VERSION;
