@@ -57,6 +57,7 @@ import {
   resolveCurrentProjectPolicyPath,
   resolveScopedPermissionDecision,
   type ScopedPermissionDecision,
+  type TrustResolver,
 } from "./scope.ts";
 import {
   evaluateBashSubcommands,
@@ -64,6 +65,11 @@ import {
 } from "./bash-subcommands.ts";
 import { isYoloModeEnabled } from "./yolo-mode.ts";
 import { loadNativePackageProbe } from "./native-loader.ts";
+import {
+  NATIVE_CONTRACT_VERSION,
+  NATIVE_PATH_TRUST_NONCE,
+} from "./native-contract.ts";
+import { adoptPathTrust } from "./native-path-trust.ts";
 import { resolveNativePackagePath } from "./native-package.ts";
 import {
   hasNativeRegistration,
@@ -1401,11 +1407,55 @@ const NONEXISTENT_PATH_TOOLS = new Set(["write", "edit", "subagent_result"]);
 
 type CanonicalPermissionPath = { path: string; cwd: string };
 
+function pathTrustRequest(
+  toolName: string,
+  requestedPath: string,
+  cwd: string,
+  trustResolver: TrustResolver,
+) {
+  let trustPath: string | null = null;
+  let trustDecision = false;
+  try {
+    const trust = trustResolver(cwd);
+    if (trust?.decision) {
+      trustPath = trust.path;
+      trustDecision = true;
+    }
+  } catch {
+    trustPath = null;
+    trustDecision = false;
+  }
+  return {
+    version: NATIVE_CONTRACT_VERSION,
+    operation: "path_trust" as const,
+    nonce: NATIVE_PATH_TRUST_NONCE,
+    tool: toolName,
+    requestedPath,
+    cwd,
+    trustPath,
+    trustDecision,
+  };
+}
+
 function canonicalPermissionPath(
   toolName: string,
   requestedPath: string,
   cwd: string,
 ): CanonicalPermissionPath {
+  const adopted = adoptPathTrust(
+    pathTrustRequest(
+      toolName,
+      requestedPath,
+      cwd,
+      createPersistedTrustResolver(getAgentDir()),
+    ),
+  );
+  if (adopted.status === "invalid") {
+    throw new Error(`invalid native path-trust result for ${toolName}`);
+  }
+  if (adopted.status === "ready") {
+    return { path: adopted.result.path, cwd: adopted.result.cwd };
+  }
   try {
     const canonicalCwd = realpathSync(cwd);
     const absolutePath = resolve(canonicalCwd, requestedPath || ".");
@@ -1458,6 +1508,52 @@ export function resolvePermissionDecisionForRequest(
   request: ToolRequest,
   options: PermissionResolverOptions = {},
 ): PermissionDecision {
+  if (
+    CONFIGURED_PATH_TOOLS.has(request.toolName) &&
+    typeof request.input === "object" &&
+    request.input !== null
+  ) {
+    const input = request.input as Record<string, unknown>;
+    const requestedPath = typeof input.path === "string" ? input.path : "";
+    const trustResolver =
+      options.trustResolver ?? createPersistedTrustResolver(getAgentDir());
+    const adopted = adoptPathTrust(
+      pathTrustRequest(
+        request.toolName,
+        requestedPath,
+        request.cwd,
+        trustResolver,
+      ),
+    );
+    if (adopted.status === "invalid") return "deny";
+    if (adopted.status === "ready") {
+      const normalizedInput = { ...input, path: adopted.result.path };
+      request.input = normalizedInput;
+      const implicit = IMPLICIT_PROJECT_PATH_TOOLS.has(request.toolName);
+      const aiignoreOnly = adopted.result.aiignoreMatch && !implicit;
+      if (adopted.result.decision === "deny" && !aiignoreOnly) return "deny";
+      if (adopted.result.aiignoreMatch && implicit) return "deny";
+      if (adopted.result.decision === "allow") return "allow";
+      const resolved = resolveToolPermissionDecision(
+        request.toolName,
+        normalizedInput,
+        request.cwd,
+        {
+          ...options,
+          trustResolver: adopted.result.trustEligible
+            ? () => null
+            : trustResolver,
+        },
+      );
+      if (resolved.diagnostic) throw new Error(resolved.diagnostic);
+      if (resolved.decision === "deny") return "deny";
+      if (!implicit) return resolved.decision;
+      if (resolved.decision === "allow") return "allow";
+      return isInsideDirectory(adopted.result.path, adopted.result.cwd)
+        ? "allow"
+        : "ask";
+    }
+  }
   const { input, canonicalCwd } = normalizedPermissionInput(request);
   if (
     request.toolName === "bash" &&

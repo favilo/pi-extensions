@@ -61,15 +61,24 @@ function isPathTrustResult(
   );
 }
 
-/** Canonicalize a permission path through the WASM path-trust operation. */
-export function evaluatePathTrust(request: PathTrustRequest): PathTrustResult {
+export type AdoptedPathTrust =
+  | { status: "unavailable" }
+  | { status: "invalid" }
+  | { status: "ready"; result: PathTrustResult };
+
+/** Load the WASM path-trust result. A missing package stays unavailable so the host can fall back. */
+export function adoptPathTrust(request: PathTrustRequest): AdoptedPathTrust {
   const packagePath = resolveNativePackagePath();
-  if (!packagePath) return denied(request);
+  if (!packagePath) return { status: "unavailable" };
+  let native: Partial<NativePathTrust>;
   try {
-    const native = requireNativePackage(
-      packagePath,
-    ) as Partial<NativePathTrust>;
-    if (typeof native.evaluatePathTrust !== "function") return denied(request);
+    native = requireNativePackage(packagePath) as Partial<NativePathTrust>;
+  } catch {
+    return { status: "unavailable" };
+  }
+  if (typeof native.evaluatePathTrust !== "function")
+    return { status: "unavailable" };
+  try {
     const nativeRequest: NativePathTrustRequest = {
       ...request,
       trustPath: request.trustPath ?? undefined,
@@ -79,8 +88,16 @@ export function evaluatePathTrust(request: PathTrustRequest): PathTrustResult {
       (path) => realpathSync(path),
       (path) => readFileSync(path, "utf8"),
     );
-    return isPathTrustResult(result, request) ? result : denied(request);
+    return isPathTrustResult(result, request)
+      ? { status: "ready", result }
+      : { status: "invalid" };
   } catch {
-    return denied(request);
+    return { status: "invalid" };
   }
+}
+
+/** Canonicalize a permission path through the WASM path-trust operation. */
+export function evaluatePathTrust(request: PathTrustRequest): PathTrustResult {
+  const adopted = adoptPathTrust(request);
+  return adopted.status === "ready" ? adopted.result : denied(request);
 }

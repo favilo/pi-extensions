@@ -15,7 +15,7 @@ stories:
   - id: e18s01
     title: Move path canonicalization, project trust, and .aiignore into WASM
     bcps: 5
-    status: failing
+    status: passing
     delta: MODIFIED
     spec: e18s01-wasm-path-trust-aiignore.md
     tasks: e18s01-tasks.yaml

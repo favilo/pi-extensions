@@ -205,3 +205,29 @@ test("invalid WASM path output denies and is not recorded as an allow", async ()
     rmSync(packageDir, { recursive: true, force: true });
   }
 });
+
+test("a disabled native package keeps the TypeScript path decision", async () => {
+  const previous = process.env.PI_TOOL_PERMISSIONS_NATIVE_DISABLE;
+  process.env.PI_TOOL_PERMISSIONS_NATIVE_DISABLE = "1";
+  const root = mkdtempSync(join(tmpdir(), "pi-path-trust-fallback-"));
+  const cwd = join(root, "project");
+  mkdirSync(cwd);
+  writeFileSync(join(cwd, "notes.txt"), "hello");
+  try {
+    const boundary = createToolPermissionBoundary({
+      execute: async () => "ran",
+    });
+    const request: ToolRequest = {
+      actor: { kind: "main" },
+      toolName: "read",
+      input: { path: "notes.txt" },
+      cwd,
+    };
+    const result = await executeToolRequest(request, boundary);
+    assert.equal(result.status, "allowed");
+  } finally {
+    if (previous === undefined)
+      delete process.env.PI_TOOL_PERMISSIONS_NATIVE_DISABLE;
+    else process.env.PI_TOOL_PERMISSIONS_NATIVE_DISABLE = previous;
+  }
+});
