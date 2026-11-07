@@ -1,5 +1,6 @@
 use crate::CONTRACT_VERSION;
 use crate::contract::{NativeOperation, PathTrustRequest, PathTrustResponse, PermissionDecision};
+use ignore::gitignore::GitignoreBuilder;
 use pi_api::PathHost;
 
 pub fn evaluate(
@@ -16,6 +17,12 @@ pub fn evaluate(
     let cwd = host.realpath(&request.cwd)?;
     let absolute = node_resolve(&cwd, &request.requested_path);
     let path = canonicalize_leaf(&request.tool, &absolute, host)?;
+    let aiignore_match = aiignore_matches(&cwd, &path, host);
+    let decision = if aiignore_match {
+        PermissionDecision::Deny
+    } else {
+        PermissionDecision::Ask
+    };
     Ok(PathTrustResponse {
         version: CONTRACT_VERSION,
         operation: NativeOperation::PathTrust,
@@ -24,9 +31,42 @@ pub fn evaluate(
         path,
         cwd,
         trust_eligible: false,
-        aiignore_match: false,
-        decision: PermissionDecision::Ask,
+        aiignore_match,
+        decision,
     })
+}
+
+fn aiignore_matches(cwd: &str, path: &str, host: &impl PathHost) -> bool {
+    if !is_inside(path, cwd) {
+        return false;
+    }
+    let relative = relative_posix(cwd, path);
+    if relative.is_empty() {
+        return false;
+    }
+    let Ok(source) = host.read_to_string(&format!("{cwd}/.aiignore")) else {
+        return false;
+    };
+    let mut builder = GitignoreBuilder::new(cwd);
+    for line in source.lines() {
+        if builder.add_line(None, line).is_err() {
+            return true;
+        }
+    }
+    match builder.build() {
+        Ok(gitignore) => gitignore.matched(relative, false).is_ignore(),
+        Err(_) => true,
+    }
+}
+
+fn is_inside(path: &str, directory: &str) -> bool {
+    path == directory || path.starts_with(&format!("{directory}/"))
+}
+
+fn relative_posix(directory: &str, path: &str) -> String {
+    path.strip_prefix(&format!("{directory}/"))
+        .unwrap_or("")
+        .to_owned()
 }
 
 fn node_resolve(cwd: &str, requested: &str) -> String {
@@ -120,6 +160,10 @@ mod tests {
             fs::canonicalize(path)
                 .map(|path| path.to_string_lossy().into_owned())
                 .map_err(|error| error.to_string())
+        }
+
+        fn read_to_string(&self, path: &str) -> Result<String, String> {
+            fs::read_to_string(path).map_err(|error| error.to_string())
         }
     }
 

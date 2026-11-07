@@ -35,6 +35,7 @@ required absolute-path form.
 ## Rust
 
 - Format with `cargo fmt` from `extensions/tool-permissions/native`.
+- Declare every dependency in `extensions/tool-permissions/native/Cargo.toml` under `[workspace.dependencies]`. Member crates use `dependency.workspace = true` and do not pin their own versions.
 
 ## TDD
 

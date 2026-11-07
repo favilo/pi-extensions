@@ -17,6 +17,7 @@ serde.workspace = true
 regex.workspace = true
 serde_json.workspace = true
 derive_more.workspace = true
+ignore.workspace = true
 
 [build-dependencies]
 napi-build.workspace = true

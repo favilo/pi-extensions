@@ -1,11 +1,15 @@
-import { realpathSync } from "node:fs";
+import { readFileSync, realpathSync } from "node:fs";
 import { NATIVE_CONTRACT_VERSION, type PathTrustRequest, type PathTrustResult, type PermissionDecision } from "./native-contract.ts";
 import { requireNativePackage, resolveNativePackagePath } from "./native-package.ts";
 
 type NativePathTrustRequest = Omit<PathTrustRequest, "trustPath"> & { trustPath?: string };
 
 type NativePathTrust = {
-  evaluatePathTrust(request: NativePathTrustRequest, realpath: (path: string) => string): PathTrustResult;
+  evaluatePathTrust(
+    request: NativePathTrustRequest,
+    realpath: (path: string) => string,
+    readFile: (path: string) => string,
+  ): PathTrustResult;
 };
 
 function denied(request: PathTrustRequest): PathTrustResult {
@@ -50,7 +54,11 @@ export function evaluatePathTrust(request: PathTrustRequest): PathTrustResult {
     const native = requireNativePackage(packagePath) as Partial<NativePathTrust>;
     if (typeof native.evaluatePathTrust !== "function") return denied(request);
     const nativeRequest: NativePathTrustRequest = { ...request, trustPath: request.trustPath ?? undefined };
-    const result = native.evaluatePathTrust(nativeRequest, (path) => realpathSync(path));
+    const result = native.evaluatePathTrust(
+      nativeRequest,
+      (path) => realpathSync(path),
+      (path) => readFileSync(path, "utf8"),
+    );
     return isPathTrustResult(result, request) ? result : denied(request);
   } catch {
     return denied(request);
