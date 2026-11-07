@@ -1,4 +1,4 @@
-active_flow: planning
+active_flow: develop-tdd
 active_epic_id: e18
 active_story_id: e18s01
 active_story: Move path canonicalization, project trust, and .aiignore into WASM
@@ -93,7 +93,7 @@ planning:
     constraints:
     - Do not modify the e06 repair flow or child-private bridge catalog.
 handoff:
-  last_step_completed: e18s00 decision is reject. pi-api is the implemented ExtensionAPI helper. The decision test passed.
+  last_step_completed: e18s01 path-trust parity covers canonical paths, missing write leaves, .aiignore denial, and project policy inside the trusted root. The story is still failing.
   open_decisions: []
   required_reading:
   - .specs/planning-context.yaml
@@ -105,16 +105,18 @@ handoff:
   - .specs/security/epics/e18/THREAT_MODEL.md
   next_skill: develop-tdd
   context: >-
-    e18s00 is passing and committed on top of favilo/e18s00-pi-oxidized-host.
-    Do not create a new bookmark. pi-oxidized 0.1.1 is the product runtime.
-    pi-oxidized-ext 0.1.1 is a Bun JSONL host client and cannot register pi.on.
-    The decision record is
-    .specs/epics/e18-wasm-only-tool-permissions/e18s00-pi-oxidized-decision.md
-    with decision reject. The implemented alternative is the private pi-api crate
-    at extensions/tool-permissions/native/crates/pi-api, in the Cargo workspace at
-    extensions/tool-permissions/native. e18s01 stays on the standalone NAPI
-    package (wasm32-wasip1-threads, flavor wasm32-wasi) and calls Pi through
-    pi-api. Do not push. Do not delete extensions/tool-permissions/index.ts.
+    e18s00 is passing. Do not create a new bookmark. Stay on
+    favilo/e18s00-pi-oxidized-host. pi-oxidized-ext stays rejected. e18s01 uses
+    the standalone NAPI package and pi-api. Do not push. Do not delete
+    extensions/tool-permissions/index.ts.
+    evaluatePathTrust now matches the host for an existing read, a missing write
+    under a symlink parent, an .aiignore denial, a nearer project denial inside
+    the trusted root, and a project policy outside that root.
+    e18s01-tasks.yaml stays failing. Task 3 is still open: the extension does
+    not route path checks through WASM, and invalid native output is not yet
+    proven to deny. Task 4, npm run build:native && npm run check, has not been
+    run since the Prettier reformat. npm test and npm run check now run cargo
+    test. npm run fmt formats Rust and TypeScript.
   blocker: null
   deferred_work:
   - Consolidate safeStringify and JSON formatting helpers into a shared utility module
