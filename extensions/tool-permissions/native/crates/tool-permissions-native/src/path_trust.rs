@@ -120,4 +120,38 @@ mod tests {
         );
         let _ = fs::remove_dir_all(cwd);
     }
+
+    #[test]
+    fn missing_write_under_a_symlink_parent_uses_the_canonical_parent() {
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!("pi-path-trust-symlink-{nanos}"));
+        let cwd = root.join("project");
+        let outside = root.join("outside");
+        fs::create_dir_all(&cwd).unwrap();
+        fs::create_dir_all(&outside).unwrap();
+        std::os::unix::fs::symlink(&outside, cwd.join("escape")).unwrap();
+
+        let response = evaluate(
+            PathTrustRequest {
+                version: 1,
+                operation: "path_trust".into(),
+                nonce: "tool-permissions-path-trust".into(),
+                tool: "write".into(),
+                requested_path: "escape/new.txt".into(),
+                cwd: cwd.to_string_lossy().into_owned(),
+                trust_path: None,
+                trust_decision: false,
+            },
+            &FsHost,
+        )
+        .unwrap();
+
+        let outside_real = FsHost.realpath(&outside.to_string_lossy()).unwrap();
+        assert_eq!(response.cwd, FsHost.realpath(&cwd.to_string_lossy()).unwrap());
+        assert_eq!(response.path, format!("{outside_real}/new.txt"));
+        let _ = fs::remove_dir_all(root);
+    }
 }
