@@ -64,3 +64,23 @@ Parent and requested child directories are resolved with `realpathSync`, verifie
 - Result: **PASS — no reportable HIGH findings**
 
 Unlisted child actions fail closed when the parent has no dialog-capable UI: the real parent adapter now omits its prompt callback, causing the shared boundary to return a structured `denied` result with reason `unavailable_ui` without executing or persisting policy. The result exposes only actor, tool name, effective cwd, a fixed action summary, and optional steering; raw tool input is excluded. Explicit allow and deny rules remain authoritative before the prompt path. Escape resolves the existing TUI prompt as `cancel`, and the boundary maps that result to `cancelled` without execution. No dependency, shell, network, credential, path, or deserialization boundary changed, and no injection, authorization-bypass, secret-exposure, or unsafe-deserialization finding met the reporting threshold.
+
+## e18s01 WASM path trust and .aiignore
+
+- Reviewed: 2026-11-07T02:59:49Z
+- Scope: `main..@-` path-trust changes in `extensions/tool-permissions/native/crates/tool-permissions-native/src/path_trust.rs`, `extensions/tool-permissions/native-path-trust.ts`, and the path decision in `extensions/tool-permissions/index.ts`
+- Result: **PASS — no reportable HIGH findings**
+
+The WASM path-trust operation canonicalizes through a host `realpath` callback, reads only project policy files and `.aiignore`, and does not spawn a process or open a network connection. Invalid contract output becomes `deny` on the shared boundary and a blocked path resolution on the registered tool handler. Project policy is skipped when the canonical policy path is outside the trusted root. A gitignore build or line error denies. An unreadable trust record does not become an allow.
+
+No command injection, path-traversal allow, authorization bypass, secret exposure, or unsafe deserialization finding reached confidence 8.
+
+## e18s01 registered handler re-review
+
+- Reviewed: 2026-11-09T17:05:08Z
+- Scope: `canonicalPermissionPath`, `handlePathPermission`, and `handleFileEditPermission` in `extensions/tool-permissions/index.ts`, plus `adoptPathTrust` in `extensions/tool-permissions/native-path-trust.ts`
+- Result: **PASS — no reportable HIGH findings**
+
+On a ready WASM result, the registered read, write, and edit handlers keep the WASM canonical path and apply `nativeDecision` before the prompt. A configured deny still returns before a WASM allow. A WASM deny, including an `.aiignore` match on write or edit, returns before the no-UI ask. An invalid `.aiignore` line or an unreadable project policy returns ask with a diagnostic. That ask blocks when no UI is available and prompts when a UI is available, so the user can allow one call that fixes the file. Invalid contract output throws and the handler blocks path resolution. A missing native package stays on the TypeScript path decision. The WASM evaluator does not spawn a process. The host `readFile` callback remains limited to the path the native package requests for policy and `.aiignore` reads.
+
+The earlier note that the registered handler ignored the WASM decision is closed. No new HIGH finding at confidence 8 or above.

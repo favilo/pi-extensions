@@ -2,8 +2,9 @@
 
 ## Bigpowers command guardrail — mandatory
 
-This rule overrides convenience and applies to every agent, every task, and every
-Bigpowers script, including timing, validation, setup, and verification scripts.
+This rule overrides convenience and applies to every agent, every task, and
+every Bigpowers script, including timing, validation, setup, and verification
+scripts.
 
 Before executing any Bigpowers script:
 
@@ -15,7 +16,8 @@ Before executing any Bigpowers script:
   `./scripts/<script>.sh`
   `sh scripts/<script>.sh`
 4. Never `cd` into `$BIGPOWERS_ROOT`.
-5. If `BIGPOWERS_ROOT` is unset, stop and report the problem; do not guess the path.
+5. If `BIGPOWERS_ROOT` is unset, stop and report the problem; do not guess the
+   path.
 
 Required form:
 
@@ -34,10 +36,20 @@ required absolute-path form.
 
 ## Rust
 
-- Format Rust and TypeScript with `npm run fmt`. That runs `cargo fmt` for `extensions/tool-permissions/native` and Prettier for TypeScript.
-- `npm test` and `npm run check` run `cargo test` for `extensions/tool-permissions/native`.
-- Declare every dependency in `extensions/tool-permissions/native/Cargo.toml` under `[workspace.dependencies]`. Member crates use `dependency.workspace = true` and do not pin their own versions.
+- Format Rust and TypeScript with `npm run fmt`. That runs `cargo fmt` for
+  `extensions/tool-permissions/native` and Prettier for TypeScript.
+- `npm test` and `npm run check` run `cargo test` for
+  `extensions/tool-permissions/native`.
+- Declare every dependency in `extensions/tool-permissions/native/Cargo.toml`
+  under `[workspace.dependencies]`. Member crates use `dependency.workspace =
+  true` and do not pin their own versions.
 
 ## TDD
 
-RED results must prove a behavioral contract failure. `module_not_found`, missing exports, missing functions, import errors, and other harness/setup failures are not valid RED results. Before running the RED test, create the smallest stub implementation with the required public module and function names; the test must then fail because the stub returns the wrong behavior or violates the contract. Keep test-only RED and implementation GREEN in separate Jujutsu changes.
+RED results must prove a behavioral contract failure. `module_not_found`,
+missing exports, missing functions, import errors, and other harness/setup
+failures are not valid RED results. Before running the RED test, create the
+smallest stub implementation with the required public module and function
+names; the test must then fail because the stub returns the wrong behavior or
+violates the contract. Keep test-only RED and implementation GREEN in separate
+Jujutsu changes.

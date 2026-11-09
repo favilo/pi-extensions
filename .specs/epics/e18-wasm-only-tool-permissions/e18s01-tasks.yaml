@@ -4,6 +4,12 @@ status: passing
 bcps: 5
 delta: MODIFIED
 spec: e18s01-wasm-path-trust-aiignore.md
+dependencies:
+  - name: ignore
+    version: 0.4.34
+    registry: crates.io
+    tag: "[OK]"
+    note: Standard gitignore matcher used for .aiignore. No slopcheck binary is installed in this environment.
 tasks:
   - id: 1
     description: Add failing parity tests for canonical paths, trust roots, .aiignore denies, and invalid WASM output. No new security findings in affected paths.
@@ -48,4 +54,14 @@ tasks:
       severity: high
       categories:
         - "Regression"
+        - "Security Review"
+  - id: 5
+    description: Apply yolo mode after the WASM path decision. Yolo must not bypass an .aiignore deny or a path-trust diagnostic. Deferred from the path-trust change.
+    verify: node --test extensions/tool-permissions/native-path-trust.test.ts extensions/tool-permissions/yolo-mode.test.ts
+    risk: P2
+    security: high
+    status: deferred
+    allure:
+      severity: normal
+      categories:
         - "Security Review"

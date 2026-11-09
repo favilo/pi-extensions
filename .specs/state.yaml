@@ -93,7 +93,7 @@ planning:
     constraints:
     - Do not modify the e06 repair flow or child-private bridge catalog.
 handoff:
-  last_step_completed: e18s01 path checks route through WASM. Invalid native output denies. npm run build:native && npm run check passed.
+  last_step_completed: npm run check passed for e18s01. Typecheck, 17 native tests, and 336 extension tests passed after the working-directory allow, write and edit .aiignore deny, and diagnostic prompt.
   open_decisions: []
   required_reading:
   - .specs/planning-context.yaml
@@ -103,20 +103,22 @@ handoff:
   - .specs/epics/e18-wasm-only-tool-permissions/e18s01-wasm-path-trust-aiignore.md
   - .specs/epics/e18-wasm-only-tool-permissions/e18s01-tasks.yaml
   - .specs/security/epics/e18/THREAT_MODEL.md
-  next_skill: verify-work
+  - .specs/verifications/e18s01-verify.yaml
+  next_skill: commit-message
   context: >-
-    e18s00 is passing. Do not create a new bookmark. Stay on
-    favilo/e18s00-pi-oxidized-host. pi-oxidized-ext stays rejected. e18s01 uses
-    the standalone NAPI package and pi-api. Do not push. Do not delete
-    extensions/tool-permissions/index.ts.
-    evaluatePathTrust matches the host for canonical paths, missing write leaves,
-    .aiignore denial, and project policy inside the trusted root. The extension
-    uses that result for path decisions. An invalid native result denies the
-    request and is not recorded as an allow. A disabled native package still uses
-    the TypeScript path decision. Prompts, audit writes, rule saves, tool
-    execution, and index.ts remain. Do not push. Do not delete index.ts.
-    e18s01 tasks are passing. npm run build:native && npm run check passed,
-    including cargo test and 324 extension tests.
+    e18s00 is passing. e18s01 audit-code passed on 2026-11-09. Do not create
+    a new bookmark. Stay on favilo/e18s00-pi-oxidized-host. pi-oxidized-ext
+    stays rejected. e18s01 uses the standalone NAPI package and pi-api. Do not
+    push. Do not delete extensions/tool-permissions/index.ts.
+    Evidence is in .specs/verifications/e18s01-verify.yaml and
+    .specs/verifications/NFR-e18s01.json. The registered read, write, and edit
+    handlers follow the WASM path decision, including .aiignore denies for
+    write and edit. A read, grep, find, or ls inside the working directory is
+    allowed when no rule matches. A broken .aiignore or project policy asks
+    and blocks when no UI is available. A disabled native package still uses
+    the TypeScript path decision. Yolo mode after WASM is deferred. Prompts,
+    audit writes, rule saves, tool execution, and index.ts remain. Next skill
+    is commit-message. Do not push.
   blocker: null
   deferred_work:
   - Consolidate safeStringify and JSON formatting helpers into a shared utility module
@@ -124,7 +126,8 @@ handoff:
   - Add interactive child steering after the read-only transcript slice
   - Build e03 directory-local tool permissions after the higher-WSJF e04 fix
   - Add real Pi process integration tests after unit contracts are established
-  verified_at: '2026-08-22T03:45:00Z'
+  - Apply yolo mode after the WASM path decision without bypassing an .aiignore deny or a path-trust diagnostic
+  verified_at: '2026-11-09T17:05:08Z'
 release:
   pr: https://github.com/favilo/pi-extensions/pull/14
   merged_commit: 841d91a0
@@ -136,7 +139,7 @@ epic_cycle:
   step: 1
   current_step: 1
   story_bcps: 5
-  security_review: pending
+  security_review: pass
   plan_consistency: pass
 metrics:
   skill_timings:

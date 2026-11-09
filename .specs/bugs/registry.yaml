@@ -27,3 +27,11 @@ bugs:
     risk_level: low
     commit_message: "fix(mcp): dispose providers on unregister"
     pull_request: https://github.com/favilo/pi-extensions/pull/9
+  - bug_id: BUG-2026-11-09T190800
+    date: '2026-11-09'
+    severity: medium
+    priority: medium
+    scope: tool-permissions-path-trust
+    summary: WASM misses a repository boundary when .git or .jj cannot be canonicalized
+    file: .specs/bugs/BUG-2026-11-09T190800-git-jj-marker-realpath.md
+    status: open

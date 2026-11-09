@@ -17,14 +17,10 @@ pub fn evaluate(
     let cwd = host.realpath(&request.cwd)?;
     let absolute = node_resolve(&cwd, &request.requested_path);
     let path = canonicalize_leaf(&request.tool, &absolute, host)?;
-    let aiignore_match = aiignore_matches(&cwd, &path, host);
-    let (trust_eligible, project_decision) = project_decision(&request, &cwd, &path, host)?;
-    let decision = match project_decision {
-        Some(PermissionDecision::Deny) => PermissionDecision::Deny,
-        _ if aiignore_match => PermissionDecision::Deny,
-        Some(decision) => decision,
-        None => PermissionDecision::Ask,
-    };
+    let aiignore = aiignore_status(&cwd, &path, host);
+    let project = project_decision(&request, &cwd, &path, host)?;
+    let (decision, aiignore_match, diagnostic) =
+        path_decision(&request.tool, &path, &cwd, &project, aiignore);
     Ok(PathTrustResponse {
         version: CONTRACT_VERSION,
         operation: NativeOperation::PathTrust,
@@ -32,10 +28,63 @@ pub fn evaluate(
         nonce: request.nonce,
         path,
         cwd,
-        trust_eligible,
+        trust_eligible: project.eligible,
         aiignore_match,
+        project_matched: project.matched,
         decision,
+        diagnostic,
     })
+}
+
+struct ProjectTrust {
+    eligible: bool,
+    decision: Option<PermissionDecision>,
+    diagnostic: Option<String>,
+    matched: bool,
+}
+
+enum AiignoreStatus {
+    Clear,
+    Matched,
+    Invalid(String),
+}
+
+fn path_decision(
+    tool: &str,
+    path: &str,
+    cwd: &str,
+    project: &ProjectTrust,
+    aiignore: AiignoreStatus,
+) -> (PermissionDecision, bool, Option<String>) {
+    if matches!(project.decision, Some(PermissionDecision::Deny)) {
+        return (
+            PermissionDecision::Deny,
+            matches!(aiignore, AiignoreStatus::Matched),
+            None,
+        );
+    }
+    // A broken ignore file stays ask so the host can prompt. No UI still blocks.
+    if let AiignoreStatus::Invalid(message) = aiignore {
+        return (PermissionDecision::Ask, false, Some(message));
+    }
+    if matches!(aiignore, AiignoreStatus::Matched) {
+        return (PermissionDecision::Deny, true, None);
+    }
+    if let Some(diagnostic) = &project.diagnostic {
+        return (PermissionDecision::Ask, false, Some(diagnostic.clone()));
+    }
+    let inside = implicit_project_tool(tool) && is_inside(path, cwd);
+    let decision = match project.decision {
+        Some(PermissionDecision::Allow) => PermissionDecision::Allow,
+        Some(PermissionDecision::Deny) => PermissionDecision::Deny,
+        Some(PermissionDecision::Ask) | None if inside => PermissionDecision::Allow,
+        Some(PermissionDecision::Ask) | None => PermissionDecision::Ask,
+    };
+    (decision, false, None)
+}
+
+fn implicit_project_tool(tool: &str) -> bool {
+    matches!(tool, "read" | "grep" | "find" | "ls")
 }
 
 fn project_decision(
@@ -43,12 +92,12 @@ fn project_decision(
     cwd: &str,
     path: &str,
     host: &impl PathHost,
-) -> Result<(bool, Option<PermissionDecision>), String> {
+) -> Result<ProjectTrust, String> {
     let Some(trust_path) = request.trust_path.as_deref() else {
-        return Ok((false, None));
+        return Ok(ProjectTrust::inactive());
     };
     if !request.trust_decision {
-        return Ok((false, None));
+        return Ok(ProjectTrust::inactive());
     }
     let trusted = host.realpath(trust_path)?;
     for policy_path in project_policy_paths(cwd, host) {
@@ -61,11 +110,43 @@ fn project_decision(
         }
         match crate::policy::decision_for_tool_path(&request.tool, &source, path) {
             Ok(PermissionDecision::Ask) => continue,
-            Ok(decision) => return Ok((true, Some(decision))),
-            Err(_) => return Ok((true, Some(PermissionDecision::Ask))),
+            Ok(decision) => {
+                return Ok(ProjectTrust {
+                    eligible: true,
+                    decision: Some(decision),
+                    diagnostic: None,
+                    matched: true,
+                });
+            }
+            Err(error) => {
+                return Ok(ProjectTrust {
+                    eligible: true,
+                    decision: Some(PermissionDecision::Ask),
+                    diagnostic: Some(format!(
+                        "Project permission policy could not be read: {error}"
+                    )),
+                    matched: false,
+                });
+            }
         }
     }
-    Ok((true, None))
+    Ok(ProjectTrust {
+        eligible: true,
+        decision: None,
+        diagnostic: None,
+        matched: false,
+    })
+}
+
+impl ProjectTrust {
+    fn inactive() -> Self {
+        Self {
+            eligible: false,
+            decision: None,
+            diagnostic: None,
+            matched: false,
+        }
+    }
 }
 
 fn project_policy_paths(cwd: &str, host: &impl PathHost) -> Vec<String> {
@@ -98,26 +179,36 @@ fn ancestors(start: &str) -> Vec<String> {
     directories
 }
 
-fn aiignore_matches(cwd: &str, path: &str, host: &impl PathHost) -> bool {
+fn aiignore_status(cwd: &str, path: &str, host: &impl PathHost) -> AiignoreStatus {
     if !is_inside(path, cwd) {
-        return false;
+        return AiignoreStatus::Clear;
     }
     let relative = relative_posix(cwd, path);
     if relative.is_empty() {
-        return false;
+        return AiignoreStatus::Clear;
     }
-    let Ok(source) = host.read_to_string(&format!("{cwd}/.aiignore")) else {
-        return false;
+    let ignore_path = format!("{cwd}/.aiignore");
+    let Ok(source) = host.read_to_string(&ignore_path) else {
+        return AiignoreStatus::Clear;
     };
     let mut builder = GitignoreBuilder::new(cwd);
-    for line in source.lines() {
-        if builder.add_line(None, line).is_err() {
-            return true;
+    for (index, line) in source.lines().enumerate() {
+        if let Err(error) = builder.add_line(None, line) {
+            return AiignoreStatus::Invalid(format!(
+                "{ignore_path} line {} is invalid: {error}",
+                index + 1
+            ));
         }
     }
     match builder.build() {
-        Ok(gitignore) => gitignore.matched(relative, false).is_ignore(),
-        Err(_) => true,
+        Ok(gitignore) => {
+            if gitignore.matched(relative, host.is_dir(path)).is_ignore() {
+                AiignoreStatus::Matched
+            } else {
+                AiignoreStatus::Clear
+            }
+        }
+        Err(error) => AiignoreStatus::Invalid(format!("{ignore_path} could not be built: {error}")),
     }
 }
 
@@ -226,6 +317,12 @@ mod tests {
 
         fn read_to_string(&self, path: &str) -> Result<String, String> {
             fs::read_to_string(path).map_err(|error| error.to_string())
+        }
+
+        fn is_dir(&self, path: &str) -> bool {
+            fs::metadata(path)
+                .map(|metadata| metadata.is_dir())
+                .unwrap_or(false)
         }
     }
 
@@ -347,6 +444,125 @@ mod tests {
 
         assert!(response.trust_eligible);
         assert!(matches!(response.decision, PermissionDecision::Deny));
+        let _ = fs::remove_dir_all(root);
+    }
+
+    fn path_request(tool: &str, cwd: &str, requested: &str) -> PathTrustRequest {
+        PathTrustRequest {
+            version: 1,
+            operation: "path_trust".into(),
+            nonce: "tool-permissions-path-trust".into(),
+            tool: tool.into(),
+            requested_path: requested.into(),
+            cwd: cwd.into(),
+            trust_path: None,
+            trust_decision: false,
+        }
+    }
+
+    #[test]
+    fn a_read_inside_the_working_directory_is_allowed() {
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let cwd = std::env::temp_dir().join(format!("pi-path-trust-inside-{nanos}"));
+        fs::create_dir_all(&cwd).unwrap();
+        fs::write(cwd.join("notes.txt"), "hello").unwrap();
+        let cwd_text = cwd.to_string_lossy().into_owned();
+
+        let response = evaluate(path_request("read", &cwd_text, "notes.txt"), &FsHost).unwrap();
+
+        assert!(matches!(response.decision, PermissionDecision::Allow));
+        assert!(response.diagnostic.is_none());
+        assert!(!response.project_matched);
+        let _ = fs::remove_dir_all(cwd);
+    }
+
+    #[test]
+    fn a_write_inside_the_working_directory_stays_ask() {
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let cwd = std::env::temp_dir().join(format!("pi-path-trust-write-inside-{nanos}"));
+        fs::create_dir_all(&cwd).unwrap();
+        fs::write(cwd.join("notes.txt"), "hello").unwrap();
+        let cwd_text = cwd.to_string_lossy().into_owned();
+
+        let response = evaluate(path_request("write", &cwd_text, "notes.txt"), &FsHost).unwrap();
+
+        assert!(matches!(response.decision, PermissionDecision::Ask));
+        let _ = fs::remove_dir_all(cwd);
+    }
+
+    #[test]
+    fn a_directory_only_pattern_matches_the_directory() {
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let cwd = std::env::temp_dir().join(format!("pi-path-trust-dir-{nanos}"));
+        fs::create_dir_all(cwd.join("logs")).unwrap();
+        fs::write(cwd.join("notes.txt"), "hello").unwrap();
+        fs::write(cwd.join(".aiignore"), "logs/\nnotes.txt/\n").unwrap();
+        let cwd_text = cwd.to_string_lossy().into_owned();
+
+        let directory = evaluate(path_request("read", &cwd_text, "logs"), &FsHost).unwrap();
+        let file = evaluate(path_request("read", &cwd_text, "notes.txt"), &FsHost).unwrap();
+
+        assert!(directory.aiignore_match);
+        assert!(matches!(directory.decision, PermissionDecision::Deny));
+        assert!(!file.aiignore_match);
+        assert!(matches!(file.decision, PermissionDecision::Allow));
+        let _ = fs::remove_dir_all(cwd);
+    }
+
+    #[test]
+    fn an_invalid_aiignore_line_asks_with_a_diagnostic() {
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let cwd = std::env::temp_dir().join(format!("pi-path-trust-bad-ignore-{nanos}"));
+        fs::create_dir_all(&cwd).unwrap();
+        fs::write(cwd.join("notes.txt"), "hello").unwrap();
+        fs::write(cwd.join(".aiignore"), "[z-a]\n").unwrap();
+        let cwd_text = cwd.to_string_lossy().into_owned();
+
+        let response = evaluate(path_request("read", &cwd_text, "notes.txt"), &FsHost).unwrap();
+
+        assert!(matches!(response.decision, PermissionDecision::Ask));
+        assert!(!response.aiignore_match);
+        let diagnostic = response.diagnostic.unwrap_or_default();
+        assert!(diagnostic.contains(".aiignore"));
+        assert!(diagnostic.contains("invalid"));
+        let _ = fs::remove_dir_all(cwd);
+    }
+
+    #[test]
+    fn a_malformed_project_policy_asks_with_a_diagnostic() {
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!("pi-path-trust-bad-policy-{nanos}"));
+        let cwd = root.join("project");
+        fs::create_dir_all(cwd.join(".git")).unwrap();
+        fs::create_dir_all(cwd.join(".pi")).unwrap();
+        fs::write(cwd.join("notes.txt"), "hello").unwrap();
+        fs::write(cwd.join(".pi/permissions.toml"), "[[[\n").unwrap();
+        let cwd_text = cwd.to_string_lossy().into_owned();
+        let mut request = path_request("read", &cwd_text, "notes.txt");
+        request.trust_path = Some(cwd_text.clone());
+        request.trust_decision = true;
+
+        let response = evaluate(request, &FsHost).unwrap();
+
+        assert!(matches!(response.decision, PermissionDecision::Ask));
+        assert!(!response.project_matched);
+        let diagnostic = response.diagnostic.unwrap_or_default();
+        assert!(diagnostic.contains("could not be read"));
         let _ = fs::remove_dir_all(root);
     }
 }

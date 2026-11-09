@@ -107,9 +107,13 @@ pub fn evaluate_path_trust(
     request: PathTrustRequest,
     realpath: Function<String, String>,
     read_file: Function<String, String>,
+    is_dir: Function<String, bool>,
 ) -> Result<PathTrustResponse> {
-    path_trust::evaluate(request, &RealpathCallback::new(&realpath, &read_file))
-        .map_err(Error::from_reason)
+    path_trust::evaluate(
+        request,
+        &RealpathCallback::new(&realpath, &read_file, &is_dir),
+    )
+    .map_err(Error::from_reason)
 }
 
 #[cfg(test)]

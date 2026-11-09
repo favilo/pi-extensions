@@ -1410,6 +1410,7 @@ type CanonicalPermissionPath = {
   cwd: string;
   nativeDecision?: PermissionDecision;
   nativeAiignoreMatch?: boolean;
+  nativeDiagnostic?: string;
 };
 
 function pathTrustRequest(
@@ -1464,6 +1465,7 @@ function canonicalPermissionPath(
       cwd: adopted.result.cwd,
       nativeDecision: adopted.result.decision,
       nativeAiignoreMatch: adopted.result.aiignoreMatch,
+      nativeDiagnostic: adopted.result.diagnostic,
     };
   }
   try {
@@ -1540,10 +1542,13 @@ export function resolvePermissionDecisionForRequest(
       const normalizedInput = { ...input, path: adopted.result.path };
       request.input = normalizedInput;
       const implicit = IMPLICIT_PROJECT_PATH_TOOLS.has(request.toolName);
-      const aiignoreOnly = adopted.result.aiignoreMatch && !implicit;
-      if (adopted.result.decision === "deny" && !aiignoreOnly) return "deny";
-      if (adopted.result.aiignoreMatch && implicit) return "deny";
-      if (adopted.result.decision === "allow") return "allow";
+      if (adopted.result.decision === "deny") return "deny";
+      if (adopted.result.diagnostic) return "ask";
+      if (
+        adopted.result.decision === "allow" &&
+        adopted.result.projectMatched === true
+      )
+        return "allow";
       const resolved = resolveToolPermissionDecision(
         request.toolName,
         normalizedInput,
@@ -1557,8 +1562,12 @@ export function resolvePermissionDecisionForRequest(
       );
       if (resolved.diagnostic) throw new Error(resolved.diagnostic);
       if (resolved.decision === "deny") return "deny";
+      if (
+        adopted.result.decision === "allow" ||
+        resolved.decision === "allow"
+      )
+        return "allow";
       if (!implicit) return resolved.decision;
-      if (resolved.decision === "allow") return "allow";
       return isInsideDirectory(adopted.result.path, adopted.result.cwd)
         ? "allow"
         : "ask";
@@ -1644,6 +1653,68 @@ function configuredDeny(
   return { block: true, reason };
 }
 
+function blockedByAiignore(
+  toolName: string,
+  requestedPath: string,
+  absolutePath: string,
+  ignoreCwd: string,
+  ctx: PermissionContext,
+): ToolCallEventResult {
+  const reason = `Blocked ${toolName}: ${requestedPath || "."} is matched by ${resolve(ignoreCwd, ".aiignore")}.`;
+  audit({
+    tool: toolName,
+    decision: "deny_aiignore",
+    cwd: ctx.cwd,
+    path: absolutePath,
+    reason,
+  });
+  return { block: true, reason };
+}
+
+async function handleNativePathDiagnostic(
+  toolName: string,
+  canonical: CanonicalPermissionPath,
+  ctx: PermissionContext,
+  pi: ExtensionAPI,
+): Promise<ToolCallEventResult | "allow" | undefined> {
+  const diagnostic = canonical.nativeDiagnostic;
+  if (!diagnostic) return undefined;
+  const absolutePath = canonical.path;
+  if (!ctx.hasUI) {
+    const reason = `Blocked ${toolName}: ${diagnostic}`;
+    audit({
+      tool: toolName,
+      decision: "deny_policy_error",
+      cwd: ctx.cwd,
+      path: absolutePath,
+      reason,
+    });
+    return { block: true, reason };
+  }
+  const result = await askScrollablePermission(
+    pi,
+    ctx,
+    {
+      actor: { kind: "main" },
+      toolName,
+      input: { path: absolutePath, diagnostic },
+      cwd: ctx.cwd,
+      toolCallId: ctx.toolCallId,
+    },
+    "Permission file needs attention",
+    `${diagnostic}\n\nPath: ${absolutePath}\n\nAllow this call once so the file can be fixed. This does not save a rule.`,
+  );
+  audit({
+    tool: toolName,
+    decision: result.decision,
+    cwd: ctx.cwd,
+    path: absolutePath,
+    ...permissionResultAudit(result),
+  });
+  if (!result.allowed) return deniedResult(`User denied ${toolName}.`, result);
+  return "allow";
+}
+
 async function handlePathPermission(
   toolName: string,
   input: PathToolInput,
@@ -1679,30 +1750,35 @@ async function handlePathPermission(
   if (decision.decision === "deny")
     return configuredDeny(toolName, ctx, { path: absolutePath });
   if (canonical.nativeDecision === "deny") {
-    if (canonical.nativeAiignoreMatch) {
-      const reason = `Blocked ${toolName}: ${requestedPath || "."} is matched by ${resolve(canonical.cwd, ".aiignore")}.`;
-      audit({
-        tool: toolName,
-        decision: "deny_aiignore",
-        cwd: ctx.cwd,
-        path: absolutePath,
-        reason,
-      });
-      return { block: true, reason };
-    }
+    if (canonical.nativeAiignoreMatch)
+      return blockedByAiignore(
+        toolName,
+        requestedPath,
+        absolutePath,
+        canonical.cwd,
+        ctx,
+      );
     return configuredDeny(toolName, ctx, { path: absolutePath });
   }
-  if (isAiIgnoredPath(absolutePath, canonical.cwd)) {
-    const reason = `Blocked ${toolName}: ${requestedPath || "."} is matched by ${resolve(canonical.cwd, ".aiignore")}.`;
-    audit({
-      tool: toolName,
-      decision: "deny_aiignore",
-      cwd: ctx.cwd,
-      path: absolutePath,
-      reason,
-    });
-    return { block: true, reason };
-  }
+  const nativeDiagnostic = await handleNativePathDiagnostic(
+    toolName,
+    canonical,
+    ctx,
+    pi,
+  );
+  if (nativeDiagnostic === "allow") return;
+  if (nativeDiagnostic) return nativeDiagnostic;
+  if (
+    canonical.nativeDecision === undefined &&
+    isAiIgnoredPath(absolutePath, canonical.cwd)
+  )
+    return blockedByAiignore(
+      toolName,
+      requestedPath,
+      absolutePath,
+      canonical.cwd,
+      ctx,
+    );
   if (
     canonical.nativeDecision === "allow" ||
     decision.decision === "allow" ||
@@ -1925,8 +2001,27 @@ async function handleFileEditPermission(
   if (configurationResult === "allow_once") return;
   if (configurationResult) return configurationResult;
 
-  if (decision.decision === "deny" || canonical.nativeDecision === "deny")
+  if (decision.decision === "deny")
     return configuredDeny(toolName, ctx, { path: absolutePath });
+  if (canonical.nativeDecision === "deny") {
+    if (canonical.nativeAiignoreMatch)
+      return blockedByAiignore(
+        toolName,
+        requestedPath,
+        absolutePath,
+        canonical.cwd,
+        ctx,
+      );
+    return configuredDeny(toolName, ctx, { path: absolutePath });
+  }
+  const nativeDiagnostic = await handleNativePathDiagnostic(
+    toolName,
+    canonical,
+    ctx,
+    pi,
+  );
+  if (nativeDiagnostic === "allow") return;
+  if (nativeDiagnostic) return nativeDiagnostic;
   if (decision.decision === "allow" || canonical.nativeDecision === "allow") {
     audit({
       tool: toolName,

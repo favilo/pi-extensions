@@ -41,7 +41,9 @@ export type PathTrustResult = {
   cwd: string;
   trustEligible: boolean;
   aiignoreMatch: boolean;
+  projectMatched?: boolean;
   decision: PermissionDecision;
+  diagnostic?: string;
 };
 
 export type NativeProbeRequest = {

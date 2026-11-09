@@ -9,23 +9,26 @@
 - **Delta:** MODIFIED
 
 ## 2. User need
-Path-sensitive permission checks still depend on a second TypeScript implementation. One wrong canonical path, trust root, or `.aiignore` match can allow a tool call the current extension would deny.
+Path-sensitive permission checks still depend on a second TypeScript
+implementation. One wrong canonical path, trust root, or `.aiignore` match can
+allow a tool call the current extension would deny.
 
 ## 3. Goal
-On the success path, the WASM runtime canonicalizes permission paths, applies project trust, and matches `.aiignore` with the same results as today's TypeScript host.
+On the success path, the WASM runtime canonicalizes permission paths, applies project trust, and matches `.aiignore`. Read, grep, find, and ls inside the working directory are allowed when no rule matches. Write and edit stay ask unless a rule or `.aiignore` decides them. An `.aiignore` match denies write and edit as well as read.
 
 ## 4. Non-goals
 - Editing e16 stories.
 - Deleting `extensions/tool-permissions/index.ts`.
 - Moving prompts, audit writes, rule saves, or tool execution.
 - Removing the TypeScript load-failure fallback. That is e18s06.
-- Changing trust rules, repository bounds, or `.aiignore` semantics.
+- Changing repository bounds. A `.git` or `.jj` marker that exists but cannot be canonicalized is `BUG-2026-11-09T190800`.
+- Applying yolo mode after the WASM decision. That is deferred task 5.
 
 ## 5. Users
 People who rely on project trust and `.aiignore` to bound read, write, and edit permissions.
 
 ## 6. User journey
-An agent requests a path-sensitive tool. WASM canonicalizes the path, checks the persisted trust root and `.aiignore`, and returns the same allow, deny, or ask class the TypeScript host returns today. The existing prompt and execution path still runs after that result.
+An agent requests a path-sensitive tool. WASM canonicalizes the path, checks the persisted trust root and `.aiignore`, and returns allow, deny, or ask. A broken `.aiignore` or a project policy that cannot be parsed returns ask with a diagnostic. With a UI, the user can allow that one call and fix the file. With no UI, the call is blocked. The existing prompt and execution path still runs after a normal result.
 
 ## 7. Preconditions
 - e16s01 through e16s07 are passing.
@@ -37,12 +40,12 @@ An agent requests a path-sensitive tool. WASM canonicalizes the path, checks the
 Tool name, requested path, working directory, persisted trust decision, `.aiignore` contents, and the current permission rules.
 
 ## 9. Outputs
-A canonical path, canonical working directory, trust eligibility, `.aiignore` match, and the same decision class the TypeScript path produces for those fixtures.
+A canonical path, canonical working directory, trust eligibility, `.aiignore` match, decision, and a diagnostic when a permission file cannot be parsed.
 
 ## 10. Requirements
 #### MODIFIED: Filesystem trust owner
 **Before:** e16s06 requires TypeScript to own filesystem canonicalization, project trust, and `.aiignore` checks.
-**After:** On a successful WASM call, Rust owns those checks and returns the same canonical path, trust eligibility, and `.aiignore` decision.
+**After:** On a successful WASM call, Rust owns those checks. It returns the canonical path, trust eligibility, and `.aiignore` decision. Write and edit follow an `.aiignore` deny. Read, grep, find, and ls inside the working directory are allowed when no rule matches.
 
 #### ADDED: Invalid path results fail closed
 A missing path, unreadable trust record, or invalid WASM path result denies the request and does not become an allow.
@@ -82,6 +85,21 @@ Tests report the tool, requested path, canonical path, trust root, `.aiignore` m
 **When** the extension evaluates a path-sensitive request
 **Then** the request is denied and is not recorded as an allow.
 
+### Scenario: A read inside the working directory is allowed
+**Given** a read, grep, find, or ls path inside the working directory and no matching rule
+**When** WASM evaluates the path-trust operation
+**Then** the decision is allow. A write or edit in that directory stays ask.
+
+### Scenario: Write and edit follow .aiignore
+**Given** a path matched by `.aiignore`
+**When** the registered write or edit handler runs
+**Then** the call is denied.
+
+### Scenario: A broken permission file asks
+**Given** an invalid `.aiignore` line or a project policy that cannot be parsed
+**When** the extension evaluates the path
+**Then** the result is ask and the diagnostic names the file. No UI blocks the call. A UI shows the diagnostic and can allow that one call.
+
 ## 18. Automated verification
 - `node --test extensions/tool-permissions/native-path-trust.test.ts extensions/tool-permissions/permission-boundary.test.ts`
 - `cargo test --manifest-path extensions/tool-permissions/native/Cargo.toml`
@@ -94,4 +112,4 @@ Tests report the tool, requested path, canonical path, trust root, `.aiignore` m
 4. Run the native build and full checks. No new security findings in affected paths. → verify: `npm run build:native && npm run check`
 
 ## 20. Definition of done
-Successful path, trust, and `.aiignore` decisions come from WASM, match the current fixtures, and fail closed on invalid native output. Prompts, saves, audit writes, execution, and the load-failure fallback stay where they are.
+Successful path, trust, and `.aiignore` decisions come from WASM. Read, grep, find, and ls inside the working directory are allowed when no rule matches. Write and edit are denied when `.aiignore` matches. A broken permission file asks, blocks without a UI, and can be allowed once when a UI is present. Invalid native output fails closed. Prompts, saves, audit writes, execution, and the load-failure fallback stay where they are.

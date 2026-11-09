@@ -14,8 +14,8 @@ pub enum NativeOperation {
     PathTrust,
 }
 
-#[derive(derive_more::FromStr)]
-#[napi(string_enum = "kebab-case")]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, derive_more::FromStr)]
+#[napi(string_enum = "snake_case")]
 pub enum PermissionDecision {
     Allow,
     Deny,
@@ -174,5 +174,7 @@ pub struct PathTrustResponse {
     pub cwd: String,
     pub trust_eligible: bool,
     pub aiignore_match: bool,
+    pub project_matched: bool,
     pub decision: PermissionDecision,
+    pub diagnostic: Option<String>,
 }

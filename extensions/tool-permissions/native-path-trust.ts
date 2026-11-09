@@ -1,4 +1,4 @@
-import { readFileSync, realpathSync } from "node:fs";
+import { readFileSync, realpathSync, statSync } from "node:fs";
 import {
   NATIVE_CONTRACT_VERSION,
   type PathTrustRequest,
@@ -19,6 +19,7 @@ type NativePathTrust = {
     request: NativePathTrustRequest,
     realpath: (path: string) => string,
     readFile: (path: string) => string,
+    isDir: (path: string) => boolean,
   ): PathTrustResult;
 };
 
@@ -57,6 +58,12 @@ function isPathTrustResult(
     result.cwd.length > 0 &&
     typeof result.trustEligible === "boolean" &&
     typeof result.aiignoreMatch === "boolean" &&
+    (result.projectMatched === undefined ||
+      result.projectMatched === null ||
+      typeof result.projectMatched === "boolean") &&
+    (result.diagnostic === undefined ||
+      result.diagnostic === null ||
+      typeof result.diagnostic === "string") &&
     isDecision(result.decision)
   );
 }
@@ -87,6 +94,13 @@ export function adoptPathTrust(request: PathTrustRequest): AdoptedPathTrust {
       nativeRequest,
       (path) => realpathSync(path),
       (path) => readFileSync(path, "utf8"),
+      (path) => {
+        try {
+          return statSync(path).isDirectory();
+        } catch {
+          return false;
+        }
+      },
     );
     return isPathTrustResult(result, request)
       ? { status: "ready", result }
