@@ -1,3 +1,4 @@
+mod audit;
 mod contract;
 mod parser;
 mod path_trust;
@@ -5,11 +6,11 @@ mod policy;
 mod registration;
 
 pub use contract::{
-    EvaluateRequest, EvaluateResponse, NativeOperation, NativeRegistrationRequest,
-    NativeRegistrationResponse, ParseRequest, ParseResponse, ParsedSubcommand, PathTrustRequest,
-    PathTrustResponse, PermissionDecision, PermissionEvaluationRequest,
-    PermissionOrchestrationRequest, PermissionOrchestrationResponse, PolicyPermission,
-    PolicyRequest, PolicyResponse, ProbeRequest, ProbeResponse,
+    AuditWriteRequest, AuditWriteResponse, EvaluateRequest, EvaluateResponse, NativeOperation,
+    NativeRegistrationRequest, NativeRegistrationResponse, ParseRequest, ParseResponse,
+    ParsedSubcommand, PathTrustRequest, PathTrustResponse, PermissionDecision,
+    PermissionEvaluationRequest, PermissionOrchestrationRequest, PermissionOrchestrationResponse,
+    PolicyPermission, PolicyRequest, PolicyResponse, ProbeRequest, ProbeResponse,
 };
 use napi::bindgen_prelude::Function;
 use napi::{Env, Error, Result};
@@ -114,6 +115,14 @@ pub fn evaluate_path_trust(
         &RealpathCallback::new(&realpath, &read_file, &is_dir),
     )
     .map_err(Error::from_reason)
+}
+
+#[napi]
+pub fn write_audit(
+    request: AuditWriteRequest,
+    append: Function<String, bool>,
+) -> Result<AuditWriteResponse> {
+    audit::write(request, &audit::AppendCallback::new(&append)).map_err(Error::from_reason)
 }
 
 #[cfg(test)]

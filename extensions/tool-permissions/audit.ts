@@ -105,50 +105,66 @@ export function createAuditLogger(options: AuditLoggerOptions = {}): {
 
   return {
     write(record): void {
-      const date = utcDate(now());
-      const target = datedPath(homeDir, date);
-      const directory = dirname(target);
       const line = `${JSON.stringify({ time: new Date().toISOString(), ...record })}\n`;
-
-      try {
-        mkdirSync(directory, { recursive: true });
-        migrateLegacy(homeDir, target);
-        appendFileSync(target, line, "utf8");
-      } catch (error) {
-        warn(
-          `Could not write permission audit log at ${target}: ${error instanceof Error ? error.message : String(error)}`,
-        );
-        try {
-          const fallback = legacyPath(homeDir);
-          mkdirSync(dirname(fallback), { recursive: true });
-          appendFileSync(fallback, line, "utf8");
-        } catch (fallbackError) {
-          warn(
-            `Could not write permission audit fallback: ${fallbackError instanceof Error ? fallbackError.message : String(fallbackError)}`,
-          );
-        }
-        return;
-      }
-
-      try {
-        ensureCurrentLink(
-          join(directory, "audit.log"),
-          target,
-          `audit-${date}.log`,
-        );
-      } catch (error) {
-        warn(
-          `Could not update current permission audit alias at ${directory}: ${error instanceof Error ? error.message : String(error)}`,
-        );
-      }
-
-      try {
-        removeExpiredLogs(directory, date);
-      } catch (error) {
-        warn(
-          `Could not rotate permission audit logs at ${directory}: ${error instanceof Error ? error.message : String(error)}`,
-        );
-      }
+      writeAuditLine({ homeDir, now, warn }, line);
     },
   };
+}
+
+/** Append one already-built audit line to the current dated log. */
+export function writeAuditLine(
+  options: AuditLoggerOptions,
+  line: string,
+): boolean {
+  const homeDir = options.homeDir ?? homedir();
+  const now = options.now ?? (() => new Date());
+  const warn =
+    options.warn ??
+    ((message: string) => process.stderr.write(`Warning: ${message}\n`));
+  const date = utcDate(now());
+  const target = datedPath(homeDir, date);
+  const directory = dirname(target);
+  const payload = line.endsWith("\n") ? line : `${line}\n`;
+
+  try {
+    mkdirSync(directory, { recursive: true });
+    migrateLegacy(homeDir, target);
+    appendFileSync(target, payload, "utf8");
+  } catch (error) {
+    warn(
+      `Could not write permission audit log at ${target}: ${error instanceof Error ? error.message : String(error)}`,
+    );
+    try {
+      const fallback = legacyPath(homeDir);
+      mkdirSync(dirname(fallback), { recursive: true });
+      appendFileSync(fallback, payload, "utf8");
+    } catch (fallbackError) {
+      warn(
+        `Could not write permission audit fallback: ${fallbackError instanceof Error ? fallbackError.message : String(fallbackError)}`,
+      );
+      return false;
+    }
+    return true;
+  }
+
+  try {
+    ensureCurrentLink(
+      join(directory, "audit.log"),
+      target,
+      `audit-${date}.log`,
+    );
+  } catch (error) {
+    warn(
+      `Could not update current permission audit alias at ${directory}: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+
+  try {
+    removeExpiredLogs(directory, date);
+  } catch (error) {
+    warn(
+      `Could not rotate permission audit logs at ${directory}: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+  return true;
 }

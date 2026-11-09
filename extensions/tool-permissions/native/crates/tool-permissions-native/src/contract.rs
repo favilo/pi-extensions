@@ -12,6 +12,7 @@ pub enum NativeOperation {
     OrchestratePermission,
     RegisterCallbacks,
     PathTrust,
+    AuditWrite,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, derive_more::FromStr)]
@@ -177,4 +178,29 @@ pub struct PathTrustResponse {
     pub project_matched: bool,
     pub decision: PermissionDecision,
     pub diagnostic: Option<String>,
+}
+
+#[napi(object)]
+pub struct AuditWriteRequest {
+    pub version: i64,
+    pub operation: String,
+    pub nonce: String,
+    pub home_dir: String,
+    pub now: String,
+    pub tool: String,
+    pub decision: String,
+    pub cwd: String,
+    pub path: Option<String>,
+    pub command: Option<String>,
+    pub reason: Option<String>,
+}
+
+#[napi(object)]
+pub struct AuditWriteResponse {
+    pub version: i64,
+    pub operation: NativeOperation,
+    pub ok: bool,
+    pub nonce: String,
+    pub decision: String,
+    pub records: i64,
 }
