@@ -1,0 +1,76 @@
+import "../test-support/forbid-fetch.ts";
+import assert from "node:assert/strict";
+import {
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  readlinkSync,
+  statSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import test from "node:test";
+import { NATIVE_CONTRACT_VERSION } from "./native-contract.ts";
+import {
+  NATIVE_AUDIT_WRITE_NONCE,
+  recordPermissionAudit,
+} from "./native-audit-write.ts";
+
+function assertCurrentAlias(directory: string, datedName: string): void {
+  const linkPath = join(directory, "audit.log");
+  const datedPath = join(directory, datedName);
+  try {
+    assert.equal(readlinkSync(linkPath), datedName);
+  } catch {
+    const aliasStats = statSync(linkPath);
+    const datedStats = statSync(datedPath);
+    assert.equal(aliasStats.dev, datedStats.dev);
+    assert.equal(aliasStats.ino, datedStats.ino);
+  }
+}
+
+test("an allow decision appends one audit record with the current fields", () => {
+  const home = mkdtempSync(join(tmpdir(), "pi-wasm-audit-"));
+  const now = "2026-07-31T12:00:00.000Z";
+  const request = {
+    version: NATIVE_CONTRACT_VERSION,
+    operation: "audit_write" as const,
+    nonce: NATIVE_AUDIT_WRITE_NONCE,
+    homeDir: home,
+    now,
+    tool: "read",
+    decision: "allow_pattern",
+    cwd: "/work",
+    path: "/work/notes.txt",
+    reason: "user allow",
+  };
+
+  const result = recordPermissionAudit(request);
+  console.log(
+    JSON.stringify({
+      decision: result.decision,
+      tool: request.tool,
+      records: result.records,
+    }),
+  );
+
+  assert.equal(result.ok, true);
+  assert.equal(result.decision, "allow_pattern");
+  assert.equal(result.records, 1);
+
+  const directory = join(home, ".pi", "tool-permissions");
+  const datedName = "audit-2026-07-31.log";
+  const datedPath = join(directory, datedName);
+  assert.equal(existsSync(datedPath), true);
+  const lines = readFileSync(datedPath, "utf8").trim().split("\n");
+  assert.equal(lines.length, 1);
+  const record = JSON.parse(lines[0]) as Record<string, unknown>;
+  assert.equal(record.time, now);
+  assert.equal(record.tool, "read");
+  assert.equal(record.decision, "allow_pattern");
+  assert.equal(record.cwd, "/work");
+  assert.equal(record.path, "/work/notes.txt");
+  assert.equal(record.reason, "user allow");
+  assert.equal("command" in record, false);
+  assertCurrentAlias(directory, datedName);
+});
