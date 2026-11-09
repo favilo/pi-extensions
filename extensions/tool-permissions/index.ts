@@ -1879,14 +1879,10 @@ async function handleFileEditPermission(
   pi: ExtensionAPI,
 ): Promise<ToolCallEventResult> {
   const requestedPath = typeof input.path === "string" ? input.path : "";
-  let absolutePath: string;
+  let canonical: CanonicalPermissionPath;
   try {
-    absolutePath = canonicalPermissionPath(
-      toolName,
-      requestedPath,
-      ctx.cwd,
-    ).path;
-    input.path = absolutePath;
+    canonical = canonicalPermissionPath(toolName, requestedPath, ctx.cwd);
+    input.path = canonical.path;
   } catch (error) {
     const reason = `Blocked ${toolName}: ${error instanceof Error ? error.message : String(error)}`;
     audit({
@@ -1897,6 +1893,7 @@ async function handleFileEditPermission(
     });
     return { block: true, reason };
   }
+  const absolutePath = canonical.path;
   if (
     toolName === "edit" &&
     Array.isArray(input.edits) &&
@@ -1927,9 +1924,9 @@ async function handleFileEditPermission(
   if (configurationResult === "allow_once") return;
   if (configurationResult) return configurationResult;
 
-  if (decision.decision === "deny")
+  if (decision.decision === "deny" || canonical.nativeDecision === "deny")
     return configuredDeny(toolName, ctx, { path: absolutePath });
-  if (decision.decision === "allow") {
+  if (decision.decision === "allow" || canonical.nativeDecision === "allow") {
     audit({
       tool: toolName,
       decision: "allow_pattern",
