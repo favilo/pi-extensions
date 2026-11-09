@@ -1704,6 +1704,7 @@ async function handlePathPermission(
     return { block: true, reason };
   }
   if (
+    canonical.nativeDecision === "allow" ||
     decision.decision === "allow" ||
     isInsideDirectory(absolutePath, canonical.cwd)
   ) {
