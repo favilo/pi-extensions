@@ -303,3 +303,79 @@ test("a registered read blocks when WASM denies a path the host would allow", as
     rmSync(packageDir, { recursive: true, force: true });
   }
 });
+
+test("a registered write uses a WASM deny instead of the no-UI ask", async () => {
+  const root = mkdtempSync(join(tmpdir(), "pi-path-trust-write-"));
+  const cwd = join(root, "project");
+  const agentDir = mkdtempSync(join(tmpdir(), "pi-path-trust-write-agent-"));
+  mkdirSync(cwd);
+  writeFileSync(join(cwd, "notes.txt"), "hello");
+  const packageDir = mkdtempSync(join(tmpdir(), "pi-path-trust-write-native-"));
+  const packagePath = join(packageDir, "index.cjs");
+  writeFileSync(
+    packagePath,
+    [
+      "exports.evaluatePathTrust = (request, realpath) => ({",
+      "  version: 1,",
+      "  operation: 'path_trust',",
+      "  ok: true,",
+      "  nonce: request.nonce,",
+      "  path: realpath(request.cwd + '/' + request.requestedPath),",
+      "  cwd: realpath(request.cwd),",
+      "  trustEligible: false,",
+      "  aiignoreMatch: false,",
+      "  decision: 'deny',",
+      "});",
+    ].join("\n"),
+  );
+  const restore = setNativePackagePathForTests(packagePath);
+  const previousAgentDir = process.env.PI_CODING_AGENT_DIR;
+  process.env.PI_CODING_AGENT_DIR = agentDir;
+  const handlers = new Map<
+    string,
+    (
+      event: {
+        toolName: string;
+        toolCallId: string;
+        input: { path: string; content: string };
+      },
+      ctx: { cwd: string; hasUI: boolean; ui: { notify: () => void } },
+    ) => Promise<{ block?: boolean; reason?: string } | undefined>
+  >();
+  try {
+    toolPermissionPolicy({
+      registerCommand() {},
+      on(
+        event: string,
+        handler: (
+          event: {
+            toolName: string;
+            toolCallId: string;
+            input: { path: string; content: string };
+          },
+          ctx: { cwd: string; hasUI: boolean; ui: { notify: () => void } },
+        ) => Promise<{ block?: boolean; reason?: string } | undefined>,
+      ) {
+        if (event === "tool_call") handlers.set(event, handler);
+      },
+      getAllTools: () => [],
+    } as never);
+    const result = await handlers.get("tool_call")?.(
+      {
+        toolName: "write",
+        toolCallId: "wasm-deny-write",
+        input: { path: "notes.txt", content: "changed" },
+      },
+      { cwd, hasUI: false, ui: { notify() {} } },
+    );
+    assert.equal(result?.block, true);
+    assert.match(result?.reason ?? "", /configured deny rule/);
+  } finally {
+    restore();
+    if (previousAgentDir === undefined) delete process.env.PI_CODING_AGENT_DIR;
+    else process.env.PI_CODING_AGENT_DIR = previousAgentDir;
+    rmSync(root, { recursive: true, force: true });
+    rmSync(agentDir, { recursive: true, force: true });
+    rmSync(packageDir, { recursive: true, force: true });
+  }
+});
