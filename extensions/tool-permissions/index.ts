@@ -1405,7 +1405,12 @@ const CONFIGURED_PATH_TOOLS = new Set([
 ]);
 const NONEXISTENT_PATH_TOOLS = new Set(["write", "edit", "subagent_result"]);
 
-type CanonicalPermissionPath = { path: string; cwd: string };
+type CanonicalPermissionPath = {
+  path: string;
+  cwd: string;
+  nativeDecision?: PermissionDecision;
+  nativeAiignoreMatch?: boolean;
+};
 
 function pathTrustRequest(
   toolName: string,
@@ -1454,7 +1459,12 @@ function canonicalPermissionPath(
     throw new Error(`invalid native path-trust result for ${toolName}`);
   }
   if (adopted.status === "ready") {
-    return { path: adopted.result.path, cwd: adopted.result.cwd };
+    return {
+      path: adopted.result.path,
+      cwd: adopted.result.cwd,
+      nativeDecision: adopted.result.decision,
+      nativeAiignoreMatch: adopted.result.aiignoreMatch,
+    };
   }
   try {
     const canonicalCwd = realpathSync(cwd);
@@ -1668,6 +1678,20 @@ async function handlePathPermission(
 
   if (decision.decision === "deny")
     return configuredDeny(toolName, ctx, { path: absolutePath });
+  if (canonical.nativeDecision === "deny") {
+    if (canonical.nativeAiignoreMatch) {
+      const reason = `Blocked ${toolName}: ${requestedPath || "."} is matched by ${resolve(canonical.cwd, ".aiignore")}.`;
+      audit({
+        tool: toolName,
+        decision: "deny_aiignore",
+        cwd: ctx.cwd,
+        path: absolutePath,
+        reason,
+      });
+      return { block: true, reason };
+    }
+    return configuredDeny(toolName, ctx, { path: absolutePath });
+  }
   if (isAiIgnoredPath(absolutePath, canonical.cwd)) {
     const reason = `Blocked ${toolName}: ${requestedPath || "."} is matched by ${resolve(canonical.cwd, ".aiignore")}.`;
     audit({
