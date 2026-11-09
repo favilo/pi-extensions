@@ -6,6 +6,7 @@ import {
   readFileSync,
   readlinkSync,
   statSync,
+  writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -73,4 +74,39 @@ test("an allow decision appends one audit record with the current fields", () =>
   assert.equal(record.reason, "user allow");
   assert.equal("command" in record, false);
   assertCurrentAlias(directory, datedName);
+});
+
+test("a failed audit write does not leave an allow decision", () => {
+  const root = mkdtempSync(join(tmpdir(), "pi-wasm-audit-fail-"));
+  const home = join(root, "blocked-home");
+  writeFileSync(home, "not a directory");
+  const request = {
+    version: NATIVE_CONTRACT_VERSION,
+    operation: "audit_write" as const,
+    nonce: NATIVE_AUDIT_WRITE_NONCE,
+    homeDir: home,
+    now: "2026-07-31T12:00:00.000Z",
+    tool: "read",
+    decision: "allow_pattern",
+    cwd: "/work",
+    path: "/work/notes.txt",
+    reason: "user allow",
+  };
+
+  const result = recordPermissionAudit(request);
+  console.log(
+    JSON.stringify({
+      decision: result.decision,
+      tool: request.tool,
+      records: result.records,
+    }),
+  );
+
+  assert.equal(result.ok, false);
+  assert.equal(result.records, 0);
+  assert.equal(result.decision, "deny");
+  assert.equal(
+    existsSync(join(home, ".pi", "tool-permissions", "audit-2026-07-31.log")),
+    false,
+  );
 });
