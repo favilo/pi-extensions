@@ -49,12 +49,18 @@ pub fn write(
     let line = record_line(&request);
     let wrote = sink.append(&line);
     let records = if wrote.is_ok() { 1 } else { 0 };
+    // A failed write must not remain an allow. The caller treats this as a deny.
+    let decision = if wrote.is_ok() {
+        request.decision
+    } else {
+        "deny".into()
+    };
     Ok(AuditWriteResponse {
         version: CONTRACT_VERSION,
         operation: NativeOperation::AuditWrite,
         ok: wrote.is_ok(),
         nonce: request.nonce,
-        decision: request.decision,
+        decision,
         records,
     })
 }
@@ -133,5 +139,18 @@ mod tests {
         assert_eq!(record["path"], "/work/notes.txt");
         assert_eq!(record["reason"], "user allow");
         assert!(record.get("command").is_none());
+    }
+
+    #[test]
+    fn a_failed_write_does_not_remain_allow() {
+        let sink = MemorySink {
+            lines: std::sync::Mutex::new(Vec::new()),
+            fail: true,
+        };
+        let response = write(request(), &sink).unwrap();
+        assert!(!response.ok);
+        assert_eq!(response.records, 0);
+        assert_eq!(response.decision, "deny");
+        assert!(sink.lines.lock().unwrap().is_empty());
     }
 }
