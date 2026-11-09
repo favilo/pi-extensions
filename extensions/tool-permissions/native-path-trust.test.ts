@@ -379,3 +379,83 @@ test("a registered write uses a WASM deny instead of the no-UI ask", async () =>
     rmSync(packageDir, { recursive: true, force: true });
   }
 });
+
+test("a registered read allows an outside path when WASM allows it", async () => {
+  const root = mkdtempSync(join(tmpdir(), "pi-path-trust-outside-read-"));
+  const cwd = join(root, "project");
+  const outside = join(root, "outside.txt");
+  const agentDir = mkdtempSync(
+    join(tmpdir(), "pi-path-trust-outside-read-agent-"),
+  );
+  mkdirSync(cwd);
+  writeFileSync(outside, "hello");
+  const packageDir = mkdtempSync(
+    join(tmpdir(), "pi-path-trust-outside-read-native-"),
+  );
+  const packagePath = join(packageDir, "index.cjs");
+  writeFileSync(
+    packagePath,
+    [
+      "exports.evaluatePathTrust = (request, realpath) => ({",
+      "  version: 1,",
+      "  operation: 'path_trust',",
+      "  ok: true,",
+      "  nonce: request.nonce,",
+      "  path: realpath(request.requestedPath),",
+      "  cwd: realpath(request.cwd),",
+      "  trustEligible: true,",
+      "  aiignoreMatch: false,",
+      "  decision: 'allow',",
+      "});",
+    ].join("\n"),
+  );
+  const restore = setNativePackagePathForTests(packagePath);
+  const previousAgentDir = process.env.PI_CODING_AGENT_DIR;
+  process.env.PI_CODING_AGENT_DIR = agentDir;
+  const handlers = new Map<
+    string,
+    (
+      event: {
+        toolName: string;
+        toolCallId: string;
+        input: { path: string };
+      },
+      ctx: { cwd: string; hasUI: boolean; ui: { notify: () => void } },
+    ) => Promise<{ block?: boolean } | undefined>
+  >();
+  try {
+    toolPermissionPolicy({
+      registerCommand() {},
+      on(
+        event: string,
+        handler: (
+          event: {
+            toolName: string;
+            toolCallId: string;
+            input: { path: string };
+          },
+          ctx: { cwd: string; hasUI: boolean; ui: { notify: () => void } },
+        ) => Promise<{ block?: boolean } | undefined>,
+      ) {
+        if (event === "tool_call") handlers.set(event, handler);
+      },
+      getAllTools: () => [],
+    } as never);
+    const result = await handlers.get("tool_call")?.(
+      {
+        toolName: "read",
+        toolCallId: "wasm-allow-outside-read",
+        input: { path: outside },
+      },
+      { cwd, hasUI: false, ui: { notify() {} } },
+    );
+    assert.equal(result, undefined);
+  } finally {
+    restore();
+    if (previousAgentDir === undefined) delete process.env.PI_CODING_AGENT_DIR;
+    else process.env.PI_CODING_AGENT_DIR = previousAgentDir;
+    rmSync(root, { recursive: true, force: true });
+    rmSync(agentDir, { recursive: true, force: true });
+    rmSync(packageDir, { recursive: true, force: true });
+  }
+});
