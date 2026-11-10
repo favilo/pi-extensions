@@ -69,12 +69,29 @@ fn record_line(request: &AuditWriteRequest) -> String {
     let mut record = Map::new();
     record.insert("time".into(), Value::String(request.now.clone()));
     record.insert("tool".into(), Value::String(request.tool.clone()));
+    insert_actor(&mut record, request);
     record.insert("decision".into(), Value::String(request.decision.clone()));
     record.insert("cwd".into(), Value::String(request.cwd.clone()));
     insert_text(&mut record, "path", &request.path);
     insert_text(&mut record, "command", &request.command);
+    insert_text(&mut record, "subcommand", &request.subcommand);
+    insert_text(&mut record, "pattern", &request.pattern);
+    insert_text(&mut record, "scope", &request.scope);
     insert_text(&mut record, "reason", &request.reason);
+    insert_text(&mut record, "steering", &request.steering);
     format!("{}\n", Value::Object(record))
+}
+
+fn insert_actor(record: &mut Map<String, Value>, request: &AuditWriteRequest) {
+    let Some(kind) = &request.actor_kind else {
+        return;
+    };
+    let mut actor = Map::new();
+    actor.insert("kind".into(), Value::String(kind.clone()));
+    if kind == "child" {
+        insert_text(&mut actor, "childId", &request.child_id);
+    }
+    record.insert("actor".into(), Value::Object(actor));
 }
 
 fn insert_text(record: &mut Map<String, Value>, key: &str, value: &Option<String>) {
@@ -116,6 +133,12 @@ mod tests {
             path: Some("/work/notes.txt".into()),
             command: None,
             reason: Some("user allow".into()),
+            actor_kind: None,
+            child_id: None,
+            subcommand: None,
+            pattern: None,
+            scope: None,
+            steering: None,
         }
     }
 
@@ -152,5 +175,28 @@ mod tests {
         assert_eq!(response.records, 0);
         assert_eq!(response.decision, "deny");
         assert!(sink.lines.lock().unwrap().is_empty());
+    }
+
+    #[test]
+    fn writes_the_host_actor_pattern_scope_and_steering() {
+        let sink = MemorySink {
+            lines: std::sync::Mutex::new(Vec::new()),
+            fail: false,
+        };
+        let mut request = request();
+        request.actor_kind = Some("main".into());
+        request.pattern = Some("^/work/notes\\.txt$".into());
+        request.scope = Some("project".into());
+        request.steering = Some("keep the notes".into());
+        let response = write(request, &sink).unwrap();
+        assert!(response.ok);
+        assert_eq!(response.records, 1);
+        let lines = sink.lines.lock().unwrap();
+        let record: serde_json::Value = serde_json::from_str(lines[0].trim()).unwrap();
+        assert_eq!(record["actor"]["kind"], "main");
+        assert_eq!(record["pattern"], "^/work/notes\\.txt$");
+        assert_eq!(record["scope"], "project");
+        assert_eq!(record["steering"], "keep the notes");
+        assert!(record.get("command").is_none());
     }
 }

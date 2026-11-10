@@ -38,7 +38,7 @@ import {
   writeFileSync,
   writeSync,
 } from "node:fs";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { basename, dirname, join, relative, resolve } from "node:path";
 import { createAuditLogger } from "./audit.ts";
 import { preflightEdit, type EditPair } from "./edit-preflight.ts";
@@ -71,6 +71,10 @@ import {
 } from "./native-contract.ts";
 import { adoptPathTrust } from "./native-path-trust.ts";
 import { resolveNativePackagePath } from "./native-package.ts";
+import {
+  NATIVE_AUDIT_WRITE_NONCE,
+  recordPermissionAudit,
+} from "./native-audit-write.ts";
 import {
   hasNativeRegistration,
   registerNativeToolPermissionsCallbacks,
@@ -366,10 +370,33 @@ function permissionResultAudit(
 }
 
 function audit(entry: Omit<AuditEntry, "time">): void {
-  auditDestination().write(entry);
+  if (!resolveNativePackagePath()) {
+    auditDestination().write(entry);
+    return;
+  }
+  const now = permissionAuditNowForTests?.() ?? new Date();
+  recordPermissionAudit({
+    version: NATIVE_CONTRACT_VERSION,
+    operation: "audit_write",
+    nonce: NATIVE_AUDIT_WRITE_NONCE,
+    homeDir: permissionAuditHomeForTests ?? homedir(),
+    now: now.toISOString(),
+    tool: entry.tool,
+    decision: entry.decision,
+    cwd: entry.cwd,
+    path: entry.path,
+    command: entry.command,
+    reason: entry.reason,
+    actorKind: entry.actor?.kind,
+    childId: entry.actor?.kind === "child" ? entry.actor.childId : undefined,
+    subcommand: entry.subcommand,
+    pattern: entry.pattern,
+    scope: entry.scope,
+    steering: entry.steering,
+  });
 }
 
-/** Record one host permission decision. The stub still uses the TypeScript logger. */
+/** Record one host permission decision through WASM when the package is loaded. */
 export function recordToolAudit(entry: Omit<AuditEntry, "time">): void {
   audit(entry);
 }

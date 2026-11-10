@@ -193,6 +193,12 @@ pub struct AuditWriteRequest {
     pub path: Option<String>,
     pub command: Option<String>,
     pub reason: Option<String>,
+    pub actor_kind: Option<String>,
+    pub child_id: Option<String>,
+    pub subcommand: Option<String>,
+    pub pattern: Option<String>,
+    pub scope: Option<String>,
+    pub steering: Option<String>,
 }
 
 #[napi(object)]

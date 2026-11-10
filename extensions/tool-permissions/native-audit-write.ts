@@ -19,6 +19,12 @@ export type AuditWriteRequest = {
   path?: string;
   command?: string;
   reason?: string;
+  actorKind?: string;
+  childId?: string;
+  subcommand?: string;
+  pattern?: string;
+  scope?: string;
+  steering?: string;
 };
 
 export type AuditWriteResult = {
@@ -42,6 +48,12 @@ type NativeAuditRequest = {
   path?: string;
   command?: string;
   reason?: string;
+  actorKind?: string;
+  childId?: string;
+  subcommand?: string;
+  pattern?: string;
+  scope?: string;
+  steering?: string;
 };
 
 type NativeAuditWrite = {
@@ -112,6 +124,12 @@ export function recordPermissionAudit(
         path: request.path,
         command: request.command,
         reason: request.reason,
+        actorKind: request.actorKind,
+        childId: request.childId,
+        subcommand: request.subcommand,
+        pattern: request.pattern,
+        scope: request.scope,
+        steering: request.steering,
       },
       (line) =>
         writeAuditLine(
