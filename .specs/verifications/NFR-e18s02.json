@@ -1,0 +1,37 @@
+{
+  "story_id": "e18s02",
+  "verified_at": "2026-11-10T22:43:30Z",
+  "status": "PASS",
+  "threshold_source": {
+    "status": "WAIVED",
+    "reason": "No e18 TEST_PLAN_LATEST artifact defines numeric NFR thresholds. Evidence uses the story quality attributes: one record, field parity, and a failed write that does not remain allow."
+  },
+  "dimensions": {
+    "performance": {
+      "status": "PASS",
+      "threshold": "One audit record per decision, with the audit fixtures completing inside the existing test run.",
+      "evidence": [
+        "node --test extensions/tool-permissions/native-audit-write.test.ts finished in 1013.579834 ms with 3 passing tests.",
+        "npm run test:preflight finished in 5023.641209 ms with 339 passing tests.",
+        "cargo test finished inside npm run check with 20 passing native tests."
+      ]
+    },
+    "reliability": {
+      "status": "PASS",
+      "threshold": "A failed audit write returns deny, writes nothing, and does not remain allow.",
+      "evidence": [
+        "a failed audit write does not leave an allow decision passed.",
+        "Rust write() sets decision to deny and records to 0 when the append callback returns false.",
+        "The host success path writes one WASM record and does not append a second TypeScript copy."
+      ]
+    },
+    "operability": {
+      "status": "PASS",
+      "threshold": "Tests report the decision, tool, and record count for the request.",
+      "evidence": [
+        "The three native-audit-write tests print decision, tool, and records.",
+        "A missing native package still uses the TypeScript logger until e18s06."
+      ]
+    }
+  }
+}

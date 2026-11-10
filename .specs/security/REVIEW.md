@@ -84,3 +84,13 @@ No command injection, path-traversal allow, authorization bypass, secret exposur
 On a ready WASM result, the registered read, write, and edit handlers keep the WASM canonical path and apply `nativeDecision` before the prompt. A configured deny still returns before a WASM allow. A WASM deny, including an `.aiignore` match on write or edit, returns before the no-UI ask. An invalid `.aiignore` line or an unreadable project policy returns ask with a diagnostic. That ask blocks when no UI is available and prompts when a UI is available, so the user can allow one call that fixes the file. Invalid contract output throws and the handler blocks path resolution. A missing native package stays on the TypeScript path decision. The WASM evaluator does not spawn a process. The host `readFile` callback remains limited to the path the native package requests for policy and `.aiignore` reads.
 
 The earlier note that the registered handler ignored the WASM decision is closed. No new HIGH finding at confidence 8 or above.
+
+## e18s02 WASM audit writes
+
+- Reviewed: 2026-11-10T22:43:30Z
+- Scope: `wlpruqvu..@` audit changes in `extensions/tool-permissions/native/crates/tool-permissions-native/src/audit.rs`, `extensions/tool-permissions/native-audit-write.ts`, `extensions/tool-permissions/audit.ts`, and `audit()` in `extensions/tool-permissions/index.ts`
+- Result: **PASS — no reportable HIGH findings**
+
+WASM builds one JSON line from the supplied decision fields and appends it through the host callback. It does not open the log itself, spawn a shell, open a network connection, or copy `permissions.toml` into the record. The host chooses the dated log path from its own home directory. A failed append returns `ok: false`, `records: 0`, and `decision: deny`. Invalid contract output is not accepted as a successful write. When the native package path resolves, the host skips the TypeScript writer, so the success path does not append a second copy.
+
+`index.ts` `audit()` does not apply the returned deny to the tool result. The permission decision is made before the audit write, and the existing TypeScript logger also warns and leaves that decision unchanged. Moving tool execution is outside this story. No command injection, path-traversal allow, authorization bypass, secret exposure, or unsafe deserialization finding reached confidence 8.

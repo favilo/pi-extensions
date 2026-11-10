@@ -1,0 +1,100 @@
+story_id: e18s02
+verified_at: "2026-11-10T22:43:30Z"
+verifier: verify-work
+status: passed
+risk: P0
+vcs:
+  kind: jj
+  working_copy: txkuorvqstkz
+  parent: lorxotmzystq
+  bookmark_ancestor: favilo/e18s00-pi-oxidized-host
+  not_main: true
+phases:
+  branch:
+    passed: true
+    note: "Working copy descends from favilo/e18s00-pi-oxidized-host and is not main (vmyzxzpk). The bookmark is not pointed at the working copy. No open PR, so gh pr checks did not run."
+  preflight:
+    passed: true
+    command: "bash $BIGPOWERS_ROOT/scripts/bp-read-agents.sh --print"
+    note: "AGENTS.md has no Preflight section. bp-timing.sh could not start because python3 lacks PyYAML. Mechanical commands came from package.json and the story tasks."
+  smoke:
+    passed: true
+    note: "Library extension. No server process and no CLI binary. Cold-start is the native release rebuild inside the terminal verdict."
+  task_verification:
+    passed: true
+    tasks:
+      - id: 1
+        command: "node --test extensions/tool-permissions/native-audit-write.test.ts"
+        exit_code: 0
+        note: "3 passed, 0 failed, duration_ms 1013.579834"
+      - id: 2
+        command: "cargo test --manifest-path extensions/tool-permissions/native/Cargo.toml"
+        exit_code: 0
+        note: "20 library tests passed, including the three audit write tests."
+      - id: 3
+        command: "node --test extensions/tool-permissions/native-audit-write.test.ts"
+        exit_code: 0
+        note: "Same contract run as task 1."
+      - id: 4
+        command: "npm run build:native && npm run check"
+        exit_code: 0
+  build:
+    passed: true
+    command: "npm run build:native"
+  typecheck:
+    passed: true
+    command: "npm run typecheck"
+  lint:
+    passed: true
+    note: "package.json has no lint script. tsc --noEmit passed inside npm run check."
+  tests:
+    passed: true
+    command: "npm run test:preflight"
+    coverage: "339 passed, 0 failed"
+  terminal_verdict:
+    command: "npm run build:native && npm run check"
+    exit_code: 0
+    captured_at: "2026-11-10T22:43:30Z"
+    note: "Single contiguous run. Release WASM build finished. tsc --noEmit passed. cargo test passed 20 tests. node --test passed 339 tests in 5023.641209 ms. check-test-guard printed PASS."
+  security:
+    passed: true
+    report: ".specs/security/REVIEW.md"
+    note: "No HIGH finding at confidence 8 or above. A failed WASM append returns deny and writes nothing. The host does not apply that deny to the earlier tool decision."
+  blind_spots:
+    passed: true
+    command: "bash $BIGPOWERS_ROOT/scripts/check-blind-spots.sh"
+    note: "0 HIGH, 7 MEDIUM double-tag findings on older stories. Exit 0. The script is not executable, so it was started with bash and its absolute path."
+  completeness_critic:
+    passed: true
+    blockers: 0
+    warnings: 1
+    note: "WARNING: the critic reads the first word of the prose active_story title (Move) instead of active_story_id e18s02, so the zero-tag check was skipped. Exit 0."
+  nfr:
+    passed: true
+    report: ".specs/verifications/NFR-e18s02.json"
+  wiki_lint:
+    passed: true
+    note: "No specs/skills-wiki or specs/conventions-wiki directory exists, so there are no stale skill pages and no orphan convention pages."
+  manual:
+    passed: true
+    steps:
+      - step: "An allow decision appends one audit record with the current fields"
+        expected: "The audit file gains one record with the same decision, tool, path, and reason, and no second record"
+        actual: "The allow test printed records 1 and passed. The dated log had one JSON line with time, tool, decision, cwd, path, and reason."
+        passed: true
+      - step: "A failed audit write does not leave an allow decision"
+        expected: "The WASM result is deny, records is 0, and no audit file is created"
+        actual: "The failed-write test printed decision deny and records 0. ok was false and the dated log was absent."
+        passed: true
+      - step: "A host allow appends one WASM audit record and no TypeScript copy"
+        expected: "The host path writes one record with actor, pattern, scope, and steering"
+        actual: "recordToolAudit wrote one line. The record matched the supplied fields and did not include command."
+        passed: true
+  gaps:
+    closed: true
+    items:
+      - id: 1
+        step: "Failed audit write and the tool handler"
+        expected: "The audit result is deny and no record is written. Tool execution stays on the earlier decision."
+        actual: "recordPermissionAudit returns deny and writes nothing. index.ts audit() does not read that result, so a failed write does not change an earlier allow. That matches the existing TypeScript logger, and moving tool execution is a non-goal."
+        status: CLOSED

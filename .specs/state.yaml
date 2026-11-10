@@ -1,7 +1,7 @@
 active_flow: develop-tdd
 active_epic_id: e18
-active_story_id: e18s01
-active_story: Move path canonicalization, project trust, and .aiignore into WASM
+active_story_id: e18s02
+active_story: Move audit log writes into WASM
 active_bug_id: null
 git:
   bookmark: favilo/e18s00-pi-oxidized-host
@@ -93,32 +93,29 @@ planning:
     constraints:
     - Do not modify the e06 repair flow or child-private bridge catalog.
 handoff:
-  last_step_completed: npm run check passed for e18s01. Typecheck, 17 native tests, and 336 extension tests passed after the working-directory allow, write and edit .aiignore deny, and diagnostic prompt.
+  last_step_completed: commit-message recorded the e18s02 verification and audit. audit-code passed with no HIGH findings.
   open_decisions: []
   required_reading:
   - .specs/planning-context.yaml
   - .specs/product/SCOPE-e18-wasm-only-tool-permissions.yaml
   - .specs/epics/e18-wasm-only-tool-permissions/epic.yaml
   - .specs/epics/e18-wasm-only-tool-permissions/e18s00-pi-oxidized-decision.md
-  - .specs/epics/e18-wasm-only-tool-permissions/e18s01-wasm-path-trust-aiignore.md
-  - .specs/epics/e18-wasm-only-tool-permissions/e18s01-tasks.yaml
+  - .specs/epics/e18-wasm-only-tool-permissions/e18s02-wasm-audit-writes.md
+  - .specs/epics/e18-wasm-only-tool-permissions/e18s02-tasks.yaml
   - .specs/security/epics/e18/THREAT_MODEL.md
-  - .specs/verifications/e18s01-verify.yaml
-  next_skill: commit-message
+  - .specs/security/REVIEW.md
+  next_skill: release-branch
   context: >-
-    e18s00 is passing. e18s01 audit-code passed on 2026-11-09. Do not create
-    a new bookmark. Stay on favilo/e18s00-pi-oxidized-host. pi-oxidized-ext
-    stays rejected. e18s01 uses the standalone NAPI package and pi-api. Do not
-    push. Do not delete extensions/tool-permissions/index.ts.
-    Evidence is in .specs/verifications/e18s01-verify.yaml and
-    .specs/verifications/NFR-e18s01.json. The registered read, write, and edit
-    handlers follow the WASM path decision, including .aiignore denies for
-    write and edit. A read, grep, find, or ls inside the working directory is
-    allowed when no rule matches. A broken .aiignore or project policy asks
-    and blocks when no UI is available. A disabled native package still uses
-    the TypeScript path decision. Yolo mode after WASM is deferred. Prompts,
-    audit writes, rule saves, tool execution, and index.ts remain. Next skill
-    is commit-message. Do not push.
+    e18s00, e18s01, and e18s02 are passing. Do not create a new bookmark. Stay
+    on favilo/e18s00-pi-oxidized-host. pi-oxidized-ext stays rejected. Use the
+    standalone NAPI package and pi-api. Do not push. Do not delete
+    extensions/tool-permissions/index.ts. WASM writes one audit record per
+    loaded decision, with the current fields and the supplied clock. A failed
+    write returns deny and writes nothing, and the host audit call does not
+    change the earlier tool decision. A missing native package still uses
+    the TypeScript logger until e18s06. Prompts, rule saves, path trust, and
+    tool execution stay put. Yolo mode and the .git/.jj boundary bug stay
+    deferred. audit-code passed. Next skill is release-branch. Do not push.
   blocker: null
   deferred_work:
   - Consolidate safeStringify and JSON formatting helpers into a shared utility module
@@ -127,7 +124,7 @@ handoff:
   - Build e03 directory-local tool permissions after the higher-WSJF e04 fix
   - Add real Pi process integration tests after unit contracts are established
   - Apply yolo mode after the WASM path decision without bypassing an .aiignore deny or a path-trust diagnostic
-  verified_at: '2026-11-09T17:05:08Z'
+  verified_at: '2026-11-10T22:43:30Z'
 release:
   pr: https://github.com/favilo/pi-extensions/pull/14
   merged_commit: 841d91a0
