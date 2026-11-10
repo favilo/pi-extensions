@@ -213,6 +213,36 @@ function getUserPermissionsPath(): string {
   return join(getAgentDir(), "permissions.toml");
 }
 const auditLogger = createAuditLogger();
+let permissionAuditHomeForTests: string | undefined;
+let permissionAuditNowForTests: (() => Date) | undefined;
+
+/** Point host audit writes at a temporary home for tests. */
+export function setPermissionAuditHomeForTests(
+  homeDir: string | undefined,
+  now?: () => Date,
+): () => void {
+  const previousHome = permissionAuditHomeForTests;
+  const previousNow = permissionAuditNowForTests;
+  permissionAuditHomeForTests = homeDir;
+  permissionAuditNowForTests = now;
+  return () => {
+    permissionAuditHomeForTests = previousHome;
+    permissionAuditNowForTests = previousNow;
+  };
+}
+
+function auditDestination() {
+  if (
+    permissionAuditHomeForTests === undefined &&
+    permissionAuditNowForTests === undefined
+  ) {
+    return auditLogger;
+  }
+  return createAuditLogger({
+    homeDir: permissionAuditHomeForTests,
+    now: permissionAuditNowForTests,
+  });
+}
 
 /** Steering text captured at allow+steer decision time, keyed by toolCallId, annotated onto the invocation-bound tool result. */
 const pendingSteering = new Map<string, string>();
@@ -336,7 +366,12 @@ function permissionResultAudit(
 }
 
 function audit(entry: Omit<AuditEntry, "time">): void {
-  auditLogger.write(entry);
+  auditDestination().write(entry);
+}
+
+/** Record one host permission decision. The stub still uses the TypeScript logger. */
+export function recordToolAudit(entry: Omit<AuditEntry, "time">): void {
+  audit(entry);
 }
 
 function compact(value: unknown, max = 2000): string {
@@ -1562,10 +1597,7 @@ export function resolvePermissionDecisionForRequest(
       );
       if (resolved.diagnostic) throw new Error(resolved.diagnostic);
       if (resolved.decision === "deny") return "deny";
-      if (
-        adopted.result.decision === "allow" ||
-        resolved.decision === "allow"
-      )
+      if (adopted.result.decision === "allow" || resolved.decision === "allow")
         return "allow";
       if (!implicit) return resolved.decision;
       return isInsideDirectory(adopted.result.path, adopted.result.cwd)

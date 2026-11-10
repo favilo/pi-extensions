@@ -16,6 +16,7 @@ import {
   NATIVE_AUDIT_WRITE_NONCE,
   recordPermissionAudit,
 } from "./native-audit-write.ts";
+import { recordToolAudit, setPermissionAuditHomeForTests } from "./index.ts";
 
 function assertCurrentAlias(directory: string, datedName: string): void {
   const linkPath = join(directory, "audit.log");
@@ -109,4 +110,49 @@ test("a failed audit write does not leave an allow decision", () => {
     existsSync(join(home, ".pi", "tool-permissions", "audit-2026-07-31.log")),
     false,
   );
+});
+
+test("a host allow appends one WASM audit record and no TypeScript copy", () => {
+  const home = mkdtempSync(join(tmpdir(), "pi-wasm-audit-host-"));
+  const now = "2026-07-31T12:00:00.000Z";
+  const restore = setPermissionAuditHomeForTests(home, () => new Date(now));
+  try {
+    recordToolAudit({
+      tool: "read",
+      actor: { kind: "main" },
+      decision: "allow_pattern",
+      cwd: "/work",
+      path: "/work/notes.txt",
+      pattern: "^/work/notes\\.txt$",
+      scope: "project",
+      reason: "user allow",
+      steering: "keep the notes",
+    });
+  } finally {
+    restore();
+  }
+
+  const directory = join(home, ".pi", "tool-permissions");
+  const datedPath = join(directory, "audit-2026-07-31.log");
+  const lines = readFileSync(datedPath, "utf8").trim().split("\n");
+  console.log(
+    JSON.stringify({
+      decision: "allow_pattern",
+      tool: "read",
+      records: lines.length,
+    }),
+  );
+  assert.equal(lines.length, 1);
+  const record = JSON.parse(lines[0]) as Record<string, unknown>;
+  assert.equal(record.time, now);
+  assert.equal(record.tool, "read");
+  assert.equal(record.decision, "allow_pattern");
+  assert.equal(record.cwd, "/work");
+  assert.equal(record.path, "/work/notes.txt");
+  assert.equal(record.reason, "user allow");
+  assert.deepEqual(record.actor, { kind: "main" });
+  assert.equal(record.pattern, "^/work/notes\\.txt$");
+  assert.equal(record.scope, "project");
+  assert.equal(record.steering, "keep the notes");
+  assert.equal("command" in record, false);
 });
