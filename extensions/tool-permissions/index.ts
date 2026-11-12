@@ -76,6 +76,10 @@ import {
   recordPermissionAudit,
 } from "./native-audit-write.ts";
 import {
+  NATIVE_RULE_SAVE_NONCE,
+  savePermissionRule,
+} from "./native-rule-save.ts";
+import {
   hasNativeRegistration,
   registerNativeToolPermissionsCallbacks,
 } from "./native-registration-loader.ts";
@@ -401,14 +405,32 @@ export function recordToolAudit(entry: Omit<AuditEntry, "time">): void {
   audit(entry);
 }
 
-/** Save one approved rule. The stub does not write, so the project-save test stays red. */
-export function saveToolPermissionRule(_input: {
+/** Save one approved rule through WASM when the package is loaded. */
+export function saveToolPermissionRule(input: {
   destination: string;
   scope: "user" | "project";
   tool: string;
   rule: PermissionRule;
 }): boolean {
-  return false;
+  const tool = permissionKeyForTool(input.tool);
+  if (!resolveNativePackagePath()) {
+    try {
+      saveAllowedRule(input.destination, tool, input.rule);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+  const result = savePermissionRule({
+    version: NATIVE_CONTRACT_VERSION,
+    operation: "rule_save",
+    nonce: NATIVE_RULE_SAVE_NONCE,
+    destination: input.destination,
+    scope: input.scope,
+    tool,
+    rule: input.rule,
+  });
+  return result.ok && result.allowed;
 }
 
 function compact(value: unknown, max = 2000): string {
@@ -919,24 +941,21 @@ async function presentScrollablePermission(
       );
       return false;
     }
-    try {
-      saveAllowedRule(
-        target,
-        permissionKeyForTool(allowPattern.toolName),
-        allowPattern.suggestedRule,
-      );
+    const saved = saveToolPermissionRule({
+      destination: target,
+      scope,
+      tool: allowPattern.toolName,
+      rule: allowPattern.suggestedRule,
+    });
+    if (!saved) {
       ctx.ui.notify?.(
-        `Saved ${scope} permission pattern to ${target}.`,
-        "info",
-      );
-      return true;
-    } catch (error) {
-      ctx.ui.notify?.(
-        `Could not save ${scope} permission pattern to ${target}: ${error instanceof Error ? error.message : String(error)}`,
+        `Could not save ${scope} permission pattern to ${target}.`,
         "error",
       );
       return false;
     }
+    ctx.ui.notify?.(`Saved ${scope} permission pattern to ${target}.`, "info");
+    return true;
   };
 
   const subcommandsToSave =
@@ -1268,11 +1287,15 @@ async function presentScrollablePermission(
           if (allowPattern && matchesKey(data, "ctrl+e")) {
             void editPatternInExternalEditor(tui, allowPattern).then((rule) => {
               if (rule) {
-                saveAllowedRule(
-                  getUserPermissionsPath(),
-                  permissionKeyForTool(allowPattern.toolName),
-                  rule,
-                );
+                if (
+                  !saveToolPermissionRule({
+                    destination: getUserPermissionsPath(),
+                    scope: "user",
+                    tool: allowPattern.toolName,
+                    rule,
+                  })
+                )
+                  return;
                 done({
                   allowed: true,
                   decision: "allow_pattern",
