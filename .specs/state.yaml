@@ -1,7 +1,7 @@
 active_flow: develop-tdd
 active_epic_id: e18
-active_story_id: e18s02
-active_story: Move audit log writes into WASM
+active_story_id: e18s03
+active_story: Move rule saves and permissions.toml patches into WASM
 active_bug_id: null
 git:
   bookmark: favilo/e18s00-pi-oxidized-host
@@ -93,29 +93,28 @@ planning:
     constraints:
     - Do not modify the e06 repair flow or child-private bridge catalog.
 handoff:
-  last_step_completed: commit-message recorded the e18s02 verification and audit. audit-code passed with no HIGH findings.
+  last_step_completed: started e18s03 on the existing bookmark. Release stays deferred while the Rust runtime becomes the owner of rule saves.
   open_decisions: []
   required_reading:
   - .specs/planning-context.yaml
   - .specs/product/SCOPE-e18-wasm-only-tool-permissions.yaml
   - .specs/epics/e18-wasm-only-tool-permissions/epic.yaml
   - .specs/epics/e18-wasm-only-tool-permissions/e18s00-pi-oxidized-decision.md
-  - .specs/epics/e18-wasm-only-tool-permissions/e18s02-wasm-audit-writes.md
-  - .specs/epics/e18-wasm-only-tool-permissions/e18s02-tasks.yaml
+  - .specs/epics/e18-wasm-only-tool-permissions/e18s03-wasm-rule-saves.md
+  - .specs/epics/e18-wasm-only-tool-permissions/e18s03-tasks.yaml
   - .specs/security/epics/e18/THREAT_MODEL.md
-  - .specs/security/REVIEW.md
-  next_skill: release-branch
+  next_skill: develop-tdd
   context: >-
     e18s00, e18s01, and e18s02 are passing. Do not create a new bookmark. Stay
-    on favilo/e18s00-pi-oxidized-host. pi-oxidized-ext stays rejected. Use the
-    standalone NAPI package and pi-api. Do not push. Do not delete
-    extensions/tool-permissions/index.ts. WASM writes one audit record per
-    loaded decision, with the current fields and the supplied clock. A failed
-    write returns deny and writes nothing, and the host audit call does not
-    change the earlier tool decision. A missing native package still uses
-    the TypeScript logger until e18s06. Prompts, rule saves, path trust, and
-    tool execution stay put. Yolo mode and the .git/.jj boundary bug stay
-    deferred. audit-code passed. Next skill is release-branch. Do not push.
+    on favilo/e18s00-pi-oxidized-host. Do not release this branch yet. The
+    remaining e18 stories are internal while Rust becomes the main
+    implementation. pi-oxidized-ext stays rejected. Use the standalone NAPI
+    package and pi-api. Do not push. Do not delete
+    extensions/tool-permissions/index.ts. e18s03 is active. WASM must patch
+    the selected permissions.toml once, and a failed patch must not allow the
+    call. Prompts, audit writes, path trust, and tool execution stay put until
+    their own stories. The TypeScript load-failure fallback stays until
+    e18s06. Yolo mode and the .git/.jj boundary bug stay deferred. Do not push.
   blocker: null
   deferred_work:
   - Consolidate safeStringify and JSON formatting helpers into a shared utility module
@@ -170,4 +169,4 @@ metrics:
       calls: 2
       total_seconds: 2.0
       avg_seconds: 1.0
-  story_start: '2026-11-07T01:56:00Z'
+  story_start: '2026-11-12T19:21:32Z'
