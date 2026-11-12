@@ -13,6 +13,7 @@ pub enum NativeOperation {
     RegisterCallbacks,
     PathTrust,
     AuditWrite,
+    RuleSave,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, derive_more::FromStr)]
@@ -209,4 +210,24 @@ pub struct AuditWriteResponse {
     pub nonce: String,
     pub decision: String,
     pub records: i64,
+}
+
+#[napi(object)]
+pub struct RuleSaveRequest {
+    pub version: i64,
+    pub operation: String,
+    pub nonce: String,
+    pub source: String,
+    pub tool: String,
+    pub rule_json: String,
+}
+
+#[napi(object)]
+pub struct RuleSaveResponse {
+    pub version: i64,
+    pub operation: NativeOperation,
+    pub ok: bool,
+    pub nonce: String,
+    pub allowed: bool,
+    pub contents: String,
 }

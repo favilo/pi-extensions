@@ -43,6 +43,12 @@ required absolute-path form.
 - Declare every dependency in `extensions/tool-permissions/native/Cargo.toml`
   under `[workspace.dependencies]`. Member crates use `dependency.workspace =
   true` and do not pin their own versions.
+- Use strong types. Prefer enums, newtypes, and typestate over bare strings so
+  an invalid value does not compile. A NAPI request may carry strings; convert
+  those strings into domain types before doing any further work.
+- Return `thiserror` enums from Rust. Do not use `String` or `&str` as an
+  error type. Convert the typed error to the NAPI error only at the export
+  boundary.
 
 ## TDD
 

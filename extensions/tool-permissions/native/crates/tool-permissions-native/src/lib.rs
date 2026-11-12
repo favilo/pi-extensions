@@ -4,13 +4,15 @@ mod parser;
 mod path_trust;
 mod policy;
 mod registration;
+mod rule_save;
 
 pub use contract::{
     AuditWriteRequest, AuditWriteResponse, EvaluateRequest, EvaluateResponse, NativeOperation,
     NativeRegistrationRequest, NativeRegistrationResponse, ParseRequest, ParseResponse,
     ParsedSubcommand, PathTrustRequest, PathTrustResponse, PermissionDecision,
     PermissionEvaluationRequest, PermissionOrchestrationRequest, PermissionOrchestrationResponse,
-    PolicyPermission, PolicyRequest, PolicyResponse, ProbeRequest, ProbeResponse,
+    PolicyPermission, PolicyRequest, PolicyResponse, ProbeRequest, ProbeResponse, RuleSaveRequest,
+    RuleSaveResponse,
 };
 use napi::bindgen_prelude::Function;
 use napi::{Env, Error, Result};
@@ -123,6 +125,11 @@ pub fn write_audit(
     append: Function<String, bool>,
 ) -> Result<AuditWriteResponse> {
     audit::write(request, &audit::AppendCallback::new(&append)).map_err(Error::from_reason)
+}
+
+#[napi]
+pub fn save_rule(request: RuleSaveRequest) -> Result<RuleSaveResponse> {
+    rule_save::save(request).map_err(|error| Error::from_reason(error.to_string()))
 }
 
 #[cfg(test)]
