@@ -1225,7 +1225,7 @@ async function presentScrollablePermission(
                 ctx.ui.notify?.("No subcommands selected.", "warning");
                 return;
               }
-              if (saveSubcommandAllowRules(target, chosen)) {
+              if (saveSubcommandAllowRules(target, chosen, scope)) {
                 ctx.ui.notify?.(
                   `Saved ${scope} permission rules for ${chosen.length} subcommand(s).`,
                   "info",

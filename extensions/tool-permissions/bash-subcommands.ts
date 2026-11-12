@@ -1,7 +1,9 @@
 import { parseBashCommand, type ParsedSubcommand } from "./bash-parser.ts";
 import { parseWithNativeFallback } from "./native-parser-loader.ts";
-import { saveAllowedRule } from "./config.ts";
-import { resolveToolPermissionDecision } from "./index.ts";
+import {
+  resolveToolPermissionDecision,
+  saveToolPermissionRule,
+} from "./index.ts";
 
 export type SubcommandDecisionResult = {
   decision: "allow" | "deny" | "ask";
@@ -170,12 +172,19 @@ export function evaluateBashSubcommands(
 export function saveSubcommandAllowRules(
   targetPath: string,
   subcommands: string[],
+  scope: "user" | "project" = "user",
 ): boolean {
   if (!subcommands.length) return false;
   try {
     for (const sub of subcommands) {
       const pattern = `^${sub.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`;
-      saveAllowedRule(targetPath, "bash", { command: pattern });
+      const saved = saveToolPermissionRule({
+        destination: targetPath,
+        scope,
+        tool: "bash",
+        rule: { command: pattern },
+      });
+      if (!saved) return false;
     }
     return true;
   } catch {
