@@ -6,7 +6,9 @@ delta: MODIFIED
 spec: e18s03-wasm-rule-saves.md
 tasks:
   - id: 1
-    description: Add failing tests for user save, project save, duplicate protection, and failed-save denial. No new security findings in affected paths.
+    description: Add failing tests for user save, project save, duplicate
+      protection, and failed-save denial. No new security findings in affected
+      paths.
     verify: node --test extensions/tool-permissions/native-rule-save.test.ts
     risk: P0
     security: high
@@ -17,7 +19,8 @@ tasks:
         - "Contract Tests"
         - "Security Review"
   - id: 2
-    description: Add the Rust TOML patch operation for an already authorized destination and rule. No new security findings in affected paths.
+    description: Add the Rust TOML patch operation for an already authorized
+      destination and rule. No new security findings in affected paths.
     verify: cargo test --manifest-path extensions/tool-permissions/native/Cargo.toml
     risk: P0
     security: high

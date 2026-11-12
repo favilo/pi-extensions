@@ -401,6 +401,16 @@ export function recordToolAudit(entry: Omit<AuditEntry, "time">): void {
   audit(entry);
 }
 
+/** Save one approved rule. The stub does not write, so the project-save test stays red. */
+export function saveToolPermissionRule(_input: {
+  destination: string;
+  scope: "user" | "project";
+  tool: string;
+  rule: PermissionRule;
+}): boolean {
+  return false;
+}
+
 function compact(value: unknown, max = 2000): string {
   const text =
     typeof value === "string" ? value : JSON.stringify(value, null, 2);
