@@ -29,7 +29,7 @@ stories:
   - id: e18s03
     title: Move rule saves and permissions.toml patches into WASM
     bcps: 5
-    status: failing
+    status: passing
     delta: MODIFIED
     spec: e18s03-wasm-rule-saves.md
     tasks: e18s03-tasks.yaml

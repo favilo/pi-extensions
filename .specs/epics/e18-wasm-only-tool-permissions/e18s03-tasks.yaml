@@ -1,6 +1,6 @@
 story_id: e18s03
 title: Move rule saves and permissions.toml patches into WASM
-status: failing
+status: passing
 bcps: 5
 delta: MODIFIED
 spec: e18s03-wasm-rule-saves.md
@@ -12,7 +12,7 @@ tasks:
     verify: node --test extensions/tool-permissions/native-rule-save.test.ts
     risk: P0
     security: high
-    status: failing
+    status: passing
     allure:
       severity: critical
       categories:
@@ -24,7 +24,7 @@ tasks:
     verify: cargo test --manifest-path extensions/tool-permissions/native/Cargo.toml
     risk: P0
     security: high
-    status: failing
+    status: passing
     allure:
       severity: critical
       categories:
@@ -35,7 +35,7 @@ tasks:
     verify: node --test extensions/tool-permissions/native-rule-save.test.ts
     risk: P0
     security: high
-    status: failing
+    status: passing
     allure:
       severity: critical
       categories:
@@ -46,7 +46,7 @@ tasks:
     verify: npm run build:native && npm run check
     risk: P1
     security: high
-    status: failing
+    status: passing
     allure:
       severity: high
       categories:

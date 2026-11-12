@@ -93,7 +93,7 @@ planning:
     constraints:
     - Do not modify the e06 repair flow or child-private bridge catalog.
 handoff:
-  last_step_completed: started e18s03 on the existing bookmark. Release stays deferred while the Rust runtime becomes the owner of rule saves.
+  last_step_completed: npm run build:native && npm run check passed for e18s03. Typecheck, 21 native tests, and 345 extension tests passed.
   open_decisions: []
   required_reading:
   - .specs/planning-context.yaml
@@ -103,18 +103,20 @@ handoff:
   - .specs/epics/e18-wasm-only-tool-permissions/e18s03-wasm-rule-saves.md
   - .specs/epics/e18-wasm-only-tool-permissions/e18s03-tasks.yaml
   - .specs/security/epics/e18/THREAT_MODEL.md
-  next_skill: develop-tdd
+  next_skill: verify-work
   context: >-
-    e18s00, e18s01, and e18s02 are passing. Do not create a new bookmark. Stay
-    on favilo/e18s00-pi-oxidized-host. Do not release this branch yet. The
-    remaining e18 stories are internal while Rust becomes the main
-    implementation. pi-oxidized-ext stays rejected. Use the standalone NAPI
-    package and pi-api. Do not push. Do not delete
-    extensions/tool-permissions/index.ts. e18s03 is active. WASM must patch
-    the selected permissions.toml once, and a failed patch must not allow the
-    call. Prompts, audit writes, path trust, and tool execution stay put until
-    their own stories. The TypeScript load-failure fallback stays until
-    e18s06. Yolo mode and the .git/.jj boundary bug stay deferred. Do not push.
+    e18s00, e18s01, e18s02, and e18s03 are passing. Do not create a new
+    bookmark. Stay on favilo/e18s00-pi-oxidized-host. Do not release this
+    branch yet. The remaining e18 stories are internal while Rust becomes the
+    main implementation. pi-oxidized-ext stays rejected. Use the standalone
+    NAPI package and pi-api. Do not push. Do not delete
+    extensions/tool-permissions/index.ts. WASM patches one approved allow rule
+    into the selected permissions.toml as an array of tables. A repeated rule
+    stays one entry. A failed write keeps the previous file and does not allow
+    the call. User, project, and bash subcommand saves use that path. A missing
+    native package still uses the TypeScript saver until e18s06. Prompts, audit
+    writes, path trust, and tool execution stay put. Yolo mode and the .git/.jj
+    boundary bug stay deferred. Next skill is verify-work. Do not push.
   blocker: null
   deferred_work:
   - Consolidate safeStringify and JSON formatting helpers into a shared utility module
@@ -123,7 +125,7 @@ handoff:
   - Build e03 directory-local tool permissions after the higher-WSJF e04 fix
   - Add real Pi process integration tests after unit contracts are established
   - Apply yolo mode after the WASM path decision without bypassing an .aiignore deny or a path-trust diagnostic
-  verified_at: '2026-11-10T22:43:30Z'
+  verified_at: '2026-11-12T21:37:31Z'
 release:
   pr: https://github.com/favilo/pi-extensions/pull/14
   merged_commit: 841d91a0
