@@ -7,14 +7,11 @@ import {
 export const NATIVE_PROMPT_QUEUE_NONCE =
   "tool-permissions-prompt-queue" as const;
 
-export const PromptQueueDecision = Object.freeze({
-  Allow: "allow",
-  Deny: "deny",
-  Steer: "steer",
-} as const);
-
-export type PromptQueueDecision =
-  (typeof PromptQueueDecision)[keyof typeof PromptQueueDecision];
+export enum PromptQueueDecision {
+  Allow = "allow",
+  Deny = "deny",
+  Steer = "steer",
+}
 
 export type PromptQueueRequest = {
   version: typeof NATIVE_CONTRACT_VERSION;

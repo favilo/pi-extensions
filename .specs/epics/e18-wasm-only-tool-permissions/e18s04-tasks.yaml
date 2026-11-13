@@ -7,7 +7,7 @@ spec: e18s04-wasm-prompt-ui.md
 tasks:
   - id: 1
     description: Add failing tests for bound prompt decisions, queue order, steering isolation, and UI failure. No new security findings in affected paths.
-    verify: node --test extensions/tool-permissions/native-prompt-queue.test.ts
+    verify: tsx --test extensions/tool-permissions/native-prompt-queue.test.ts
     risk: P0
     security: high
     status: failing
@@ -29,7 +29,7 @@ tasks:
         - "Security Review"
   - id: 3
     description: Route the success-path prompt through WASM. No new security findings in affected paths.
-    verify: node --test extensions/tool-permissions/native-prompt-queue.test.ts
+    verify: tsx --test extensions/tool-permissions/native-prompt-queue.test.ts
     risk: P0
     security: high
     status: failing

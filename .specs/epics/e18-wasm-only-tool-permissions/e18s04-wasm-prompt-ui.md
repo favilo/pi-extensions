@@ -83,7 +83,7 @@ Tests report tool-call id, queue position, decision, and steering text. A mismat
 **Then** the tool call is denied and is not left queued as an allow.
 
 ## 18. Automated verification
-- `node --test extensions/tool-permissions/native-prompt-queue.test.ts`
+- `tsx --test extensions/tool-permissions/native-prompt-queue.test.ts`
 - `cargo test --manifest-path extensions/tool-permissions/native/Cargo.toml`
 - `npm run build:native && npm run check`
 
