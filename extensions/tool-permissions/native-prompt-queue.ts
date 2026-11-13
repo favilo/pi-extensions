@@ -1,4 +1,8 @@
 import { NATIVE_CONTRACT_VERSION } from "./native-contract.ts";
+import {
+  requireNativePackage,
+  resolveNativePackagePath,
+} from "./native-package.ts";
 
 export const NATIVE_PROMPT_QUEUE_NONCE =
   "tool-permissions-prompt-queue" as const;
@@ -24,19 +28,86 @@ export type PromptQueueResult = {
 
 export type PromptPresenter = (prompt: {
   toolCallId: string;
-}) => PromptQueueDecision | Promise<PromptQueueDecision>;
+}) => PromptQueueDecision;
 
-/** Stub. Returns a deny with no tool-call id until WASM owns the prompt. */
-export async function presentBoundPrompt(
-  request: PromptQueueRequest,
-  _present: PromptPresenter,
-): Promise<PromptQueueResult> {
+type NativePromptQueueRequest = {
+  version: number;
+  operation: string;
+  nonce: string;
+  toolCallId: string;
+};
+
+type NativePromptQueue = {
+  decidePrompt(
+    request: NativePromptQueueRequest,
+    present: (toolCallId: string) => string,
+  ): PromptQueueResult;
+};
+
+function failedResult(request: PromptQueueRequest): PromptQueueResult {
   return {
-    version: request.version,
+    version: NATIVE_CONTRACT_VERSION,
     operation: "prompt_queue",
     ok: false,
     nonce: request.nonce,
-    toolCallId: "",
+    toolCallId: request.toolCallId,
     decision: "deny",
   };
+}
+
+function isPromptDecision(value: unknown): value is PromptQueueDecision {
+  return value === "allow" || value === "deny" || value === "steer";
+}
+
+function isBoundResult(
+  value: unknown,
+  request: PromptQueueRequest,
+): value is PromptQueueResult {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const result = value as Record<string, unknown>;
+  return (
+    result.version === NATIVE_CONTRACT_VERSION &&
+    result.operation === "prompt_queue" &&
+    result.ok === true &&
+    result.nonce === request.nonce &&
+    result.toolCallId === request.toolCallId &&
+    isPromptDecision(result.decision)
+  );
+}
+
+/** Ask WASM to open one prompt and return that prompt's decision. */
+export async function presentBoundPrompt(
+  request: PromptQueueRequest,
+  present: PromptPresenter,
+): Promise<PromptQueueResult> {
+  if (
+    request.version !== NATIVE_CONTRACT_VERSION ||
+    request.operation !== "prompt_queue" ||
+    request.toolCallId.length === 0
+  ) {
+    return failedResult(request);
+  }
+  const packagePath = resolveNativePackagePath();
+  if (!packagePath) return failedResult(request);
+  let native: Partial<NativePromptQueue>;
+  try {
+    native = requireNativePackage(packagePath) as Partial<NativePromptQueue>;
+  } catch {
+    return failedResult(request);
+  }
+  if (typeof native.decidePrompt !== "function") return failedResult(request);
+  try {
+    const result = native.decidePrompt(
+      {
+        version: request.version,
+        operation: request.operation,
+        nonce: request.nonce,
+        toolCallId: request.toolCallId,
+      },
+      (toolCallId) => present({ toolCallId }),
+    );
+    return isBoundResult(result, request) ? result : failedResult(request);
+  } catch {
+    return failedResult(request);
+  }
 }

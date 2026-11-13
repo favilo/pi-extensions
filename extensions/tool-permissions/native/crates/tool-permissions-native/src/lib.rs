@@ -3,6 +3,7 @@ mod contract;
 mod parser;
 mod path_trust;
 mod policy;
+mod prompt_queue;
 mod registration;
 mod rule_save;
 
@@ -11,7 +12,8 @@ pub use contract::{
     NativeRegistrationRequest, NativeRegistrationResponse, ParseRequest, ParseResponse,
     ParsedSubcommand, PathTrustRequest, PathTrustResponse, PermissionDecision,
     PermissionEvaluationRequest, PermissionOrchestrationRequest, PermissionOrchestrationResponse,
-    PolicyPermission, PolicyRequest, PolicyResponse, ProbeRequest, ProbeResponse, RuleSaveRequest,
+    PolicyPermission, PolicyRequest, PolicyResponse, ProbeRequest, ProbeResponse,
+    PromptQueueDecision, PromptQueueRequest, PromptQueueResponse, RuleSaveRequest,
     RuleSaveResponse,
 };
 use napi::bindgen_prelude::Function;
@@ -130,6 +132,15 @@ pub fn write_audit(
 #[napi]
 pub fn save_rule(request: RuleSaveRequest) -> Result<RuleSaveResponse> {
     rule_save::save(request).map_err(|error| Error::from_reason(error.to_string()))
+}
+
+#[napi]
+pub fn decide_prompt(
+    request: PromptQueueRequest,
+    present: Function<String, String>,
+) -> Result<PromptQueueResponse> {
+    prompt_queue::present(request, &prompt_queue::PresentCallback::new(&present))
+        .map_err(|error| Error::from_reason(error.to_string()))
 }
 
 #[cfg(test)]

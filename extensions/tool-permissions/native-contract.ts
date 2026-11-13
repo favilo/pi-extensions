@@ -8,7 +8,8 @@ export type NativeOperation =
   | "register_callbacks"
   | "path_trust"
   | "audit_write"
-  | "rule_save";
+  | "rule_save"
+  | "prompt_queue";
 
 export type PermissionDecision = "allow" | "deny" | "ask";
 

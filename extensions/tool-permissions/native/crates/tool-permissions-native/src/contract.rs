@@ -14,6 +14,7 @@ pub enum NativeOperation {
     PathTrust,
     AuditWrite,
     RuleSave,
+    PromptQueue,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, derive_more::FromStr)]
@@ -230,4 +231,30 @@ pub struct RuleSaveResponse {
     pub nonce: String,
     pub allowed: bool,
     pub contents: String,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[napi(string_enum = "snake_case")]
+pub enum PromptQueueDecision {
+    Allow,
+    Deny,
+    Steer,
+}
+
+#[napi(object)]
+pub struct PromptQueueRequest {
+    pub version: i64,
+    pub operation: String,
+    pub nonce: String,
+    pub tool_call_id: String,
+}
+
+#[napi(object)]
+pub struct PromptQueueResponse {
+    pub version: i64,
+    pub operation: NativeOperation,
+    pub ok: bool,
+    pub nonce: String,
+    pub tool_call_id: String,
+    pub decision: PromptQueueDecision,
 }

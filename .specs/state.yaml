@@ -1,7 +1,7 @@
 active_flow: develop-tdd
 active_epic_id: e18
-active_story_id: e18s03
-active_story: Move rule saves and permissions.toml patches into WASM
+active_story_id: e18s04
+active_story: Move the prompt UI, steering editor, and prompt queue into WASM
 active_bug_id: null
 git:
   bookmark: favilo/e18s00-pi-oxidized-host
@@ -93,38 +93,41 @@ planning:
     constraints:
     - Do not modify the e06 repair flow or child-private bridge catalog.
 handoff:
-  last_step_completed: commit-message drafted for the e18s03 verification record. The working copy is docs only.
-  open_decisions: []
+  last_step_completed: RED test committed for one bound allow. The GREEN prompt binding is uncommitted and unverified.
+  open_decisions:
+  - The host presenter is synchronous. The real Pi prompt is async and is not wired.
+  - Queue order, steering isolation, and UI-failure deny are not tested yet.
   required_reading:
   - .specs/planning-context.yaml
   - .specs/product/SCOPE-e18-wasm-only-tool-permissions.yaml
   - .specs/epics/e18-wasm-only-tool-permissions/epic.yaml
   - .specs/epics/e18-wasm-only-tool-permissions/e18s00-pi-oxidized-decision.md
-  - .specs/epics/e18-wasm-only-tool-permissions/e18s03-wasm-rule-saves.md
-  - .specs/epics/e18-wasm-only-tool-permissions/e18s03-tasks.yaml
+  - .specs/epics/e18-wasm-only-tool-permissions/e18s04-wasm-prompt-ui.md
+  - .specs/epics/e18-wasm-only-tool-permissions/e18s04-tasks.yaml
   - .specs/security/epics/e18/THREAT_MODEL.md
   - .specs/security/REVIEW.md
-  - .specs/verifications/e18s03-verify.yaml
   next_skill: develop-tdd
   context: >-
-    e18s00, e18s01, e18s02, and e18s03 are passing. verify-work and audit-code
-    passed for e18s03. Do not create a new bookmark. Stay on
-    favilo/e18s00-pi-oxidized-host. Do not run release-branch. The next story
-    is e18s04, Move the prompt UI, steering editor, and prompt queue into WASM.
-    The remaining e18 stories are internal while Rust becomes the main
-    implementation. pi-oxidized-ext stays rejected. Use the standalone NAPI
-    package and pi-api. Do not push. Do not delete
-    extensions/tool-permissions/index.ts. WASM patches one approved allow rule
-    into the selected permissions.toml as an array of tables. A repeated rule
-    stays one entry. A failed write keeps the previous file and does not allow
-    the call. User, project, and bash subcommand saves use that path. A missing
-    native package still uses the TypeScript saver until e18s06. Prompts, audit
-    writes, path trust, and tool execution stay put. Yolo mode and the .git/.jj
-    boundary bug stay deferred. The saver rewrites the whole TOML file, so
-    comments are not preserved. scope is stored on the request and is not read
-    by the saver. A failed ctrl+e save does not notify. The uncommitted change
-    is the e18s03 verification record only. Next skill is develop-tdd for
-    e18s04. Do not push.
+    Work in .workspaces/e18s04-prompt-queue (jj workspace e18s04-prompt-queue@,
+    change mqmsyynq). The default checkout stays on
+    favilo/e18s00-pi-oxidized-host at the RED commit oyxktqxp. Do not build
+    WASM or run npm run build:native in the default checkout. Do not create a
+    new bookmark. Do not move the bookmark until the GREEN commit is made from
+    this workspace. Do not push. Do not run release-branch. Do not delete
+    extensions/tool-permissions/index.ts. pi-oxidized-ext stays rejected. Use
+    the standalone NAPI package and pi-api. e18s00 through e18s03 are passing.
+    e18s04 task 1 has one RED test, committed on the parent: an allow must stay
+    bound to the tool-call id that opened the prompt. The stub returns deny
+    and an empty id, and node --test
+    extensions/tool-permissions/native-prompt-queue.test.ts failed on that
+    assertion. The uncommitted GREEN on mqmsyynq adds decide_prompt, a
+    PromptHost callback, and presentBoundPrompt. It is not formatted, not
+    cargo-tested, and not built. This worktree has no node_modules; run npm ci
+    before the native build or the node test. Next: cargo fmt, cargo test,
+    npm ci, npm run build:native, then the node test. Commit GREEN only after
+    that test passes. Leave queue order, steering text, and UI failure for
+    later vertical slices. Threat 5 is queue mixup. Yolo mode and the
+    .git/.jj boundary bug stay deferred.
   blocker: null
   deferred_work:
   - Consolidate safeStringify and JSON formatting helpers into a shared utility module
@@ -133,7 +136,7 @@ handoff:
   - Build e03 directory-local tool permissions after the higher-WSJF e04 fix
   - Add real Pi process integration tests after unit contracts are established
   - Apply yolo mode after the WASM path decision without bypassing an .aiignore deny or a path-trust diagnostic
-  verified_at: '2026-11-13T00:24:52Z'
+  verified_at: '2026-11-13T21:36:00Z'
 release:
   pr: https://github.com/favilo/pi-extensions/pull/14
   merged_commit: 841d91a0
@@ -144,7 +147,7 @@ release:
 epic_cycle:
   step: 1
   current_step: 1
-  story_bcps: 5
+  story_bcps: 8
   security_review: pass
   plan_consistency: pass
 metrics:
