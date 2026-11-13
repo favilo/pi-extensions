@@ -111,3 +111,29 @@ test("a second prompt waits until the active prompt settles", async () => {
   });
   assert.deepEqual(presented, ["call-first", "call-second"]);
 });
+
+test("steering stays bound to the prompt that submitted it", async () => {
+  const toolCallId = "call-steering";
+  const result = await presentBoundPrompt(
+    {
+      version: NATIVE_CONTRACT_VERSION,
+      operation: "prompt_queue",
+      nonce: NATIVE_PROMPT_QUEUE_NONCE,
+      toolCallId,
+    },
+    async () => ({
+      decision: PromptQueueDecision.Steer,
+      steering: "use the project policy instead",
+    }),
+  );
+
+  assert.deepEqual(result, {
+    version: NATIVE_CONTRACT_VERSION,
+    operation: "prompt_queue",
+    ok: true,
+    nonce: NATIVE_PROMPT_QUEUE_NONCE,
+    toolCallId,
+    decision: PromptQueueDecision.Steer,
+    steering: "use the project policy instead",
+  });
+});
