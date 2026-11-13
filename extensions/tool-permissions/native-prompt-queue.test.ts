@@ -36,3 +36,25 @@ test("an allow stays bound to the tool-call that opened the prompt", async () =>
     { ok: true, toolCallId, decision: "allow" },
   );
 });
+
+test("an asynchronous prompt allow stays bound to its tool-call", async () => {
+  const toolCallId = "call-async-allow";
+  const result = await presentBoundPrompt(
+    {
+      version: NATIVE_CONTRACT_VERSION,
+      operation: "prompt_queue",
+      nonce: NATIVE_PROMPT_QUEUE_NONCE,
+      toolCallId,
+    },
+    async () => "allow",
+  );
+
+  assert.deepEqual(
+    {
+      ok: result.ok,
+      toolCallId: result.toolCallId,
+      decision: result.decision,
+    },
+    { ok: true, toolCallId, decision: "allow" },
+  );
+});
