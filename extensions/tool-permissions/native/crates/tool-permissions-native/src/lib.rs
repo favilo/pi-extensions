@@ -13,8 +13,8 @@ pub use contract::{
     ParsedSubcommand, PathTrustRequest, PathTrustResponse, PermissionDecision,
     PermissionEvaluationRequest, PermissionOrchestrationRequest, PermissionOrchestrationResponse,
     PolicyPermission, PolicyRequest, PolicyResponse, ProbeRequest, ProbeResponse,
-    PromptQueueDecision, PromptQueueRequest, PromptQueueResponse, RuleSaveRequest,
-    RuleSaveResponse,
+    PromptQueueDecision, PromptQueueRequest, PromptQueueResolution, PromptQueueResponse,
+    RuleSaveRequest, RuleSaveResponse,
 };
 use napi::bindgen_prelude::{Function, PromiseRaw};
 use napi::{Env, Error, Result};
@@ -137,7 +137,7 @@ pub fn save_rule(request: RuleSaveRequest) -> Result<RuleSaveResponse> {
 #[napi]
 pub fn decide_prompt<'env>(
     request: PromptQueueRequest,
-    present: Function<'env, String, PromiseRaw<'env, PromptQueueDecision>>,
+    present: Function<'env, String, PromiseRaw<'env, PromptQueueResolution>>,
 ) -> Result<PromiseRaw<'env, PromptQueueResponse>> {
     prompt_queue::validate(&request).map_err(|error| Error::from_reason(error.to_string()))?;
     let tool_call_id = request.tool_call_id.clone();

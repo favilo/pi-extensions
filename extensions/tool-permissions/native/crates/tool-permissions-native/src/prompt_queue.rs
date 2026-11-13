@@ -1,6 +1,6 @@
 use crate::CONTRACT_VERSION;
 use crate::contract::{
-    NativeOperation, PromptQueueDecision, PromptQueueRequest, PromptQueueResponse,
+    NativeOperation, PromptQueueRequest, PromptQueueResolution, PromptQueueResponse,
 };
 use thiserror::Error;
 
@@ -27,16 +27,9 @@ pub fn validate(request: &PromptQueueRequest) -> Result<(), PromptQueueError> {
 
 pub fn complete(
     request: PromptQueueRequest,
-    decision: PromptQueueDecision,
+    resolution: PromptQueueResolution,
 ) -> Result<PromptQueueResponse, PromptQueueError> {
     validate(&request)?;
-    response(request, decision)
-}
-
-fn response(
-    request: PromptQueueRequest,
-    decision: PromptQueueDecision,
-) -> Result<PromptQueueResponse, PromptQueueError> {
     let tool_call_id = ToolCallId::parse(&request.tool_call_id)?;
     Ok(PromptQueueResponse {
         version: CONTRACT_VERSION,
@@ -44,7 +37,8 @@ fn response(
         ok: true,
         nonce: request.nonce,
         tool_call_id: tool_call_id.into_string(),
-        decision,
+        decision: resolution.decision,
+        steering: resolution.steering,
     })
 }
 
@@ -65,8 +59,8 @@ impl ToolCallId {
 
 #[cfg(test)]
 mod tests {
-    use super::{PromptQueueDecision, complete};
-    use crate::contract::PromptQueueRequest;
+    use super::complete;
+    use crate::contract::{PromptQueueDecision, PromptQueueRequest, PromptQueueResolution};
 
     #[test]
     fn allow_stays_bound_to_the_tool_call_that_opened_the_prompt() {
@@ -77,7 +71,10 @@ mod tests {
                 nonce: "tool-permissions-prompt-queue".into(),
                 tool_call_id: "call-allow".into(),
             },
-            PromptQueueDecision::Allow,
+            PromptQueueResolution {
+                decision: PromptQueueDecision::Allow,
+                steering: None,
+            },
         )
         .unwrap();
 

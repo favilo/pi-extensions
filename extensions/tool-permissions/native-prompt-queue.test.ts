@@ -25,7 +25,7 @@ test("an allow stays bound to the tool-call that opened the prompt", async () =>
       nonce: NATIVE_PROMPT_QUEUE_NONCE,
       toolCallId,
     },
-    () => PromptQueueDecision.Allow,
+    () => ({ decision: PromptQueueDecision.Allow }),
   );
   console.log(
     JSON.stringify({
@@ -55,7 +55,7 @@ test("an asynchronous prompt allow stays bound to its tool-call", async () => {
       nonce: NATIVE_PROMPT_QUEUE_NONCE,
       toolCallId,
     },
-    async () => PromptQueueDecision.Allow,
+    async () => ({ decision: PromptQueueDecision.Allow }),
   );
 
   assert.deepEqual(
@@ -79,13 +79,13 @@ test("a second prompt waits until the active prompt settles", async () => {
   });
   const first = presentBoundPrompt(requestFor("call-first"), async (prompt) => {
     presented.push(prompt.toolCallId);
-    return activeDecision.promise;
+    return activeDecision.promise.then((decision) => ({ decision }));
   });
   const second = presentBoundPrompt(
     requestFor("call-second"),
     async (prompt) => {
       presented.push(prompt.toolCallId);
-      return PromptQueueDecision.Deny;
+      return { decision: PromptQueueDecision.Deny };
     },
   );
 

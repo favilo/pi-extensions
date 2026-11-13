@@ -20,6 +20,11 @@ export type PromptQueueRequest = {
   toolCallId: string;
 };
 
+export type PromptResolution = {
+  decision: PromptQueueDecision;
+  steering?: string;
+};
+
 export type PromptQueueResult = {
   version: typeof NATIVE_CONTRACT_VERSION;
   operation: "prompt_queue";
@@ -32,7 +37,7 @@ export type PromptQueueResult = {
 
 export type PromptPresenter = (prompt: {
   toolCallId: string;
-}) => PromptQueueDecision | Promise<PromptQueueDecision>;
+}) => PromptResolution | Promise<PromptResolution>;
 
 type NativePromptQueueRequest = {
   version: number;
@@ -44,7 +49,7 @@ type NativePromptQueueRequest = {
 type NativePromptQueue = {
   decidePrompt(
     request: NativePromptQueueRequest,
-    present: (toolCallId: string) => Promise<PromptQueueDecision>,
+    present: (toolCallId: string) => Promise<PromptResolution>,
   ): Promise<PromptQueueResult>;
 };
 
@@ -92,7 +97,8 @@ function isBoundResult(
     result.ok === true &&
     result.nonce === request.nonce &&
     result.toolCallId === request.toolCallId &&
-    isPromptDecision(result.decision)
+    isPromptDecision(result.decision) &&
+    (result.steering === undefined || typeof result.steering === "string")
   );
 }
 

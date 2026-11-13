@@ -250,6 +250,12 @@ pub struct PromptQueueRequest {
 }
 
 #[napi(object)]
+pub struct PromptQueueResolution {
+    pub decision: PromptQueueDecision,
+    pub steering: Option<String>,
+}
+
+#[napi(object)]
 pub struct PromptQueueResponse {
     pub version: i64,
     pub operation: NativeOperation,
@@ -257,4 +263,5 @@ pub struct PromptQueueResponse {
     pub nonce: String,
     pub tool_call_id: String,
     pub decision: PromptQueueDecision,
+    pub steering: Option<String>,
 }
