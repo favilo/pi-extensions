@@ -8,6 +8,14 @@ import {
   presentBoundPrompt,
 } from "./native-prompt-queue.ts";
 
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((settle) => {
+    resolve = settle;
+  });
+  return { promise, resolve };
+}
+
 test("an allow stays bound to the tool-call that opened the prompt", async () => {
   const toolCallId = "call-allow";
   const result = await presentBoundPrompt(
@@ -58,4 +66,44 @@ test("an asynchronous prompt allow stays bound to its tool-call", async () => {
     },
     { ok: true, toolCallId, decision: PromptQueueDecision.Allow },
   );
+});
+
+test("a second prompt waits until the active prompt settles", async () => {
+  const activeDecision = deferred<PromptQueueDecision>();
+  const presented: string[] = [];
+  const requestFor = (toolCallId: string) => ({
+    version: NATIVE_CONTRACT_VERSION,
+    operation: "prompt_queue" as const,
+    nonce: NATIVE_PROMPT_QUEUE_NONCE,
+    toolCallId,
+  });
+  const first = presentBoundPrompt(requestFor("call-first"), async (prompt) => {
+    presented.push(prompt.toolCallId);
+    return activeDecision.promise;
+  });
+  const second = presentBoundPrompt(requestFor("call-second"), async (prompt) => {
+    presented.push(prompt.toolCallId);
+    return PromptQueueDecision.Deny;
+  });
+
+  assert.deepEqual(presented, ["call-first"]);
+  activeDecision.resolve(PromptQueueDecision.Allow);
+
+  assert.deepEqual(await first, {
+    version: NATIVE_CONTRACT_VERSION,
+    operation: "prompt_queue",
+    ok: true,
+    nonce: NATIVE_PROMPT_QUEUE_NONCE,
+    toolCallId: "call-first",
+    decision: PromptQueueDecision.Allow,
+  });
+  assert.deepEqual(await second, {
+    version: NATIVE_CONTRACT_VERSION,
+    operation: "prompt_queue",
+    ok: true,
+    nonce: NATIVE_PROMPT_QUEUE_NONCE,
+    toolCallId: "call-second",
+    decision: PromptQueueDecision.Deny,
+  });
+  assert.deepEqual(presented, ["call-first", "call-second"]);
 });
