@@ -4,6 +4,12 @@ status: passing
 bcps: 5
 delta: MODIFIED
 spec: e18s03-wasm-rule-saves.md
+dependencies:
+  - name: thiserror
+    version: 2.0.21
+    registry: crates.io
+    tag: "[OK]"
+    note: Standard Rust error-type crate. No slopcheck binary is installed in this environment. The lockfile already contained thiserror 1.0.69 through another crate.
 tasks:
   - id: 1
     description: Add failing tests for user save, project save, duplicate

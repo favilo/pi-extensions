@@ -1,0 +1,103 @@
+story_id: e18s03
+verified_at: "2026-11-13T00:24:52Z"
+verifier: verify-work
+status: passed
+risk: P0
+vcs:
+  kind: jj
+  working_copy: uqppwwxzrsrz
+  parent: nzmoroxumrtv
+  bookmark_ancestor: favilo/e18s00-pi-oxidized-host
+  not_main: true
+phases:
+  branch:
+    passed: true
+    note: "Working copy descends from favilo/e18s00-pi-oxidized-host and is not main (vmyzxzpk). The bookmark is not pointed at the working copy. No open PR, so gh pr checks did not run."
+  preflight:
+    passed: true
+    command: "bash $BIGPOWERS_ROOT/scripts/bp-read-agents.sh --print"
+    note: "AGENTS.md has no Preflight section. bp-timing.sh could not start because python3 lacks PyYAML. Mechanical commands came from package.json and the story tasks."
+  smoke:
+    passed: true
+    note: "Library extension. No server process and no CLI binary. Cold-start is the native release rebuild inside the terminal verdict."
+  task_verification:
+    passed: true
+    tasks:
+      - id: 1
+        command: "node --test extensions/tool-permissions/native-rule-save.test.ts"
+        exit_code: 0
+        note: "6 passed, 0 failed, duration_ms 802.503333"
+      - id: 2
+        command: "cargo test --manifest-path extensions/tool-permissions/native/Cargo.toml"
+        exit_code: 0
+        note: "21 library tests passed, including the rule-save patch test."
+      - id: 3
+        command: "node --test extensions/tool-permissions/native-rule-save.test.ts"
+        exit_code: 0
+        note: "The same six tests passed again inside npm run test:preflight."
+      - id: 4
+        command: "npm run build:native && npm run check"
+        exit_code: 0
+  build:
+    passed: true
+    command: "npm run build:native"
+  typecheck:
+    passed: true
+    command: "npm run typecheck"
+  lint:
+    passed: true
+    note: "package.json has no lint script. tsc --noEmit passed inside npm run check."
+  tests:
+    passed: true
+    command: "npm run test:preflight"
+    coverage: "345 passed, 0 failed"
+  terminal_verdict:
+    command: "npm run build:native && npm run check"
+    exit_code: 0
+    captured_at: "2026-11-13T00:24:52Z"
+    note: "Single contiguous run, completed before this timestamp. Release WASM build finished. tsc --noEmit passed. cargo test passed 21 tests. node --test passed 345 tests in 5670.304166 ms. check-test-guard printed PASS."
+  security:
+    passed: true
+    report: ".specs/security/REVIEW.md"
+    note: "No HIGH finding at confidence 8 or above. WASM returns patched text and does not open the destination. A failed replace keeps the previous file and does not allow. The loaded native path does not also call the TypeScript saver."
+  blind_spots:
+    passed: true
+    command: "bash $BIGPOWERS_ROOT/scripts/check-blind-spots.sh"
+    note: "0 HIGH, 7 MEDIUM double-tag findings on older stories. Exit 0. The script was started with bash and its absolute path."
+  completeness_critic:
+    passed: true
+    blockers: 0
+    warnings: 1
+    note: "WARNING: the critic reads the first word of the prose active_story title (Move) instead of active_story_id e18s03, so the zero-tag check was skipped. Exit 0."
+  nfr:
+    passed: true
+    report: ".specs/verifications/NFR-e18s03.json"
+  wiki_lint:
+    passed: true
+    note: "No specs/skills-wiki or specs/conventions-wiki directory exists, so there are no stale skill pages and no orphan convention pages."
+  manual:
+    passed: true
+    steps:
+      - step: "A user save patches the approved rule once"
+        expected: "The selected permissions.toml contains that rule once and the current loader reads it back"
+        actual: "The user-save test printed ok true and allowed true. parsePermissions read one matching allow rule and an empty deny list."
+        passed: true
+      - step: "A project save patches the approved rule once"
+        expected: "The project permissions.toml changes and contains the approved rule once"
+        actual: "The project-save test printed allowed true and rules 1. The file bytes changed and the loader read that one rule."
+        passed: true
+      - step: "Saving the same rule twice leaves one allow rule"
+        expected: "A repeated rule, including the same fields in another order, stays one entry"
+        actual: "The duplicate test and the field-order test each printed rules 1 and passed."
+        passed: true
+      - step: "A failed save keeps the previous file and does not allow"
+        expected: "The previous contents remain, the failure is reported, and the call is not allowed as a saved rule"
+        actual: "The failed-save test printed ok false and allowed false. The file bytes stayed equal to the original contents."
+        passed: true
+      - step: "A bash subcommand save uses the same WASM patch"
+        expected: "The subcommand saver writes the same file bytes as one direct WASM save of the approved command rule"
+        actual: "The subcommand test printed allowed true and rules 1. The destination bytes matched the direct WASM save."
+        passed: true
+  gaps:
+    closed: true
+    items: []

@@ -94,3 +94,15 @@ The earlier note that the registered handler ignored the WASM decision is closed
 WASM builds one JSON line from the supplied decision fields and appends it through the host callback. It does not open the log itself, spawn a shell, open a network connection, or copy `permissions.toml` into the record. The host chooses the dated log path from its own home directory. A failed append returns `ok: false`, `records: 0`, and `decision: deny`. Invalid contract output is not accepted as a successful write. When the native package path resolves, the host skips the TypeScript writer, so the success path does not append a second copy.
 
 `index.ts` `audit()` does not apply the returned deny to the tool result. The permission decision is made before the audit write, and the existing TypeScript logger also warns and leaves that decision unchanged. Moving tool execution is outside this story. No command injection, path-traversal allow, authorization bypass, secret exposure, or unsafe deserialization finding reached confidence 8.
+
+## e18s03 WASM rule saves
+
+- Reviewed: 2026-11-13T00:24:52Z
+- Scope: `txkuorvq..nzmoroxu` rule-save changes in `extensions/tool-permissions/native/crates/tool-permissions-native/src/rule_save.rs`, `extensions/tool-permissions/native-rule-save.ts`, `saveToolPermissionRule` in `extensions/tool-permissions/index.ts`, and `saveSubcommandAllowRules` in `extensions/tool-permissions/bash-subcommands.ts`
+- Result: **PASS — no reportable HIGH findings**
+
+WASM `save_rule` returns patched TOML text. It does not open the destination, spawn a process, or open a network connection. The host reads the selected file, accepts the patched text only when the contract, nonce, `ok`, and `allowed` match, and replaces the destination through a temporary file and `rename`. A failed read, patch, or replace returns `ok: false` and `allowed: false`. The failed-save test kept the previous file bytes. The prompt returns before `allow_pattern` when that save returns false.
+
+When the native package path resolves, the host does not also call `saveAllowedRule`, so the success path does not append a second copy. A missing package still uses the TypeScript saver until e18s06. The host chooses the destination: a project save uses the trusted project policy path, and an untrusted directory is refused before the save. Rule values are parsed as a JSON object of strings, checked as regular expressions, and written as TOML strings. An invalid rule or file shape errors and is not written. A repeated rule stays one allow entry.
+
+No command injection, path-traversal allow, authorization bypass, secret exposure, or unsafe deserialization finding reached confidence 8.

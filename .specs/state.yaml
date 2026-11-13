@@ -93,7 +93,7 @@ planning:
     constraints:
     - Do not modify the e06 repair flow or child-private bridge catalog.
 handoff:
-  last_step_completed: npm run build:native && npm run check passed for e18s03. Typecheck, 21 native tests, and 345 extension tests passed.
+  last_step_completed: commit-message drafted for the e18s03 verification record. The working copy is docs only.
   open_decisions: []
   required_reading:
   - .specs/planning-context.yaml
@@ -103,20 +103,28 @@ handoff:
   - .specs/epics/e18-wasm-only-tool-permissions/e18s03-wasm-rule-saves.md
   - .specs/epics/e18-wasm-only-tool-permissions/e18s03-tasks.yaml
   - .specs/security/epics/e18/THREAT_MODEL.md
-  next_skill: verify-work
+  - .specs/security/REVIEW.md
+  - .specs/verifications/e18s03-verify.yaml
+  next_skill: develop-tdd
   context: >-
-    e18s00, e18s01, e18s02, and e18s03 are passing. Do not create a new
-    bookmark. Stay on favilo/e18s00-pi-oxidized-host. Do not release this
-    branch yet. The remaining e18 stories are internal while Rust becomes the
-    main implementation. pi-oxidized-ext stays rejected. Use the standalone
-    NAPI package and pi-api. Do not push. Do not delete
+    e18s00, e18s01, e18s02, and e18s03 are passing. verify-work and audit-code
+    passed for e18s03. Do not create a new bookmark. Stay on
+    favilo/e18s00-pi-oxidized-host. Do not run release-branch. The next story
+    is e18s04, Move the prompt UI, steering editor, and prompt queue into WASM.
+    The remaining e18 stories are internal while Rust becomes the main
+    implementation. pi-oxidized-ext stays rejected. Use the standalone NAPI
+    package and pi-api. Do not push. Do not delete
     extensions/tool-permissions/index.ts. WASM patches one approved allow rule
     into the selected permissions.toml as an array of tables. A repeated rule
     stays one entry. A failed write keeps the previous file and does not allow
     the call. User, project, and bash subcommand saves use that path. A missing
     native package still uses the TypeScript saver until e18s06. Prompts, audit
     writes, path trust, and tool execution stay put. Yolo mode and the .git/.jj
-    boundary bug stay deferred. Next skill is verify-work. Do not push.
+    boundary bug stay deferred. The saver rewrites the whole TOML file, so
+    comments are not preserved. scope is stored on the request and is not read
+    by the saver. A failed ctrl+e save does not notify. The uncommitted change
+    is the e18s03 verification record only. Next skill is develop-tdd for
+    e18s04. Do not push.
   blocker: null
   deferred_work:
   - Consolidate safeStringify and JSON formatting helpers into a shared utility module
@@ -125,7 +133,7 @@ handoff:
   - Build e03 directory-local tool permissions after the higher-WSJF e04 fix
   - Add real Pi process integration tests after unit contracts are established
   - Apply yolo mode after the WASM path decision without bypassing an .aiignore deny or a path-trust diagnostic
-  verified_at: '2026-11-12T21:37:31Z'
+  verified_at: '2026-11-13T00:24:52Z'
 release:
   pr: https://github.com/favilo/pi-extensions/pull/14
   merged_commit: 841d91a0
