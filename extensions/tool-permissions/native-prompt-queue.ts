@@ -7,7 +7,14 @@ import {
 export const NATIVE_PROMPT_QUEUE_NONCE =
   "tool-permissions-prompt-queue" as const;
 
-export type PromptQueueDecision = "allow" | "deny" | "steer";
+export const PromptQueueDecision = Object.freeze({
+  Allow: "allow",
+  Deny: "deny",
+  Steer: "steer",
+} as const);
+
+export type PromptQueueDecision =
+  (typeof PromptQueueDecision)[keyof typeof PromptQueueDecision];
 
 export type PromptQueueRequest = {
   version: typeof NATIVE_CONTRACT_VERSION;
@@ -28,7 +35,7 @@ export type PromptQueueResult = {
 
 export type PromptPresenter = (prompt: {
   toolCallId: string;
-}) => PromptQueueDecision;
+}) => PromptQueueDecision | Promise<PromptQueueDecision>;
 
 type NativePromptQueueRequest = {
   version: number;
@@ -40,8 +47,8 @@ type NativePromptQueueRequest = {
 type NativePromptQueue = {
   decidePrompt(
     request: NativePromptQueueRequest,
-    present: (toolCallId: string) => string,
-  ): PromptQueueResult;
+    present: (toolCallId: string) => Promise<PromptQueueDecision>,
+  ): Promise<PromptQueueResult>;
 };
 
 function failedResult(request: PromptQueueRequest): PromptQueueResult {
@@ -51,12 +58,14 @@ function failedResult(request: PromptQueueRequest): PromptQueueResult {
     ok: false,
     nonce: request.nonce,
     toolCallId: request.toolCallId,
-    decision: "deny",
+    decision: PromptQueueDecision.Deny,
   };
 }
 
 function isPromptDecision(value: unknown): value is PromptQueueDecision {
-  return value === "allow" || value === "deny" || value === "steer";
+  return Object.values(PromptQueueDecision).includes(
+    value as PromptQueueDecision,
+  );
 }
 
 function isBoundResult(
@@ -97,14 +106,14 @@ export async function presentBoundPrompt(
   }
   if (typeof native.decidePrompt !== "function") return failedResult(request);
   try {
-    const result = native.decidePrompt(
+    const result = await native.decidePrompt(
       {
         version: request.version,
         operation: request.operation,
         nonce: request.nonce,
         toolCallId: request.toolCallId,
       },
-      (toolCallId) => present({ toolCallId }),
+      (toolCallId) => Promise.resolve(present({ toolCallId })),
     );
     return isBoundResult(result, request) ? result : failedResult(request);
   } catch {

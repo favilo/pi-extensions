@@ -4,6 +4,7 @@ import test from "node:test";
 import { NATIVE_CONTRACT_VERSION } from "./native-contract.ts";
 import {
   NATIVE_PROMPT_QUEUE_NONCE,
+  PromptQueueDecision,
   presentBoundPrompt,
 } from "./native-prompt-queue.ts";
 
@@ -16,7 +17,7 @@ test("an allow stays bound to the tool-call that opened the prompt", async () =>
       nonce: NATIVE_PROMPT_QUEUE_NONCE,
       toolCallId,
     },
-    () => "allow",
+    () => PromptQueueDecision.Allow,
   );
   console.log(
     JSON.stringify({
@@ -33,7 +34,7 @@ test("an allow stays bound to the tool-call that opened the prompt", async () =>
       toolCallId: result.toolCallId,
       decision: result.decision,
     },
-    { ok: true, toolCallId, decision: "allow" },
+    { ok: true, toolCallId, decision: PromptQueueDecision.Allow },
   );
 });
 
@@ -46,7 +47,7 @@ test("an asynchronous prompt allow stays bound to its tool-call", async () => {
       nonce: NATIVE_PROMPT_QUEUE_NONCE,
       toolCallId,
     },
-    async () => "allow",
+    async () => PromptQueueDecision.Allow,
   );
 
   assert.deepEqual(
@@ -55,6 +56,6 @@ test("an asynchronous prompt allow stays bound to its tool-call", async () => {
       toolCallId: result.toolCallId,
       decision: result.decision,
     },
-    { ok: true, toolCallId, decision: "allow" },
+    { ok: true, toolCallId, decision: PromptQueueDecision.Allow },
   );
 });

@@ -16,7 +16,7 @@ pub use contract::{
     PromptQueueDecision, PromptQueueRequest, PromptQueueResponse, RuleSaveRequest,
     RuleSaveResponse,
 };
-use napi::bindgen_prelude::Function;
+use napi::bindgen_prelude::{Function, PromiseRaw};
 use napi::{Env, Error, Result};
 use napi_derive::napi;
 use pi_api::RealpathCallback;
@@ -135,12 +135,17 @@ pub fn save_rule(request: RuleSaveRequest) -> Result<RuleSaveResponse> {
 }
 
 #[napi]
-pub fn decide_prompt(
+pub fn decide_prompt<'env>(
     request: PromptQueueRequest,
-    present: Function<String, String>,
-) -> Result<PromptQueueResponse> {
-    prompt_queue::present(request, &prompt_queue::PresentCallback::new(&present))
-        .map_err(|error| Error::from_reason(error.to_string()))
+    present: Function<'env, String, PromiseRaw<'env, PromptQueueDecision>>,
+) -> Result<PromiseRaw<'env, PromptQueueResponse>> {
+    prompt_queue::validate(&request).map_err(|error| Error::from_reason(error.to_string()))?;
+    let tool_call_id = request.tool_call_id.clone();
+    let decision = present.call(tool_call_id)?;
+    decision.then(move |context| {
+        prompt_queue::complete(request, context.value)
+            .map_err(|error| Error::from_reason(error.to_string()))
+    })
 }
 
 #[cfg(test)]
