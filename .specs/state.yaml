@@ -93,10 +93,10 @@ planning:
     constraints:
     - Do not modify the e06 repair flow or child-private bridge catalog.
 handoff:
-  last_step_completed: RED test committed for one bound allow. The GREEN prompt binding is uncommitted and unverified.
+  last_step_completed: Bound allow, async host presentation, FIFO serialization, and bound steering are committed and verified in the isolated workspace.
   open_decisions:
-  - The host presenter is synchronous. The real Pi prompt is async and is not wired.
-  - Queue order, steering isolation, and UI-failure deny are not tested yet.
+  - The FIFO queue currently serializes host presentation in TypeScript; migrate its persistent state into Rust/NAPI before declaring e18s04 complete.
+  - Add the remaining UI-failure denial contract, including proof that a failed active prompt advances the next queued request.
   required_reading:
   - .specs/planning-context.yaml
   - .specs/product/SCOPE-e18-wasm-only-tool-permissions.yaml
@@ -109,25 +109,23 @@ handoff:
   next_skill: develop-tdd
   context: >-
     Work in .workspaces/e18s04-prompt-queue (jj workspace e18s04-prompt-queue@,
-    change mqmsyynq). The default checkout stays on
+    current empty change kxqqsznk; parent feature commit d10995ce). The default checkout stays on
     favilo/e18s00-pi-oxidized-host at the RED commit oyxktqxp. Do not build
     WASM or run npm run build:native in the default checkout. Do not create a
     new bookmark. Do not move the bookmark until the GREEN commit is made from
     this workspace. Do not push. Do not run release-branch. Do not delete
     extensions/tool-permissions/index.ts. pi-oxidized-ext stays rejected. Use
     the standalone NAPI package and pi-api. e18s00 through e18s03 are passing.
-    e18s04 task 1 has one RED test, committed on the parent: an allow must stay
-    bound to the tool-call id that opened the prompt. The stub returns deny
-    and an empty id, and node --test
-    extensions/tool-permissions/native-prompt-queue.test.ts failed on that
-    assertion. The uncommitted GREEN on mqmsyynq adds decide_prompt, a
-    PromptHost callback, and presentBoundPrompt. It is not formatted, not
-    cargo-tested, and not built. This worktree has no node_modules; run npm ci
-    before the native build or the node test. Next: cargo fmt, cargo test,
-    npm ci, npm run build:native, then the node test. Commit GREEN only after
-    that test passes. Leave queue order, steering text, and UI failure for
-    later vertical slices. Threat 5 is queue mixup. Yolo mode and the
-    .git/.jj boundary bug stay deferred.
+    e18s04 has committed RED/GREEN pairs for bound allow (01a8f974/3d139502),
+    async host presentation (cfdbf65a/d7656be7), FIFO host serialization
+    (d3a70911/006ef369), and bound steering (8515106e/d10995ce). tsx is now
+    the test runner and supports real TypeScript enums. Latest validation:
+    cargo test, npm run build:native, and tsx --test
+    extensions/tool-permissions/native-prompt-queue.test.ts all pass (4 tests).
+    Next: RED test for UI host rejection fails closed and advances a queued
+    request; then move the persistent FIFO state out of TypeScript and into
+    Rust/NAPI. Threat 5 is queue mixup. Yolo mode and the .git/.jj boundary bug
+    stay deferred.
   blocker: null
   deferred_work:
   - Consolidate safeStringify and JSON formatting helpers into a shared utility module
