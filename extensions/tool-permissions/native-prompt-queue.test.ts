@@ -81,11 +81,15 @@ test("a second prompt waits until the active prompt settles", async () => {
     presented.push(prompt.toolCallId);
     return activeDecision.promise;
   });
-  const second = presentBoundPrompt(requestFor("call-second"), async (prompt) => {
-    presented.push(prompt.toolCallId);
-    return PromptQueueDecision.Deny;
-  });
+  const second = presentBoundPrompt(
+    requestFor("call-second"),
+    async (prompt) => {
+      presented.push(prompt.toolCallId);
+      return PromptQueueDecision.Deny;
+    },
+  );
 
+  await Promise.resolve();
   assert.deepEqual(presented, ["call-first"]);
   activeDecision.resolve(PromptQueueDecision.Allow);
 
