@@ -1,3 +1,5 @@
+use std::collections::VecDeque;
+
 use crate::CONTRACT_VERSION;
 use crate::contract::{
     NativeOperation, PromptQueueRequest, PromptQueueResolution, PromptQueueResponse,
@@ -42,6 +44,35 @@ pub fn complete(
     })
 }
 
+#[derive(Default)]
+struct PromptQueue {
+    active: Option<ToolCallId>,
+    pending: VecDeque<ToolCallId>,
+}
+
+#[derive(Debug, Eq, PartialEq)]
+enum QueuePosition {
+    Active,
+    Waiting,
+}
+
+impl PromptQueue {
+    fn submit(&mut self, tool_call_id: ToolCallId) -> QueuePosition {
+        if self.active.is_none() {
+            self.active = Some(tool_call_id);
+            QueuePosition::Active
+        } else {
+            self.pending.push_back(tool_call_id);
+            QueuePosition::Waiting
+        }
+    }
+
+    fn complete(&mut self, _tool_call_id: &ToolCallId) -> Option<ToolCallId> {
+        None
+    }
+}
+
+#[derive(Debug, Eq, PartialEq)]
 struct ToolCallId(String);
 
 impl ToolCallId {
@@ -61,6 +92,20 @@ impl ToolCallId {
 mod tests {
     use super::complete;
     use crate::contract::{PromptQueueDecision, PromptQueueRequest, PromptQueueResolution};
+
+    #[test]
+    fn releases_the_next_fifo_prompt_when_the_active_prompt_settles() {
+        let mut queue = super::PromptQueue::default();
+        let first = super::ToolCallId::parse("call-first").unwrap();
+        let second = super::ToolCallId::parse("call-second").unwrap();
+
+        assert_eq!(queue.submit(first), super::QueuePosition::Active);
+        assert_eq!(queue.submit(second), super::QueuePosition::Waiting);
+        assert_eq!(
+            queue.complete(&super::ToolCallId::parse("call-first").unwrap()),
+            Some(super::ToolCallId::parse("call-second").unwrap())
+        );
+    }
 
     #[test]
     fn allow_stays_bound_to_the_tool_call_that_opened_the_prompt() {
