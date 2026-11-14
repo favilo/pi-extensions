@@ -241,6 +241,7 @@ pub enum PromptQueueDecision {
     Steer,
 }
 
+#[derive(Clone)]
 #[napi(object)]
 pub struct PromptQueueRequest {
     pub version: i64,

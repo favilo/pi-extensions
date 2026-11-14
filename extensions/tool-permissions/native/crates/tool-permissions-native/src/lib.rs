@@ -136,16 +136,11 @@ pub fn save_rule(request: RuleSaveRequest) -> Result<RuleSaveResponse> {
 
 #[napi]
 pub fn decide_prompt<'env>(
+    env: Env,
     request: PromptQueueRequest,
     present: Function<'env, String, PromiseRaw<'env, PromptQueueResolution>>,
 ) -> Result<PromiseRaw<'env, PromptQueueResponse>> {
-    prompt_queue::validate(&request).map_err(|error| Error::from_reason(error.to_string()))?;
-    let tool_call_id = request.tool_call_id.clone();
-    let decision = present.call(tool_call_id)?;
-    decision.then(move |context| {
-        prompt_queue::complete(request, context.value)
-            .map_err(|error| Error::from_reason(error.to_string()))
-    })
+    prompt_queue::decide(env, request, present)
 }
 
 #[cfg(test)]

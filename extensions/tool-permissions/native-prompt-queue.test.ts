@@ -136,14 +136,14 @@ test("a native queue fails closed on UI rejection before presenting the next mod
 
   const first = firstModule.presentBoundPrompt(
     requestFor("call-rejected-ui"),
-    async (prompt) => {
+    async (prompt: { toolCallId: string }) => {
       presented.push(prompt.toolCallId);
       return rejectedUi.promise.then((decision) => ({ decision }));
     },
   );
   const second = secondModule.presentBoundPrompt(
     requestFor("call-after-rejection"),
-    async (prompt) => {
+    async (prompt: { toolCallId: string }) => {
       presented.push(prompt.toolCallId);
       return { decision: PromptQueueDecision.Allow };
     },
@@ -181,7 +181,9 @@ test("the native boundary queues a later prompt until the active UI settles", as
         nonce: string;
         toolCallId: string;
       },
-      present: (toolCallId: string) => Promise<{ decision: PromptQueueDecision }>,
+      present: (
+        toolCallId: string,
+      ) => Promise<{ decision: PromptQueueDecision }>,
     ): Promise<unknown>;
   };
   const native = requireNativePackage(
@@ -196,14 +198,20 @@ test("the native boundary queues a later prompt until the active UI settles", as
     toolCallId,
   });
 
-  const first = native.decidePrompt(requestFor("call-native-first"), async (id) => {
-    presented.push(id);
-    return activeDecision.promise.then((decision) => ({ decision }));
-  });
-  const second = native.decidePrompt(requestFor("call-native-second"), async (id) => {
-    presented.push(id);
-    return { decision: PromptQueueDecision.Deny };
-  });
+  const first = native.decidePrompt(
+    requestFor("call-native-first"),
+    async (id) => {
+      presented.push(id);
+      return activeDecision.promise.then((decision) => ({ decision }));
+    },
+  );
+  const second = native.decidePrompt(
+    requestFor("call-native-second"),
+    async (id) => {
+      presented.push(id);
+      return { decision: PromptQueueDecision.Deny };
+    },
+  );
 
   await Promise.resolve();
   assert.deepEqual(presented, ["call-native-first"]);

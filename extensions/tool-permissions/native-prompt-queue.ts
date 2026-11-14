@@ -53,36 +53,6 @@ type NativePromptQueue = {
   ): Promise<PromptQueueResult>;
 };
 
-class PromptCallQueue {
-  #tail: Promise<void> = Promise.resolve();
-
-  enqueue<Result>(present: () => Promise<Result>): Promise<Result> {
-    const result = this.#tail.then(present, present);
-    this.#tail = result.then(
-      () => undefined,
-      () => undefined,
-    );
-    return result;
-  }
-}
-
-const NATIVE_PROMPT_QUEUE_KEY = Symbol.for(
-  "pi-extensions.tool-permissions.native-prompt-call-queue",
-);
-
-type ProcessGlobal = { [key: symbol]: unknown };
-
-function promptCallQueue(): PromptCallQueue {
-  const processGlobal = globalThis as ProcessGlobal;
-  const existing = processGlobal[NATIVE_PROMPT_QUEUE_KEY] as
-    | PromptCallQueue
-    | undefined;
-  if (existing) return existing;
-  const queue = new PromptCallQueue();
-  processGlobal[NATIVE_PROMPT_QUEUE_KEY] = queue;
-  return queue;
-}
-
 function failedResult(request: PromptQueueRequest): PromptQueueResult {
   return {
     version: NATIVE_CONTRACT_VERSION,
@@ -138,20 +108,18 @@ export async function presentBoundPrompt(
     return failedResult(request);
   }
   if (typeof native.decidePrompt !== "function") return failedResult(request);
-  return promptCallQueue().enqueue(async () => {
-    try {
-      const result = await native.decidePrompt(
-        {
-          version: request.version,
-          operation: request.operation,
-          nonce: request.nonce,
-          toolCallId: request.toolCallId,
-        },
-        (toolCallId) => Promise.resolve(present({ toolCallId })),
-      );
-      return isBoundResult(result, request) ? result : failedResult(request);
-    } catch {
-      return failedResult(request);
-    }
-  });
+  try {
+    const result = await native.decidePrompt(
+      {
+        version: request.version,
+        operation: request.operation,
+        nonce: request.nonce,
+        toolCallId: request.toolCallId,
+      },
+      (toolCallId) => Promise.resolve(present({ toolCallId })),
+    );
+    return isBoundResult(result, request) ? result : failedResult(request);
+  } catch {
+    return failedResult(request);
+  }
 }
