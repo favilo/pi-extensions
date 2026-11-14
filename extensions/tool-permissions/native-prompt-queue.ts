@@ -66,7 +66,22 @@ class PromptCallQueue {
   }
 }
 
-const promptCallQueue = new PromptCallQueue();
+const NATIVE_PROMPT_QUEUE_KEY = Symbol.for(
+  "pi-extensions.tool-permissions.native-prompt-call-queue",
+);
+
+type ProcessGlobal = { [key: symbol]: unknown };
+
+function promptCallQueue(): PromptCallQueue {
+  const processGlobal = globalThis as ProcessGlobal;
+  const existing = processGlobal[NATIVE_PROMPT_QUEUE_KEY] as
+    | PromptCallQueue
+    | undefined;
+  if (existing) return existing;
+  const queue = new PromptCallQueue();
+  processGlobal[NATIVE_PROMPT_QUEUE_KEY] = queue;
+  return queue;
+}
 
 function failedResult(request: PromptQueueRequest): PromptQueueResult {
   return {
@@ -123,7 +138,7 @@ export async function presentBoundPrompt(
     return failedResult(request);
   }
   if (typeof native.decidePrompt !== "function") return failedResult(request);
-  return promptCallQueue.enqueue(async () => {
+  return promptCallQueue().enqueue(async () => {
     try {
       const result = await native.decidePrompt(
         {
