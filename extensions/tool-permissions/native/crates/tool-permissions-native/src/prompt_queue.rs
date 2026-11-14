@@ -67,12 +67,16 @@ impl PromptQueue {
         }
     }
 
-    fn complete(&mut self, _tool_call_id: &ToolCallId) -> Option<ToolCallId> {
-        None
+    fn complete(&mut self, tool_call_id: &ToolCallId) -> Option<ToolCallId> {
+        if self.active.as_ref() != Some(tool_call_id) {
+            return None;
+        }
+        self.active = self.pending.pop_front();
+        self.active.clone()
     }
 }
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 struct ToolCallId(String);
 
 impl ToolCallId {
