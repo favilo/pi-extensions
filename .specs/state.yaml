@@ -93,8 +93,7 @@ planning:
     constraints:
     - Do not modify the e06 repair flow or child-private bridge catalog.
 handoff:
-  last_step_completed: Rust now owns the NAPI prompt FIFO queue, including bound decisions,
-    steering, UI-failure denial, and next-prompt release.
+  last_step_completed: verify-work failed because the live prompt still uses the TypeScript queue.
   open_decisions:
   - Add Miri-oriented validation or a documented alternative for the scoped FunctionRef
     lifetime erasure before broader reuse of this native queue pattern.
@@ -107,19 +106,17 @@ handoff:
   - .specs/epics/e18-wasm-only-tool-permissions/e18s04-tasks.yaml
   - .specs/security/epics/e18/THREAT_MODEL.md
   - .specs/security/REVIEW.md
-  next_skill: verify-work
-  context: 'Work in .workspaces/e18s04-prompt-queue. e18s04 native prompt FIFO is
-    complete: RED 650bca3d / GREEN e6d90484 prove the native NAPI boundary queues
-    calls in order. Rust retains a FunctionRef for each queued host callback and returns
-    a raw deferred promise; its SAFETY comment records the confined lifetime erasure,
-    same-Env check, and immediate promise use. The prior AsyncTask alternative deadlocked
-    WASI workers and was discarded. The TypeScript PromptCallQueue was removed. Full
-    verification passed: cargo test, npm run build:native, focused TS tests (6), and
-    npm run check (351 tests). The Bigpowers RED verifier exists at $BIGPOWERS_ROOT/scripts/verify-tdd-red-commit.sh
-    but reports SKIP because TDD_VERIFY_CMD is unset. Do not use git, push, or create
-    bookmarks. Next: verify-work, then arrange Miri-oriented validation or document
-    why NAPI/WASI FFI prevents it.'
-  blocker: null
+  next_skill: develop-tdd
+  context: 'Work in .workspaces/e18s04-prompt-queue. verify-work did not pass.
+    The native FIFO tests pass, and one npm run build:native && npm run check run
+    at 2026-11-16T18:56:11Z passed 23 cargo tests and 351 TypeScript tests. The live
+    ask path still uses PermissionPromptQueue. askScrollablePermission calls
+    permissionPromptQueueFor().enqueue. presentBoundPrompt is called only from
+    native-prompt-queue.test.ts. Rust does not own the success-path prompt.
+    Do not mark e18s04 done. Next, add a failing test that promptToolPermissionRequest
+    uses the native queue when the package loads, then route that path while keeping
+    session cancel and shutdown behavior. Do not use git, push, or create bookmarks.'
+  blocker: Success-path prompts still enqueue on PermissionPromptQueue. presentBoundPrompt is not used by index.ts.
   deferred_work:
   - Consolidate safeStringify and JSON formatting helpers into a shared utility module
   - Persist completed and active child sessions for later external analysis

@@ -106,3 +106,13 @@ WASM `save_rule` returns patched TOML text. It does not open the destination, sp
 When the native package path resolves, the host does not also call `saveAllowedRule`, so the success path does not append a second copy. A missing package still uses the TypeScript saver until e18s06. The host chooses the destination: a project save uses the trusted project policy path, and an untrusted directory is refused before the save. Rule values are parsed as a JSON object of strings, checked as regular expressions, and written as TOML strings. An invalid rule or file shape errors and is not written. A repeated rule stays one allow entry.
 
 No command injection, path-traversal allow, authorization bypass, secret exposure, or unsafe deserialization finding reached confidence 8.
+
+## e18s04 WASM prompt queue
+
+- Reviewed: 2026-11-16T18:56:11Z
+- Scope: `uqppwwxz..@-` prompt changes in `extensions/tool-permissions/native/crates/tool-permissions-native/src/prompt_queue.rs`, `extensions/tool-permissions/native-prompt-queue.ts`, and `askScrollablePermission` in `extensions/tool-permissions/index.ts`
+- Result: **PASS — no reportable HIGH findings**
+
+The native queue binds each host callback to the tool-call id captured when that prompt opens. A UI rejection or a thrown presenter resolves `ok: false`, `decision: deny`, and no steering, then releases the next queued prompt. `presentBoundPrompt` accepts a result only when the version, operation, nonce, and tool-call id match the request. A mismatched or malformed result becomes deny. The queue rejects a second N-API environment while work is queued. The `FunctionRef` lifetime erasure is confined to that queue, checked against the captured environment, and used only to attach `then` and `catch`.
+
+`askScrollablePermission` does not call this queue yet. The live prompt still uses `PermissionPromptQueue`. That is a missing integration, not an allow bypass: the existing TypeScript queue still serializes the visible prompt. No command injection, path-traversal allow, authorization bypass, secret exposure, or unsafe deserialization finding reached confidence 8.

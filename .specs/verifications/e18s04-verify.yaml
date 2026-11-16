@@ -1,0 +1,96 @@
+story_id: e18s04
+verified_at: "2026-11-16T18:56:11Z"
+verifier: verify-work
+status: failed
+risk: P0
+vcs:
+  kind: jj
+  working_copy: ppuqqyno
+  parent: pmlznsvz
+  bookmark_ancestor: favilo/e18s00-pi-oxidized-host
+  not_main: true
+phases:
+  branch:
+    passed: true
+    note: "Working copy descends from favilo/e18s00-pi-oxidized-host and is not main (vmyzxzpk). The bookmark is not pointed at the working copy. No open PR, so gh pr checks did not run."
+  preflight:
+    passed: true
+    command: "bash $BIGPOWERS_ROOT/scripts/bp-read-agents.sh --print"
+    note: "AGENTS.md has no Preflight section. bp-timing.sh could not start because python3 lacks PyYAML. Mechanical commands came from package.json and the story tasks."
+  smoke:
+    passed: true
+    note: "Library extension. No server process and no CLI binary. Cold-start is the native release rebuild inside the terminal verdict."
+  task_verification:
+    passed: false
+    tasks:
+      - id: 1
+        command: "tsx --test extensions/tool-permissions/native-prompt-queue.test.ts"
+        exit_code: 0
+        note: "6 passed, 0 failed, duration_ms 160.206958. The allow test printed toolCallId call-allow, ok true, boundId call-allow, decision allow."
+      - id: 2
+        command: "cargo test --manifest-path extensions/tool-permissions/native/Cargo.toml"
+        exit_code: 0
+        note: "23 library tests passed inside the terminal verdict, including both prompt_queue tests."
+      - id: 3
+        command: "tsx --test extensions/tool-permissions/native-prompt-queue.test.ts"
+        exit_code: 0
+        note: "The command passed again inside npm run test:preflight, but it never calls promptToolPermissionRequest. askScrollablePermission still enqueues on PermissionPromptQueue."
+      - id: 4
+        command: "npm run build:native && npm run check"
+        exit_code: 0
+  build:
+    passed: true
+    command: "npm run build:native"
+  typecheck:
+    passed: true
+    command: "npm run typecheck"
+  lint:
+    passed: true
+    note: "package.json has no lint script. tsc --noEmit passed inside npm run check."
+  tests:
+    passed: true
+    command: "npm run test:preflight"
+    coverage: "351 passed, 0 failed"
+  terminal_verdict:
+    command: "npm run build:native && npm run check"
+    exit_code: 0
+    captured_at: "2026-11-16T18:56:11Z"
+    note: "Single contiguous run from 2026-11-16T18:56:03Z to 2026-11-16T18:56:11Z. Release WASM build finished. tsc --noEmit passed. cargo test passed 23 tests. tsx passed 351 tests in 3463.584 ms. check-test-guard printed PASS."
+  security:
+    passed: true
+    report: ".specs/security/REVIEW.md"
+    note: "No HIGH finding at confidence 8 or above in the native queue. The missing success-path call is a functional gap, not an allow bypass."
+  blind_spots:
+    passed: true
+    command: "bash $BIGPOWERS_ROOT/scripts/check-blind-spots.sh"
+    note: "0 HIGH, 7 MEDIUM double-tag findings on older stories. Exit 0. Direct execution was permission denied, so bash ran the absolute script path."
+  completeness_critic:
+    passed: true
+    blockers: 0
+    warnings: 1
+    note: "WARNING: the critic reads the first word of the prose active_story title (Move) instead of active_story_id e18s04, so the zero-tag check was skipped. Exit 0."
+  nfr:
+    passed: false
+    report: ".specs/verifications/NFR-e18s04.json"
+  wiki_lint:
+    passed: true
+    note: "No specs/skills-wiki or specs/conventions-wiki directory exists, so there are no stale skill pages and no orphan convention pages."
+  manual:
+    passed: false
+    steps:
+      - step: "A user allow, deny, or steering result comes back from WASM for that tool-call id"
+        expected: "promptToolPermissionRequest opens the existing Pi prompt through the native queue and returns the bound decision"
+        actual: "The native unit test bound call-allow to allow. index.ts askScrollablePermission still calls permissionPromptQueueFor().enqueue, and presentBoundPrompt has no production caller."
+        passed: false
+      - step: "A second ask waits, and its steering cannot satisfy the first request"
+        expected: "The WASM queue holds the second request until the first prompt settles"
+        actual: "The live FIFO behavior still comes from PermissionPromptQueue in prompt-queue.ts. The native wait test passes only when decidePrompt is called directly."
+        passed: false
+      - step: "A Pi UI failure denies the tool call"
+        expected: "The success path records deny and does not leave the call queued as allow"
+        actual: "The native rejection test denies call-rejected-ui and then presents the next id. The live prompt path does not use that function."
+        passed: false
+  gaps:
+    closed: false
+    items:
+      - "Route askScrollablePermission through presentBoundPrompt when the native package loads, and keep the TypeScript queue only for load failure until e18s06."

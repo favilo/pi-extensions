@@ -1,6 +1,6 @@
 story_id: e18s04
 title: Move the prompt UI, steering editor, and prompt queue into WASM
-status: passing
+status: todo
 bcps: 8
 delta: MODIFIED
 spec: e18s04-wasm-prompt-ui.md
@@ -32,7 +32,7 @@ tasks:
     verify: tsx --test extensions/tool-permissions/native-prompt-queue.test.ts
     risk: P0
     security: high
-    status: passing
+    status: todo
     allure:
       severity: critical
       categories:
