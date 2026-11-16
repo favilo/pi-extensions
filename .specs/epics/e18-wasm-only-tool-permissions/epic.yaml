@@ -36,7 +36,7 @@ stories:
   - id: e18s04
     title: Move the prompt UI, steering editor, and prompt queue into WASM
     bcps: 8
-    status: failing
+    status: passing
     delta: MODIFIED
     spec: e18s04-wasm-prompt-ui.md
     tasks: e18s04-tasks.yaml

@@ -93,10 +93,11 @@ planning:
     constraints:
     - Do not modify the e06 repair flow or child-private bridge catalog.
 handoff:
-  last_step_completed: Bound allow, async host presentation, FIFO serialization, and bound steering are committed and verified in the isolated workspace.
+  last_step_completed: Rust now owns the NAPI prompt FIFO queue, including bound decisions,
+    steering, UI-failure denial, and next-prompt release.
   open_decisions:
-  - The FIFO queue currently serializes host presentation in TypeScript; migrate its persistent state into Rust/NAPI before declaring e18s04 complete.
-  - Add the remaining UI-failure denial contract, including proof that a failed active prompt advances the next queued request.
+  - Add Miri-oriented validation or a documented alternative for the scoped FunctionRef
+    lifetime erasure before broader reuse of this native queue pattern.
   required_reading:
   - .specs/planning-context.yaml
   - .specs/product/SCOPE-e18-wasm-only-tool-permissions.yaml
@@ -106,26 +107,18 @@ handoff:
   - .specs/epics/e18-wasm-only-tool-permissions/e18s04-tasks.yaml
   - .specs/security/epics/e18/THREAT_MODEL.md
   - .specs/security/REVIEW.md
-  next_skill: develop-tdd
-  context: >-
-    Work in .workspaces/e18s04-prompt-queue (jj workspace e18s04-prompt-queue@,
-    current empty change kxqqsznk; parent feature commit d10995ce). The default checkout stays on
-    favilo/e18s00-pi-oxidized-host at the RED commit oyxktqxp. Do not build
-    WASM or run npm run build:native in the default checkout. Do not create a
-    new bookmark. Do not move the bookmark until the GREEN commit is made from
-    this workspace. Do not push. Do not run release-branch. Do not delete
-    extensions/tool-permissions/index.ts. pi-oxidized-ext stays rejected. Use
-    the standalone NAPI package and pi-api. e18s00 through e18s03 are passing.
-    e18s04 has committed RED/GREEN pairs for bound allow (01a8f974/3d139502),
-    async host presentation (cfdbf65a/d7656be7), FIFO host serialization
-    (d3a70911/006ef369), and bound steering (8515106e/d10995ce). tsx is now
-    the test runner and supports real TypeScript enums. Latest validation:
-    cargo test, npm run build:native, and tsx --test
-    extensions/tool-permissions/native-prompt-queue.test.ts all pass (4 tests).
-    Next: RED test for UI host rejection fails closed and advances a queued
-    request; then move the persistent FIFO state out of TypeScript and into
-    Rust/NAPI. Threat 5 is queue mixup. Yolo mode and the .git/.jj boundary bug
-    stay deferred.
+  next_skill: verify-work
+  context: 'Work in .workspaces/e18s04-prompt-queue. e18s04 native prompt FIFO is
+    complete: RED 650bca3d / GREEN e6d90484 prove the native NAPI boundary queues
+    calls in order. Rust retains a FunctionRef for each queued host callback and returns
+    a raw deferred promise; its SAFETY comment records the confined lifetime erasure,
+    same-Env check, and immediate promise use. The prior AsyncTask alternative deadlocked
+    WASI workers and was discarded. The TypeScript PromptCallQueue was removed. Full
+    verification passed: cargo test, npm run build:native, focused TS tests (6), and
+    npm run check (351 tests). The Bigpowers RED verifier exists at $BIGPOWERS_ROOT/scripts/verify-tdd-red-commit.sh
+    but reports SKIP because TDD_VERIFY_CMD is unset. Do not use git, push, or create
+    bookmarks. Next: verify-work, then arrange Miri-oriented validation or document
+    why NAPI/WASI FFI prevents it.'
   blocker: null
   deferred_work:
   - Consolidate safeStringify and JSON formatting helpers into a shared utility module
@@ -133,7 +126,8 @@ handoff:
   - Add interactive child steering after the read-only transcript slice
   - Build e03 directory-local tool permissions after the higher-WSJF e04 fix
   - Add real Pi process integration tests after unit contracts are established
-  - Apply yolo mode after the WASM path decision without bypassing an .aiignore deny or a path-trust diagnostic
+  - Apply yolo mode after the WASM path decision without bypassing an .aiignore deny
+    or a path-trust diagnostic
   verified_at: '2026-11-13T21:36:00Z'
 release:
   pr: https://github.com/favilo/pi-extensions/pull/14
@@ -169,9 +163,9 @@ metrics:
       total_seconds: 3246.0
       avg_seconds: 1082.0
     develop-tdd:
-      calls: 8
-      total_seconds: 424933.0
-      avg_seconds: 53116.625
+      calls: 9
+      total_seconds: 663436.0
+      avg_seconds: 73715.11111111111
     plan-work:
       calls: 3
       total_seconds: 1580.0
