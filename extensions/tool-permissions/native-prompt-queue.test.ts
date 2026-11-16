@@ -2,6 +2,7 @@ import "../test-support/forbid-fetch.ts";
 import assert from "node:assert/strict";
 import test from "node:test";
 import { NATIVE_CONTRACT_VERSION } from "./native-contract.ts";
+import { promptToolPermissionRequest } from "./index.ts";
 import {
   NATIVE_PROMPT_QUEUE_NONCE,
   PromptQueueDecision,
@@ -11,6 +12,11 @@ import {
   bundledNativePackagePath,
   requireNativePackage,
 } from "./native-package.ts";
+
+type VisiblePrompt = {
+  handleInput(data: string): void;
+  render(width: number): string[];
+};
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
@@ -244,4 +250,103 @@ test("steering stays bound to the prompt that submitted it", async () => {
     decision: PromptQueueDecision.Steer,
     steering: "use the project policy instead",
   });
+});
+
+test("promptToolPermissionRequest holds the native queue until the visible prompt settles", async () => {
+  const components: VisiblePrompt[] = [];
+  const pending = promptToolPermissionRequest(
+    { sendUserMessage() {} },
+    {
+      cwd: "/workspace/project",
+      hasUI: true,
+      mode: "tui",
+      sessionId: "native-live-prompt",
+      ui: {
+        confirm: async () => false,
+        custom<T>(
+          factory: (
+            tui: {
+              requestRender(force?: boolean): void;
+              stop(): void;
+              start(): void;
+            },
+            theme: unknown,
+            keybindings: unknown,
+            done: (value: T) => void,
+          ) => unknown,
+        ): Promise<T> {
+          return new Promise<T>((resolve) => {
+            const component = factory(
+              { requestRender() {}, stop() {}, start() {} },
+              {
+                fg: (_color: string, text: string) => text,
+                bold: (text: string) => text,
+              },
+              {},
+              resolve,
+            );
+            components.push(component as VisiblePrompt);
+          });
+        },
+      },
+    },
+    {
+      actor: { kind: "main" },
+      toolName: "read",
+      input: { path: "notes.md" },
+      cwd: "/workspace/project",
+      toolCallId: "call-live-prompt",
+    },
+  );
+
+  const deadline = Date.now() + 1000;
+  while (components.length === 0 && Date.now() < deadline) {
+    await new Promise((resolve) => setImmediate(resolve));
+  }
+  assert.equal(components.length, 1);
+  assert.match(
+    components[0].render(100).join("\n"),
+    /Allow the main agent to use read\?/,
+  );
+
+  const native = requireNativePackage(bundledNativePackagePath()) as {
+    decidePrompt(
+      request: {
+        version: number;
+        operation: string;
+        nonce: string;
+        toolCallId: string;
+      },
+      present: (toolCallId: string) => Promise<{ decision: PromptQueueDecision }>,
+    ): Promise<unknown>;
+  };
+  let nativePresented = false;
+  const queued = native.decidePrompt(
+    {
+      version: NATIVE_CONTRACT_VERSION,
+      operation: "prompt_queue",
+      nonce: NATIVE_PROMPT_QUEUE_NONCE,
+      toolCallId: "call-after-live-prompt",
+    },
+    async () => {
+      nativePresented = true;
+      return { decision: PromptQueueDecision.Deny };
+    },
+  );
+
+  try {
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(
+      nativePresented,
+      false,
+      "promptToolPermissionRequest must hold the native queue until the visible prompt settles",
+    );
+    components[0].handleInput("\x04");
+    assert.equal(await pending, "deny");
+    await queued;
+    assert.equal(nativePresented, true);
+  } finally {
+    if (components[0]) components[0].handleInput("\x04");
+    await Promise.allSettled([pending, queued]);
+  }
 });
