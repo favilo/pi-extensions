@@ -1,7 +1,7 @@
 active_flow: develop-tdd
 active_epic_id: e18
-active_story_id: e18s04
-active_story: Move the prompt UI, steering editor, and prompt queue into WASM
+active_story_id: e18s05
+active_story: Move tool execution sequencing into WASM
 active_bug_id: null
 git:
   bookmark: favilo/e18s00-pi-oxidized-host
@@ -93,26 +93,24 @@ planning:
     constraints:
     - Do not modify the e06 repair flow or child-private bridge catalog.
 handoff:
-  last_step_completed: audit-code passed for the native prompt queue and the Escape contract
+  last_step_completed: e18s04 committed as wvrtqpnz e4edf52f
   open_decisions:
   - e18s07 proves the prompt-queue FunctionRef lifetime erasure under Miri before that
-    pattern is copied.
+    pattern is copied. e18s05 must not copy it.
   required_reading:
   - .specs/planning-context.yaml
   - .specs/product/SCOPE-e18-wasm-only-tool-permissions.yaml
   - .specs/epics/e18-wasm-only-tool-permissions/epic.yaml
-  - .specs/epics/e18-wasm-only-tool-permissions/e18s00-pi-oxidized-decision.md
-  - .specs/epics/e18-wasm-only-tool-permissions/e18s04-wasm-prompt-ui.md
-  - .specs/epics/e18-wasm-only-tool-permissions/e18s04-tasks.yaml
+  - .specs/epics/e18-wasm-only-tool-permissions/e18s05-wasm-tool-execution.md
+  - .specs/epics/e18-wasm-only-tool-permissions/e18s05-tasks.yaml
   - .specs/security/epics/e18/THREAT_MODEL.md
   - .specs/security/REVIEW.md
-  next_skill: commit-message
-  context: 'Work in .workspaces/e18s04-prompt-queue. verify-work passed for e18s04.
-    The live prompt uses presentBoundPrompt when the native package loads. A load
-    failure still uses PermissionPromptQueue. Escape stays in the Vim steering editor.
-    Tab in normal mode leaves steering. Escape does not cancel the prompt. Evidence
-    is in .specs/verifications/e18s04-verify.yaml. Next is commit-message. Do not use
-    git, push, or create bookmarks.'
+  next_skill: develop-tdd
+  context: 'Work in .workspaces/e18s04-prompt-queue. e18s04 is passing and committed.
+    The live prompt uses presentBoundPrompt when the native package loads. Next is
+    develop-tdd for e18s05: WASM owns one Pi execution after allow, and no execution
+    after deny. Do not copy the prompt-queue FunctionRef lifetime erasure. That proof
+    is e18s07. Do not use git, push, or create bookmarks.'
   blocker: null
   deferred_work:
   - Consolidate safeStringify and JSON formatting helpers into a shared utility module
@@ -168,4 +166,4 @@ metrics:
       calls: 2
       total_seconds: 2.0
       avg_seconds: 1.0
-  story_start: '2026-11-12T19:21:32Z'
+  story_start: '2026-11-17T21:43:00Z'
