@@ -93,7 +93,7 @@ planning:
     constraints:
     - Do not modify the e06 repair flow or child-private bridge catalog.
 handoff:
-  last_step_completed: verify-work failed because the live prompt still uses the TypeScript queue.
+  last_step_completed: askScrollablePermission uses the native prompt queue when the package loads.
   open_decisions:
   - Add Miri-oriented validation or a documented alternative for the scoped FunctionRef
     lifetime erasure before broader reuse of this native queue pattern.
@@ -106,17 +106,15 @@ handoff:
   - .specs/epics/e18-wasm-only-tool-permissions/e18s04-tasks.yaml
   - .specs/security/epics/e18/THREAT_MODEL.md
   - .specs/security/REVIEW.md
-  next_skill: develop-tdd
-  context: 'Work in .workspaces/e18s04-prompt-queue. verify-work did not pass.
-    The native FIFO tests pass, and one npm run build:native && npm run check run
-    at 2026-11-16T18:56:11Z passed 23 cargo tests and 351 TypeScript tests. The live
-    ask path still uses PermissionPromptQueue. askScrollablePermission calls
-    permissionPromptQueueFor().enqueue. presentBoundPrompt is called only from
-    native-prompt-queue.test.ts. Rust does not own the success-path prompt.
-    Do not mark e18s04 done. Next, add a failing test that promptToolPermissionRequest
-    uses the native queue when the package loads, then route that path while keeping
-    session cancel and shutdown behavior. Do not use git, push, or create bookmarks.'
-  blocker: Success-path prompts still enqueue on PermissionPromptQueue. presentBoundPrompt is not used by index.ts.
+  next_skill: verify-work
+  context: 'Work in .workspaces/e18s04-prompt-queue. promptToolPermissionRequest now
+    presents through presentBoundPrompt when the native package loads. A load failure
+    still uses PermissionPromptQueue. Session shutdown aborts the native presentation
+    before the next queued prompt can open, and an aborted prompt returns cancel.
+    npm run check passed 23 cargo tests and 352 TypeScript tests. The wasm package
+    was not rebuilt in that run. Next is verify-work. Do not use git, push, or
+    create bookmarks.'
+  blocker: null
   deferred_work:
   - Consolidate safeStringify and JSON formatting helpers into a shared utility module
   - Persist completed and active child sessions for later external analysis
