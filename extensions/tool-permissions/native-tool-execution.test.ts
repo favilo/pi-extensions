@@ -54,3 +54,21 @@ test("an allow executes the host callback once with the original request", async
     },
   );
 });
+
+test("a deny, a cancellation, or an invalid decision executes nothing", async () => {
+  for (const decision of ["deny", "cancel", "invalid"]) {
+    const calls: string[] = [];
+    const result = await executeSequencedTool(
+      { ...allowRequest(), decision },
+      async (toolName) => {
+        calls.push(toolName);
+        return JSON.stringify("ran");
+      },
+    );
+    console.log(JSON.stringify({ decision, executions: calls.length }));
+
+    assert.equal(calls.length, 0, decision);
+    assert.equal(result.executions, 0, decision);
+    assert.equal(result.valueJson, undefined, decision);
+  }
+});

@@ -122,4 +122,22 @@ mod tests {
         assert_eq!(response.decision, "allow");
         assert_eq!(response.value_json.as_deref(), Some("\"file-body\""));
     }
+
+    #[test]
+    fn deny_cancel_and_invalid_do_not_call_the_host() {
+        for decision in ["deny", "cancel", "invalid"] {
+            let host = CountingHost {
+                calls: Mutex::new(Vec::new()),
+            };
+            let mut request = allow_request();
+            request.decision = decision.to_owned();
+            let response = sequence(request, &host).unwrap();
+            assert!(
+                host.calls.lock().expect("host call lock").is_empty(),
+                "{decision}"
+            );
+            assert_eq!(response.executions, 0, "{decision}");
+            assert!(response.value_json.is_none(), "{decision}");
+        }
+    }
 }
