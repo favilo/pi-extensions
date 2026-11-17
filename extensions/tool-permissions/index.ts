@@ -659,6 +659,10 @@ function readTextIfPresent(path: string): string {
   }
 }
 
+function normalizeToLF(text: string): string {
+  return text.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+}
+
 function applyEditPreview(
   oldContent: string,
   edits: Array<{ oldText: string; newText: string }>,
@@ -781,10 +785,10 @@ function buildFileEditPrompt(
   }
 
   const absolutePath = resolve(cwd, path);
-  const oldContent = readTextIfPresent(absolutePath);
+  const oldContent = normalizeToLF(readTextIfPresent(absolutePath));
   const normalizedEdits = edits.map((edit) => ({
-    oldText: String(edit.oldText ?? ""),
-    newText: String(edit.newText ?? ""),
+    oldText: normalizeToLF(String(edit.oldText ?? "")),
+    newText: normalizeToLF(String(edit.newText ?? "")),
   }));
 
   try {

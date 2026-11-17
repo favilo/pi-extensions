@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import { stringify as stringifyToml } from "smol-toml";
+import { initTheme } from "@earendil-works/pi-coding-agent";
 import { preflightEdit } from "./edit-preflight.ts";
 
 function fixture(content: string): { path: string; cleanup: () => void } {
@@ -184,6 +185,78 @@ test("a doomed edit is blocked before the permission prompt is shown", async () 
       (result as { reason?: string }).reason ?? "",
       /Could not find the exact text/,
     );
+  } finally {
+    if (previousAgentDir === undefined) delete process.env.PI_CODING_AGENT_DIR;
+    else process.env.PI_CODING_AGENT_DIR = previousAgentDir;
+    rmSync(agentDir, { recursive: true, force: true });
+    rmSync(project, { recursive: true, force: true });
+  }
+});
+
+test("a CRLF file still shows the edit diff for a Unix oldText", async () => {
+  const agentDir = mkdtempSync(join(tmpdir(), "pi-edit-preflight-agent-"));
+  writeFileSync(
+    join(agentDir, "permissions.toml"),
+    stringifyToml({ permissions: {} }),
+  );
+  const project = mkdtempSync(join(tmpdir(), "pi-edit-preflight-project-"));
+  writeFileSync(join(project, "file.txt"), "alpha\r\nbeta\r\ngamma\r\n");
+
+  const previousAgentDir = process.env.PI_CODING_AGENT_DIR;
+  process.env.PI_CODING_AGENT_DIR = agentDir;
+
+  let promptBody = "";
+  const handlers = new Map<
+    string,
+    (
+      event: { toolName: string; input: Record<string, unknown> },
+      ctx: unknown,
+    ) => Promise<unknown>
+  >();
+  try {
+    const { default: toolPermissionPolicy } = await import(
+      `./index.ts?edit-crlf=${encodeURIComponent(agentDir)}`
+    );
+    initTheme("dark");
+    toolPermissionPolicy({
+      registerCommand() {},
+      on(
+        event: string,
+        handler: (
+          event: { toolName: string; input: Record<string, unknown> },
+          ctx: unknown,
+        ) => Promise<unknown>,
+      ) {
+        if (event === "tool_call") handlers.set(event, handler);
+      },
+      getAllTools: () => [],
+    } as never);
+
+    await handlers.get("tool_call")!(
+      {
+        toolName: "edit",
+        input: {
+          path: join(project, "file.txt"),
+          edits: [{ oldText: "alpha\nbeta", newText: "ALPHA\nBETA" }],
+        },
+      },
+      {
+        cwd: project,
+        hasUI: true,
+        mode: "json",
+        sessionId: "crlf-edit-session",
+        ui: {
+          confirm: (_title: string, body: string) => {
+            promptBody = body;
+            return Promise.resolve(false);
+          },
+        },
+      },
+    );
+
+    assert.doesNotMatch(promptBody, /oldText was not found/);
+    assert.match(promptBody, /ALPHA/);
+    assert.match(promptBody, /BETA/);
   } finally {
     if (previousAgentDir === undefined) delete process.env.PI_CODING_AGENT_DIR;
     else process.env.PI_CODING_AGENT_DIR = previousAgentDir;
