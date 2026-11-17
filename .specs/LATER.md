@@ -1,0 +1,60 @@
+# Later
+
+Unfinished ideas. Add the next idea at the bottom. This file is a holding list,
+not a plan, and it does not start work.
+
+## Skip activate_skill after a recent /skill command
+
+Block `activate_skill` when `/skill:<name>` already ran for that skill
+recently. The slash command has already put the skill in context. Reading
+`SKILL.md` again only repeats it.
+
+The important case is when the skill files have not changed since that load. If
+a file changed, loading it again can still be useful.
+
+## Allow other tools forever
+
+The permission prompt can save an allow rule into the project
+`.pi/permissions.toml` or the user permissions file.
+
+Known MCP tools already get that action. `handleUnknownToolPermission` passes
+an empty `suggestedRule` for a known `mcp__` tool, and Ctrl+A / Ctrl+Shift+A
+write it under that tool's own key. An empty allow rule matches every call.
+
+Expose the same save for other tool types. I want to allow
+`context-checkpoint`, and some skills, forever from the prompt, into either the
+local or the user `permissions.toml`. Those tools already evaluate by their own
+permission key. The prompt for a known non-MCP tool does not offer the save.
+
+## A tool that proposes a permission rule
+
+Add a tool that writes one permission rule for a case where a good regex is
+hard to invent, such as `jj diff ...`. The tool shows the rule for audit.
+Approval loads that rule into the permissions file the request names, project
+or user.
+
+This tool can never be allow-listed. Every call stays an explicit approval. An
+allow rule for the tool itself must not match.
+
+Also look at shipping a skill with the pi-extensions plugin. Loading that
+skill should be enough to drive this permission edit.
+
+## Configurable external edit tools with diff approval
+
+Allow registered extension tools that perform exact-text edits to opt into the
+same diff-based approval UI as Pi's built-in `edit` tool. The registration must
+be configurable from a settings file, rather than hard-coding tool names in
+tool-permissions.
+
+A configured tool needs a way to resolve its request into: a stable display
+path, the existing text, and its `edits[].oldText` / `edits[].newText` array.
+The permission prompt must generate and display the complete contextual diff
+before approval, then preserve the existing tool's execution path. Reject an
+invalid resolver result or an edit whose preconditions fail before prompting.
+
+Initial consumer: `obsidian_edit`, resolving its `vault` and `note` arguments
+to the vault's note path. The mechanism should remain generic for other
+extension edit tools. Keep the Rust/WASM permission migration in mind: put
+policy/registration semantics behind the native boundary where appropriate,
+while leaving host-specific filesystem resolution in the host adapter.
+
