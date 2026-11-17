@@ -22,6 +22,8 @@ in_scope:
     outcome: WASM owns the allow-to-execute sequence and calls Pi to run the permitted tool.
   - future_story_id: e18s06
     outcome: The TypeScript permission implementation is no longer a fallback. A missing or invalid WASM module fails closed.
+  - future_story_id: e18s07
+    outcome: Miri executes the prompt queue's FunctionRef lifetime erasure and reports no undefined behavior for a borrow inside the captured environment.
 out_of_scope:
   - item: Editing passing e16 story specs or removing their recorded non-goals
     reason: e16 is a completed hybrid migration. e18 supersedes the host boundary in new stories.

@@ -93,10 +93,10 @@ planning:
     constraints:
     - Do not modify the e06 repair flow or child-private bridge catalog.
 handoff:
-  last_step_completed: askScrollablePermission uses the native prompt queue when the package loads.
+  last_step_completed: audit-code passed for the native prompt queue and the Escape contract
   open_decisions:
-  - Add Miri-oriented validation or a documented alternative for the scoped FunctionRef
-    lifetime erasure before broader reuse of this native queue pattern.
+  - e18s07 proves the prompt-queue FunctionRef lifetime erasure under Miri before that
+    pattern is copied.
   required_reading:
   - .specs/planning-context.yaml
   - .specs/product/SCOPE-e18-wasm-only-tool-permissions.yaml
@@ -106,14 +106,13 @@ handoff:
   - .specs/epics/e18-wasm-only-tool-permissions/e18s04-tasks.yaml
   - .specs/security/epics/e18/THREAT_MODEL.md
   - .specs/security/REVIEW.md
-  next_skill: verify-work
-  context: 'Work in .workspaces/e18s04-prompt-queue. promptToolPermissionRequest now
-    presents through presentBoundPrompt when the native package loads. A load failure
-    still uses PermissionPromptQueue. Session shutdown aborts the native presentation
-    before the next queued prompt can open, and an aborted prompt returns cancel.
-    npm run check passed 23 cargo tests and 352 TypeScript tests. The wasm package
-    was not rebuilt in that run. Next is verify-work. Do not use git, push, or
-    create bookmarks.'
+  next_skill: commit-message
+  context: 'Work in .workspaces/e18s04-prompt-queue. verify-work passed for e18s04.
+    The live prompt uses presentBoundPrompt when the native package loads. A load
+    failure still uses PermissionPromptQueue. Escape stays in the Vim steering editor.
+    Tab in normal mode leaves steering. Escape does not cancel the prompt. Evidence
+    is in .specs/verifications/e18s04-verify.yaml. Next is commit-message. Do not use
+    git, push, or create bookmarks.'
   blocker: null
   deferred_work:
   - Consolidate safeStringify and JSON formatting helpers into a shared utility module
@@ -123,7 +122,7 @@ handoff:
   - Add real Pi process integration tests after unit contracts are established
   - Apply yolo mode after the WASM path decision without bypassing an .aiignore deny
     or a path-trust diagnostic
-  verified_at: '2026-11-13T21:36:00Z'
+  verified_at: '2026-11-17T19:42:40Z'
 release:
   pr: https://github.com/favilo/pi-extensions/pull/14
   merged_commit: 841d91a0

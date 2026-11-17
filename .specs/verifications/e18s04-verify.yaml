@@ -1,12 +1,12 @@
 story_id: e18s04
-verified_at: "2026-11-16T18:56:11Z"
+verified_at: "2026-11-17T19:42:40Z"
 verifier: verify-work
-status: failed
+status: passed
 risk: P0
 vcs:
   kind: jj
-  working_copy: ppuqqyno
-  parent: pmlznsvz
+  working_copy: wvrtqpnz
+  parent: mqrqqxto
   bookmark_ancestor: favilo/e18s00-pi-oxidized-host
   not_main: true
 phases:
@@ -15,26 +15,26 @@ phases:
     note: "Working copy descends from favilo/e18s00-pi-oxidized-host and is not main (vmyzxzpk). The bookmark is not pointed at the working copy. No open PR, so gh pr checks did not run."
   preflight:
     passed: true
-    command: "bash $BIGPOWERS_ROOT/scripts/bp-read-agents.sh --print"
+    command: "\"$BIGPOWERS_ROOT/scripts/bp-read-agents.sh\" --print"
     note: "AGENTS.md has no Preflight section. bp-timing.sh could not start because python3 lacks PyYAML. Mechanical commands came from package.json and the story tasks."
   smoke:
     passed: true
     note: "Library extension. No server process and no CLI binary. Cold-start is the native release rebuild inside the terminal verdict."
   task_verification:
-    passed: false
+    passed: true
     tasks:
       - id: 1
         command: "tsx --test extensions/tool-permissions/native-prompt-queue.test.ts"
         exit_code: 0
-        note: "6 passed, 0 failed, duration_ms 160.206958. The allow test printed toolCallId call-allow, ok true, boundId call-allow, decision allow."
+        note: "7 passed, 0 failed, duration_ms 805.993625. The allow test printed toolCallId call-allow, ok true, boundId call-allow, decision allow."
       - id: 2
         command: "cargo test --manifest-path extensions/tool-permissions/native/Cargo.toml"
         exit_code: 0
-        note: "23 library tests passed inside the terminal verdict, including both prompt_queue tests."
+        note: "23 library tests passed, including both prompt_queue tests."
       - id: 3
         command: "tsx --test extensions/tool-permissions/native-prompt-queue.test.ts"
         exit_code: 0
-        note: "The command passed again inside npm run test:preflight, but it never calls promptToolPermissionRequest. askScrollablePermission still enqueues on PermissionPromptQueue."
+        note: "Same command as task 1. The live test promptToolPermissionRequest holds the native queue until the visible prompt settles passed. askScrollablePermission calls presentBoundPrompt when the native package loads."
       - id: 4
         command: "npm run build:native && npm run check"
         exit_code: 0
@@ -43,54 +43,53 @@ phases:
     command: "npm run build:native"
   typecheck:
     passed: true
-    command: "npm run typecheck"
+    command: "tsc --noEmit"
   lint:
     passed: true
     note: "package.json has no lint script. tsc --noEmit passed inside npm run check."
   tests:
     passed: true
     command: "npm run test:preflight"
-    coverage: "351 passed, 0 failed"
+    coverage: "352 passed, 0 failed"
   terminal_verdict:
     command: "npm run build:native && npm run check"
     exit_code: 0
-    captured_at: "2026-11-16T18:56:11Z"
-    note: "Single contiguous run from 2026-11-16T18:56:03Z to 2026-11-16T18:56:11Z. Release WASM build finished. tsc --noEmit passed. cargo test passed 23 tests. tsx passed 351 tests in 3463.584 ms. check-test-guard printed PASS."
+    captured_at: "2026-11-17T19:42:40Z"
+    note: "Single contiguous run from 2026-11-17T19:42:32Z to 2026-11-17T19:42:40Z. Release WASM build finished. tsc --noEmit passed. cargo test passed 23 tests. tsx passed 352 tests in 3800.683625 ms. check-test-guard printed PASS."
   security:
     passed: true
     report: ".specs/security/REVIEW.md"
-    note: "No HIGH finding at confidence 8 or above in the native queue. The missing success-path call is a functional gap, not an allow bypass."
+    note: "No HIGH finding at confidence 8 or above. A mismatched id, malformed result, or thrown presenter becomes deny."
   blind_spots:
     passed: true
-    command: "bash $BIGPOWERS_ROOT/scripts/check-blind-spots.sh"
-    note: "0 HIGH, 7 MEDIUM double-tag findings on older stories. Exit 0. Direct execution was permission denied, so bash ran the absolute script path."
+    command: "bash \"$BIGPOWERS_ROOT/scripts/check-blind-spots.sh\""
+    note: "0 HIGH, 7 MEDIUM double-tag findings on older stories. Exit 0. The script is not executable, so bash ran the absolute path."
   completeness_critic:
     passed: true
     blockers: 0
     warnings: 1
-    note: "WARNING: the critic reads the first word of the prose active_story title (Move) instead of active_story_id e18s04, so the zero-tag check was skipped. Exit 0."
+    note: "WARNING: the critic reads the first word of the prose active_story title (Move) instead of active_story_id e18s04, so the zero-tag check was skipped. The August traceability matrix also has no e18s04 entry. Exit 0."
   nfr:
-    passed: false
+    passed: true
     report: ".specs/verifications/NFR-e18s04.json"
   wiki_lint:
     passed: true
     note: "No specs/skills-wiki or specs/conventions-wiki directory exists, so there are no stale skill pages and no orphan convention pages."
   manual:
-    passed: false
+    passed: true
     steps:
       - step: "A user allow, deny, or steering result comes back from WASM for that tool-call id"
         expected: "promptToolPermissionRequest opens the existing Pi prompt through the native queue and returns the bound decision"
-        actual: "The native unit test bound call-allow to allow. index.ts askScrollablePermission still calls permissionPromptQueueFor().enqueue, and presentBoundPrompt has no production caller."
-        passed: false
+        actual: "askScrollablePermission calls presentBoundPrompt when the native package loads. The live test rendered Allow the main agent to use read? for call-live-prompt and returned deny. The allow test bound call-allow to allow. The steering test returned call-steering with the submitted text."
+        passed: true
       - step: "A second ask waits, and its steering cannot satisfy the first request"
         expected: "The WASM queue holds the second request until the first prompt settles"
-        actual: "The live FIFO behavior still comes from PermissionPromptQueue in prompt-queue.ts. The native wait test passes only when decidePrompt is called directly."
-        passed: false
+        actual: "The queue-order test presented call-first, then call-second only after the first decision. The live test kept call-after-live-prompt unpresented until the visible prompt settled. The steering test kept its text on call-steering."
+        passed: true
       - step: "A Pi UI failure denies the tool call"
         expected: "The success path records deny and does not leave the call queued as allow"
-        actual: "The native rejection test denies call-rejected-ui and then presents the next id. The live prompt path does not use that function."
-        passed: false
+        actual: "A rejected presenter returned ok false and decision deny for call-rejected-ui, then presented the next id. presentBoundPrompt turns a thrown presenter into that deny result, and acceptBoundPermission denies any result that is not ok or not bound to the same id."
+        passed: true
   gaps:
-    closed: false
-    items:
-      - "Route askScrollablePermission through presentBoundPrompt when the native package loads, and keep the TypeScript queue only for load failure until e18s06."
+    closed: true
+    items: []

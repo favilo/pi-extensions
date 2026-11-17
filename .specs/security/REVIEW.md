@@ -116,3 +116,13 @@ No command injection, path-traversal allow, authorization bypass, secret exposur
 The native queue binds each host callback to the tool-call id captured when that prompt opens. A UI rejection or a thrown presenter resolves `ok: false`, `decision: deny`, and no steering, then releases the next queued prompt. `presentBoundPrompt` accepts a result only when the version, operation, nonce, and tool-call id match the request. A mismatched or malformed result becomes deny. The queue rejects a second N-API environment while work is queued. The `FunctionRef` lifetime erasure is confined to that queue, checked against the captured environment, and used only to attach `then` and `catch`.
 
 `askScrollablePermission` does not call this queue yet. The live prompt still uses `PermissionPromptQueue`. That is a missing integration, not an allow bypass: the existing TypeScript queue still serializes the visible prompt. No command injection, path-traversal allow, authorization bypass, secret exposure, or unsafe deserialization finding reached confidence 8.
+
+## e18s04 live prompt routing
+
+- Reviewed: 2026-11-17T19:42:40Z
+- Scope: `vuwmxvln` in `askScrollablePermission` and `presentBoundPrompt` (`extensions/tool-permissions/index.ts`, `extensions/tool-permissions/native-prompt-queue.ts`)
+- Result: **PASS — no reportable HIGH findings**
+
+On a loaded native package, `askScrollablePermission` sends the prompt through `presentBoundPrompt` and keeps `PermissionPromptQueue` for load failure only. The host accepts a result only when `ok` is true and the tool-call id, decision, and steering match the prompt that opened. A mismatched id, a malformed result, or a thrown presenter becomes deny. A parent abort or session shutdown cancels the open prompt before the next queued prompt is presented. The queue id is the tool-call id when one exists, and otherwise a fresh `randomUUID` request id. The nonce remains the existing host/module contract value, not a credential.
+
+No command injection, path-traversal allow, authorization bypass, secret exposure, or unsafe deserialization finding reached confidence 8. The earlier missing-integration note is closed.

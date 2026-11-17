@@ -118,9 +118,9 @@ epics:
     title: WASM-only tool-permissions runtime
     capsule_dir: epics/e18-wasm-only-tool-permissions
     wsjf: 2.1
-    bcps: 35
+    bcps: 38
     note: >-
-      WSJF = (business value 8 + time criticality 5 + risk reduction 8) / job size 10 = 2.1. First record whether to adopt pi-oxidized-ext. Then move path trust, audit writes, rule saves, prompts, and tool execution into WASM, and remove the TypeScript permission fallback. The package entry still only loads WASM. Passing e16 stories stay closed.
+      WSJF = (business value 8 + time criticality 5 + risk reduction 8) / job size 10 = 2.1. First record whether to adopt pi-oxidized-ext. Then move path trust, audit writes, rule saves, prompts, and tool execution into WASM, and remove the TypeScript permission fallback. e18s07 proves the prompt-queue FunctionRef lifetime erasure under Miri before that pattern is copied. The package entry still only loads WASM. Passing e16 stories stay closed.
 bugs:
   total: 1
   fixed: 0

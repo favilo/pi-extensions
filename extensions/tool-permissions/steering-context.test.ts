@@ -121,6 +121,7 @@ function typeText(text: string): string[] {
 }
 
 const TAB = "\t";
+const ESC = "\x1b";
 const CTRL_D = "\x04";
 const CTRL_Y = "\x19";
 
@@ -180,6 +181,72 @@ test("allow-with-steering annotates the invocation-bound tool result", async () 
       "unsteered results pass through unmodified",
     );
   } finally {
+    harness.cleanup();
+  }
+});
+
+test("extra Escape presses stay in the Vim steering editor", async () => {
+  const previousVim = process.env.PI_VIM_MODE;
+  process.env.PI_VIM_MODE = "1";
+  const harness = await steeringHarness();
+  try {
+    const pending = harness.toolCall(
+      {
+        toolName: "bash",
+        toolCallId: "call_vim_escape",
+        input: { command: "npm test" },
+      },
+      promptingCtx(harness),
+    );
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(harness.prompts.length, 1);
+
+    for (const key of [TAB, ...typeText("keep this"), ESC, ESC, ESC])
+      harness.prompts[0].handleInput(key);
+
+    const raced = await Promise.race([
+      pending.then((value) => ({ settled: true, value })),
+      new Promise<{ settled: false }>((resolve) =>
+        setImmediate(() => resolve({ settled: false })),
+      ),
+    ]);
+    assert.deepEqual(raced, { settled: false });
+
+    harness.prompts[0].handleInput(CTRL_Y);
+    await pending;
+    const kept = harness.toolResult(
+      {
+        toolCallId: "call_vim_escape",
+        content: [{ type: "text", text: "exit code: 0" }],
+      },
+      {},
+    );
+    assert.match(JSON.stringify(kept), /keep this/);
+
+    const left = harness.toolCall(
+      {
+        toolName: "bash",
+        toolCallId: "call_vim_tab_exit",
+        input: { command: "npm test" },
+      },
+      promptingCtx(harness),
+    );
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(harness.prompts.length, 2);
+    for (const key of [TAB, ...typeText("keep this"), ESC, TAB, CTRL_Y])
+      harness.prompts[1].handleInput(key);
+    await left;
+    const exited = harness.toolResult(
+      {
+        toolCallId: "call_vim_tab_exit",
+        content: [{ type: "text", text: "exit code: 0" }],
+      },
+      {},
+    );
+    assert.equal(exited, undefined);
+  } finally {
+    if (previousVim === undefined) delete process.env.PI_VIM_MODE;
+    else process.env.PI_VIM_MODE = previousVim;
     harness.cleanup();
   }
 });

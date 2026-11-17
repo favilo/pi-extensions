@@ -11,14 +11,17 @@ import {
   type ToolPermissionBoundary,
 } from "../tool-permissions/permission-boundary.ts";
 
-function isInputComponent(
-  value: unknown,
-): value is { handleInput(data: string): void } {
+function isInputComponent(value: unknown): value is {
+  handleInput(data: string): void;
+  render(width: number): string[];
+} {
   return (
     typeof value === "object" &&
     value !== null &&
     "handleInput" in value &&
-    typeof value.handleInput === "function"
+    typeof value.handleInput === "function" &&
+    "render" in value &&
+    typeof value.render === "function"
   );
 }
 
@@ -109,7 +112,13 @@ test("attributes the visible prompt while marking only the requesting child as w
   assert.deepEqual(statuses, ["waiting-for-permission", "running"]);
 });
 
-test("Escape cancels an available main UI permission prompt", async () => {
+function openWritePrompt(): {
+  pending: Promise<"allow" | "deny" | "cancel">;
+  prompt: {
+    handleInput(data: string): void;
+    render(width: number): string[];
+  };
+} {
   let promptComponent: unknown;
   const context = {
     cwd: "/workspace/project",
@@ -144,8 +153,7 @@ test("Escape cancels an available main UI permission prompt", async () => {
       },
     },
   } satisfies PermissionContext;
-
-  const pendingResult = promptToolPermissionRequest(
+  const pending = promptToolPermissionRequest(
     { sendUserMessage() {} },
     context,
     {
@@ -155,17 +163,42 @@ test("Escape cancels an available main UI permission prompt", async () => {
       cwd: context.cwd,
     },
   );
-
   assert.ok(isInputComponent(promptComponent));
-  promptComponent.handleInput("\x1b");
+  return { pending, prompt: promptComponent };
+}
+
+test("Escape does not cancel an available main UI permission prompt", async () => {
+  const { pending, prompt } = openWritePrompt();
+  prompt.handleInput("\x1b");
+  prompt.handleInput("\x1b");
 
   const result = await Promise.race([
-    pendingResult.then((value) => ({ settled: true, value })),
+    pending.then((value) => ({ settled: true, value })),
     new Promise<{ settled: false }>((resolve) =>
       setImmediate(() => resolve({ settled: false })),
     ),
   ]);
-  assert.deepEqual(result, { settled: true, value: "cancel" });
+  assert.deepEqual(result, { settled: false });
+  assert.doesNotMatch(prompt.render(80).join("\n"), /Esc cancel/);
+  prompt.handleInput("\x04");
+  assert.equal(await pending, "deny");
+});
+
+test("Vim insert steering does not say that Escape returns", async () => {
+  const previousVim = process.env.PI_VIM_MODE;
+  process.env.PI_VIM_MODE = "1";
+  try {
+    const { pending, prompt } = openWritePrompt();
+    prompt.handleInput("\t");
+    const hint = prompt.render(80).join("\n");
+    assert.match(hint, /Esc normal mode/);
+    assert.doesNotMatch(hint, /Esc returns/);
+    prompt.handleInput("\x04");
+    assert.equal(await pending, "deny");
+  } finally {
+    if (previousVim === undefined) delete process.env.PI_VIM_MODE;
+    else process.env.PI_VIM_MODE = previousVim;
+  }
 });
 
 test("reports prompt cancellation distinctly without executing", async () => {

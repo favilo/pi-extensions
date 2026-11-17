@@ -88,7 +88,6 @@ import type {
   ToolPermissionBoundary,
   ToolRequest,
 } from "./permission-boundary.ts";
-import { isPermissionPromptCancellation } from "./prompt-input.ts";
 import { SteeringEditor } from "./steering-editor.ts";
 import {
   NATIVE_PROMPT_QUEUE_NONCE,
@@ -1094,9 +1093,9 @@ async function presentScrollablePermission(
             ? isVim
               ? steeringEditor.getMode() === "insert"
                 ? `Esc normal mode • Ctrl+D deny+steer`
-                : `Esc exit steering • i/A insert mode • hjkl navigate • Ctrl+D deny+steer`
+                : `Tab exit steering • i/A insert mode • hjkl navigate • Ctrl+D deny+steer`
               : `Esc exit steering • Ctrl+D deny+steer`
-            : `Tab steering • Ctrl+D deny • Esc cancel`;
+            : `Tab steering • Ctrl+D deny`;
           const approvalHint = steeringMode
             ? `Ctrl+Y allow once+steer${steeringAllowHint}`
             : `Ctrl+Y allow once${allowHint}`;
@@ -1152,7 +1151,9 @@ async function presentScrollablePermission(
                       "dim",
                       steeringEditor.getValue().trim()
                         ? "choose allow or deny"
-                        : "type a message; Esc returns",
+                        : isVim
+                          ? "type a message"
+                          : "type a message; Esc returns",
                     ),
                   ),
                 ]
@@ -1224,9 +1225,19 @@ async function presentScrollablePermission(
               else done({ allowed: false, decision: "deny" });
               return;
             }
+            if (
+              isVim &&
+              steeringEditor.getMode() !== "insert" &&
+              matchesKey(data, "tab")
+            ) {
+              steeringMode = false;
+              tui.requestRender();
+              return;
+            }
             if (matchesKey(data, "escape")) {
-              if (steeringEditor.getMode() === "insert" && isVim) {
-                steeringEditor.handleInput(data);
+              if (isVim) {
+                if (steeringEditor.getMode() === "insert")
+                  steeringEditor.handleInput(data);
               } else {
                 steeringMode = false;
               }
@@ -1302,10 +1313,6 @@ async function presentScrollablePermission(
             return;
           }
 
-          if (isPermissionPromptCancellation(data)) {
-            done({ allowed: false, decision: "cancel" });
-            return;
-          }
           if (matchesKey(data, "tab")) {
             steeringMode = true;
             tui.requestRender();

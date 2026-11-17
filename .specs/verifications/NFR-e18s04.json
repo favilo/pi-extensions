@@ -1,7 +1,7 @@
 {
   "story_id": "e18s04",
-  "verified_at": "2026-11-16T18:56:11Z",
-  "status": "FAIL",
+  "verified_at": "2026-11-17T19:42:40Z",
+  "status": "PASS",
   "threshold_source": {
     "status": "WAIVED",
     "reason": "No e18 TEST_PLAN_LATEST artifact defines numeric NFR thresholds. Evidence uses the story quality attributes: one WASM owner for queue order, tool-call binding, and steering."
@@ -11,18 +11,18 @@
       "status": "PASS",
       "threshold": "Bound-decision, queue-order, UI-failure, and steering checks complete inside the existing test run.",
       "evidence": [
-        "tsx --test extensions/tool-permissions/native-prompt-queue.test.ts finished in 160.206958 ms with 6 passing tests.",
-        "npm run test:preflight finished in 3463.584 ms with 351 passing tests.",
+        "tsx --test extensions/tool-permissions/native-prompt-queue.test.ts finished in 805.993625 ms with 7 passing tests.",
+        "npm run test:preflight finished in 3800.683625 ms with 352 passing tests.",
         "cargo test finished inside npm run check with 23 passing native tests."
       ]
     },
     "reliability": {
-      "status": "FAIL",
+      "status": "PASS",
       "threshold": "On a successful WASM load, Rust owns queue order and returns the decision for the tool-call id that opened the prompt. A UI failure denies that call.",
       "evidence": [
-        "askScrollablePermission in extensions/tool-permissions/index.ts still calls permissionPromptQueueFor().enqueue.",
-        "presentBoundPrompt is referenced only by extensions/tool-permissions/native-prompt-queue.ts and its test.",
-        "The native rejection test does deny call-rejected-ui, but that path is not the live prompt."
+        "askScrollablePermission calls presentBoundPrompt when isNativePromptQueueLoaded is true, and uses PermissionPromptQueue only when the package is not loaded.",
+        "The live test held the native queue for call-live-prompt until the visible prompt settled, then returned deny.",
+        "A rejected presenter returned deny for call-rejected-ui. presentBoundPrompt maps a thrown presenter to ok false and decision deny. acceptBoundPermission denies a result that is not ok or not bound to the same id."
       ]
     },
     "operability": {

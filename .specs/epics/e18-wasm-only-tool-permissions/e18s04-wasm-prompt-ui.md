@@ -56,7 +56,7 @@ Rust calls host-supplied Pi UI operations for open, input, and close. The host v
 Queue and steering state are process-local and cleared on the existing session shutdown path. Saved rules remain the concern of e18s03.
 
 ## 14. Dependencies
-- Current prompt-queue, prompt-input, and steering tests.
+- Current prompt-queue and steering tests.
 - e09 invocation binding and e10 editor behavior as oracles.
 - `.specs/security/epics/e18/THREAT_MODEL.md` threat 5.
 
