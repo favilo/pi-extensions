@@ -87,6 +87,26 @@ function isBoundResult(
   );
 }
 
+function loadNativePromptQueue(): NativePromptQueue | undefined {
+  const packagePath = resolveNativePackagePath();
+  if (!packagePath) return undefined;
+  try {
+    const native = requireNativePackage(
+      packagePath,
+    ) as Partial<NativePromptQueue>;
+    return typeof native.decidePrompt === "function"
+      ? (native as NativePromptQueue)
+      : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** True when the loaded package can own prompt order. */
+export function isNativePromptQueueLoaded(): boolean {
+  return loadNativePromptQueue() !== undefined;
+}
+
 /** Ask WASM to open one prompt and return that prompt's decision. */
 export async function presentBoundPrompt(
   request: PromptQueueRequest,
@@ -99,15 +119,8 @@ export async function presentBoundPrompt(
   ) {
     return failedResult(request);
   }
-  const packagePath = resolveNativePackagePath();
-  if (!packagePath) return failedResult(request);
-  let native: Partial<NativePromptQueue>;
-  try {
-    native = requireNativePackage(packagePath) as Partial<NativePromptQueue>;
-  } catch {
-    return failedResult(request);
-  }
-  if (typeof native.decidePrompt !== "function") return failedResult(request);
+  const native = loadNativePromptQueue();
+  if (!native) return failedResult(request);
   try {
     const result = await native.decidePrompt(
       {

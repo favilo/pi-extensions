@@ -91,6 +91,13 @@ import type {
 import { isPermissionPromptCancellation } from "./prompt-input.ts";
 import { SteeringEditor } from "./steering-editor.ts";
 import {
+  NATIVE_PROMPT_QUEUE_NONCE,
+  PromptQueueDecision,
+  isNativePromptQueueLoaded,
+  presentBoundPrompt,
+  type PromptQueueResult,
+} from "./native-prompt-queue.ts";
+import {
   closePermissionPromptQueue,
   createPermissionPromptIdentity,
   permissionPromptQueueFor,
@@ -254,6 +261,58 @@ function auditDestination() {
 
 /** Steering text captured at allow+steer decision time, keyed by toolCallId, annotated onto the invocation-bound tool result. */
 const pendingSteering = new Map<string, string>();
+const SESSION_PROMPT_ABORTS = Symbol.for(
+  "pi-extensions.tool-permissions.session-prompt-aborts",
+);
+
+type SessionPromptAbortState = {
+  sessions: Map<string, Set<AbortController>>;
+  cancelled: Set<AbortSignal>;
+};
+
+function sessionPromptAbortState(): SessionPromptAbortState {
+  const processGlobal = globalThis as { [key: symbol]: unknown };
+  const current = processGlobal[SESSION_PROMPT_ABORTS] as
+    SessionPromptAbortState | undefined;
+  if (current) return current;
+  const state: SessionPromptAbortState = {
+    sessions: new Map(),
+    cancelled: new Set(),
+  };
+  processGlobal[SESSION_PROMPT_ABORTS] = state;
+  return state;
+}
+
+function promptWasCancelled(signal: AbortSignal): boolean {
+  return signal.aborted || sessionPromptAbortState().cancelled.has(signal);
+}
+
+function trackSessionPromptAbort(
+  sessionId: string,
+  controller: AbortController,
+): () => void {
+  const state = sessionPromptAbortState();
+  const group = state.sessions.get(sessionId) ?? new Set<AbortController>();
+  group.add(controller);
+  state.sessions.set(sessionId, group);
+  return () => {
+    group.delete(controller);
+    state.cancelled.delete(controller.signal);
+    if (group.size === 0) state.sessions.delete(sessionId);
+    if (state.sessions.size === 0 && state.cancelled.size === 0) {
+      delete (globalThis as { [key: symbol]: unknown })[SESSION_PROMPT_ABORTS];
+    }
+  };
+}
+
+function abortSessionPromptPresentations(sessionId: string): void {
+  const state = sessionPromptAbortState();
+  const group = state.sessions.get(sessionId);
+  if (!group) return;
+  const controllers = [...group];
+  for (const controller of controllers) state.cancelled.add(controller.signal);
+  for (const controller of controllers) controller.abort();
+}
 /** Previews published during a prompt; re-appended after the tool result for bottom-of-transcript visibility. */
 const promptedPreviews = new Map<string, PermissionPreview>();
 /** Tool calls whose permission prompt is still waiting; their preview entries ignore the collapsed state. */
@@ -1327,13 +1386,104 @@ function permissionParentSessionId(ctx: PermissionContext): string {
   return sessionId;
 }
 
+type ScrollablePermissionRequest = Pick<
+  ToolRequest,
+  "actor" | "toolName" | "cwd" | "input" | "toolCallId"
+>;
+
+function promptResolution(result: PermissionResult): {
+  decision: PromptQueueDecision;
+  steering?: string;
+} {
+  if (result.decision === "cancel")
+    return { decision: PromptQueueDecision.Deny };
+  return {
+    decision: result.allowed
+      ? PromptQueueDecision.Allow
+      : PromptQueueDecision.Deny,
+    ...(result.steering !== undefined ? { steering: result.steering } : {}),
+  };
+}
+
+function boundDecisionAgrees(
+  bound: PromptQueueResult,
+  outcome: PermissionResult,
+): boolean {
+  if (outcome.decision === "cancel") {
+    return (
+      bound.decision === PromptQueueDecision.Deny &&
+      bound.steering === undefined
+    );
+  }
+  const expected = outcome.allowed
+    ? PromptQueueDecision.Allow
+    : PromptQueueDecision.Deny;
+  return bound.decision === expected && bound.steering === outcome.steering;
+}
+
+function acceptBoundPermission(
+  bound: PromptQueueResult,
+  outcome: PermissionResult | undefined,
+  queueId: string,
+): PermissionResult {
+  if (
+    outcome &&
+    bound.ok &&
+    bound.toolCallId === queueId &&
+    boundDecisionAgrees(bound, outcome)
+  ) {
+    return outcome;
+  }
+  return { allowed: false, decision: "deny" };
+}
+
+async function presentOnNativePromptQueue(
+  ctx: PermissionContext,
+  request: ScrollablePermissionRequest,
+  queueId: string,
+  present: (signal: AbortSignal) => Promise<PermissionResult>,
+): Promise<PermissionResult> {
+  if (ctx.signal?.aborted) return { allowed: false, decision: "cancel" };
+  const sessionId = permissionParentSessionId(ctx);
+  const abort = new AbortController();
+  const abortFromParent = (): void => abort.abort();
+  ctx.signal?.addEventListener("abort", abortFromParent);
+  const release = trackSessionPromptAbort(sessionId, abort);
+  let outcome: PermissionResult | undefined;
+  try {
+    const bound = await presentBoundPrompt(
+      {
+        version: NATIVE_CONTRACT_VERSION,
+        operation: "prompt_queue",
+        nonce: NATIVE_PROMPT_QUEUE_NONCE,
+        toolCallId: queueId,
+      },
+      async (prompt) => {
+        if (prompt.toolCallId !== queueId || promptWasCancelled(abort.signal)) {
+          outcome = {
+            allowed: false,
+            decision: promptWasCancelled(abort.signal) ? "cancel" : "deny",
+          };
+          return { decision: PromptQueueDecision.Deny };
+        }
+        outcome = await present(abort.signal);
+        return promptResolution(outcome);
+      },
+    );
+    const accepted = acceptBoundPermission(bound, outcome, queueId);
+    if (outcome?.allowed && !accepted.allowed && request.toolCallId)
+      pendingSteering.delete(request.toolCallId);
+    return accepted;
+  } finally {
+    ctx.signal?.removeEventListener("abort", abortFromParent);
+    release();
+  }
+}
+
 async function askScrollablePermission(
   pi: PermissionPreviewPublisher,
   ctx: PermissionContext,
-  request: Pick<
-    ToolRequest,
-    "actor" | "toolName" | "cwd" | "input" | "toolCallId"
-  >,
+  request: ScrollablePermissionRequest,
   title: string,
   body: string,
   allowPattern?: AllowPatternOption,
@@ -1342,38 +1492,48 @@ async function askScrollablePermission(
 ): Promise<PermissionResult> {
   const identity = createPermissionPromptIdentity(request);
   logSubagentDebug("permission-queue-enqueue", { identity });
-  return permissionPromptQueueFor(permissionParentSessionId(ctx)).enqueue({
-    identity,
-    cancel: { allowed: false, decision: "cancel" },
-    signal: ctx.signal,
-    present: async (signal) => {
-      logSubagentDebug("permission-queue-present", { identity });
-      try {
-        const result = await presentScrollablePermission(
-          pi,
-          ctx,
-          title,
-          body,
-          allowPattern,
-          stickyHeader,
-          signal,
-          request.toolCallId,
-          previewText,
-        );
-        logSubagentDebug("permission-queue-settle", {
-          identity,
-          decision: result.decision,
-        });
-        return result;
-      } catch (error) {
-        logSubagentDebug("permission-queue-error", {
-          identity,
-          errorType: error instanceof Error ? error.name : typeof error,
-        });
-        throw error;
-      }
-    },
-  });
+  const present = async (signal: AbortSignal): Promise<PermissionResult> => {
+    logSubagentDebug("permission-queue-present", { identity });
+    try {
+      const result = await presentScrollablePermission(
+        pi,
+        ctx,
+        title,
+        body,
+        allowPattern,
+        stickyHeader,
+        signal,
+        request.toolCallId,
+        previewText,
+      );
+      logSubagentDebug("permission-queue-settle", {
+        identity,
+        decision: result.decision,
+      });
+      return result;
+    } catch (error) {
+      logSubagentDebug("permission-queue-error", {
+        identity,
+        errorType: error instanceof Error ? error.name : typeof error,
+      });
+      throw error;
+    }
+  };
+
+  if (!isNativePromptQueueLoaded()) {
+    return permissionPromptQueueFor(permissionParentSessionId(ctx)).enqueue({
+      identity,
+      cancel: { allowed: false, decision: "cancel" },
+      signal: ctx.signal,
+      present,
+    });
+  }
+
+  const queueId =
+    request.toolCallId && request.toolCallId.length > 0
+      ? request.toolCallId
+      : identity.requestId;
+  return presentOnNativePromptQueue(ctx, request, queueId, present);
 }
 
 export async function promptToolPermissionRequest(
@@ -2499,7 +2659,9 @@ function handleRegisteredSessionShutdown(ctx: any): void {
   promptedPreviews.clear();
   pendingPreviewReviews.clear();
   previewReviewOverrides.clear();
-  closePermissionPromptQueue(permissionParentSessionId(ctx));
+  const sessionId = permissionParentSessionId(ctx);
+  abortSessionPromptPresentations(sessionId);
+  closePermissionPromptQueue(sessionId);
 }
 
 function handleRegisteredToolResult(
