@@ -15,6 +15,7 @@ pub enum NativeOperation {
     AuditWrite,
     RuleSave,
     PromptQueue,
+    ToolExecution,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, derive_more::FromStr)]
@@ -265,4 +266,26 @@ pub struct PromptQueueResponse {
     pub tool_call_id: String,
     pub decision: PromptQueueDecision,
     pub steering: Option<String>,
+}
+
+#[napi(object)]
+pub struct ToolExecutionRequest {
+    pub version: i64,
+    pub operation: String,
+    pub nonce: String,
+    pub decision: String,
+    pub tool_name: String,
+    pub input_json: String,
+}
+
+#[napi(object)]
+pub struct ToolExecutionResponse {
+    pub version: i64,
+    pub operation: NativeOperation,
+    pub ok: bool,
+    pub nonce: String,
+    pub decision: String,
+    pub executions: i64,
+    pub value_json: Option<String>,
+    pub error: Option<String>,
 }

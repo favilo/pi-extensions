@@ -1,5 +1,6 @@
 mod audit;
 mod contract;
+mod execution;
 mod parser;
 mod path_trust;
 mod policy;
@@ -14,9 +15,9 @@ pub use contract::{
     PermissionEvaluationRequest, PermissionOrchestrationRequest, PermissionOrchestrationResponse,
     PolicyPermission, PolicyRequest, PolicyResponse, ProbeRequest, ProbeResponse,
     PromptQueueDecision, PromptQueueRequest, PromptQueueResolution, PromptQueueResponse,
-    RuleSaveRequest, RuleSaveResponse,
+    RuleSaveRequest, RuleSaveResponse, ToolExecutionRequest, ToolExecutionResponse,
 };
-use napi::bindgen_prelude::{Function, PromiseRaw};
+use napi::bindgen_prelude::{FnArgs, Function, PromiseRaw};
 use napi::{Env, Error, Result};
 use napi_derive::napi;
 use pi_api::RealpathCallback;
@@ -143,12 +144,30 @@ pub fn decide_prompt<'env>(
     prompt_queue::decide(env, request, present)
 }
 
+#[napi]
+pub fn execute_tool<'env>(
+    request: ToolExecutionRequest,
+    execute: Function<'env, FnArgs<(String, String)>, PromiseRaw<'env, String>>,
+) -> Result<PromiseRaw<'env, ToolExecutionResponse>> {
+    execution::execute(request, execute)
+}
+
 #[cfg(test)]
 mod tests {
     use super::{
         EvaluateRequest, ParseRequest, PermissionOrchestrationRequest, PolicyRequest, ProbeRequest,
         evaluate_permission_orchestration, evaluate_policy, parse, parse_policy, probe,
     };
+
+    #[test]
+    fn tool_execution_source_stays_a_host_callback() {
+        let source = include_str!("execution.rs");
+        assert!(!source.contains("std::process"));
+        assert!(!source.contains("std::net"));
+        assert!(!source.contains("FunctionRef"));
+        assert!(!source.contains("mem::transmute"));
+    }
+
     #[test]
     fn probe_returns_a_distinct_typed_response() {
         let response = probe(ProbeRequest {
