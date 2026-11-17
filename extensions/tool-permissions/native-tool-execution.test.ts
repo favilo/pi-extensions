@@ -72,3 +72,25 @@ test("a deny, a cancellation, or an invalid decision executes nothing", async ()
     assert.equal(result.valueJson, undefined, decision);
   }
 });
+
+test("a host execution error is returned and is not a successful tool result", async () => {
+  let executions = 0;
+  const result = await executeSequencedTool(allowRequest(), async () => {
+    executions += 1;
+    throw new Error("disk full");
+  });
+  console.log(
+    JSON.stringify({
+      decision: "allow",
+      executions,
+      ok: result.ok,
+      error: result.error,
+    }),
+  );
+
+  assert.equal(executions, 1);
+  assert.equal(result.ok, false);
+  assert.equal(result.executions, 1);
+  assert.equal(result.valueJson, undefined);
+  assert.match(result.error ?? "", /disk full/);
+});

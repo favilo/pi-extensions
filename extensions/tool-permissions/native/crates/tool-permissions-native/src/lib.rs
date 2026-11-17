@@ -146,10 +146,11 @@ pub fn decide_prompt<'env>(
 
 #[napi]
 pub fn execute_tool<'env>(
+    env: Env,
     request: ToolExecutionRequest,
     execute: Function<'env, FnArgs<(String, String)>, PromiseRaw<'env, String>>,
 ) -> Result<PromiseRaw<'env, ToolExecutionResponse>> {
-    execution::execute(request, execute)
+    execution::execute(&env, request, execute)
 }
 
 #[cfg(test)]

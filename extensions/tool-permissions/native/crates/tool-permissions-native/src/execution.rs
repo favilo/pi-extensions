@@ -1,7 +1,7 @@
 use crate::CONTRACT_VERSION;
 use crate::contract::{NativeOperation, ToolExecutionRequest, ToolExecutionResponse};
 use napi::bindgen_prelude::{FnArgs, Function, PromiseRaw};
-use napi::{Error, Result as NapiResult};
+use napi::{Env, Error, Result as NapiResult};
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -51,12 +51,44 @@ pub fn success_response(
     }
 }
 
+fn skipped_response(request: ToolExecutionRequest) -> ToolExecutionResponse {
+    ToolExecutionResponse {
+        version: CONTRACT_VERSION,
+        operation: NativeOperation::ToolExecution,
+        ok: false,
+        nonce: request.nonce,
+        decision: request.decision,
+        executions: 0,
+        value_json: None,
+        error: None,
+    }
+}
+
+pub enum ExecutionDecision {
+    Run(ToolExecutionRequest),
+    Skip(ToolExecutionResponse),
+}
+
+pub fn decide_execution(
+    request: ToolExecutionRequest,
+) -> Result<ExecutionDecision, ToolExecutionError> {
+    let request = prepare(request)?;
+    if request.decision == "allow" {
+        Ok(ExecutionDecision::Run(request))
+    } else {
+        Ok(ExecutionDecision::Skip(skipped_response(request)))
+    }
+}
+
 #[cfg(test)]
 pub fn sequence(
     request: ToolExecutionRequest,
     host: &impl HostExecutor,
 ) -> Result<ToolExecutionResponse, ToolExecutionError> {
-    let request = prepare(request)?;
+    let request = match decide_execution(request)? {
+        ExecutionDecision::Skip(response) => return Ok(response),
+        ExecutionDecision::Run(request) => request,
+    };
     let value = host
         .execute(&request.tool_name, &request.input_json)
         .map_err(ToolExecutionError::Host)?;
@@ -64,10 +96,15 @@ pub fn sequence(
 }
 
 pub fn execute<'env>(
+    env: &Env,
     request: ToolExecutionRequest,
     host: Function<'env, FnArgs<(String, String)>, PromiseRaw<'env, String>>,
 ) -> NapiResult<PromiseRaw<'env, ToolExecutionResponse>> {
-    let request = prepare(request).map_err(|error| Error::from_reason(error.to_string()))?;
+    let request =
+        match decide_execution(request).map_err(|error| Error::from_reason(error.to_string()))? {
+            ExecutionDecision::Skip(response) => return PromiseRaw::resolve(env, response),
+            ExecutionDecision::Run(request) => request,
+        };
     let pending = host.call(FnArgs::from((
         request.tool_name.clone(),
         request.input_json.clone(),
@@ -139,5 +176,21 @@ mod tests {
             assert_eq!(response.executions, 0, "{decision}");
             assert!(response.value_json.is_none(), "{decision}");
         }
+    }
+
+    #[test]
+    fn a_host_error_is_not_a_successful_result() {
+        struct FailingHost;
+        impl HostExecutor for FailingHost {
+            fn execute(&self, _tool_name: &str, _input_json: &str) -> Result<String, String> {
+                Err("disk full".into())
+            }
+        }
+
+        let response = sequence(allow_request(), &FailingHost).unwrap();
+        assert!(!response.ok);
+        assert_eq!(response.executions, 1);
+        assert!(response.value_json.is_none());
+        assert_eq!(response.error.as_deref(), Some("disk full"));
     }
 }
