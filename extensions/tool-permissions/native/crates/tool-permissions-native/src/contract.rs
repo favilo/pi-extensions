@@ -268,6 +268,7 @@ pub struct PromptQueueResponse {
     pub steering: Option<String>,
 }
 
+#[derive(Clone)]
 #[napi(object)]
 pub struct ToolExecutionRequest {
     pub version: i64,

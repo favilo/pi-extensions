@@ -1,7 +1,9 @@
 use crate::CONTRACT_VERSION;
 use crate::contract::{NativeOperation, ToolExecutionRequest, ToolExecutionResponse};
-use napi::bindgen_prelude::{FnArgs, Function, PromiseRaw};
-use napi::{Env, Error, Result as NapiResult};
+use napi::bindgen_prelude::{
+    CallbackContext, FnArgs, Function, JsObjectValue, Object, PromiseRaw, Unknown,
+};
+use napi::{Env, Error, Result as NapiResult, ValueType};
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -12,9 +14,6 @@ pub enum ToolExecutionError {
     Nonce,
     #[error("tool execution is missing the tool name")]
     ToolName,
-    #[cfg(test)]
-    #[error("{0}")]
-    Host(String),
 }
 
 #[cfg(test)]
@@ -80,6 +79,43 @@ pub fn decide_execution(
     }
 }
 
+fn host_failure(request: ToolExecutionRequest, error: String) -> ToolExecutionResponse {
+    ToolExecutionResponse {
+        version: CONTRACT_VERSION,
+        operation: NativeOperation::ToolExecution,
+        ok: false,
+        nonce: request.nonce,
+        decision: request.decision,
+        executions: 1,
+        value_json: None,
+        error: Some(error),
+    }
+}
+
+fn host_error_message(value: &Unknown) -> String {
+    if matches!(value.get_type(), Ok(ValueType::Object)) {
+        // SAFETY: `Unknown::cast` requires the JavaScript type to match `Object`.
+        // `get_type()` just reported `ValueType::Object` for this value.
+        if let Ok(object) = unsafe { value.cast::<Object>() } {
+            if let Ok(message) = object.get_named_property::<String>("message") {
+                if !message.is_empty() {
+                    return message;
+                }
+            }
+        }
+    }
+    if matches!(value.get_type(), Ok(ValueType::String)) {
+        // SAFETY: `Unknown::cast` requires the JavaScript type to match `String`.
+        // `get_type()` just reported `ValueType::String` for this value.
+        if let Ok(text) = unsafe { value.cast::<String>() } {
+            if !text.is_empty() {
+                return text;
+            }
+        }
+    }
+    "host execution failed".to_owned()
+}
+
 #[cfg(test)]
 pub fn sequence(
     request: ToolExecutionRequest,
@@ -89,9 +125,10 @@ pub fn sequence(
         ExecutionDecision::Skip(response) => return Ok(response),
         ExecutionDecision::Run(request) => request,
     };
-    let value = host
-        .execute(&request.tool_name, &request.input_json)
-        .map_err(ToolExecutionError::Host)?;
+    let value = match host.execute(&request.tool_name, &request.input_json) {
+        Ok(value) => value,
+        Err(error) => return Ok(host_failure(request, error)),
+    };
     Ok(success_response(request, value))
 }
 
@@ -105,11 +142,18 @@ pub fn execute<'env>(
             ExecutionDecision::Skip(response) => return PromiseRaw::resolve(env, response),
             ExecutionDecision::Run(request) => request,
         };
-    let pending = host.call(FnArgs::from((
+    let pending = match host.call(FnArgs::from((
         request.tool_name.clone(),
         request.input_json.clone(),
-    )))?;
-    pending.then(move |context| Ok(success_response(request, context.value)))
+    ))) {
+        Ok(pending) => pending,
+        Err(error) => return PromiseRaw::resolve(env, host_failure(request, error.to_string())),
+    };
+    let failed = request.clone();
+    let settled = pending.then(move |context| Ok(success_response(request, context.value)))?;
+    settled.catch(move |context: CallbackContext<Unknown>| {
+        Ok(host_failure(failed, host_error_message(&context.value)))
+    })
 }
 
 #[cfg(test)]
