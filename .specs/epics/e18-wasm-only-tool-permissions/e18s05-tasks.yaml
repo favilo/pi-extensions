@@ -7,7 +7,7 @@ spec: e18s05-wasm-tool-execution.md
 tasks:
   - id: 1
     description: Add failing tests for one execution on allow, zero executions on deny, and visible host errors. No new security findings in affected paths.
-    verify: node --test extensions/tool-permissions/native-tool-execution.test.ts extensions/tool-permissions/permission-boundary.test.ts
+    verify: tsx --test extensions/tool-permissions/native-tool-execution.test.ts extensions/tool-permissions/permission-boundary.test.ts
     risk: P0
     security: high
     status: failing
@@ -29,7 +29,7 @@ tasks:
         - "Security Review"
   - id: 3
     description: Route the success path through WASM and remove the duplicate TypeScript invocation. No new security findings in affected paths.
-    verify: node --test extensions/tool-permissions/native-tool-execution.test.ts extensions/tool-permissions/permission-boundary.test.ts
+    verify: tsx --test extensions/tool-permissions/native-tool-execution.test.ts extensions/tool-permissions/permission-boundary.test.ts
     risk: P0
     security: high
     status: failing

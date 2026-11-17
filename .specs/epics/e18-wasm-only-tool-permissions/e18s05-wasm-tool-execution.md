@@ -82,14 +82,14 @@ Tests count host callback invocations and record the decision that preceded each
 **Then** the error is returned to Pi and is not replaced with a successful tool result.
 
 ## 18. Automated verification
-- `node --test extensions/tool-permissions/native-tool-execution.test.ts extensions/tool-permissions/permission-boundary.test.ts`
+- `tsx --test extensions/tool-permissions/native-tool-execution.test.ts extensions/tool-permissions/permission-boundary.test.ts`
 - `cargo test --manifest-path extensions/tool-permissions/native/Cargo.toml`
 - `npm run build:native && npm run check`
 
 ## 19. Implementation steps
-1. Add failing tests for one execution on allow, zero executions on deny, and visible host errors. → verify: `node --test extensions/tool-permissions/native-tool-execution.test.ts extensions/tool-permissions/permission-boundary.test.ts`
+1. Add failing tests for one execution on allow, zero executions on deny, and visible host errors. → verify: `tsx --test extensions/tool-permissions/native-tool-execution.test.ts extensions/tool-permissions/permission-boundary.test.ts`
 2. Add the Rust execution sequence that calls only the host callback. → verify: `cargo test --manifest-path extensions/tool-permissions/native/Cargo.toml`
-3. Route the success path through WASM and remove the duplicate TypeScript invocation. → verify: `node --test extensions/tool-permissions/native-tool-execution.test.ts extensions/tool-permissions/permission-boundary.test.ts`
+3. Route the success path through WASM and remove the duplicate TypeScript invocation. → verify: `tsx --test extensions/tool-permissions/native-tool-execution.test.ts extensions/tool-permissions/permission-boundary.test.ts`
 4. Run the native build and full checks. No new security findings in affected paths. → verify: `npm run build:native && npm run check`
 
 ## 20. Definition of done
