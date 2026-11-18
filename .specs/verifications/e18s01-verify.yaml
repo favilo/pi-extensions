@@ -1,0 +1,104 @@
+story_id: e18s01
+verified_at: "2026-11-09T17:05:08Z"
+verifier: verify-work
+status: passed
+risk: P0
+vcs:
+  kind: jj
+  working_copy: wlpruqvuwlmo
+  parent: tqlpuxsoqlrs
+  bookmark_ancestor: favilo/e18s00-pi-oxidized-host
+  not_main: true
+phases:
+  branch:
+    passed: true
+    note: "Working copy descends from favilo/e18s00-pi-oxidized-host and is not main (vmyzxzpk). No open PR, so gh pr checks did not run."
+  preflight:
+    passed: true
+    command: "bash $BIGPOWERS_ROOT/scripts/bp-read-agents.sh --print"
+    note: "AGENTS.md has no Preflight section. bp-timing.sh could not start because python3 lacks PyYAML. Mechanical commands came from package.json."
+  smoke:
+    passed: true
+    note: "Library extension. No server process and no CLI binary. Cold-start is the native release rebuild inside the terminal verdict."
+  task_verification:
+    passed: true
+    tasks:
+      - id: 1
+        command: "node --test extensions/tool-permissions/native-path-trust.test.ts extensions/tool-permissions/permission-boundary.test.ts"
+        exit_code: 0
+        note: "20 passed, 0 failed, duration_ms 986.120709"
+      - id: 2
+        command: "cargo test --manifest-path extensions/tool-permissions/native/Cargo.toml"
+        exit_code: 0
+        note: "Ran as npm run test:native inside the terminal verdict. 12 library tests passed."
+      - id: 3
+        command: "node --test extensions/tool-permissions/native-path-trust.test.ts extensions/tool-permissions/permission-boundary.test.ts"
+        exit_code: 0
+        note: "Same contract run as task 1."
+      - id: 4
+        command: "npm run build:native && npm run check"
+        exit_code: 0
+  build:
+    passed: true
+    command: "npm run build:native"
+  typecheck:
+    passed: true
+    command: "npm run typecheck"
+  lint:
+    passed: true
+    note: "package.json has no lint script. tsc --noEmit passed inside npm run check."
+  tests:
+    passed: true
+    command: "npm run test:preflight"
+    coverage: "327 passed, 0 failed"
+  terminal_verdict:
+    command: "npm run build:native && npm run check"
+    exit_code: 0
+    captured_at: "2026-11-09T17:05:08Z"
+    note: "Single contiguous run. Release WASM build finished. tsc --noEmit passed. cargo test passed 12 tests. node --test passed 327 tests in 4879.837583 ms. check-test-guard printed PASS."
+  security:
+    passed: true
+    report: ".specs/security/REVIEW.md"
+    note: "Re-reviewed the registered handler. No HIGH finding at confidence 8 or above. A configured deny still wins before a WASM allow."
+  blind_spots:
+    passed: true
+    command: "bash $BIGPOWERS_ROOT/scripts/check-blind-spots.sh"
+    note: "0 HIGH, 7 MEDIUM double-tag findings on older stories. Exit 0. The script is not executable, so it was started with bash and its absolute path."
+  completeness_critic:
+    passed: true
+    blockers: 0
+    warnings: 1
+    note: "WARNING: the critic reads the first word of the prose active_story title (Move) instead of active_story_id e18s01, so the zero-tag check was skipped. Exit 0."
+  nfr:
+    passed: true
+    report: ".specs/verifications/NFR-e18s01.json"
+  wiki_lint:
+    passed: true
+    note: "No specs/skills-wiki or specs/conventions-wiki directory exists, so there are no stale skill pages and no orphan convention pages."
+  manual:
+    passed: true
+    steps:
+      - step: "WASM canonical path matches the host for an existing read and a missing write under a symlink parent"
+        expected: "Canonical path and working directory match the TypeScript host"
+        actual: "native-path-trust tests passed for both fixtures"
+        passed: true
+      - step: "WASM trust and .aiignore match the host"
+        expected: "Nearer project denial wins inside the trusted root, a policy outside the root is not honored, and an ignored path is denied"
+        actual: "Those three native-path-trust tests passed"
+        passed: true
+      - step: "Invalid WASM path output denies"
+        expected: "The request is denied and is not recorded as an allow"
+        actual: "The invalid-output test passed, and a disabled native package kept the TypeScript path decision"
+        passed: true
+      - step: "The registered tool-call path uses the WASM decision before the prompt"
+        expected: "A WASM deny blocks before the no-UI ask, and a WASM allow permits an outside path"
+        actual: "Registered read deny, registered write deny, and registered read allow tests passed. A WASM .aiignore deny blocks write. A broken .aiignore asks and blocks when no UI is available."
+        passed: true
+  gaps:
+    closed: true
+    items:
+      - id: 1
+        step: "Registered tool handler consumes the WASM decision"
+        expected: "Prompt and execution run after the WASM allow, deny, or ask result"
+        actual: "Registered read and write tests follow the WASM decision. Edit uses the same nativeDecision gate before the prompt. An .aiignore-only deny on write or edit does not replace the TypeScript decision."
+        status: CLOSED

@@ -18,11 +18,18 @@ export type BackgroundTaskSnapshot = {
 export type BackgroundTaskRegistry = {
   register(cwd: string): BackgroundTaskSnapshot;
   get(id: string): BackgroundTaskSnapshot | undefined;
-  transition(id: string, status: BackgroundChildStatus): BackgroundTaskSnapshot | undefined;
+  transition(
+    id: string,
+    status: BackgroundChildStatus,
+  ): BackgroundTaskSnapshot | undefined;
   remove(id: string): void;
 };
 
-const TERMINAL_STATUSES = new Set<BackgroundChildStatus>(["completed", "failed", "cancelled"]);
+const TERMINAL_STATUSES = new Set<BackgroundChildStatus>([
+  "completed",
+  "failed",
+  "cancelled",
+]);
 
 function snapshot(task: BackgroundTaskSnapshot): BackgroundTaskSnapshot {
   return { ...task };
@@ -39,7 +46,9 @@ export function createBackgroundTaskRegistry(): BackgroundTaskRegistry {
 
     register(cwd) {
       if ([...tasks.values()].some((task) => !task.terminal)) {
-        throw new Error("Only one active background child is allowed until permission prompts are serialized.");
+        throw new Error(
+          "Only one active background child is allowed until permission prompts are serialized.",
+        );
       }
 
       let id = randomUUID();

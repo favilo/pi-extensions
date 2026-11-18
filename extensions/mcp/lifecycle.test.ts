@@ -35,7 +35,12 @@ function harness() {
       active = names;
     },
   };
-  return { pi: pi as unknown as ExtensionAPI, registered, active: () => active, lifecycle };
+  return {
+    pi: pi as unknown as ExtensionAPI,
+    registered,
+    active: () => active,
+    lifecycle,
+  };
 }
 
 const provider: McpToolProvider = {
@@ -92,7 +97,8 @@ test("session shutdown disposes registered providers", () => {
   };
   registerMcpProvider(testHarness.pi, disposable);
 
-  for (const handler of testHarness.lifecycle.get("session_shutdown") ?? []) handler();
+  for (const handler of testHarness.lifecycle.get("session_shutdown") ?? [])
+    handler();
 
   assert.equal(disposed, 1);
 });
@@ -152,7 +158,11 @@ function replacementHarness() {
   return {
     createRuntime,
     active: () => active,
-    listenerCount: () => [...events.values()].reduce((count, handlers) => count + handlers.size, 0),
+    listenerCount: () =>
+      [...events.values()].reduce(
+        (count, handlers) => count + handlers.size,
+        0,
+      ),
   };
 }
 
@@ -178,7 +188,11 @@ test("100 runtime replacement cycles leave no stale or duplicate tools", () => {
 
   for (let cycle = 0; cycle < 100; cycle += 1) {
     const runtime = session.createRuntime();
-    assert.deepEqual(session.active(), ["mcp__lifecycle__ping"], `cycle ${cycle}`);
+    assert.deepEqual(
+      session.active(),
+      ["mcp__lifecycle__ping"],
+      `cycle ${cycle}`,
+    );
     runtime.shutdown("reload");
     assert.deepEqual(session.active(), [], `cycle ${cycle}`);
     assert.equal(session.listenerCount(), 0, `cycle ${cycle}`);

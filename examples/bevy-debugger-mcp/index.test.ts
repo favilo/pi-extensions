@@ -9,7 +9,10 @@ import bevyDebuggerMcpExtension from "./index.ts";
 import { isCommandOnPath } from "./path.ts";
 
 test("the Bevy provider stays absent when bevy_brp_mcp is not on PATH", () => {
-  assert.equal(isCommandOnPath("bevy_brp_mcp", "/definitely/not-a-path"), false);
+  assert.equal(
+    isCommandOnPath("bevy_brp_mcp", "/definitely/not-a-path"),
+    false,
+  );
 });
 
 test("PATH detection recognizes an executable provider binary", async () => {
@@ -66,12 +69,19 @@ test("the extension disposes the provider on session shutdown", () => {
   assert.equal(disposed, 1);
 });
 
-test("bevy_brp_mcp completes MCP initialization and tool discovery", { skip: !isCommandOnPath("bevy_brp_mcp") }, async () => {
-  const client = new StdioMcpClient({ command: "bevy_brp_mcp", requestTimeoutMs: 15_000 });
-  try {
-    const tools = await client.start();
-    assert.ok(tools.some((tool) => tool.name === "brp_status"));
-  } finally {
-    client.close();
-  }
-});
+test(
+  "bevy_brp_mcp completes MCP initialization and tool discovery",
+  { skip: !isCommandOnPath("bevy_brp_mcp") },
+  async () => {
+    const client = new StdioMcpClient({
+      command: "bevy_brp_mcp",
+      requestTimeoutMs: 15_000,
+    });
+    try {
+      const tools = await client.start();
+      assert.ok(tools.some((tool) => tool.name === "brp_status"));
+    } finally {
+      client.close();
+    }
+  },
+);

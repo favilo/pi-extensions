@@ -40,7 +40,10 @@ test("caps defensive expanded output without introducing event details", () => {
   const oversized = {
     ...completed,
     output: "y".repeat(MAX_EXPANDED_RESULT_BYTES),
-    outputBytes: { original: MAX_EXPANDED_RESULT_BYTES, returned: MAX_EXPANDED_RESULT_BYTES },
+    outputBytes: {
+      original: MAX_EXPANDED_RESULT_BYTES,
+      returned: MAX_EXPANDED_RESULT_BYTES,
+    },
   } as BackgroundResult;
 
   const json = subagentResultDisplay(oversized, true).expandedJson ?? "";

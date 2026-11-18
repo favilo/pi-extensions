@@ -6,11 +6,27 @@ import { join } from "node:path";
 import test from "node:test";
 import { stringify as stringifyToml } from "smol-toml";
 
-type ToolCallHandler = (event: { toolName: string; toolCallId?: string; input: Record<string, unknown> }, ctx: unknown) => Promise<unknown>;
+type ToolCallHandler = (
+  event: {
+    toolName: string;
+    toolCallId?: string;
+    input: Record<string, unknown>;
+  },
+  ctx: unknown,
+) => Promise<unknown>;
 
-type PromptComponent = { handleInput(data: string): void; render(width: number): string[] };
+type PromptComponent = {
+  handleInput(data: string): void;
+  render(width: number): string[];
+};
 
-type ToolResultHandler = (event: { toolCallId: string; content: Array<{ type: string; text?: string }> }, ctx: unknown) => unknown;
+type ToolResultHandler = (
+  event: {
+    toolCallId: string;
+    content: Array<{ type: string; text?: string }>;
+  },
+  ctx: unknown,
+) => unknown;
 
 type Harness = {
   toolCall: ToolCallHandler;
@@ -21,13 +37,22 @@ type Harness = {
   cleanup: () => void;
 };
 
-const theme = new Proxy({}, {
-  get: () => (...args: unknown[]) => String(args[args.length - 1]),
-});
+const theme = new Proxy(
+  {},
+  {
+    get:
+      () =>
+      (...args: unknown[]) =>
+        String(args[args.length - 1]),
+  },
+);
 
 async function steeringHarness(): Promise<Harness> {
   const agentDir = mkdtempSync(join(tmpdir(), "pi-steering-agent-"));
-  writeFileSync(join(agentDir, "permissions.toml"), stringifyToml({ permissions: {} }));
+  writeFileSync(
+    join(agentDir, "permissions.toml"),
+    stringifyToml({ permissions: {} }),
+  );
   const project = mkdtempSync(join(tmpdir(), "pi-steering-project-"));
 
   const previousAgentDir = process.env.PI_CODING_AGENT_DIR;
@@ -36,7 +61,9 @@ async function steeringHarness(): Promise<Harness> {
   const handlers = new Map<string, unknown>();
   const steerMessages: Array<{ text: string; options: unknown }> = [];
   const prompts: PromptComponent[] = [];
-  const { default: toolPermissionPolicy } = await import(`./index.ts?steering-context=${encodeURIComponent(agentDir)}`);
+  const { default: toolPermissionPolicy } = await import(
+    `./index.ts?steering-context=${encodeURIComponent(agentDir)}`
+  );
   toolPermissionPolicy({
     registerCommand() {},
     on(event: string, handler: unknown) {
@@ -55,7 +82,8 @@ async function steeringHarness(): Promise<Harness> {
     prompts,
     project,
     cleanup: () => {
-      if (previousAgentDir === undefined) delete process.env.PI_CODING_AGENT_DIR;
+      if (previousAgentDir === undefined)
+        delete process.env.PI_CODING_AGENT_DIR;
       else process.env.PI_CODING_AGENT_DIR = previousAgentDir;
       rmSync(agentDir, { recursive: true, force: true });
       rmSync(project, { recursive: true, force: true });
@@ -71,7 +99,14 @@ function promptingCtx(harness: Harness): unknown {
     sessionId: "steering-context-test",
     ui: {
       notify() {},
-      custom(factory: (tui: unknown, t: unknown, kb: unknown, finish: (result: unknown) => void) => PromptComponent) {
+      custom(
+        factory: (
+          tui: unknown,
+          t: unknown,
+          kb: unknown,
+          finish: (result: unknown) => void,
+        ) => PromptComponent,
+      ) {
         return new Promise((resolve) => {
           const component = factory({ requestRender() {} }, theme, {}, resolve);
           harness.prompts.push(component);
@@ -86,6 +121,7 @@ function typeText(text: string): string[] {
 }
 
 const TAB = "\t";
+const ESC = "\x1b";
 const CTRL_D = "\x04";
 const CTRL_Y = "\x19";
 
@@ -93,31 +129,124 @@ test("allow-with-steering annotates the invocation-bound tool result", async () 
   const harness = await steeringHarness();
   try {
     const pending = harness.toolCall(
-      { toolName: "bash", toolCallId: "call_test_123", input: { command: "npm test" } },
+      {
+        toolName: "bash",
+        toolCallId: "call_test_123",
+        input: { command: "npm test" },
+      },
       promptingCtx(harness),
     );
     await new Promise((resolve) => setImmediate(resolve));
     assert.equal(harness.prompts.length, 1);
 
-    for (const key of [TAB, ...typeText("only this once"), CTRL_Y]) harness.prompts[0].handleInput(key);
+    for (const key of [TAB, ...typeText("only this once"), CTRL_Y])
+      harness.prompts[0].handleInput(key);
     await pending;
 
-    assert.deepEqual(harness.steerMessages, [], "allowed calls annotate the result; no floating steer message");
+    assert.deepEqual(
+      harness.steerMessages,
+      [],
+      "allowed calls annotate the result; no floating steer message",
+    );
 
     const annotated = harness.toolResult(
-      { toolCallId: "call_test_123", content: [{ type: "text", text: "exit code: 0" }] },
+      {
+        toolCallId: "call_test_123",
+        content: [{ type: "text", text: "exit code: 0" }],
+      },
       {},
     );
     const text = JSON.stringify(annotated);
-    assert.match(text, /only this once/, "the tool result must carry the steering text");
-    assert.match(text, /<user-steering/, "the annotation must be marked as not part of the tool output");
+    assert.match(
+      text,
+      /only this once/,
+      "the tool result must carry the steering text",
+    );
+    assert.match(
+      text,
+      /<user-steering/,
+      "the annotation must be marked as not part of the tool output",
+    );
 
     const untouched = harness.toolResult(
-      { toolCallId: "call_unrelated", content: [{ type: "text", text: "exit code: 0" }] },
+      {
+        toolCallId: "call_unrelated",
+        content: [{ type: "text", text: "exit code: 0" }],
+      },
       {},
     );
-    assert.equal(untouched, undefined, "unsteered results pass through unmodified");
+    assert.equal(
+      untouched,
+      undefined,
+      "unsteered results pass through unmodified",
+    );
   } finally {
+    harness.cleanup();
+  }
+});
+
+test("extra Escape presses stay in the Vim steering editor", async () => {
+  const previousVim = process.env.PI_VIM_MODE;
+  process.env.PI_VIM_MODE = "1";
+  const harness = await steeringHarness();
+  try {
+    const pending = harness.toolCall(
+      {
+        toolName: "bash",
+        toolCallId: "call_vim_escape",
+        input: { command: "npm test" },
+      },
+      promptingCtx(harness),
+    );
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(harness.prompts.length, 1);
+
+    for (const key of [TAB, ...typeText("keep this"), ESC, ESC, ESC])
+      harness.prompts[0].handleInput(key);
+
+    const raced = await Promise.race([
+      pending.then((value) => ({ settled: true, value })),
+      new Promise<{ settled: false }>((resolve) =>
+        setImmediate(() => resolve({ settled: false })),
+      ),
+    ]);
+    assert.deepEqual(raced, { settled: false });
+
+    harness.prompts[0].handleInput(CTRL_Y);
+    await pending;
+    const kept = harness.toolResult(
+      {
+        toolCallId: "call_vim_escape",
+        content: [{ type: "text", text: "exit code: 0" }],
+      },
+      {},
+    );
+    assert.match(JSON.stringify(kept), /keep this/);
+
+    const left = harness.toolCall(
+      {
+        toolName: "bash",
+        toolCallId: "call_vim_tab_exit",
+        input: { command: "npm test" },
+      },
+      promptingCtx(harness),
+    );
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(harness.prompts.length, 2);
+    for (const key of [TAB, ...typeText("keep this"), ESC, TAB, CTRL_Y])
+      harness.prompts[1].handleInput(key);
+    await left;
+    const exited = harness.toolResult(
+      {
+        toolCallId: "call_vim_tab_exit",
+        content: [{ type: "text", text: "exit code: 0" }],
+      },
+      {},
+    );
+    assert.equal(exited, undefined);
+  } finally {
+    if (previousVim === undefined) delete process.env.PI_VIM_MODE;
+    else process.env.PI_VIM_MODE = previousVim;
     harness.cleanup();
   }
 });
@@ -140,7 +269,8 @@ test("parallel prompts never share steering context", async () => {
     assert.equal(harness.prompts.length, 1);
 
     // Deny the first with steering; the reason embeds in ITS result only.
-    for (const key of [TAB, ...typeText("not the test command"), CTRL_D]) harness.prompts[0].handleInput(key);
+    for (const key of [TAB, ...typeText("not the test command"), CTRL_D])
+      harness.prompts[0].handleInput(key);
     const firstResult = await first;
 
     // The second prompt is presented next, with pristine steering state.
@@ -153,7 +283,10 @@ test("parallel prompts never share steering context", async () => {
       block: true,
       reason: "User denied bash command. (reason: not the test command)",
     });
-    assert.deepEqual(secondResult, { block: true, reason: "User denied bash command." });
+    assert.deepEqual(secondResult, {
+      block: true,
+      reason: "User denied bash command.",
+    });
   } finally {
     harness.cleanup();
   }

@@ -59,14 +59,27 @@ function utf8Prefix(text: string, maxBytes: number): string {
 }
 
 function createStreamState(): StreamState {
-  return { kept: "", keptBytes: 0, keptNewlines: 0, totalBytes: 0, totalNewlines: 0, lastChar: undefined, truncated: false };
+  return {
+    kept: "",
+    keptBytes: 0,
+    keptNewlines: 0,
+    totalBytes: 0,
+    totalNewlines: 0,
+    lastChar: undefined,
+    truncated: false,
+  };
 }
 
 /** Bounded per-stream output capture with explicit truncation metadata. */
-export function createOutputCapture(options: OutputCaptureOptions = {}): OutputCapture {
+export function createOutputCapture(
+  options: OutputCaptureOptions = {},
+): OutputCapture {
   const maxLines = options.maxLinesPerStream ?? DEFAULT_MAX_LINES;
   const maxBytes = options.maxBytesPerStream ?? DEFAULT_MAX_BYTES;
-  const streams: Record<"stdout" | "stderr", StreamState> = { stdout: createStreamState(), stderr: createStreamState() };
+  const streams: Record<"stdout" | "stderr", StreamState> = {
+    stdout: createStreamState(),
+    stderr: createStreamState(),
+  };
 
   function append(stream: "stdout" | "stderr", chunk: string): void {
     const state = streams[stream];
@@ -76,7 +89,10 @@ export function createOutputCapture(options: OutputCaptureOptions = {}): OutputC
     if (state.truncated) return;
 
     const byLines = firstCompleteLines(chunk, maxLines - state.keptNewlines);
-    const bounded = utf8Prefix(byLines, Math.max(0, maxBytes - state.keptBytes));
+    const bounded = utf8Prefix(
+      byLines,
+      Math.max(0, maxBytes - state.keptBytes),
+    );
     if (bounded.length < chunk.length) state.truncated = true;
     state.kept += bounded;
     state.keptBytes += Buffer.byteLength(bounded, "utf8");
@@ -89,7 +105,9 @@ export function createOutputCapture(options: OutputCaptureOptions = {}): OutputC
       const view = (state: StreamState): CapturedStream => ({
         text: state.kept,
         truncated: state.truncated,
-        totalLines: state.totalNewlines + (state.totalBytes > 0 && state.lastChar !== "\n" ? 1 : 0),
+        totalLines:
+          state.totalNewlines +
+          (state.totalBytes > 0 && state.lastChar !== "\n" ? 1 : 0),
         totalBytes: state.totalBytes,
         keptBytes: state.keptBytes,
       });

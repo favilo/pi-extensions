@@ -1,7 +1,9 @@
 import { parseBashCommand, type ParsedSubcommand } from "./bash-parser.ts";
 import { parseWithNativeFallback } from "./native-parser-loader.ts";
-import { saveAllowedRule } from "./config.ts";
-import { resolveToolPermissionDecision } from "./index.ts";
+import {
+  resolveToolPermissionDecision,
+  saveToolPermissionRule,
+} from "./index.ts";
 
 export type SubcommandDecisionResult = {
   decision: "allow" | "deny" | "ask";
@@ -11,7 +13,9 @@ export type SubcommandDecisionResult = {
   source?: string;
 };
 
-export type EvaluateSubcommandOptions = Parameters<typeof resolveToolPermissionDecision>[3] & {
+export type EvaluateSubcommandOptions = Parameters<
+  typeof resolveToolPermissionDecision
+>[3] & {
   audit?: (entry: Record<string, unknown>) => void;
 };
 
@@ -39,10 +43,23 @@ export function evaluateBashSubcommands(
     }
   };
 
-  const rawDecision = resolveToolPermissionDecision("bash", { command }, cwd, options);
+  const rawDecision = resolveToolPermissionDecision(
+    "bash",
+    { command },
+    cwd,
+    options,
+  );
   if (rawDecision.decision === "deny") {
-    const reason = "Blocked bash command: arguments match a configured deny rule.";
-    safeAudit({ tool: "bash", command, decision: "deny", cwd, reason, source: rawDecision.source });
+    const reason =
+      "Blocked bash command: arguments match a configured deny rule.";
+    safeAudit({
+      tool: "bash",
+      command,
+      decision: "deny",
+      cwd,
+      reason,
+      source: rawDecision.source,
+    });
     return {
       decision: "deny",
       subcommands: [],
@@ -51,7 +68,9 @@ export function evaluateBashSubcommands(
     };
   }
 
-  const parseResult = parseWithNativeFallback(command, () => parseBashCommand(command));
+  const parseResult = parseWithNativeFallback(command, () =>
+    parseBashCommand(command),
+  );
   if (!parseResult.ok) {
     // A broad raw allow must not bypass parser uncertainty. An unsupported or
     // malformed command can hide additional executions, so it requires an
@@ -67,7 +86,13 @@ export function evaluateBashSubcommands(
 
   const subcommands = parseResult.subcommands;
   if (subcommands.length === 0) {
-    safeAudit({ tool: "bash", command, decision: rawDecision.decision, cwd, source: rawDecision.source });
+    safeAudit({
+      tool: "bash",
+      command,
+      decision: rawDecision.decision,
+      cwd,
+      source: rawDecision.source,
+    });
     return {
       decision: rawDecision.decision,
       subcommands: [],
@@ -79,7 +104,12 @@ export function evaluateBashSubcommands(
   let allowedSource: string | undefined;
 
   for (const sub of subcommands) {
-    const decision = resolveToolPermissionDecision("bash", { command: sub.normalized }, cwd, options);
+    const decision = resolveToolPermissionDecision(
+      "bash",
+      { command: sub.normalized },
+      cwd,
+      options,
+    );
     safeAudit({
       tool: "bash",
       command,
@@ -116,7 +146,10 @@ export function evaluateBashSubcommands(
   }
 
   const finalDecision: "allow" | "ask" = hasAsk ? "ask" : "allow";
-  const finalSource = finalDecision === "allow" ? (allowedSource ?? rawDecision.source) : undefined;
+  const finalSource =
+    finalDecision === "allow"
+      ? (allowedSource ?? rawDecision.source)
+      : undefined;
 
   safeAudit({
     tool: "bash",
@@ -139,12 +172,19 @@ export function evaluateBashSubcommands(
 export function saveSubcommandAllowRules(
   targetPath: string,
   subcommands: string[],
+  scope: "user" | "project" = "user",
 ): boolean {
   if (!subcommands.length) return false;
   try {
     for (const sub of subcommands) {
       const pattern = `^${sub.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`;
-      saveAllowedRule(targetPath, "bash", { command: pattern });
+      const saved = saveToolPermissionRule({
+        destination: targetPath,
+        scope,
+        tool: "bash",
+        rule: { command: pattern },
+      });
+      if (!saved) return false;
     }
     return true;
   } catch {

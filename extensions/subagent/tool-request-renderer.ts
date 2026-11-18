@@ -33,7 +33,13 @@ function pushWrapped(lines: string[], text: string, width: number): void {
 function safeFormatValue(val: unknown): string {
   if (typeof val === "string") return val;
   try {
-    return JSON.stringify(val, (_key, v) => typeof v === "bigint" ? v.toString() : v, 2) ?? String(val);
+    return (
+      JSON.stringify(
+        val,
+        (_key, v) => (typeof v === "bigint" ? v.toString() : v),
+        2,
+      ) ?? String(val)
+    );
   } catch {
     return String(val);
   }
@@ -45,19 +51,28 @@ export function renderSubagentToolRequestCall(
 ): RenderComponent {
   const toolName = args.toolName ?? "unknown";
   const rawInput = args.input;
-  const inputObj = (rawInput && typeof rawInput === "object" && !Array.isArray(rawInput)) ? rawInput as Record<string, unknown> : {};
+  const inputObj =
+    rawInput && typeof rawInput === "object" && !Array.isArray(rawInput)
+      ? (rawInput as Record<string, unknown>)
+      : {};
 
   return {
     render(width: number) {
       const targetWidth = Math.max(1, width);
       const lines: string[] = [];
 
-      const header = theme.bold(theme.fg("toolTitle", `subagent-tool-request → ${toolName}`));
+      const header = theme.bold(
+        theme.fg("toolTitle", `subagent-tool-request → ${toolName}`),
+      );
       pushWrapped(lines, header, targetWidth);
 
       if (toolName === "bash" && typeof inputObj.command === "string") {
         lines.push("$ ");
-        pushWrapped(lines, theme.fg("syntaxKeyword", inputObj.command), targetWidth);
+        pushWrapped(
+          lines,
+          theme.fg("syntaxKeyword", inputObj.command),
+          targetWidth,
+        );
       } else {
         const entries = Object.entries(inputObj);
         if (entries.length === 0) {

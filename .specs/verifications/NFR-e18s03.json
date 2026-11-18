@@ -1,0 +1,38 @@
+{
+  "story_id": "e18s03",
+  "verified_at": "2026-11-13T00:24:52Z",
+  "status": "PASS",
+  "threshold_source": {
+    "status": "WAIVED",
+    "reason": "No e18 TEST_PLAN_LATEST artifact defines numeric NFR thresholds. Evidence uses the story quality attributes: one durable rule, no duplicate patch, and a failed write that does not allow."
+  },
+  "dimensions": {
+    "performance": {
+      "status": "PASS",
+      "threshold": "User, project, duplicate, and failed-save checks complete inside the existing test run.",
+      "evidence": [
+        "node --test extensions/tool-permissions/native-rule-save.test.ts finished in 802.503333 ms with 6 passing tests.",
+        "npm run test:preflight finished in 5670.304166 ms with 345 passing tests.",
+        "cargo test finished inside npm run check with 21 passing native tests."
+      ]
+    },
+    "reliability": {
+      "status": "PASS",
+      "threshold": "A failed save keeps the previous file and does not allow the call. A repeated rule stays one entry.",
+      "evidence": [
+        "a failed save keeps the previous file and does not allow printed ok false and allowed false.",
+        "saving the same rule twice leaves one allow rule passed with rules 1.",
+        "saving the same rule fields in a different order leaves one allow rule passed with rules 1.",
+        "When the native package resolves, saveToolPermissionRule does not also call saveAllowedRule."
+      ]
+    },
+    "operability": {
+      "status": "PASS",
+      "threshold": "Tests report the destination path, rule text, allow result, and rule count.",
+      "evidence": [
+        "The six native-rule-save tests print destination, rule, and ok, allowed, or rules.",
+        "A missing native package still uses the TypeScript saver until e18s06."
+      ]
+    }
+  }
+}

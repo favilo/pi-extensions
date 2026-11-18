@@ -15,7 +15,7 @@ Refactor `presentScrollablePermission` / `askScrollablePermission` and prompt la
 ## Acceptance criteria
 - Full request bodies render without sub-window height clipping, allowing native terminal scrollback navigation.
 - `SteeringEditor` renders inline above the action hints without box border artifacts.
-- Navigation hints dynamically indicate `Esc` normal mode vs `Esc` exit steering based on editor state.
+- Navigation hints show `Esc normal mode` in Vim insert, `Tab exit steering` in Vim normal, and `Esc exit steering` when Vim is off. The main prompt does not offer Esc cancel.
 - All preflight unit tests and `npm run check` pass cleanly.
 
 ## Verification

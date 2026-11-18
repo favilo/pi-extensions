@@ -15,6 +15,7 @@ This threat model covers moving the remaining tool-permissions host areas into t
 | Prompt and steering state | Queue mixups can apply one approval to a different tool call. |
 | Tool execution | An allow must execute once. A deny must not execute. |
 | WASM artifact | After e18s06, a missing artifact must not fall back to another implementation. |
+| Prompt-queue presenter reference | A borrow after the captured N-API environment ends can call into a dead environment. |
 
 ## Threats
 
@@ -25,6 +26,7 @@ This threat model covers moving the remaining tool-permissions host areas into t
 5. **Queue mixup** — steering text or an approval is applied to the wrong queued prompt.
 6. **WASM gains a shell or network** — the module executes tools by spawning processes itself instead of calling Pi.
 7. **Fallback left behind** — after e18s06, a load failure still authorizes through TypeScript.
+8. **Erased presenter outlives its environment** — the prompt queue borrows a `FunctionRef` after the N-API environment that created it is gone.
 
 ## Required mitigations
 
@@ -35,6 +37,7 @@ This threat model covers moving the remaining tool-permissions host areas into t
 - Prompt queue tests bind steering and decisions to a tool-call id.
 - Tool execution is a Pi host callback. The WASM module does not spawn a shell or open a network.
 - e18s06 tests a missing and an invalid artifact and assert that no TypeScript engine authorizes the call.
+- e18s07 runs the prompt-queue lifetime erasure under Miri. A borrow after the captured environment ends is undefined behavior.
 - Keep the NAPI target on `wasm32-wasip1-threads`.
 
 ## Out of scope

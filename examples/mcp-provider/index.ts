@@ -1,4 +1,7 @@
-import type { ExtensionAPI, ToolDefinition } from "@earendil-works/pi-coding-agent";
+import type {
+  ExtensionAPI,
+  ToolDefinition,
+} from "@earendil-works/pi-coding-agent";
 
 // These event names are the public wire contract. A machine-local provider should not import
 // the registry implementation because installed package paths differ across computers.
@@ -45,7 +48,10 @@ const provider: McpToolProvider = {
     // Providers own section content so the shared registry never needs provider-specific logic.
     return [
       { title: "Example healthy server", lines: ["ready", "tools: echo"] },
-      { title: "Example failed server", lines: ["failed: simulated connection error"] },
+      {
+        title: "Example failed server",
+        lines: ["failed: simulated connection error"],
+      },
     ];
   },
 };

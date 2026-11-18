@@ -17,8 +17,8 @@ const options = { deliverAs: "steer", triggerTurn: true } as const;
 
 test("retries an unacknowledged completion after the parent settles", () => {
   const sent: unknown[] = [];
-  const dispatcher = createCompletionSignalDispatcher(
-    (message, delivery) => sent.push({ message, delivery }),
+  const dispatcher = createCompletionSignalDispatcher((message, delivery) =>
+    sent.push({ message, delivery }),
   );
   const completion = signal();
 

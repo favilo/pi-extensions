@@ -19,13 +19,19 @@ export type SubagentTranscriptPanel = {
 
 function safeStringify(value: unknown): string {
   try {
-    return JSON.stringify(value, (_key, val) => typeof val === "bigint" ? val.toString() : val);
+    return JSON.stringify(value, (_key, val) =>
+      typeof val === "bigint" ? val.toString() : val,
+    );
   } catch {
     return String(value);
   }
 }
 
-function pushSafeWrappedLines(lines: string[], text: string, width: number): void {
+function pushSafeWrappedLines(
+  lines: string[],
+  text: string,
+  width: number,
+): void {
   const targetWidth = Math.max(1, width);
   const rawLines = text.split("\n");
   for (const raw of rawLines) {
@@ -40,7 +46,9 @@ function pushSafeWrappedLines(lines: string[], text: string, width: number): voi
   }
 }
 
-export function createSubagentTranscriptPanel(options: SubagentTranscriptPanelOptions): SubagentTranscriptPanel {
+export function createSubagentTranscriptPanel(
+  options: SubagentTranscriptPanelOptions,
+): SubagentTranscriptPanel {
   const events: NormalizedBackgroundEvent[] = [];
   let currentStatus = options.status;
   const theme = options.theme ?? {
@@ -59,11 +67,19 @@ export function createSubagentTranscriptPanel(options: SubagentTranscriptPanelOp
       const targetWidth = Math.max(1, width);
       const lines: string[] = [];
       const headerText = `Subagent ${options.childId} • ${currentStatus} • ${options.cwd}`;
-      pushSafeWrappedLines(lines, theme.bold(theme.fg("accent", headerText)), targetWidth);
+      pushSafeWrappedLines(
+        lines,
+        theme.bold(theme.fg("accent", headerText)),
+        targetWidth,
+      );
       lines.push("─".repeat(targetWidth));
 
       if (events.length === 0) {
-        pushSafeWrappedLines(lines, theme.fg("dim", "(No events yet)"), targetWidth);
+        pushSafeWrappedLines(
+          lines,
+          theme.fg("dim", "(No events yet)"),
+          targetWidth,
+        );
         return lines;
       }
 
@@ -74,20 +90,38 @@ export function createSubagentTranscriptPanel(options: SubagentTranscriptPanelOp
             pushSafeWrappedLines(lines, payload.text, targetWidth);
           }
         } else if (event.type === "tool-call") {
-          const payload = event.payload as { toolName?: string; input?: unknown } | undefined;
+          const payload = event.payload as
+            { toolName?: string; input?: unknown } | undefined;
           const toolName = payload?.toolName ?? "unknown";
           const inputStr = payload?.input ? safeStringify(payload.input) : "";
-          pushSafeWrappedLines(lines, theme.fg("toolTitle", `→ tool: ${toolName} ${inputStr}`), targetWidth);
+          pushSafeWrappedLines(
+            lines,
+            theme.fg("toolTitle", `→ tool: ${toolName} ${inputStr}`),
+            targetWidth,
+          );
         } else if (event.type === "tool-update") {
-          const payload = event.payload as { toolName?: string; update?: unknown } | undefined;
+          const payload = event.payload as
+            { toolName?: string; update?: unknown } | undefined;
           const toolName = payload?.toolName ?? "unknown";
-          pushSafeWrappedLines(lines, theme.fg("dim", `… tool update: ${toolName}`), targetWidth);
+          pushSafeWrappedLines(
+            lines,
+            theme.fg("dim", `… tool update: ${toolName}`),
+            targetWidth,
+          );
         } else if (event.type === "tool-result") {
-          const payload = event.payload as { toolName?: string; result?: unknown; isError?: boolean } | undefined;
+          const payload = event.payload as
+            | { toolName?: string; result?: unknown; isError?: boolean }
+            | undefined;
           const toolName = payload?.toolName ?? "unknown";
-          const resultStr = payload?.result ? safeStringify(payload.result) : "";
+          const resultStr = payload?.result
+            ? safeStringify(payload.result)
+            : "";
           const color = payload?.isError ? "error" : "success";
-          pushSafeWrappedLines(lines, theme.fg(color, `← tool result: ${toolName} ${resultStr}`), targetWidth);
+          pushSafeWrappedLines(
+            lines,
+            theme.fg(color, `← tool result: ${toolName} ${resultStr}`),
+            targetWidth,
+          );
         }
       }
 

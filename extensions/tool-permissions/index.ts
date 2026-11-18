@@ -1,30 +1,101 @@
 // story: e03s01
-import { CONFIG_DIR_NAME, generateDiffString, getAgentDir, isToolCallEventType, renderDiff, type ExtensionAPI, type ExtensionCommandContext, type ToolResultEvent } from "@earendil-works/pi-coding-agent";
-import { CURSOR_MARKER, matchesKey, Text, visibleWidth, wrapTextWithAnsi, type Component, type Focusable } from "@earendil-works/pi-tui";
+import {
+  CONFIG_DIR_NAME,
+  generateDiffString,
+  getAgentDir,
+  isToolCallEventType,
+  renderDiff,
+  type ExtensionAPI,
+  type ExtensionCommandContext,
+  type ToolResultEvent,
+} from "@earendil-works/pi-coding-agent";
+import {
+  CURSOR_MARKER,
+  matchesKey,
+  Text,
+  visibleWidth,
+  wrapTextWithAnsi,
+  type Component,
+  type Focusable,
+} from "@earendil-works/pi-tui";
 import ignore from "ignore";
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
-import { appendFileSync, chmodSync, closeSync, constants as fsConstants, existsSync, fchmodSync, fstatSync, mkdirSync, mkdtempSync, openSync, readFileSync, realpathSync, unlinkSync, writeFileSync, writeSync } from "node:fs";
-import { tmpdir } from "node:os";
+import {
+  appendFileSync,
+  chmodSync,
+  closeSync,
+  constants as fsConstants,
+  existsSync,
+  fchmodSync,
+  fstatSync,
+  mkdirSync,
+  mkdtempSync,
+  openSync,
+  readFileSync,
+  realpathSync,
+  unlinkSync,
+  writeFileSync,
+  writeSync,
+} from "node:fs";
+import { homedir, tmpdir } from "node:os";
 import { basename, dirname, join, relative, resolve } from "node:path";
 import { createAuditLogger } from "./audit.ts";
 import { preflightEdit, type EditPair } from "./edit-preflight.ts";
-import { attachChildRuntimeSelection, resolveChildRuntimeSelection } from "../subagent/account-runtime.ts";
+import {
+  attachChildRuntimeSelection,
+  resolveChildRuntimeSelection,
+} from "../subagent/account-runtime.ts";
 import {
   parsePermissionRuleJson,
   permissionKeyForTool,
   saveAllowedRule,
   type PermissionRule,
 } from "./config.ts";
-import { createPersistedTrustResolver, resolveCurrentProjectPolicyPath, resolveScopedPermissionDecision, type ScopedPermissionDecision } from "./scope.ts";
-import { evaluateBashSubcommands, saveSubcommandAllowRules } from "./bash-subcommands.ts";
+import {
+  createPersistedTrustResolver,
+  resolveCurrentProjectPolicyPath,
+  resolveScopedPermissionDecision,
+  type ScopedPermissionDecision,
+  type TrustResolver,
+} from "./scope.ts";
+import {
+  evaluateBashSubcommands,
+  saveSubcommandAllowRules,
+} from "./bash-subcommands.ts";
 import { isYoloModeEnabled } from "./yolo-mode.ts";
 import { loadNativePackageProbe } from "./native-loader.ts";
+import {
+  NATIVE_CONTRACT_VERSION,
+  NATIVE_PATH_TRUST_NONCE,
+} from "./native-contract.ts";
+import { adoptPathTrust } from "./native-path-trust.ts";
 import { resolveNativePackagePath } from "./native-package.ts";
-import { hasNativeRegistration, registerNativeToolPermissionsCallbacks } from "./native-registration-loader.ts";
-import type { PermissionDecision, ToolPermissionBoundary, ToolRequest } from "./permission-boundary.ts";
-import { isPermissionPromptCancellation } from "./prompt-input.ts";
+import {
+  NATIVE_AUDIT_WRITE_NONCE,
+  recordPermissionAudit,
+} from "./native-audit-write.ts";
+import {
+  NATIVE_RULE_SAVE_NONCE,
+  savePermissionRule,
+} from "./native-rule-save.ts";
+import {
+  hasNativeRegistration,
+  registerNativeToolPermissionsCallbacks,
+} from "./native-registration-loader.ts";
+import type {
+  PermissionDecision,
+  ToolPermissionBoundary,
+  ToolRequest,
+} from "./permission-boundary.ts";
 import { SteeringEditor } from "./steering-editor.ts";
+import {
+  NATIVE_PROMPT_QUEUE_NONCE,
+  PromptQueueDecision,
+  isNativePromptQueueLoaded,
+  presentBoundPrompt,
+  type PromptQueueResult,
+} from "./native-prompt-queue.ts";
 import {
   closePermissionPromptQueue,
   createPermissionPromptIdentity,
@@ -40,9 +111,22 @@ export type PermissionContext = {
   hasUI: boolean;
   mode: string;
   ui: {
-    confirm(title: string, body: string, options?: { signal?: AbortSignal }): Promise<boolean>;
+    confirm(
+      title: string,
+      body: string,
+      options?: { signal?: AbortSignal },
+    ): Promise<boolean>;
     custom?<T>(
-      factory: (tui: { requestRender(force?: boolean): void; stop(): void; start(): void }, theme: unknown, keybindings: unknown, done: (value: T) => void) => unknown,
+      factory: (
+        tui: {
+          requestRender(force?: boolean): void;
+          stop(): void;
+          start(): void;
+        },
+        theme: unknown,
+        keybindings: unknown,
+        done: (value: T) => void,
+      ) => unknown,
     ): Promise<T>;
     getEditorText?(): string;
     setEditorText?(text: string): void;
@@ -79,13 +163,21 @@ type SubagentInput = {
 };
 
 /** Whether a child launch can select credentials or a model outside the default runtime. */
-export function requiresSubagentRuntimeApproval(input: SubagentInput, environment: NodeJS.ProcessEnv = process.env): boolean {
-  return typeof input.account === "string"
-    || typeof input.model === "string"
-    || Boolean(environment.PI_ACCOUNT_SWITCHER_NEXT_ID)
-    || Boolean(environment.PI_ACCOUNT_SWITCHER_ACTIVE_ID);
+export function requiresSubagentRuntimeApproval(
+  input: SubagentInput,
+  environment: NodeJS.ProcessEnv = process.env,
+): boolean {
+  return (
+    typeof input.account === "string" ||
+    typeof input.model === "string" ||
+    Boolean(environment.PI_ACCOUNT_SWITCHER_NEXT_ID) ||
+    Boolean(environment.PI_ACCOUNT_SWITCHER_ACTIVE_ID)
+  );
 }
-type EditInput = { path?: unknown; edits?: Array<{ oldText?: unknown; newText?: unknown }> };
+type EditInput = {
+  path?: unknown;
+  edits?: Array<{ oldText?: unknown; newText?: unknown }>;
+};
 type WriteInput = { path?: unknown; content?: unknown };
 
 type AuditEntry = {
@@ -122,16 +214,104 @@ type AllowPatternOption = {
 
 type PermissionResult =
   | { allowed: true; decision: "allow_once"; steering?: string }
-  | { allowed: true; decision: "allow_pattern"; pattern: string; scope: "project" | "user"; steering?: string }
+  | {
+      allowed: true;
+      decision: "allow_pattern";
+      pattern: string;
+      scope: "project" | "user";
+      steering?: string;
+    }
   | { allowed: false; decision: "deny" | "cancel"; steering?: string };
 
 function getUserPermissionsPath(): string {
   return join(getAgentDir(), "permissions.toml");
 }
 const auditLogger = createAuditLogger();
+let permissionAuditHomeForTests: string | undefined;
+let permissionAuditNowForTests: (() => Date) | undefined;
+
+/** Point host audit writes at a temporary home for tests. */
+export function setPermissionAuditHomeForTests(
+  homeDir: string | undefined,
+  now?: () => Date,
+): () => void {
+  const previousHome = permissionAuditHomeForTests;
+  const previousNow = permissionAuditNowForTests;
+  permissionAuditHomeForTests = homeDir;
+  permissionAuditNowForTests = now;
+  return () => {
+    permissionAuditHomeForTests = previousHome;
+    permissionAuditNowForTests = previousNow;
+  };
+}
+
+function auditDestination() {
+  if (
+    permissionAuditHomeForTests === undefined &&
+    permissionAuditNowForTests === undefined
+  ) {
+    return auditLogger;
+  }
+  return createAuditLogger({
+    homeDir: permissionAuditHomeForTests,
+    now: permissionAuditNowForTests,
+  });
+}
 
 /** Steering text captured at allow+steer decision time, keyed by toolCallId, annotated onto the invocation-bound tool result. */
 const pendingSteering = new Map<string, string>();
+const SESSION_PROMPT_ABORTS = Symbol.for(
+  "pi-extensions.tool-permissions.session-prompt-aborts",
+);
+
+type SessionPromptAbortState = {
+  sessions: Map<string, Set<AbortController>>;
+  cancelled: Set<AbortSignal>;
+};
+
+function sessionPromptAbortState(): SessionPromptAbortState {
+  const processGlobal = globalThis as { [key: symbol]: unknown };
+  const current = processGlobal[SESSION_PROMPT_ABORTS] as
+    SessionPromptAbortState | undefined;
+  if (current) return current;
+  const state: SessionPromptAbortState = {
+    sessions: new Map(),
+    cancelled: new Set(),
+  };
+  processGlobal[SESSION_PROMPT_ABORTS] = state;
+  return state;
+}
+
+function promptWasCancelled(signal: AbortSignal): boolean {
+  return signal.aborted || sessionPromptAbortState().cancelled.has(signal);
+}
+
+function trackSessionPromptAbort(
+  sessionId: string,
+  controller: AbortController,
+): () => void {
+  const state = sessionPromptAbortState();
+  const group = state.sessions.get(sessionId) ?? new Set<AbortController>();
+  group.add(controller);
+  state.sessions.set(sessionId, group);
+  return () => {
+    group.delete(controller);
+    state.cancelled.delete(controller.signal);
+    if (group.size === 0) state.sessions.delete(sessionId);
+    if (state.sessions.size === 0 && state.cancelled.size === 0) {
+      delete (globalThis as { [key: symbol]: unknown })[SESSION_PROMPT_ABORTS];
+    }
+  };
+}
+
+function abortSessionPromptPresentations(sessionId: string): void {
+  const state = sessionPromptAbortState();
+  const group = state.sessions.get(sessionId);
+  if (!group) return;
+  const controllers = [...group];
+  for (const controller of controllers) state.cancelled.add(controller.signal);
+  for (const controller of controllers) controller.abort();
+}
 /** Previews published during a prompt; re-appended after the tool result for bottom-of-transcript visibility. */
 const promptedPreviews = new Map<string, PermissionPreview>();
 /** Tool calls whose permission prompt is still waiting; their preview entries ignore the collapsed state. */
@@ -139,30 +319,46 @@ const pendingPreviewReviews = new Set<string>();
 /** Explicit Ctrl+O expansion toggles made while a review prompt is open. Cleared when the prompt settles. */
 const previewReviewOverrides = new Map<string, boolean>();
 
-type PermissionEditorTarget = { scope: "user" | "local"; path: string } | { error: string };
+type PermissionEditorTarget =
+  { scope: "user" | "local"; path: string } | { error: string };
 
 export function resolvePermissionEditorTarget(
   args: string | undefined,
   cwd: string,
-  options: { userPermissionsPath?: string; trustResolver?: Parameters<typeof resolveScopedPermissionDecision>[0]["trustResolver"] } = {},
+  options: {
+    userPermissionsPath?: string;
+    trustResolver?: Parameters<
+      typeof resolveScopedPermissionDecision
+    >[0]["trustResolver"];
+  } = {},
 ): PermissionEditorTarget {
   const tokens = args?.trim() ? args.trim().split(/\s+/) : [];
-  if (tokens.length > 1 || (tokens[0] && tokens[0] !== "user" && tokens[0] !== "local")) {
+  if (
+    tokens.length > 1 ||
+    (tokens[0] && tokens[0] !== "user" && tokens[0] !== "local")
+  ) {
     return { error: "Usage: /permissions [user|local]" };
   }
 
   if (!tokens[0] || tokens[0] === "user") {
-    return { scope: "user", path: options.userPermissionsPath ?? getUserPermissionsPath() };
+    return {
+      scope: "user",
+      path: options.userPermissionsPath ?? getUserPermissionsPath(),
+    };
   }
 
   const path = resolveCurrentProjectPolicyPath({
     cwd,
     configDirName: CONFIG_DIR_NAME,
-    trustResolver: options.trustResolver ?? createPersistedTrustResolver(getAgentDir()),
+    trustResolver:
+      options.trustResolver ?? createPersistedTrustResolver(getAgentDir()),
   });
   return path
     ? { scope: "local", path }
-    : { error: "Local permissions cannot be edited because this directory is not trusted." };
+    : {
+        error:
+          "Local permissions cannot be edited because this directory is not trusted.",
+      };
 }
 
 function ruleFromEditedBuffer(buffer: string): PermissionRule | undefined {
@@ -175,7 +371,10 @@ function ruleFromEditedBuffer(buffer: string): PermissionRule | undefined {
 
 function isInsideDirectory(path: string, directory: string): boolean {
   const rel = relative(resolve(directory), resolve(path));
-  return rel === "" || (!rel.startsWith("..") && !rel.startsWith("/") && !rel.match(/^[A-Za-z]:/));
+  return (
+    rel === "" ||
+    (!rel.startsWith("..") && !rel.startsWith("/") && !rel.match(/^[A-Za-z]:/))
+  );
 }
 
 function isAiIgnoredPath(path: string, cwd: string): boolean {
@@ -188,7 +387,10 @@ function isAiIgnoredPath(path: string, cwd: string): boolean {
     return false;
   }
 
-  const relativePath = relative(resolve(cwd), resolve(path)).replace(/\\/g, "/");
+  const relativePath = relative(resolve(cwd), resolve(path)).replace(
+    /\\/g,
+    "/",
+  );
   return ignore().add(aiignore).ignores(relativePath);
 }
 
@@ -203,15 +405,25 @@ function exactPattern(value: string): string {
 /** Prompt prefix surfacing the agent-supplied call reason, when present. */
 function reasonPrefix(input: unknown): string {
   const reason = (input as { reason?: unknown } | undefined)?.reason;
-  return typeof reason === "string" && reason.trim() ? `Reason: ${reason.trim()}\n\n` : "";
+  return typeof reason === "string" && reason.trim()
+    ? `Reason: ${reason.trim()}\n\n`
+    : "";
 }
 
 /** Blocked result for a user denial; steering text is embedded so the reason stays bound to the exact invocation's result. */
-function deniedResult(base: string, result: PermissionResult): ToolCallEventResult {
-  return { block: true, reason: result.steering ? `${base} (reason: ${result.steering})` : base };
+function deniedResult(
+  base: string,
+  result: PermissionResult,
+): ToolCallEventResult {
+  return {
+    block: true,
+    reason: result.steering ? `${base} (reason: ${result.steering})` : base,
+  };
 }
 
-function permissionResultAudit(result: PermissionResult): Pick<AuditEntry, "pattern" | "scope" | "steering"> {
+function permissionResultAudit(
+  result: PermissionResult,
+): Pick<AuditEntry, "pattern" | "scope" | "steering"> {
   return {
     pattern: "pattern" in result ? result.pattern : undefined,
     scope: "scope" in result ? result.scope : undefined,
@@ -220,26 +432,99 @@ function permissionResultAudit(result: PermissionResult): Pick<AuditEntry, "patt
 }
 
 function audit(entry: Omit<AuditEntry, "time">): void {
-  auditLogger.write(entry);
+  if (!resolveNativePackagePath()) {
+    auditDestination().write(entry);
+    return;
+  }
+  const now = permissionAuditNowForTests?.() ?? new Date();
+  recordPermissionAudit({
+    version: NATIVE_CONTRACT_VERSION,
+    operation: "audit_write",
+    nonce: NATIVE_AUDIT_WRITE_NONCE,
+    homeDir: permissionAuditHomeForTests ?? homedir(),
+    now: now.toISOString(),
+    tool: entry.tool,
+    decision: entry.decision,
+    cwd: entry.cwd,
+    path: entry.path,
+    command: entry.command,
+    reason: entry.reason,
+    actorKind: entry.actor?.kind,
+    childId: entry.actor?.kind === "child" ? entry.actor.childId : undefined,
+    subcommand: entry.subcommand,
+    pattern: entry.pattern,
+    scope: entry.scope,
+    steering: entry.steering,
+  });
+}
+
+/** Record one host permission decision through WASM when the package is loaded. */
+export function recordToolAudit(entry: Omit<AuditEntry, "time">): void {
+  audit(entry);
+}
+
+/** Save one approved rule through WASM when the package is loaded. */
+export function saveToolPermissionRule(input: {
+  destination: string;
+  scope: "user" | "project";
+  tool: string;
+  rule: PermissionRule;
+}): boolean {
+  const tool = permissionKeyForTool(input.tool);
+  if (!resolveNativePackagePath()) {
+    try {
+      saveAllowedRule(input.destination, tool, input.rule);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+  const result = savePermissionRule({
+    version: NATIVE_CONTRACT_VERSION,
+    operation: "rule_save",
+    nonce: NATIVE_RULE_SAVE_NONCE,
+    destination: input.destination,
+    scope: input.scope,
+    tool,
+    rule: input.rule,
+  });
+  return result.ok && result.allowed;
 }
 
 function compact(value: unknown, max = 2000): string {
-  const text = typeof value === "string" ? value : JSON.stringify(value, null, 2);
+  const text =
+    typeof value === "string" ? value : JSON.stringify(value, null, 2);
   if (!text) return "(no arguments)";
   return text.length > max ? `${text.slice(0, max)}\n…` : text;
 }
 
 const SAFE_DEBUG_STRING_FIELDS = new Set([
-  "requestId", "childId", "cwd", "inputHash", "decision", "status",
-  "eventType", "parentMode", "mode", "errorType", "customType",
+  "requestId",
+  "childId",
+  "cwd",
+  "inputHash",
+  "decision",
+  "status",
+  "eventType",
+  "parentMode",
+  "mode",
+  "errorType",
+  "customType",
 ]);
-const SAFE_DEBUG_BOOLEAN_FIELDS = new Set(["parentHasUI", "hasUI", "hasCustomUI"]);
+const SAFE_DEBUG_BOOLEAN_FIELDS = new Set([
+  "parentHasUI",
+  "hasUI",
+  "hasCustomUI",
+]);
 const SAFE_DEBUG_NUMBER_FIELDS = new Set(["attempt", "attempts"]);
 
 function debugValueHash(value: unknown): string {
   let serialized: string;
   try {
-    serialized = JSON.stringify(value, (_key, candidate) => typeof candidate === "bigint" ? candidate.toString() : candidate) ?? "null";
+    serialized =
+      JSON.stringify(value, (_key, candidate) =>
+        typeof candidate === "bigint" ? candidate.toString() : candidate,
+      ) ?? "null";
   } catch {
     serialized = "[unserializable]";
   }
@@ -250,7 +535,8 @@ function safeDebugActor(value: unknown): Record<string, string> | undefined {
   if (!value || typeof value !== "object") return undefined;
   const actor = value as { kind?: unknown; childId?: unknown };
   if (actor.kind === "main") return { kind: "main" };
-  if (actor.kind === "child" && typeof actor.childId === "string") return { kind: "child", childId: actor.childId };
+  if (actor.kind === "child" && typeof actor.childId === "string")
+    return { kind: "child", childId: actor.childId };
   return undefined;
 }
 
@@ -260,9 +546,15 @@ function safeDebugDetails(value: unknown): Record<string, unknown> {
   const safe: Record<string, unknown> = {};
 
   for (const [key, candidate] of Object.entries(source)) {
-    if (SAFE_DEBUG_STRING_FIELDS.has(key) && typeof candidate === "string") safe[key] = candidate;
-    else if (SAFE_DEBUG_BOOLEAN_FIELDS.has(key) && typeof candidate === "boolean") safe[key] = candidate;
-    else if (SAFE_DEBUG_NUMBER_FIELDS.has(key) && typeof candidate === "number") safe[key] = candidate;
+    if (SAFE_DEBUG_STRING_FIELDS.has(key) && typeof candidate === "string")
+      safe[key] = candidate;
+    else if (
+      SAFE_DEBUG_BOOLEAN_FIELDS.has(key) &&
+      typeof candidate === "boolean"
+    )
+      safe[key] = candidate;
+    else if (SAFE_DEBUG_NUMBER_FIELDS.has(key) && typeof candidate === "number")
+      safe[key] = candidate;
     else if (key === "actor") safe.actor = safeDebugActor(candidate);
     else if (key === "identity") safe.identity = safeDebugDetails(candidate);
     else if (key === "request" && candidate && typeof candidate === "object") {
@@ -278,7 +570,9 @@ function safeDebugDetails(value: unknown): Record<string, unknown> {
     } else if (key === "input") {
       safe.inputHash = debugValueHash(candidate);
     } else if (key === "activeTools" && Array.isArray(candidate)) {
-      safe.activeTools = candidate.filter((tool): tool is string => typeof tool === "string");
+      safe.activeTools = candidate.filter(
+        (tool): tool is string => typeof tool === "string",
+      );
     }
   }
 
@@ -300,36 +594,61 @@ export function logSubagentDebug(event: string, details: unknown): void {
   let descriptor: number | undefined;
   try {
     const noFollow = process.platform === "win32" ? 0 : fsConstants.O_NOFOLLOW;
-    const nonBlocking = process.platform === "win32" ? 0 : fsConstants.O_NONBLOCK;
+    const nonBlocking =
+      process.platform === "win32" ? 0 : fsConstants.O_NONBLOCK;
     descriptor = openSync(
       subagentDebugPath(),
-      fsConstants.O_APPEND | fsConstants.O_CREAT | fsConstants.O_WRONLY | noFollow | nonBlocking,
+      fsConstants.O_APPEND |
+        fsConstants.O_CREAT |
+        fsConstants.O_WRONLY |
+        noFollow |
+        nonBlocking,
       0o600,
     );
     if (!fstatSync(descriptor).isFile()) return;
     if (process.platform !== "win32") fchmodSync(descriptor, 0o600);
-    writeSync(descriptor, `${JSON.stringify({ time: new Date().toISOString(), event, details: safeDebugDetails(details) })}\n`, undefined, "utf8");
+    writeSync(
+      descriptor,
+      `${JSON.stringify({ time: new Date().toISOString(), event, details: safeDebugDetails(details) })}\n`,
+      undefined,
+      "utf8",
+    );
   } catch {
     // Debug logging must never affect permission behavior.
   } finally {
     if (descriptor !== undefined) {
-      try { closeSync(descriptor); } catch { /* Ignore debug cleanup errors. */ }
+      try {
+        closeSync(descriptor);
+      } catch {
+        /* Ignore debug cleanup errors. */
+      }
     }
   }
 }
 
-function wrapWithContinuation(text: string, width: number, continuationPrefix: string): string[] {
+function wrapWithContinuation(
+  text: string,
+  width: number,
+  continuationPrefix: string,
+): string[] {
   const availableWidth = Math.max(1, width);
   const prefixWidth = visibleWidth(continuationPrefix);
-  if (availableWidth <= prefixWidth) return wrapTextWithAnsi(text, availableWidth);
+  if (availableWidth <= prefixWidth)
+    return wrapTextWithAnsi(text, availableWidth);
 
-  return wrapTextWithAnsi(text, availableWidth - prefixWidth).map((line, index) =>
-    index === 0 ? line : `${continuationPrefix}${line}`,
+  return wrapTextWithAnsi(text, availableWidth - prefixWidth).map(
+    (line, index) => (index === 0 ? line : `${continuationPrefix}${line}`),
   );
 }
 
 function isPrintableInput(data: string): boolean {
-  return data.length > 0 && !data.startsWith("\x1b") && !data.startsWith("\x00") && !data.startsWith("\x1f") && !/[\x00-\x08\x0b-\x1f\x7f]/.test(data);
+  return (
+    data.length > 0 &&
+    !data.startsWith("\x1b") &&
+    !data.startsWith("\x00") &&
+    !data.startsWith("\x1f") &&
+    !/[\x00-\x08\x0b-\x1f\x7f]/.test(data)
+  );
 }
 
 function readTextIfPresent(path: string): string {
@@ -340,15 +659,32 @@ function readTextIfPresent(path: string): string {
   }
 }
 
-function applyEditPreview(oldContent: string, edits: Array<{ oldText: string; newText: string }>): string {
+function normalizeToLF(text: string): string {
+  return text.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+}
+
+function applyEditPreview(
+  oldContent: string,
+  edits: Array<{ oldText: string; newText: string }>,
+): string {
   const replacements = edits.map((edit, index) => {
     const first = oldContent.indexOf(edit.oldText);
-    if (first === -1) throw new Error(`edit ${index + 1}: oldText was not found`);
+    if (first === -1)
+      throw new Error(`edit ${index + 1}: oldText was not found`);
 
-    const second = oldContent.indexOf(edit.oldText, first + edit.oldText.length);
-    if (second !== -1) throw new Error(`edit ${index + 1}: oldText matches more than once`);
+    const second = oldContent.indexOf(
+      edit.oldText,
+      first + edit.oldText.length,
+    );
+    if (second !== -1)
+      throw new Error(`edit ${index + 1}: oldText matches more than once`);
 
-    return { index: first, length: edit.oldText.length, newText: edit.newText, editIndex: index };
+    return {
+      index: first,
+      length: edit.oldText.length,
+      newText: edit.newText,
+      editIndex: index,
+    };
   });
 
   replacements.sort((a, b) => a.index - b.index);
@@ -356,13 +692,18 @@ function applyEditPreview(oldContent: string, edits: Array<{ oldText: string; ne
     const previous = replacements[i - 1];
     const current = replacements[i];
     if (previous.index + previous.length > current.index) {
-      throw new Error(`edit ${current.editIndex + 1}: replacement overlaps another edit`);
+      throw new Error(
+        `edit ${current.editIndex + 1}: replacement overlaps another edit`,
+      );
     }
   }
 
   let next = oldContent;
   for (const replacement of [...replacements].reverse()) {
-    next = next.slice(0, replacement.index) + replacement.newText + next.slice(replacement.index + replacement.length);
+    next =
+      next.slice(0, replacement.index) +
+      replacement.newText +
+      next.slice(replacement.index + replacement.length);
   }
   return next;
 }
@@ -370,10 +711,18 @@ function applyEditPreview(oldContent: string, edits: Array<{ oldText: string; ne
 function truncateDiff(diff: string, maxLines = 10000): string {
   const lines = diff.split("\n");
   if (lines.length <= maxLines) return diff;
-  return [...lines.slice(0, maxLines), `… diff truncated, ${lines.length - maxLines} more lines`].join("\n");
+  return [
+    ...lines.slice(0, maxLines),
+    `… diff truncated, ${lines.length - maxLines} more lines`,
+  ].join("\n");
 }
 
-function diffPromptBody(path: string, oldContent: string, newContent: string, previewError?: string): { body: string; preview: string; lineCount: number } {
+function diffPromptBody(
+  path: string,
+  oldContent: string,
+  newContent: string,
+  previewError?: string,
+): { body: string; preview: string; lineCount: number } {
   if (previewError) {
     const body = `Path: ${path}\n\nDiff preview unavailable: ${previewError}\n\nReview the tool request carefully before allowing it.`;
     return { body, preview: body, lineCount: body.split("\n").length };
@@ -396,42 +745,83 @@ function diffPromptBody(path: string, oldContent: string, newContent: string, pr
   return { body, preview, lineCount: body.split("\n").length };
 }
 
-function buildFileEditPrompt(toolName: string, input: unknown, cwd: string): { title: string; body: string; preview: string; lineCount: number } {
+function buildFileEditPrompt(
+  toolName: string,
+  input: unknown,
+  cwd: string,
+): { title: string; body: string; preview: string; lineCount: number } {
   if (toolName === "write") {
     const { path, content } = input as WriteInput;
     if (typeof path !== "string" || typeof content !== "string") {
       const body = `Invalid write arguments.\n\n${compact(input)}`;
-      return { title: "Allow write?", body, preview: body, lineCount: body.split("\n").length };
+      return {
+        title: "Allow write?",
+        body,
+        preview: body,
+        lineCount: body.split("\n").length,
+      };
     }
 
     const absolutePath = resolve(cwd, path);
     const oldContent = readTextIfPresent(absolutePath);
     const prompt = diffPromptBody(path, oldContent, content);
-    return { title: `Allow write to ${path}?`, body: prompt.body, preview: prompt.preview, lineCount: prompt.lineCount };
+    return {
+      title: `Allow write to ${path}?`,
+      body: prompt.body,
+      preview: prompt.preview,
+      lineCount: prompt.lineCount,
+    };
   }
 
   const { path, edits } = input as EditInput;
   if (typeof path !== "string" || !Array.isArray(edits)) {
     const body = `Invalid edit arguments.\n\n${compact(input)}`;
-    return { title: "Allow edit?", body, preview: body, lineCount: body.split("\n").length };
+    return {
+      title: "Allow edit?",
+      body,
+      preview: body,
+      lineCount: body.split("\n").length,
+    };
   }
 
   const absolutePath = resolve(cwd, path);
-  const oldContent = readTextIfPresent(absolutePath);
-  const normalizedEdits = edits.map((edit) => ({ oldText: String(edit.oldText ?? ""), newText: String(edit.newText ?? "") }));
+  const oldContent = normalizeToLF(readTextIfPresent(absolutePath));
+  const normalizedEdits = edits.map((edit) => ({
+    oldText: normalizeToLF(String(edit.oldText ?? "")),
+    newText: normalizeToLF(String(edit.newText ?? "")),
+  }));
 
   try {
     const newContent = applyEditPreview(oldContent, normalizedEdits);
     const prompt = diffPromptBody(path, oldContent, newContent);
-    return { title: `Allow edit to ${path}?`, body: prompt.body, preview: prompt.preview, lineCount: prompt.lineCount };
+    return {
+      title: `Allow edit to ${path}?`,
+      body: prompt.body,
+      preview: prompt.preview,
+      lineCount: prompt.lineCount,
+    };
   } catch (error) {
-    const prompt = diffPromptBody(path, oldContent, oldContent, error instanceof Error ? error.message : String(error));
-    return { title: `Allow edit to ${path}?`, body: prompt.body, preview: prompt.preview, lineCount: prompt.lineCount };
+    const prompt = diffPromptBody(
+      path,
+      oldContent,
+      oldContent,
+      error instanceof Error ? error.message : String(error),
+    );
+    return {
+      title: `Allow edit to ${path}?`,
+      body: prompt.body,
+      preview: prompt.preview,
+      lineCount: prompt.lineCount,
+    };
   }
 }
 
 function getExternalEditorCommand(): string {
-  return process.env.VISUAL || process.env.EDITOR || (process.platform === "win32" ? "notepad" : "nano");
+  return (
+    process.env.VISUAL ||
+    process.env.EDITOR ||
+    (process.platform === "win32" ? "notepad" : "nano")
+  );
 }
 
 type TuiController = {
@@ -440,15 +830,23 @@ type TuiController = {
   start(): void;
 };
 
-async function launchExternalEditor(tui: TuiController, path: string): Promise<boolean> {
+async function launchExternalEditor(
+  tui: TuiController,
+  path: string,
+): Promise<boolean> {
   const editorCmd = getExternalEditorCommand();
 
   try {
     tui.stop();
-    process.stdout.write(`Launching external editor: ${editorCmd}\nPi will resume when the editor exits.\n`);
+    process.stdout.write(
+      `Launching external editor: ${editorCmd}\nPi will resume when the editor exits.\n`,
+    );
     const [editor, ...editorArgs] = editorCmd.split(" ");
     const status = await new Promise<number | null>((resolveStatus) => {
-      const child = spawn(editor, [...editorArgs, path], { stdio: "inherit", shell: process.platform === "win32" });
+      const child = spawn(editor, [...editorArgs, path], {
+        stdio: "inherit",
+        shell: process.platform === "win32",
+      });
       child.on("error", () => resolveStatus(null));
       child.on("close", (code) => resolveStatus(code));
     });
@@ -459,7 +857,10 @@ async function launchExternalEditor(tui: TuiController, path: string): Promise<b
   }
 }
 
-async function editPatternInExternalEditor(tui: TuiController, option: AllowPatternOption): Promise<PermissionRule | undefined> {
+async function editPatternInExternalEditor(
+  tui: TuiController,
+  option: AllowPatternOption,
+): Promise<PermissionRule | undefined> {
   const tmpFile = join(tmpdir(), `pi-allow-pattern-${Date.now()}.txt`);
   const buffer = [
     "# Edit the JSON rule below, save, and exit.",
@@ -474,7 +875,7 @@ async function editPatternInExternalEditor(tui: TuiController, option: AllowPatt
 
   try {
     writeFileSync(tmpFile, buffer, "utf8");
-    if (!await launchExternalEditor(tui, tmpFile)) return undefined;
+    if (!(await launchExternalEditor(tui, tmpFile))) return undefined;
     return ruleFromEditedBuffer(readFileSync(tmpFile, "utf8"));
   } finally {
     try {
@@ -485,34 +886,54 @@ async function editPatternInExternalEditor(tui: TuiController, option: AllowPatt
   }
 }
 
-async function editPermissionsInExternalEditor(ctx: PermissionContext, target: { scope: "user" | "local"; path: string }): Promise<void> {
+async function editPermissionsInExternalEditor(
+  ctx: PermissionContext,
+  target: { scope: "user" | "local"; path: string },
+): Promise<void> {
   if (ctx.mode !== "tui" || !ctx.ui.custom) {
-    throw new Error("The permissions editor is only available in interactive TUI mode.");
+    throw new Error(
+      "The permissions editor is only available in interactive TUI mode.",
+    );
   }
 
   try {
     mkdirSync(dirname(target.path), { recursive: true });
     appendFileSync(target.path, "", "utf8");
   } catch (error) {
-    throw new Error(`Could not prepare ${target.scope} permission policy at ${target.path}: ${error instanceof Error ? error.message : String(error)}`);
+    throw new Error(
+      `Could not prepare ${target.scope} permission policy at ${target.path}: ${error instanceof Error ? error.message : String(error)}`,
+    );
   }
 
   await ctx.ui.custom<void>((tui, theme: any, _keybindings, done) => {
     void launchExternalEditor(tui, target.path)
       .then((succeeded) => {
-        if (!succeeded) ctx.ui.notify?.(`Editor exited without saving ${target.path}.`, "error");
+        if (!succeeded)
+          ctx.ui.notify?.(
+            `Editor exited without saving ${target.path}.`,
+            "error",
+          );
         done(undefined);
       })
       .catch((error) => {
-        ctx.ui.notify?.(error instanceof Error ? error.message : String(error), "error");
+        ctx.ui.notify?.(
+          error instanceof Error ? error.message : String(error),
+          "error",
+        );
         done(undefined);
       });
 
     return {
       render(width: number): string[] {
-        return wrapTextWithAnsi(theme.fg("muted", `Editing ${target.scope} permissions at ${target.path}…`), width);
+        return wrapTextWithAnsi(
+          theme.fg(
+            "muted",
+            `Editing ${target.scope} permissions at ${target.path}…`,
+          ),
+          width,
+        );
       },
-      invalidate(): void { },
+      invalidate(): void {},
     };
   });
 }
@@ -531,20 +952,26 @@ async function presentScrollablePermission(
   if (ctx.mode !== "tui" || !ctx.ui.custom) {
     const bodyWithHeader = stickyHeader ? `${stickyHeader}\n\n${body}` : body;
     const allowed = await ctx.ui.confirm(title, bodyWithHeader, { signal });
-    return allowed ? { allowed: true, decision: "allow_once" } : { allowed: false, decision: "deny" };
+    return allowed
+      ? { allowed: true, decision: "allow_once" }
+      : { allowed: false, decision: "deny" };
   }
 
   const rawLines = body.split("\n");
   if (rawLines.length > 1000) {
     const steeringReason = `Tool request content is too large (${rawLines.length} lines, exceeding the 1000 line limit). Please break this request down into smaller incremental steps (e.g. write an initial stub file followed by edit operations, or split into multiple smaller bash commands).`;
-    ctx.ui.notify?.(`Tool request exceeded 1000 lines (${rawLines.length} lines) and was automatically denied.`, "error");
+    ctx.ui.notify?.(
+      `Tool request exceeded 1000 lines (${rawLines.length} lines) and was automatically denied.`,
+      "error",
+    );
     return {
       allowed: false,
       decision: "deny",
       steering: steeringReason,
     };
   }
-  const publishedPreview = typeof pi.appendEntry === "function" && Boolean(toolCallId);
+  const publishedPreview =
+    typeof pi.appendEntry === "function" && Boolean(toolCallId);
   if (publishedPreview && toolCallId) {
     const preview: PermissionPreview = {
       title,
@@ -561,284 +988,513 @@ async function presentScrollablePermission(
   let steeringText = "";
   const projectPath = allowPattern
     ? resolveCurrentProjectPolicyPath({
-      cwd: ctx.cwd,
-      configDirName: CONFIG_DIR_NAME,
-      trustResolver: createPersistedTrustResolver(getAgentDir()),
-    })
+        cwd: ctx.cwd,
+        configDirName: CONFIG_DIR_NAME,
+        trustResolver: createPersistedTrustResolver(getAgentDir()),
+      })
     : undefined;
   const savePattern = (scope: "project" | "user"): boolean => {
     if (!allowPattern) return false;
     const target = scope === "project" ? projectPath : getUserPermissionsPath();
     if (!target) {
-      ctx.ui.notify?.("Project permissions cannot be saved because this directory is not trusted.", "warning");
+      ctx.ui.notify?.(
+        "Project permissions cannot be saved because this directory is not trusted.",
+        "warning",
+      );
       return false;
     }
-    try {
-      saveAllowedRule(target, permissionKeyForTool(allowPattern.toolName), allowPattern.suggestedRule);
-      ctx.ui.notify?.(`Saved ${scope} permission pattern to ${target}.`, "info");
-      return true;
-    } catch (error) {
-      ctx.ui.notify?.(`Could not save ${scope} permission pattern to ${target}: ${error instanceof Error ? error.message : String(error)}`, "error");
+    const saved = saveToolPermissionRule({
+      destination: target,
+      scope,
+      tool: allowPattern.toolName,
+      rule: allowPattern.suggestedRule,
+    });
+    if (!saved) {
+      ctx.ui.notify?.(
+        `Could not save ${scope} permission pattern to ${target}.`,
+        "error",
+      );
       return false;
     }
+    ctx.ui.notify?.(`Saved ${scope} permission pattern to ${target}.`, "info");
+    return true;
   };
 
-  const subcommandsToSave = allowPattern?.toolName === "bash" && (previewText || body)
-    ? evaluateBashSubcommands(previewText || body, ctx.cwd).subcommands.map((s) => s.normalized)
-    : [];
+  const subcommandsToSave =
+    allowPattern?.toolName === "bash" && (previewText || body)
+      ? evaluateBashSubcommands(previewText || body, ctx.cwd).subcommands.map(
+          (s) => s.normalized,
+        )
+      : [];
 
-  return ctx.ui.custom<PermissionResult>((tui, theme: any, keybindings: any, finish) => {
-    let settled = false;
-    let subcommandMode = false;
-    const selectedSubcommands = new Set<number>(subcommandsToSave.map((_, i) => i));
-    const customFactory = (ctx.ui as any)?.getEditorComponent?.();
-    const isVim =
-      process.env.PI_VIM_MODE === "1" ||
-      Boolean(keybindings?.vimMode) ||
-      (ctx as any).settings?.editorMode === "vim" ||
-      Boolean(process.env.EDITOR?.includes("vim")) ||
-      Boolean(process.env.VISUAL?.includes("vim"));
-    const steeringEditor = new SteeringEditor({
-      tui: tui as any,
-      theme: theme?.editorTheme,
-      keybindings,
-      customEditorFactory: customFactory,
-      vimMode: isVim,
-    });
-    const onAbort = (): void => done({ allowed: false, decision: "cancel" });
-    const done = (value: PermissionResult): void => {
-      if (settled) return;
-      settled = true;
-      signal.removeEventListener("abort", onAbort);
-      if (toolCallId) {
-        pendingPreviewReviews.delete(toolCallId);
-        previewReviewOverrides.delete(toolCallId);
-      }
-      finish(value);
-    };
-    signal.addEventListener("abort", onAbort, { once: true });
-    if (signal.aborted) queueMicrotask(onAbort);
-
-    const finishWithSteering = (result: PermissionResult, steering: string): void => {
-      // Denials carry the steering text inside the invocation-bound block
-      // reason (see deniedResult). Allows annotate the invocation-bound tool
-      // result (see the tool_result handler) — no floating steer messages.
-      if (result.allowed && toolCallId) pendingSteering.set(toolCallId, steering);
-      done({ ...result, steering });
-    };
-
-    const component: Component & Focusable = {
-      focused: false,
-      render(width: number): string[] {
-      const continuationPrefix = theme.fg("muted", "… ");
-      const contentWidth = Math.max(1, width - 2);
-
-      const wrappedBody = publishedPreview ? [] : rawLines.flatMap((line) => wrapWithContinuation(line, contentWidth, continuationPrefix));
-      const subcommandHint = subcommandsToSave.length > 0 ? " • Ctrl+S subcommands" : "";
-      const allowHint = allowPattern ? ` • Ctrl+A allow+save project • Ctrl+Shift+A allow+save user • Ctrl+E edit pattern${subcommandHint}` : "";
-      const steeringAllowHint = allowPattern ? " • Ctrl+A project-save+steer • Ctrl+Shift+A user-save+steer" : "";
-      const navigationHint = steeringMode
-        ? isVim
-          ? steeringEditor.getMode() === "insert"
-            ? `Esc normal mode • Ctrl+D deny+steer`
-            : `Esc exit steering • i/A insert mode • hjkl navigate • Ctrl+D deny+steer`
-          : `Esc exit steering • Ctrl+D deny+steer`
-        : `Tab steering • Ctrl+D deny • Esc cancel`;
-      const approvalHint = steeringMode
-        ? `Ctrl+Y allow once+steer${steeringAllowHint}`
-        : `Ctrl+Y allow once${allowHint}`;
-      const wrap = (text: string): string[] => wrapWithContinuation(text, width, continuationPrefix);
-
-      const steeringBoxLines = steeringEditor.render(contentWidth);
-
-      if (subcommandMode) {
-        return [
-          ...wrap(theme.fg("accent", theme.bold("Subcommand Rule Saving Mode:"))),
-          ...subcommandsToSave.flatMap((sub, i) =>
-            wrap(theme.fg(selectedSubcommands.has(i) ? "success" : "dim", `  ${selectedSubcommands.has(i) ? "[x]" : "[ ]"} ${i + 1}. ${sub}`))
-          ),
-          "",
-          ...wrap(theme.fg("dim", `1-${subcommandsToSave.length} toggle • a select all • Ctrl+A save project • Ctrl+Shift+A save user • Esc exit`)),
-        ];
-      }
-
-      return [
-        ...wrap(theme.fg("accent", theme.bold(title))),
-        ...(stickyHeader ? wrap(theme.fg("muted", stickyHeader)) : []),
-        ...(allowPattern ? wrap(theme.fg("muted", "Rule: save the reviewed exact match.")) : []),
-        "",
-        ...(publishedPreview
-          ? wrap(theme.fg("muted", "Review permission preview above in terminal scrollback."))
-          : wrappedBody),
-        "",
-        ...(steeringMode
-          ? [
-              ...steeringBoxLines,
-              ...wrap(theme.fg("dim", steeringEditor.getValue().trim() ? "choose allow or deny" : "type a message; Esc returns")),
-            ]
-          : []),
-        ...wrap(theme.fg("dim", navigationHint)),
-        ...wrap(theme.fg("dim", approvalHint)),
-      ];
-    },
-    handleInput(data: string): void {
-      // While the review is pending, honor the app-level expand toggle for the preview entry.
-      const expandKey = typeof keybindings?.matches === "function"
-        ? Boolean(keybindings.matches(data, "app.tools.expand"))
-        : matchesKey(data, "ctrl+o");
-      if (expandKey && toolCallId && pendingPreviewReviews.has(toolCallId)) {
-        const current = previewReviewOverrides.get(toolCallId) ?? true;
-        previewReviewOverrides.set(toolCallId, !current);
-        tui.requestRender();
-        return;
-      }
-      steeringEditor.focused = component.focused;
-      const steeringMessage = steeringEditor.getValue().trim();
-
-      if (steeringMode) {
-        if (matchesKey(data, "ctrl+y")) {
-          if (!steeringMessage) return;
-          finishWithSteering({ allowed: true, decision: "allow_once" }, steeringMessage);
-          return;
+  return ctx.ui.custom<PermissionResult>(
+    (tui, theme: any, keybindings: any, finish) => {
+      let settled = false;
+      let subcommandMode = false;
+      const selectedSubcommands = new Set<number>(
+        subcommandsToSave.map((_, i) => i),
+      );
+      const customFactory = (ctx.ui as any)?.getEditorComponent?.();
+      const isVim =
+        process.env.PI_VIM_MODE === "1" ||
+        Boolean(keybindings?.vimMode) ||
+        (ctx as any).settings?.editorMode === "vim" ||
+        Boolean(process.env.EDITOR?.includes("vim")) ||
+        Boolean(process.env.VISUAL?.includes("vim"));
+      const steeringEditor = new SteeringEditor({
+        tui: tui as any,
+        theme: theme?.editorTheme,
+        keybindings,
+        customEditorFactory: customFactory,
+        vimMode: isVim,
+      });
+      const onAbort = (): void => done({ allowed: false, decision: "cancel" });
+      const done = (value: PermissionResult): void => {
+        if (settled) return;
+        settled = true;
+        signal.removeEventListener("abort", onAbort);
+        if (toolCallId) {
+          pendingPreviewReviews.delete(toolCallId);
+          previewReviewOverrides.delete(toolCallId);
         }
-        if (allowPattern && matchesKey(data, "ctrl+shift+a")) {
-          if (!steeringMessage || !savePattern("user")) return;
-          finishWithSteering(
-            { allowed: true, decision: "allow_pattern", pattern: JSON.stringify(allowPattern.suggestedRule), scope: "user" },
-            steeringMessage,
-          );
-          return;
-        }
-        if (allowPattern && matchesKey(data, "ctrl+a")) {
-          if (!steeringMessage || !savePattern("project")) return;
-          finishWithSteering(
-            { allowed: true, decision: "allow_pattern", pattern: JSON.stringify(allowPattern.suggestedRule), scope: "project" },
-            steeringMessage,
-          );
-          return;
-        }
-        if (matchesKey(data, "ctrl+d")) {
-          if (steeringMessage) finishWithSteering({ allowed: false, decision: "deny" }, steeringMessage);
-          else done({ allowed: false, decision: "deny" });
-          return;
-        }
-        if (matchesKey(data, "escape")) {
-          if (steeringEditor.getMode() === "insert" && isVim) {
-            steeringEditor.handleInput(data);
-          } else {
-            steeringMode = false;
+        finish(value);
+      };
+      signal.addEventListener("abort", onAbort, { once: true });
+      if (signal.aborted) queueMicrotask(onAbort);
+
+      const finishWithSteering = (
+        result: PermissionResult,
+        steering: string,
+      ): void => {
+        // Denials carry the steering text inside the invocation-bound block
+        // reason (see deniedResult). Allows annotate the invocation-bound tool
+        // result (see the tool_result handler) — no floating steer messages.
+        if (result.allowed && toolCallId)
+          pendingSteering.set(toolCallId, steering);
+        done({ ...result, steering });
+      };
+
+      const component: Component & Focusable = {
+        focused: false,
+        render(width: number): string[] {
+          const continuationPrefix = theme.fg("muted", "… ");
+          const contentWidth = Math.max(1, width - 2);
+
+          const wrappedBody = publishedPreview
+            ? []
+            : rawLines.flatMap((line) =>
+                wrapWithContinuation(line, contentWidth, continuationPrefix),
+              );
+          const subcommandHint =
+            subcommandsToSave.length > 0 ? " • Ctrl+S subcommands" : "";
+          const allowHint = allowPattern
+            ? ` • Ctrl+A allow+save project • Ctrl+Shift+A allow+save user • Ctrl+E edit pattern${subcommandHint}`
+            : "";
+          const steeringAllowHint = allowPattern
+            ? " • Ctrl+A project-save+steer • Ctrl+Shift+A user-save+steer"
+            : "";
+          const navigationHint = steeringMode
+            ? isVim
+              ? steeringEditor.getMode() === "insert"
+                ? `Esc normal mode • Ctrl+D deny+steer`
+                : `Tab exit steering • i/A insert mode • hjkl navigate • Ctrl+D deny+steer`
+              : `Esc exit steering • Ctrl+D deny+steer`
+            : `Tab steering • Ctrl+D deny`;
+          const approvalHint = steeringMode
+            ? `Ctrl+Y allow once+steer${steeringAllowHint}`
+            : `Ctrl+Y allow once${allowHint}`;
+          const wrap = (text: string): string[] =>
+            wrapWithContinuation(text, width, continuationPrefix);
+
+          const steeringBoxLines = steeringEditor.render(contentWidth);
+
+          if (subcommandMode) {
+            return [
+              ...wrap(
+                theme.fg("accent", theme.bold("Subcommand Rule Saving Mode:")),
+              ),
+              ...subcommandsToSave.flatMap((sub, i) =>
+                wrap(
+                  theme.fg(
+                    selectedSubcommands.has(i) ? "success" : "dim",
+                    `  ${selectedSubcommands.has(i) ? "[x]" : "[ ]"} ${i + 1}. ${sub}`,
+                  ),
+                ),
+              ),
+              "",
+              ...wrap(
+                theme.fg(
+                  "dim",
+                  `1-${subcommandsToSave.length} toggle • a select all • Ctrl+A save project • Ctrl+Shift+A save user • Esc exit`,
+                ),
+              ),
+            ];
           }
-          tui.requestRender();
-          return;
-        }
-        steeringEditor.handleInput(data);
-        tui.requestRender();
-        return;
-      }
 
-      if (subcommandMode) {
-        if (matchesKey(data, "escape")) {
-          subcommandMode = false;
-          tui.requestRender();
-          return;
-        }
-        if (data === "a" || data === "A") {
-          subcommandsToSave.forEach((_, i) => selectedSubcommands.add(i));
-          tui.requestRender();
-          return;
-        }
-        const digit = parseInt(data, 10);
-        if (!isNaN(digit) && digit >= 1 && digit <= subcommandsToSave.length) {
-          const idx = digit - 1;
-          if (selectedSubcommands.has(idx)) selectedSubcommands.delete(idx);
-          else selectedSubcommands.add(idx);
-          tui.requestRender();
-          return;
-        }
-        if (matchesKey(data, "ctrl+a") || matchesKey(data, "ctrl+shift+a")) {
-          const scope: "project" | "user" = matchesKey(data, "ctrl+shift+a") ? "user" : "project";
-          const target = scope === "project" ? projectPath : getUserPermissionsPath();
-          if (!target) {
-            ctx.ui.notify?.("Project permissions cannot be saved because this directory is not trusted.", "warning");
-            return;
-          }
-          const chosen = subcommandsToSave.filter((_, i) => selectedSubcommands.has(i));
-          if (!chosen.length) {
-            ctx.ui.notify?.("No subcommands selected.", "warning");
-            return;
-          }
-          if (saveSubcommandAllowRules(target, chosen)) {
-            ctx.ui.notify?.(`Saved ${scope} permission rules for ${chosen.length} subcommand(s).`, "info");
-            subcommandMode = false;
+          return [
+            ...wrap(theme.fg("accent", theme.bold(title))),
+            ...(stickyHeader ? wrap(theme.fg("muted", stickyHeader)) : []),
+            ...(allowPattern
+              ? wrap(theme.fg("muted", "Rule: save the reviewed exact match."))
+              : []),
+            "",
+            ...(publishedPreview
+              ? wrap(
+                  theme.fg(
+                    "muted",
+                    "Review permission preview above in terminal scrollback.",
+                  ),
+                )
+              : wrappedBody),
+            "",
+            ...(steeringMode
+              ? [
+                  ...steeringBoxLines,
+                  ...wrap(
+                    theme.fg(
+                      "dim",
+                      steeringEditor.getValue().trim()
+                        ? "choose allow or deny"
+                        : isVim
+                          ? "type a message"
+                          : "type a message; Esc returns",
+                    ),
+                  ),
+                ]
+              : []),
+            ...wrap(theme.fg("dim", navigationHint)),
+            ...wrap(theme.fg("dim", approvalHint)),
+          ];
+        },
+        handleInput(data: string): void {
+          // While the review is pending, honor the app-level expand toggle for the preview entry.
+          const expandKey =
+            typeof keybindings?.matches === "function"
+              ? Boolean(keybindings.matches(data, "app.tools.expand"))
+              : matchesKey(data, "ctrl+o");
+          if (
+            expandKey &&
+            toolCallId &&
+            pendingPreviewReviews.has(toolCallId)
+          ) {
+            const current = previewReviewOverrides.get(toolCallId) ?? true;
+            previewReviewOverrides.set(toolCallId, !current);
             tui.requestRender();
-          } else {
-            ctx.ui.notify?.(`Could not save subcommand rules to ${target}.`, "error");
+            return;
           }
-          return;
-        }
-        return;
-      }
+          steeringEditor.focused = component.focused;
+          const steeringMessage = steeringEditor.getValue().trim();
 
-      if (isPermissionPromptCancellation(data)) {
-        done({ allowed: false, decision: "cancel" });
-        return;
-      }
-      if (matchesKey(data, "tab")) {
-        steeringMode = true;
-        tui.requestRender();
-        return;
-      }
-      if (matchesKey(data, "ctrl+y")) {
-        done({ allowed: true, decision: "allow_once" });
-        return;
-      }
-      if (subcommandsToSave.length > 0 && (matchesKey(data, "ctrl+s") || data === "s")) {
-        subcommandMode = true;
-        tui.requestRender();
-        return;
-      }
-      if (allowPattern && matchesKey(data, "ctrl+shift+a")) {
-        if (!savePattern("user")) return;
-        done({ allowed: true, decision: "allow_pattern", pattern: JSON.stringify(allowPattern.suggestedRule), scope: "user" });
-        return;
-      }
-      if (allowPattern && matchesKey(data, "ctrl+a")) {
-        if (!savePattern("project")) return;
-        done({ allowed: true, decision: "allow_pattern", pattern: JSON.stringify(allowPattern.suggestedRule), scope: "project" });
-        return;
-      }
-      if (allowPattern && matchesKey(data, "ctrl+e")) {
-        void editPatternInExternalEditor(tui, allowPattern).then((rule) => {
-          if (rule) {
-            saveAllowedRule(getUserPermissionsPath(), permissionKeyForTool(allowPattern.toolName), rule);
-            done({ allowed: true, decision: "allow_pattern", pattern: JSON.stringify(rule), scope: "user" });
+          if (steeringMode) {
+            if (matchesKey(data, "ctrl+y")) {
+              if (!steeringMessage) return;
+              finishWithSteering(
+                { allowed: true, decision: "allow_once" },
+                steeringMessage,
+              );
+              return;
+            }
+            if (allowPattern && matchesKey(data, "ctrl+shift+a")) {
+              if (!steeringMessage || !savePattern("user")) return;
+              finishWithSteering(
+                {
+                  allowed: true,
+                  decision: "allow_pattern",
+                  pattern: JSON.stringify(allowPattern.suggestedRule),
+                  scope: "user",
+                },
+                steeringMessage,
+              );
+              return;
+            }
+            if (allowPattern && matchesKey(data, "ctrl+a")) {
+              if (!steeringMessage || !savePattern("project")) return;
+              finishWithSteering(
+                {
+                  allowed: true,
+                  decision: "allow_pattern",
+                  pattern: JSON.stringify(allowPattern.suggestedRule),
+                  scope: "project",
+                },
+                steeringMessage,
+              );
+              return;
+            }
+            if (matchesKey(data, "ctrl+d")) {
+              if (steeringMessage)
+                finishWithSteering(
+                  { allowed: false, decision: "deny" },
+                  steeringMessage,
+                );
+              else done({ allowed: false, decision: "deny" });
+              return;
+            }
+            if (
+              isVim &&
+              steeringEditor.getMode() !== "insert" &&
+              matchesKey(data, "tab")
+            ) {
+              steeringMode = false;
+              tui.requestRender();
+              return;
+            }
+            if (matchesKey(data, "escape")) {
+              if (isVim) {
+                if (steeringEditor.getMode() === "insert")
+                  steeringEditor.handleInput(data);
+              } else {
+                steeringMode = false;
+              }
+              tui.requestRender();
+              return;
+            }
+            steeringEditor.handleInput(data);
+            tui.requestRender();
+            return;
           }
-        });
-        return;
-      }
-      if (matchesKey(data, "ctrl+d")) {
-        done({ allowed: false, decision: "deny" });
-        return;
-      }
-      tui.requestRender();
+
+          if (subcommandMode) {
+            if (matchesKey(data, "escape")) {
+              subcommandMode = false;
+              tui.requestRender();
+              return;
+            }
+            if (data === "a" || data === "A") {
+              subcommandsToSave.forEach((_, i) => selectedSubcommands.add(i));
+              tui.requestRender();
+              return;
+            }
+            const digit = parseInt(data, 10);
+            if (
+              !isNaN(digit) &&
+              digit >= 1 &&
+              digit <= subcommandsToSave.length
+            ) {
+              const idx = digit - 1;
+              if (selectedSubcommands.has(idx)) selectedSubcommands.delete(idx);
+              else selectedSubcommands.add(idx);
+              tui.requestRender();
+              return;
+            }
+            if (
+              matchesKey(data, "ctrl+a") ||
+              matchesKey(data, "ctrl+shift+a")
+            ) {
+              const scope: "project" | "user" = matchesKey(data, "ctrl+shift+a")
+                ? "user"
+                : "project";
+              const target =
+                scope === "project" ? projectPath : getUserPermissionsPath();
+              if (!target) {
+                ctx.ui.notify?.(
+                  "Project permissions cannot be saved because this directory is not trusted.",
+                  "warning",
+                );
+                return;
+              }
+              const chosen = subcommandsToSave.filter((_, i) =>
+                selectedSubcommands.has(i),
+              );
+              if (!chosen.length) {
+                ctx.ui.notify?.("No subcommands selected.", "warning");
+                return;
+              }
+              if (saveSubcommandAllowRules(target, chosen, scope)) {
+                ctx.ui.notify?.(
+                  `Saved ${scope} permission rules for ${chosen.length} subcommand(s).`,
+                  "info",
+                );
+                subcommandMode = false;
+                tui.requestRender();
+              } else {
+                ctx.ui.notify?.(
+                  `Could not save subcommand rules to ${target}.`,
+                  "error",
+                );
+              }
+              return;
+            }
+            return;
+          }
+
+          if (matchesKey(data, "tab")) {
+            steeringMode = true;
+            tui.requestRender();
+            return;
+          }
+          if (matchesKey(data, "ctrl+y")) {
+            done({ allowed: true, decision: "allow_once" });
+            return;
+          }
+          if (
+            subcommandsToSave.length > 0 &&
+            (matchesKey(data, "ctrl+s") || data === "s")
+          ) {
+            subcommandMode = true;
+            tui.requestRender();
+            return;
+          }
+          if (allowPattern && matchesKey(data, "ctrl+shift+a")) {
+            if (!savePattern("user")) return;
+            done({
+              allowed: true,
+              decision: "allow_pattern",
+              pattern: JSON.stringify(allowPattern.suggestedRule),
+              scope: "user",
+            });
+            return;
+          }
+          if (allowPattern && matchesKey(data, "ctrl+a")) {
+            if (!savePattern("project")) return;
+            done({
+              allowed: true,
+              decision: "allow_pattern",
+              pattern: JSON.stringify(allowPattern.suggestedRule),
+              scope: "project",
+            });
+            return;
+          }
+          if (allowPattern && matchesKey(data, "ctrl+e")) {
+            void editPatternInExternalEditor(tui, allowPattern).then((rule) => {
+              if (rule) {
+                if (
+                  !saveToolPermissionRule({
+                    destination: getUserPermissionsPath(),
+                    scope: "user",
+                    tool: allowPattern.toolName,
+                    rule,
+                  })
+                )
+                  return;
+                done({
+                  allowed: true,
+                  decision: "allow_pattern",
+                  pattern: JSON.stringify(rule),
+                  scope: "user",
+                });
+              }
+            });
+            return;
+          }
+          if (matchesKey(data, "ctrl+d")) {
+            done({ allowed: false, decision: "deny" });
+            return;
+          }
+          tui.requestRender();
+        },
+        invalidate(): void {},
+      };
+
+      return component;
     },
-      invalidate(): void { },
-    };
-
-    return component;
-  });
+  );
 }
 
 function permissionParentSessionId(ctx: PermissionContext): string {
   const sessionId = ctx.sessionId ?? ctx.sessionManager?.getSessionId();
-  if (!sessionId) throw new Error("Permission prompt session identity is unavailable.");
+  if (!sessionId)
+    throw new Error("Permission prompt session identity is unavailable.");
   return sessionId;
+}
+
+type ScrollablePermissionRequest = Pick<
+  ToolRequest,
+  "actor" | "toolName" | "cwd" | "input" | "toolCallId"
+>;
+
+function promptResolution(result: PermissionResult): {
+  decision: PromptQueueDecision;
+  steering?: string;
+} {
+  if (result.decision === "cancel")
+    return { decision: PromptQueueDecision.Deny };
+  return {
+    decision: result.allowed
+      ? PromptQueueDecision.Allow
+      : PromptQueueDecision.Deny,
+    ...(result.steering !== undefined ? { steering: result.steering } : {}),
+  };
+}
+
+function boundDecisionAgrees(
+  bound: PromptQueueResult,
+  outcome: PermissionResult,
+): boolean {
+  if (outcome.decision === "cancel") {
+    return (
+      bound.decision === PromptQueueDecision.Deny &&
+      bound.steering === undefined
+    );
+  }
+  const expected = outcome.allowed
+    ? PromptQueueDecision.Allow
+    : PromptQueueDecision.Deny;
+  return bound.decision === expected && bound.steering === outcome.steering;
+}
+
+function acceptBoundPermission(
+  bound: PromptQueueResult,
+  outcome: PermissionResult | undefined,
+  queueId: string,
+): PermissionResult {
+  if (
+    outcome &&
+    bound.ok &&
+    bound.toolCallId === queueId &&
+    boundDecisionAgrees(bound, outcome)
+  ) {
+    return outcome;
+  }
+  return { allowed: false, decision: "deny" };
+}
+
+async function presentOnNativePromptQueue(
+  ctx: PermissionContext,
+  request: ScrollablePermissionRequest,
+  queueId: string,
+  present: (signal: AbortSignal) => Promise<PermissionResult>,
+): Promise<PermissionResult> {
+  if (ctx.signal?.aborted) return { allowed: false, decision: "cancel" };
+  const sessionId = permissionParentSessionId(ctx);
+  const abort = new AbortController();
+  const abortFromParent = (): void => abort.abort();
+  ctx.signal?.addEventListener("abort", abortFromParent);
+  const release = trackSessionPromptAbort(sessionId, abort);
+  let outcome: PermissionResult | undefined;
+  try {
+    const bound = await presentBoundPrompt(
+      {
+        version: NATIVE_CONTRACT_VERSION,
+        operation: "prompt_queue",
+        nonce: NATIVE_PROMPT_QUEUE_NONCE,
+        toolCallId: queueId,
+      },
+      async (prompt) => {
+        if (prompt.toolCallId !== queueId || promptWasCancelled(abort.signal)) {
+          outcome = {
+            allowed: false,
+            decision: promptWasCancelled(abort.signal) ? "cancel" : "deny",
+          };
+          return { decision: PromptQueueDecision.Deny };
+        }
+        outcome = await present(abort.signal);
+        return promptResolution(outcome);
+      },
+    );
+    const accepted = acceptBoundPermission(bound, outcome, queueId);
+    if (outcome?.allowed && !accepted.allowed && request.toolCallId)
+      pendingSteering.delete(request.toolCallId);
+    return accepted;
+  } finally {
+    ctx.signal?.removeEventListener("abort", abortFromParent);
+    release();
+  }
 }
 
 async function askScrollablePermission(
   pi: PermissionPreviewPublisher,
   ctx: PermissionContext,
-  request: Pick<ToolRequest, "actor" | "toolName" | "cwd" | "input" | "toolCallId">,
+  request: ScrollablePermissionRequest,
   title: string,
   body: string,
   allowPattern?: AllowPatternOption,
@@ -847,22 +1503,48 @@ async function askScrollablePermission(
 ): Promise<PermissionResult> {
   const identity = createPermissionPromptIdentity(request);
   logSubagentDebug("permission-queue-enqueue", { identity });
-  return permissionPromptQueueFor(permissionParentSessionId(ctx)).enqueue({
-    identity,
-    cancel: { allowed: false, decision: "cancel" },
-    signal: ctx.signal,
-    present: async (signal) => {
-      logSubagentDebug("permission-queue-present", { identity });
-      try {
-        const result = await presentScrollablePermission(pi, ctx, title, body, allowPattern, stickyHeader, signal, request.toolCallId, previewText);
-        logSubagentDebug("permission-queue-settle", { identity, decision: result.decision });
-        return result;
-      } catch (error) {
-        logSubagentDebug("permission-queue-error", { identity, errorType: error instanceof Error ? error.name : typeof error });
-        throw error;
-      }
-    },
-  });
+  const present = async (signal: AbortSignal): Promise<PermissionResult> => {
+    logSubagentDebug("permission-queue-present", { identity });
+    try {
+      const result = await presentScrollablePermission(
+        pi,
+        ctx,
+        title,
+        body,
+        allowPattern,
+        stickyHeader,
+        signal,
+        request.toolCallId,
+        previewText,
+      );
+      logSubagentDebug("permission-queue-settle", {
+        identity,
+        decision: result.decision,
+      });
+      return result;
+    } catch (error) {
+      logSubagentDebug("permission-queue-error", {
+        identity,
+        errorType: error instanceof Error ? error.name : typeof error,
+      });
+      throw error;
+    }
+  };
+
+  if (!isNativePromptQueueLoaded()) {
+    return permissionPromptQueueFor(permissionParentSessionId(ctx)).enqueue({
+      identity,
+      cancel: { allowed: false, decision: "cancel" },
+      signal: ctx.signal,
+      present,
+    });
+  }
+
+  const queueId =
+    request.toolCallId && request.toolCallId.length > 0
+      ? request.toolCallId
+      : identity.requestId;
+  return presentOnNativePromptQueue(ctx, request, queueId, present);
 }
 
 export async function promptToolPermissionRequest(
@@ -876,7 +1558,10 @@ export async function promptToolPermissionRequest(
     hasUI: ctx.hasUI,
     hasCustomUI: typeof ctx.ui.custom === "function",
   });
-  const actor = request.actor.kind === "child" ? `subagent \"${request.actor.childId}\"` : "the main agent";
+  const actor =
+    request.actor.kind === "child"
+      ? `subagent \"${request.actor.childId}\"`
+      : "the main agent";
   const result = await askScrollablePermission(
     pi,
     ctx,
@@ -907,22 +1592,44 @@ async function handleConfigurationDiagnostic(
   const reason = `${result.diagnostic}${result.path ? `\n\nPath: ${result.path}` : ""}`;
   if (!ctx.hasUI) {
     const blocked = `Blocked tool call: ${reason}`;
-    audit({ tool: "permissions", decision: "deny_policy_error", cwd: ctx.cwd, reason: blocked });
+    audit({
+      tool: "permissions",
+      decision: "deny_policy_error",
+      cwd: ctx.cwd,
+      reason: blocked,
+    });
     return { block: true, reason: blocked };
   }
   const warning = await askScrollablePermission(
     pi,
     ctx,
-    { actor: { kind: "main" }, toolName: "permissions", input: { diagnostic: result.diagnostic, path: result.path }, cwd: ctx.cwd },
+    {
+      actor: { kind: "main" },
+      toolName: "permissions",
+      input: { diagnostic: result.diagnostic, path: result.path },
+      cwd: ctx.cwd,
+    },
     "Permission policy warning",
     reason,
   );
   if (warning.allowed) {
-    audit({ tool: "permissions", decision: "allow_once_policy_warning", cwd: ctx.cwd, path: result.path });
+    audit({
+      tool: "permissions",
+      decision: "allow_once_policy_warning",
+      cwd: ctx.cwd,
+      path: result.path,
+    });
     return "allow_once";
   }
-  const blocked = "Tool call blocked because the permission policy could not be read.";
-  audit({ tool: "permissions", decision: "deny_policy_error", cwd: ctx.cwd, path: result.path, reason: blocked });
+  const blocked =
+    "Tool call blocked because the permission policy could not be read.";
+  audit({
+    tool: "permissions",
+    decision: "deny_policy_error",
+    cwd: ctx.cwd,
+    path: result.path,
+    reason: blocked,
+  });
   return { block: true, reason: blocked };
 }
 
@@ -930,49 +1637,145 @@ export function resolveToolPermissionDecision(
   toolName: string,
   input: unknown,
   cwd: string,
-  options: { userPermissionsPath?: string; trustResolver?: Parameters<typeof resolveScopedPermissionDecision>[0]["trustResolver"] } = {},
+  options: {
+    userPermissionsPath?: string;
+    trustResolver?: Parameters<
+      typeof resolveScopedPermissionDecision
+    >[0]["trustResolver"];
+  } = {},
 ): ScopedPermissionDecision {
   return resolveScopedPermissionDecision({
     cwd,
     toolName,
     input,
-    userPermissionsPath: options.userPermissionsPath ?? getUserPermissionsPath(),
+    userPermissionsPath:
+      options.userPermissionsPath ?? getUserPermissionsPath(),
     configDirName: CONFIG_DIR_NAME,
-    trustResolver: options.trustResolver ?? createPersistedTrustResolver(getAgentDir()),
+    trustResolver:
+      options.trustResolver ?? createPersistedTrustResolver(getAgentDir()),
   });
 }
 
-type PermissionResolverOptions = Parameters<typeof resolveToolPermissionDecision>[3];
+type PermissionResolverOptions = Parameters<
+  typeof resolveToolPermissionDecision
+>[3];
 
 const IMPLICIT_PROJECT_PATH_TOOLS = new Set(["read", "grep", "find", "ls"]);
-const CONFIGURED_PATH_TOOLS = new Set(["read", "grep", "find", "ls", "write", "edit"]);
+const CONFIGURED_PATH_TOOLS = new Set([
+  "read",
+  "grep",
+  "find",
+  "ls",
+  "write",
+  "edit",
+]);
 const NONEXISTENT_PATH_TOOLS = new Set(["write", "edit", "subagent_result"]);
 
-type CanonicalPermissionPath = { path: string; cwd: string };
+type CanonicalPermissionPath = {
+  path: string;
+  cwd: string;
+  nativeDecision?: PermissionDecision;
+  nativeAiignoreMatch?: boolean;
+  nativeDiagnostic?: string;
+};
 
-function canonicalPermissionPath(toolName: string, requestedPath: string, cwd: string): CanonicalPermissionPath {
+function pathTrustRequest(
+  toolName: string,
+  requestedPath: string,
+  cwd: string,
+  trustResolver: TrustResolver,
+) {
+  let trustPath: string | null = null;
+  let trustDecision = false;
+  try {
+    const trust = trustResolver(cwd);
+    if (trust?.decision) {
+      trustPath = trust.path;
+      trustDecision = true;
+    }
+  } catch {
+    trustPath = null;
+    trustDecision = false;
+  }
+  return {
+    version: NATIVE_CONTRACT_VERSION,
+    operation: "path_trust" as const,
+    nonce: NATIVE_PATH_TRUST_NONCE,
+    tool: toolName,
+    requestedPath,
+    cwd,
+    trustPath,
+    trustDecision,
+  };
+}
+
+function canonicalPermissionPath(
+  toolName: string,
+  requestedPath: string,
+  cwd: string,
+): CanonicalPermissionPath {
+  const adopted = adoptPathTrust(
+    pathTrustRequest(
+      toolName,
+      requestedPath,
+      cwd,
+      createPersistedTrustResolver(getAgentDir()),
+    ),
+  );
+  if (adopted.status === "invalid") {
+    throw new Error(`invalid native path-trust result for ${toolName}`);
+  }
+  if (adopted.status === "ready") {
+    return {
+      path: adopted.result.path,
+      cwd: adopted.result.cwd,
+      nativeDecision: adopted.result.decision,
+      nativeAiignoreMatch: adopted.result.aiignoreMatch,
+      nativeDiagnostic: adopted.result.diagnostic,
+    };
+  }
   try {
     const canonicalCwd = realpathSync(cwd);
     const absolutePath = resolve(canonicalCwd, requestedPath || ".");
     try {
       return { path: realpathSync(absolutePath), cwd: canonicalCwd };
     } catch (error) {
-      if (!NONEXISTENT_PATH_TOOLS.has(toolName) || (error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+      if (
+        !NONEXISTENT_PATH_TOOLS.has(toolName) ||
+        (error as NodeJS.ErrnoException).code !== "ENOENT"
+      )
+        throw error;
       const canonicalParent = realpathSync(dirname(absolutePath));
-      return { path: join(canonicalParent, basename(absolutePath)), cwd: canonicalCwd };
+      return {
+        path: join(canonicalParent, basename(absolutePath)),
+        cwd: canonicalCwd,
+      };
     }
   } catch (error) {
-    throw new Error(`Could not canonicalize ${toolName} path: ${error instanceof Error ? error.message : String(error)}`);
+    throw new Error(
+      `Could not canonicalize ${toolName} path: ${error instanceof Error ? error.message : String(error)}`,
+    );
   }
 }
 
-function normalizedPermissionInput(request: ToolRequest): { input: unknown; canonicalCwd?: string } {
-  if (!CONFIGURED_PATH_TOOLS.has(request.toolName) || typeof request.input !== "object" || request.input === null) {
+function normalizedPermissionInput(request: ToolRequest): {
+  input: unknown;
+  canonicalCwd?: string;
+} {
+  if (
+    !CONFIGURED_PATH_TOOLS.has(request.toolName) ||
+    typeof request.input !== "object" ||
+    request.input === null
+  ) {
     return { input: request.input };
   }
   const input = request.input as Record<string, unknown>;
   const requestedPath = typeof input.path === "string" ? input.path : "";
-  const canonical = canonicalPermissionPath(request.toolName, requestedPath, request.cwd);
+  const canonical = canonicalPermissionPath(
+    request.toolName,
+    requestedPath,
+    request.cwd,
+  );
   const normalizedInput = { ...input, path: canonical.path };
   request.input = normalizedInput;
   return { input: normalizedInput, canonicalCwd: canonical.cwd };
@@ -983,15 +1786,80 @@ export function resolvePermissionDecisionForRequest(
   request: ToolRequest,
   options: PermissionResolverOptions = {},
 ): PermissionDecision {
+  if (
+    CONFIGURED_PATH_TOOLS.has(request.toolName) &&
+    typeof request.input === "object" &&
+    request.input !== null
+  ) {
+    const input = request.input as Record<string, unknown>;
+    const requestedPath = typeof input.path === "string" ? input.path : "";
+    const trustResolver =
+      options.trustResolver ?? createPersistedTrustResolver(getAgentDir());
+    const adopted = adoptPathTrust(
+      pathTrustRequest(
+        request.toolName,
+        requestedPath,
+        request.cwd,
+        trustResolver,
+      ),
+    );
+    if (adopted.status === "invalid") return "deny";
+    if (adopted.status === "ready") {
+      const normalizedInput = { ...input, path: adopted.result.path };
+      request.input = normalizedInput;
+      const implicit = IMPLICIT_PROJECT_PATH_TOOLS.has(request.toolName);
+      if (adopted.result.decision === "deny") return "deny";
+      if (adopted.result.diagnostic) return "ask";
+      if (
+        adopted.result.decision === "allow" &&
+        adopted.result.projectMatched === true
+      )
+        return "allow";
+      const resolved = resolveToolPermissionDecision(
+        request.toolName,
+        normalizedInput,
+        request.cwd,
+        {
+          ...options,
+          trustResolver: adopted.result.trustEligible
+            ? () => null
+            : trustResolver,
+        },
+      );
+      if (resolved.diagnostic) throw new Error(resolved.diagnostic);
+      if (resolved.decision === "deny") return "deny";
+      if (adopted.result.decision === "allow" || resolved.decision === "allow")
+        return "allow";
+      if (!implicit) return resolved.decision;
+      return isInsideDirectory(adopted.result.path, adopted.result.cwd)
+        ? "allow"
+        : "ask";
+    }
+  }
   const { input, canonicalCwd } = normalizedPermissionInput(request);
-  if (request.toolName === "bash" && typeof input === "object" && input !== null && typeof (input as any).command === "string") {
-    const subcommandEval = evaluateBashSubcommands((input as any).command, request.cwd, options);
+  if (
+    request.toolName === "bash" &&
+    typeof input === "object" &&
+    input !== null &&
+    typeof (input as any).command === "string"
+  ) {
+    const subcommandEval = evaluateBashSubcommands(
+      (input as any).command,
+      request.cwd,
+      options,
+    );
     return subcommandEval.decision;
   }
-  const resolved = resolveToolPermissionDecision(request.toolName, input, request.cwd, options);
+  const resolved = resolveToolPermissionDecision(
+    request.toolName,
+    input,
+    request.cwd,
+    options,
+  );
   if (resolved.diagnostic) throw new Error(resolved.diagnostic);
   if (resolved.decision === "deny") return "deny";
-  if (!IMPLICIT_PROJECT_PATH_TOOLS.has(request.toolName)) return resolved.decision;
+  if (!IMPLICIT_PROJECT_PATH_TOOLS.has(request.toolName))
+    return resolved.decision;
 
   const path = (input as { path: string }).path;
   const projectCwd = canonicalCwd ?? request.cwd;
@@ -1000,34 +1868,122 @@ export function resolvePermissionDecisionForRequest(
   return isInsideDirectory(path, projectCwd) ? "allow" : "ask";
 }
 
-export function createToolPermissionBoundary(
-  options: {
-    prompt?: ToolPermissionBoundary["prompt"];
-    execute: ToolPermissionBoundary["execute"];
-    validate?: ToolPermissionBoundary["validate"];
-    audit?: ToolPermissionBoundary["audit"];
-  },
-): ToolPermissionBoundary {
+export function createToolPermissionBoundary(options: {
+  prompt?: ToolPermissionBoundary["prompt"];
+  execute: ToolPermissionBoundary["execute"];
+  validate?: ToolPermissionBoundary["validate"];
+  audit?: ToolPermissionBoundary["audit"];
+}): ToolPermissionBoundary {
   return {
     evaluate: async (request) => resolvePermissionDecisionForRequest(request),
     prompt: options.prompt,
     execute: options.execute,
     validate: options.validate,
-    audit: options.audit ?? ((entry) => audit({ tool: entry.toolName, actor: entry.actor, decision: entry.decision, cwd: entry.cwd, reason: entry.reason })), 
+    audit:
+      options.audit ??
+      ((entry) =>
+        audit({
+          tool: entry.toolName,
+          actor: entry.actor,
+          decision: entry.decision,
+          cwd: entry.cwd,
+          reason: entry.reason,
+        })),
   };
 }
 
-function configuredDecision(toolName: string, input: unknown, cwd: string): ScopedPermissionDecision {
+function configuredDecision(
+  toolName: string,
+  input: unknown,
+  cwd: string,
+): ScopedPermissionDecision {
   return resolveToolPermissionDecision(toolName, input, cwd);
 }
 
-function configuredDeny(toolName: string, ctx: PermissionContext, details: Pick<AuditEntry, "path" | "command"> = {}): ToolCallEventResult {
+function configuredDeny(
+  toolName: string,
+  ctx: PermissionContext,
+  details: Pick<AuditEntry, "path" | "command"> = {},
+): ToolCallEventResult {
   const reason = `Blocked ${toolName}: arguments match a configured deny rule.`;
-  audit({ tool: toolName, decision: "deny_pattern", cwd: ctx.cwd, ...details, reason });
+  audit({
+    tool: toolName,
+    decision: "deny_pattern",
+    cwd: ctx.cwd,
+    ...details,
+    reason,
+  });
   return { block: true, reason };
 }
 
-async function handlePathPermission(toolName: string, input: PathToolInput, ctx: PermissionContext, pi: ExtensionAPI): Promise<ToolCallEventResult> {
+function blockedByAiignore(
+  toolName: string,
+  requestedPath: string,
+  absolutePath: string,
+  ignoreCwd: string,
+  ctx: PermissionContext,
+): ToolCallEventResult {
+  const reason = `Blocked ${toolName}: ${requestedPath || "."} is matched by ${resolve(ignoreCwd, ".aiignore")}.`;
+  audit({
+    tool: toolName,
+    decision: "deny_aiignore",
+    cwd: ctx.cwd,
+    path: absolutePath,
+    reason,
+  });
+  return { block: true, reason };
+}
+
+async function handleNativePathDiagnostic(
+  toolName: string,
+  canonical: CanonicalPermissionPath,
+  ctx: PermissionContext,
+  pi: ExtensionAPI,
+): Promise<ToolCallEventResult | "allow" | undefined> {
+  const diagnostic = canonical.nativeDiagnostic;
+  if (!diagnostic) return undefined;
+  const absolutePath = canonical.path;
+  if (!ctx.hasUI) {
+    const reason = `Blocked ${toolName}: ${diagnostic}`;
+    audit({
+      tool: toolName,
+      decision: "deny_policy_error",
+      cwd: ctx.cwd,
+      path: absolutePath,
+      reason,
+    });
+    return { block: true, reason };
+  }
+  const result = await askScrollablePermission(
+    pi,
+    ctx,
+    {
+      actor: { kind: "main" },
+      toolName,
+      input: { path: absolutePath, diagnostic },
+      cwd: ctx.cwd,
+      toolCallId: ctx.toolCallId,
+    },
+    "Permission file needs attention",
+    `${diagnostic}\n\nPath: ${absolutePath}\n\nAllow this call once so the file can be fixed. This does not save a rule.`,
+  );
+  audit({
+    tool: toolName,
+    decision: result.decision,
+    cwd: ctx.cwd,
+    path: absolutePath,
+    ...permissionResultAudit(result),
+  });
+  if (!result.allowed) return deniedResult(`User denied ${toolName}.`, result);
+  return "allow";
+}
+
+async function handlePathPermission(
+  toolName: string,
+  input: PathToolInput,
+  ctx: PermissionContext,
+  pi: ExtensionAPI,
+): Promise<ToolCallEventResult> {
   const requestedPath = typeof input.path === "string" ? input.path : "";
   let canonical: CanonicalPermissionPath;
   try {
@@ -1035,77 +1991,185 @@ async function handlePathPermission(toolName: string, input: PathToolInput, ctx:
     input.path = canonical.path;
   } catch (error) {
     const reason = `Blocked ${toolName}: ${error instanceof Error ? error.message : String(error)}`;
-    audit({ tool: toolName, decision: "deny_path_resolution", cwd: ctx.cwd, reason });
+    audit({
+      tool: toolName,
+      decision: "deny_path_resolution",
+      cwd: ctx.cwd,
+      reason,
+    });
     return { block: true, reason };
   }
   const absolutePath = canonical.path;
   const normalizedInput = { ...input, path: absolutePath };
   const decision = configuredDecision(toolName, normalizedInput, ctx.cwd);
-  const configurationResult = await handleConfigurationDiagnostic(decision, ctx, pi);
+  const configurationResult = await handleConfigurationDiagnostic(
+    decision,
+    ctx,
+    pi,
+  );
   if (configurationResult === "allow_once") return;
   if (configurationResult) return configurationResult;
 
-  if (decision.decision === "deny") return configuredDeny(toolName, ctx, { path: absolutePath });
-  if (isAiIgnoredPath(absolutePath, canonical.cwd)) {
-    const reason = `Blocked ${toolName}: ${requestedPath || "."} is matched by ${resolve(canonical.cwd, ".aiignore")}.`;
-    audit({ tool: toolName, decision: "deny_aiignore", cwd: ctx.cwd, path: absolutePath, reason });
-    return { block: true, reason };
+  if (decision.decision === "deny")
+    return configuredDeny(toolName, ctx, { path: absolutePath });
+  if (canonical.nativeDecision === "deny") {
+    if (canonical.nativeAiignoreMatch)
+      return blockedByAiignore(
+        toolName,
+        requestedPath,
+        absolutePath,
+        canonical.cwd,
+        ctx,
+      );
+    return configuredDeny(toolName, ctx, { path: absolutePath });
   }
-  if (decision.decision === "allow" || isInsideDirectory(absolutePath, canonical.cwd)) {
-    if (decision.decision === "allow") audit({ tool: toolName, decision: "allow_pattern", cwd: ctx.cwd, path: absolutePath, reason: decision.source });
+  const nativeDiagnostic = await handleNativePathDiagnostic(
+    toolName,
+    canonical,
+    ctx,
+    pi,
+  );
+  if (nativeDiagnostic === "allow") return;
+  if (nativeDiagnostic) return nativeDiagnostic;
+  if (
+    canonical.nativeDecision === undefined &&
+    isAiIgnoredPath(absolutePath, canonical.cwd)
+  )
+    return blockedByAiignore(
+      toolName,
+      requestedPath,
+      absolutePath,
+      canonical.cwd,
+      ctx,
+    );
+  if (
+    canonical.nativeDecision === "allow" ||
+    decision.decision === "allow" ||
+    isInsideDirectory(absolutePath, canonical.cwd)
+  ) {
+    if (decision.decision === "allow")
+      audit({
+        tool: toolName,
+        decision: "allow_pattern",
+        cwd: ctx.cwd,
+        path: absolutePath,
+        reason: decision.source,
+      });
     return;
   }
   if (!ctx.hasUI) {
     const reason = `Blocked ${toolName}: accessing paths outside the project requires explicit interactive permission or an allow rule.`;
-    audit({ tool: toolName, decision: "deny_no_ui", cwd: ctx.cwd, path: absolutePath, reason });
+    audit({
+      tool: toolName,
+      decision: "deny_no_ui",
+      cwd: ctx.cwd,
+      path: absolutePath,
+      reason,
+    });
     return { block: true, reason };
   }
 
   const result = await askScrollablePermission(
     pi,
     ctx,
-    { actor: { kind: "main" }, toolName, input: normalizedInput, cwd: ctx.cwd, toolCallId: ctx.toolCallId },
+    {
+      actor: { kind: "main" },
+      toolName,
+      input: normalizedInput,
+      cwd: ctx.cwd,
+      toolCallId: ctx.toolCallId,
+    },
     `Allow external ${toolName} path?`,
     `pi wants to use ${toolName} on a path outside the project directory.\n\nProject: ${canonical.cwd}\nPath: ${absolutePath}\n\nRules are stored under permissions.read in ${getUserPermissionsPath()}.`,
-    { toolName, suggestedRule: { path: exactPattern(absolutePath) }, subject: absolutePath },
+    {
+      toolName,
+      suggestedRule: { path: exactPattern(absolutePath) },
+      subject: absolutePath,
+    },
   );
 
-  audit({ tool: toolName, decision: result.decision, cwd: ctx.cwd, path: absolutePath, ...permissionResultAudit(result) });
-  if (!result.allowed) return deniedResult(`User denied external ${toolName} path.`, result);
+  audit({
+    tool: toolName,
+    decision: result.decision,
+    cwd: ctx.cwd,
+    path: absolutePath,
+    ...permissionResultAudit(result),
+  });
+  if (!result.allowed)
+    return deniedResult(`User denied external ${toolName} path.`, result);
 }
 
-async function handleReadPermission(input: ReadInput, ctx: PermissionContext, pi: ExtensionAPI): Promise<ToolCallEventResult> {
+async function handleReadPermission(
+  input: ReadInput,
+  ctx: PermissionContext,
+  pi: ExtensionAPI,
+): Promise<ToolCallEventResult> {
   return handlePathPermission("read", input, ctx, pi);
 }
 
-type SubagentResultExportInput = { id?: unknown; full_context?: unknown; overwrite?: unknown };
+type SubagentResultExportInput = {
+  id?: unknown;
+  full_context?: unknown;
+  overwrite?: unknown;
+};
 
-async function handleSubagentResultExportPermission(input: SubagentResultExportInput, ctx: PermissionContext, pi: ExtensionAPI): Promise<ToolCallEventResult> {
-  let requestedPath = typeof input.full_context === "string" ? input.full_context : "";
+async function handleSubagentResultExportPermission(
+  input: SubagentResultExportInput,
+  ctx: PermissionContext,
+  pi: ExtensionAPI,
+): Promise<ToolCallEventResult> {
+  let requestedPath =
+    typeof input.full_context === "string" ? input.full_context : "";
   if (requestedPath.startsWith("@")) requestedPath = requestedPath.slice(1);
   let absolutePath: string;
   try {
-    absolutePath = canonicalPermissionPath("write", requestedPath, ctx.cwd).path;
+    absolutePath = canonicalPermissionPath(
+      "write",
+      requestedPath,
+      ctx.cwd,
+    ).path;
     input.full_context = absolutePath;
   } catch (error) {
     const reason = `Blocked write: ${error instanceof Error ? error.message : String(error)}`;
-    audit({ tool: "write", decision: "deny_path_resolution", cwd: ctx.cwd, reason });
+    audit({
+      tool: "write",
+      decision: "deny_path_resolution",
+      cwd: ctx.cwd,
+      reason,
+    });
     return { block: true, reason };
   }
 
   const decision = configuredDecision("write", { path: absolutePath }, ctx.cwd);
-  const configurationResult = await handleConfigurationDiagnostic(decision, ctx, pi);
+  const configurationResult = await handleConfigurationDiagnostic(
+    decision,
+    ctx,
+    pi,
+  );
   if (configurationResult === "allow_once") return;
   if (configurationResult) return configurationResult;
 
-  if (decision.decision === "deny") return configuredDeny("write", ctx, { path: absolutePath });
+  if (decision.decision === "deny")
+    return configuredDeny("write", ctx, { path: absolutePath });
   if (decision.decision === "allow") {
-    audit({ tool: "write", decision: "allow_pattern", cwd: ctx.cwd, path: absolutePath });
+    audit({
+      tool: "write",
+      decision: "allow_pattern",
+      cwd: ctx.cwd,
+      path: absolutePath,
+    });
     return;
   }
   if (!ctx.hasUI) {
-    const reason = "Blocked write: file edits require explicit interactive permission or an allow rule.";
-    audit({ tool: "write", decision: "deny_no_ui", cwd: ctx.cwd, path: absolutePath, reason });
+    const reason =
+      "Blocked write: file edits require explicit interactive permission or an allow rule.";
+    audit({
+      tool: "write",
+      decision: "deny_no_ui",
+      cwd: ctx.cwd,
+      path: absolutePath,
+      reason,
+    });
     return { block: true, reason };
   }
 
@@ -1115,7 +2179,13 @@ async function handleSubagentResultExportPermission(input: SubagentResultExportI
   const result = await askScrollablePermission(
     pi,
     ctx,
-    { actor: { kind: "main" }, toolName: "write", input: { path: absolutePath }, cwd: ctx.cwd, toolCallId: ctx.toolCallId },
+    {
+      actor: { kind: "main" },
+      toolName: "write",
+      input: { path: absolutePath },
+      cwd: ctx.cwd,
+      toolCallId: ctx.toolCallId,
+    },
     "Export subagent result?",
     [
       "Export full versioned child context to a local file.",
@@ -1124,128 +2194,292 @@ async function handleSubagentResultExportPermission(input: SubagentResultExportI
       `Target: ${absolutePath}`,
       `Overwrite: ${overwriteStr}`,
     ].join("\n"),
-    { toolName: "write", suggestedRule: { path: exactPattern(absolutePath) }, subject: absolutePath },
+    {
+      toolName: "write",
+      suggestedRule: { path: exactPattern(absolutePath) },
+      subject: absolutePath,
+    },
     `Path: ${requestedPath || absolutePath}`,
   );
 
-  audit({ tool: "write", decision: result.decision, cwd: ctx.cwd, path: absolutePath, ...permissionResultAudit(result) });
+  audit({
+    tool: "write",
+    decision: result.decision,
+    cwd: ctx.cwd,
+    path: absolutePath,
+    ...permissionResultAudit(result),
+  });
   if (!result.allowed) return deniedResult("User denied write.", result);
 }
 
-async function handleFileEditPermission(toolName: string, input: FileEditInput, ctx: PermissionContext, pi: ExtensionAPI): Promise<ToolCallEventResult> {
+async function handleFileEditPermission(
+  toolName: string,
+  input: FileEditInput,
+  ctx: PermissionContext,
+  pi: ExtensionAPI,
+): Promise<ToolCallEventResult> {
   const requestedPath = typeof input.path === "string" ? input.path : "";
-  let absolutePath: string;
+  let canonical: CanonicalPermissionPath;
   try {
-    absolutePath = canonicalPermissionPath(toolName, requestedPath, ctx.cwd).path;
-    input.path = absolutePath;
+    canonical = canonicalPermissionPath(toolName, requestedPath, ctx.cwd);
+    input.path = canonical.path;
   } catch (error) {
     const reason = `Blocked ${toolName}: ${error instanceof Error ? error.message : String(error)}`;
-    audit({ tool: toolName, decision: "deny_path_resolution", cwd: ctx.cwd, reason });
+    audit({
+      tool: toolName,
+      decision: "deny_path_resolution",
+      cwd: ctx.cwd,
+      reason,
+    });
     return { block: true, reason };
   }
-  if (toolName === "edit" && Array.isArray(input.edits) && input.edits.every(isEditPair)) {
+  const absolutePath = canonical.path;
+  if (
+    toolName === "edit" &&
+    Array.isArray(input.edits) &&
+    input.edits.every(isEditPair)
+  ) {
     const preflight = await preflightEdit(absolutePath, input.edits);
     if (!preflight.ok) {
-      audit({ tool: toolName, decision: "deny_preflight", cwd: ctx.cwd, path: absolutePath, reason: preflight.reason });
+      audit({
+        tool: toolName,
+        decision: "deny_preflight",
+        cwd: ctx.cwd,
+        path: absolutePath,
+        reason: preflight.reason,
+      });
       return { block: true, reason: preflight.reason };
     }
   }
-  const decision = configuredDecision(toolName, { ...input, path: absolutePath }, ctx.cwd);
-  const configurationResult = await handleConfigurationDiagnostic(decision, ctx, pi);
+  const decision = configuredDecision(
+    toolName,
+    { ...input, path: absolutePath },
+    ctx.cwd,
+  );
+  const configurationResult = await handleConfigurationDiagnostic(
+    decision,
+    ctx,
+    pi,
+  );
   if (configurationResult === "allow_once") return;
   if (configurationResult) return configurationResult;
 
-  if (decision.decision === "deny") return configuredDeny(toolName, ctx, { path: absolutePath });
-  if (decision.decision === "allow") {
-    audit({ tool: toolName, decision: "allow_pattern", cwd: ctx.cwd, path: absolutePath });
+  if (decision.decision === "deny")
+    return configuredDeny(toolName, ctx, { path: absolutePath });
+  if (canonical.nativeDecision === "deny") {
+    if (canonical.nativeAiignoreMatch)
+      return blockedByAiignore(
+        toolName,
+        requestedPath,
+        absolutePath,
+        canonical.cwd,
+        ctx,
+      );
+    return configuredDeny(toolName, ctx, { path: absolutePath });
+  }
+  const nativeDiagnostic = await handleNativePathDiagnostic(
+    toolName,
+    canonical,
+    ctx,
+    pi,
+  );
+  if (nativeDiagnostic === "allow") return;
+  if (nativeDiagnostic) return nativeDiagnostic;
+  if (decision.decision === "allow" || canonical.nativeDecision === "allow") {
+    audit({
+      tool: toolName,
+      decision: "allow_pattern",
+      cwd: ctx.cwd,
+      path: absolutePath,
+    });
     return;
   }
   if (!ctx.hasUI) {
     const reason = `Blocked ${toolName}: file edits require explicit interactive permission or an allow rule.`;
-    audit({ tool: toolName, decision: "deny_no_ui", cwd: ctx.cwd, path: absolutePath, reason });
+    audit({
+      tool: toolName,
+      decision: "deny_no_ui",
+      cwd: ctx.cwd,
+      path: absolutePath,
+      reason,
+    });
     return { block: true, reason };
   }
 
   const prompt = buildFileEditPrompt(toolName, input, ctx.cwd);
   if (prompt.lineCount > 1000) {
     const reason = `Tool request content is too large (${prompt.lineCount} lines, exceeding the 1000 line limit). Please break this request down into smaller incremental steps (e.g. write an initial stub file followed by edit operations, or split into multiple smaller bash commands).`;
-    ctx.ui.notify?.(`Tool request exceeded 1000 lines (${prompt.lineCount} lines) and was automatically denied.`, "error");
-    audit({ tool: toolName, decision: "deny", cwd: ctx.cwd, path: absolutePath, reason });
+    ctx.ui.notify?.(
+      `Tool request exceeded 1000 lines (${prompt.lineCount} lines) and was automatically denied.`,
+      "error",
+    );
+    audit({
+      tool: toolName,
+      decision: "deny",
+      cwd: ctx.cwd,
+      path: absolutePath,
+      reason,
+    });
     return { block: true, reason };
   }
   const result = await askScrollablePermission(
     pi,
     ctx,
-    { actor: { kind: "main" }, toolName, input: { ...input, path: absolutePath }, cwd: ctx.cwd, toolCallId: ctx.toolCallId },
+    {
+      actor: { kind: "main" },
+      toolName,
+      input: { ...input, path: absolutePath },
+      cwd: ctx.cwd,
+      toolCallId: ctx.toolCallId,
+    },
     prompt.title,
     reasonPrefix(input) + prompt.body,
-    { toolName, suggestedRule: { path: exactPattern(absolutePath) }, subject: absolutePath },
+    {
+      toolName,
+      suggestedRule: { path: exactPattern(absolutePath) },
+      subject: absolutePath,
+    },
     `Path: ${requestedPath || absolutePath}`,
     prompt.preview,
   );
 
-  audit({ tool: toolName, decision: result.decision, cwd: ctx.cwd, path: absolutePath, ...permissionResultAudit(result) });
+  audit({
+    tool: toolName,
+    decision: result.decision,
+    cwd: ctx.cwd,
+    path: absolutePath,
+    ...permissionResultAudit(result),
+  });
   if (!result.allowed) return deniedResult(`User denied ${toolName}.`, result);
 }
 
-async function handleBashPermission(input: BashInput, ctx: PermissionContext, pi: ExtensionAPI): Promise<ToolCallEventResult> {
+async function handleBashPermission(
+  input: BashInput,
+  ctx: PermissionContext,
+  pi: ExtensionAPI,
+): Promise<ToolCallEventResult> {
   const command = typeof input.command === "string" ? input.command : "";
   const subcommandEval = evaluateBashSubcommands(command, ctx.cwd, {
     audit: (entry) => {
       if (typeof entry.decision === "string") {
-        audit({ tool: "bash", cwd: ctx.cwd, ...entry, decision: entry.decision });
+        audit({
+          tool: "bash",
+          cwd: ctx.cwd,
+          ...entry,
+          decision: entry.decision,
+        });
       }
     },
   });
   const decision = configuredDecision("bash", input, ctx.cwd);
-  const configurationResult = await handleConfigurationDiagnostic(decision, ctx, pi);
+  const configurationResult = await handleConfigurationDiagnostic(
+    decision,
+    ctx,
+    pi,
+  );
   if (configurationResult === "allow_once") return;
   if (configurationResult) return configurationResult;
 
   if (subcommandEval.decision === "deny") {
-    const reason = subcommandEval.reason || "Blocked bash: arguments match a configured deny rule.";
-    audit({ tool: "bash", decision: "deny_pattern", cwd: ctx.cwd, command, reason });
+    const reason =
+      subcommandEval.reason ||
+      "Blocked bash: arguments match a configured deny rule.";
+    audit({
+      tool: "bash",
+      decision: "deny_pattern",
+      cwd: ctx.cwd,
+      command,
+      reason,
+    });
     return { block: true, reason };
   }
   if (subcommandEval.decision === "allow") {
-    audit({ tool: "bash", decision: "allow_pattern", cwd: ctx.cwd, command, reason: subcommandEval.source });
+    audit({
+      tool: "bash",
+      decision: "allow_pattern",
+      cwd: ctx.cwd,
+      command,
+      reason: subcommandEval.source,
+    });
     return;
   }
   if (!ctx.hasUI) {
-    const reason = "Blocked bash command: command requires explicit interactive permission or an allow rule.";
-    audit({ tool: "bash", decision: "deny_no_ui", cwd: ctx.cwd, command, reason });
+    const reason =
+      "Blocked bash command: command requires explicit interactive permission or an allow rule.";
+    audit({
+      tool: "bash",
+      decision: "deny_no_ui",
+      cwd: ctx.cwd,
+      command,
+      reason,
+    });
     return { block: true, reason };
   }
 
   const result = await askScrollablePermission(
     pi,
     ctx,
-    { actor: { kind: "main" }, toolName: "bash", input, cwd: ctx.cwd, toolCallId: ctx.toolCallId },
+    {
+      actor: { kind: "main" },
+      toolName: "bash",
+      input,
+      cwd: ctx.cwd,
+      toolCallId: ctx.toolCallId,
+    },
     "Allow bash command?",
-    reasonPrefix(input) + `pi wants to run this shell command.\n\n${compact(command)}\n\nRules are stored under permissions.bash in ${getUserPermissionsPath()}.`,
-    { toolName: "bash", suggestedRule: { command: exactPattern(command) }, subject: command },
+    reasonPrefix(input) +
+      `pi wants to run this shell command.\n\n${compact(command)}\n\nRules are stored under permissions.bash in ${getUserPermissionsPath()}.`,
+    {
+      toolName: "bash",
+      suggestedRule: { command: exactPattern(command) },
+      subject: command,
+    },
     undefined,
     compact(command),
   );
 
-  audit({ tool: "bash", decision: result.decision, cwd: ctx.cwd, command, ...permissionResultAudit(result) });
+  audit({
+    tool: "bash",
+    decision: result.decision,
+    cwd: ctx.cwd,
+    command,
+    ...permissionResultAudit(result),
+  });
   if (!result.allowed) return deniedResult("User denied bash command.", result);
 }
 
-async function handleSubagentPermission(input: SubagentInput, ctx: PermissionContext, pi: ExtensionAPI): Promise<ToolCallEventResult> {
+async function handleSubagentPermission(
+  input: SubagentInput,
+  ctx: PermissionContext,
+  pi: ExtensionAPI,
+): Promise<ToolCallEventResult> {
   const decision = configuredDecision("subagent", input, ctx.cwd);
   const requestedRuntime = requiresSubagentRuntimeApproval(input);
-  const configurationResult = await handleConfigurationDiagnostic(decision, ctx, pi);
-  if (configurationResult && configurationResult !== "allow_once") return configurationResult;
+  const configurationResult = await handleConfigurationDiagnostic(
+    decision,
+    ctx,
+    pi,
+  );
+  if (configurationResult && configurationResult !== "allow_once")
+    return configurationResult;
   if (decision.decision === "deny") return configuredDeny("subagent", ctx);
 
-  const selection = await resolveChildRuntimeSelection({
-    ...(typeof input.account === "string" ? { account: input.account } : {}),
-    ...(typeof input.model === "string" ? { model: input.model } : {}),
-  }, ctx.model);
+  const selection = await resolveChildRuntimeSelection(
+    {
+      ...(typeof input.account === "string" ? { account: input.account } : {}),
+      ...(typeof input.model === "string" ? { model: input.model } : {}),
+    },
+    ctx.model,
+  );
   if (requestedRuntime && !selection) {
-    const reason = "Blocked subagent: selected account or model could not be resolved through account-switcher.";
-    audit({ tool: "subagent", decision: "deny_runtime_unavailable", cwd: ctx.cwd, reason });
+    const reason =
+      "Blocked subagent: selected account or model could not be resolved through account-switcher.";
+    audit({
+      tool: "subagent",
+      decision: "deny_runtime_unavailable",
+      cwd: ctx.cwd,
+      reason,
+    });
     return { block: true, reason };
   }
   if (selection) attachChildRuntimeSelection(input, selection);
@@ -1266,8 +2500,16 @@ async function handleSubagentPermission(input: SubagentInput, ctx: PermissionCon
   const result = await askScrollablePermission(
     pi,
     ctx,
-    { actor: { kind: "main" }, toolName: "subagent", input, cwd: ctx.cwd, toolCallId: ctx.toolCallId },
-    requiresRuntimeApproval ? "Allow subagent delegation with selected runtime?" : "Allow subagent delegation?",
+    {
+      actor: { kind: "main" },
+      toolName: "subagent",
+      input,
+      cwd: ctx.cwd,
+      toolCallId: ctx.toolCallId,
+    },
+    requiresRuntimeApproval
+      ? "Allow subagent delegation with selected runtime?"
+      : "Allow subagent delegation?",
     [
       "pi wants to delegate work to one or more child agents.",
       "",
@@ -1288,20 +2530,38 @@ async function handleSubagentPermission(input: SubagentInput, ctx: PermissionCon
     { toolName: "subagent", suggestedRule: {}, subject: "all subagent calls" },
   );
 
-  audit({ tool: "subagent", decision: result.decision, cwd: ctx.cwd, ...permissionResultAudit(result) });
-  if (!result.allowed) return deniedResult("User denied subagent delegation.", result);
+  audit({
+    tool: "subagent",
+    decision: result.decision,
+    cwd: ctx.cwd,
+    ...permissionResultAudit(result),
+  });
+  if (!result.allowed)
+    return deniedResult("User denied subagent delegation.", result);
 }
 
 function isKnownMcpTool(toolName: string, pi: ExtensionAPI): boolean {
-  return toolName.startsWith("mcp__") && pi.getAllTools().some((tool) => tool.name === toolName);
+  return (
+    toolName.startsWith("mcp__") &&
+    pi.getAllTools().some((tool) => tool.name === toolName)
+  );
 }
 
-async function handleUnknownToolPermission(toolName: string, input: unknown, ctx: PermissionContext, pi: ExtensionAPI): Promise<ToolCallEventResult> {
+async function handleUnknownToolPermission(
+  toolName: string,
+  input: unknown,
+  ctx: PermissionContext,
+  pi: ExtensionAPI,
+): Promise<ToolCallEventResult> {
   const knownTool = pi.getAllTools().some((tool) => tool.name === toolName);
   const knownMcpTool = isKnownMcpTool(toolName, pi);
   if (knownTool) {
     const decision = configuredDecision(toolName, input, ctx.cwd);
-    const configurationResult = await handleConfigurationDiagnostic(decision, ctx, pi);
+    const configurationResult = await handleConfigurationDiagnostic(
+      decision,
+      ctx,
+      pi,
+    );
     if (configurationResult === "allow_once") return;
     if (configurationResult) return configurationResult;
     if (decision.decision === "deny") return configuredDeny(toolName, ctx);
@@ -1320,24 +2580,42 @@ async function handleUnknownToolPermission(toolName: string, input: unknown, ctx
   const result = await askScrollablePermission(
     pi,
     ctx,
-    { actor: { kind: "main" }, toolName, input, cwd: ctx.cwd, toolCallId: ctx.toolCallId },
+    {
+      actor: { kind: "main" },
+      toolName,
+      input,
+      cwd: ctx.cwd,
+      toolCallId: ctx.toolCallId,
+    },
     `Allow ${toolName}?`,
     [
-      knownMcpTool ? "pi wants to call a known MCP tool without a matching permission rule." : "pi wants to call a tool without a specific permission rule.",
+      knownMcpTool
+        ? "pi wants to call a known MCP tool without a matching permission rule."
+        : "pi wants to call a tool without a specific permission rule.",
       "",
       `Tool: ${toolName}`,
       "",
       "Arguments:",
       compact(input, 8000),
     ].join("\n"),
-    knownMcpTool ? { toolName, suggestedRule: {}, subject: "all calls to this MCP tool" } : undefined,
+    knownMcpTool
+      ? { toolName, suggestedRule: {}, subject: "all calls to this MCP tool" }
+      : undefined,
   );
 
-  audit({ tool: toolName, decision: result.decision, cwd: ctx.cwd, ...permissionResultAudit(result) });
+  audit({
+    tool: toolName,
+    decision: result.decision,
+    cwd: ctx.cwd,
+    ...permissionResultAudit(result),
+  });
   if (!result.allowed) return deniedResult(`User denied ${toolName}.`, result);
 }
 
-async function handleRegisteredSessionStart(ctx: PermissionContext, options: { reportNativeProbe?: boolean } = {}): Promise<void> {
+async function handleRegisteredSessionStart(
+  ctx: PermissionContext,
+  options: { reportNativeProbe?: boolean } = {},
+): Promise<void> {
   const nativePackage = resolveNativePackagePath();
   if (options.reportNativeProbe !== false && nativePackage) {
     const nativeResult = await loadNativePackageProbe(nativePackage);
@@ -1352,16 +2630,26 @@ async function handleRegisteredSessionStart(ctx: PermissionContext, options: { r
   }
   if (isYoloModeEnabled()) {
     if (ctx.hasUI) {
-      ctx.ui.notify?.("YOLO permission mode active via environment variable.", "warning");
+      ctx.ui.notify?.(
+        "YOLO permission mode active via environment variable.",
+        "warning",
+      );
     }
-    audit({ tool: "permissions", decision: "yolo_mode_activated", cwd: ctx.cwd });
+    audit({
+      tool: "permissions",
+      decision: "yolo_mode_activated",
+      cwd: ctx.cwd,
+    });
   }
   if (process.env.PI_SUBAGENT_DEBUG === "1" && ctx.hasUI) {
     ctx.ui.notify?.(`Subagent debug log: ${subagentDebugPath()}`, "info");
   }
 }
 
-async function handleRegisteredPermissionsCommand(args: string, ctx: ExtensionCommandContext): Promise<void> {
+async function handleRegisteredPermissionsCommand(
+  args: string,
+  ctx: ExtensionCommandContext,
+): Promise<void> {
   const target = resolvePermissionEditorTarget(args, ctx.cwd);
   if ("error" in target) {
     ctx.ui.notify(target.error, "error");
@@ -1370,7 +2658,10 @@ async function handleRegisteredPermissionsCommand(args: string, ctx: ExtensionCo
   try {
     await editPermissionsInExternalEditor(ctx, target);
   } catch (error) {
-    ctx.ui.notify(error instanceof Error ? error.message : String(error), "error");
+    ctx.ui.notify(
+      error instanceof Error ? error.message : String(error),
+      "error",
+    );
   }
 }
 
@@ -1379,10 +2670,14 @@ function handleRegisteredSessionShutdown(ctx: any): void {
   promptedPreviews.clear();
   pendingPreviewReviews.clear();
   previewReviewOverrides.clear();
-  closePermissionPromptQueue(permissionParentSessionId(ctx));
+  const sessionId = permissionParentSessionId(ctx);
+  abortSessionPromptPresentations(sessionId);
+  closePermissionPromptQueue(sessionId);
 }
 
-function handleRegisteredToolResult(event: ToolResultEvent): { content?: ToolResultEvent["content"] } | undefined {
+function handleRegisteredToolResult(
+  event: ToolResultEvent,
+): { content?: ToolResultEvent["content"] } | undefined {
   promptedPreviews.delete(event.toolCallId);
   const steering = pendingSteering.get(event.toolCallId);
   if (!steering) return undefined;
@@ -1392,23 +2687,39 @@ function handleRegisteredToolResult(event: ToolResultEvent): { content?: ToolRes
       ...event.content,
       // Providers may join text blocks into one string, so the marker text
       // itself must signal this is not part of the tool's own output.
-      { type: "text", text: `\n\n<user-steering source="permission-prompt">\n${steering}\n</user-steering>` },
+      {
+        type: "text",
+        text: `\n\n<user-steering source="permission-prompt">\n${steering}\n</user-steering>`,
+      },
     ],
   };
 }
 
-function renderRegisteredPermissionPreview(entry: { data?: PermissionPreview }, options: { expanded: boolean }, theme: any): Component | undefined {
+function renderRegisteredPermissionPreview(
+  entry: { data?: PermissionPreview },
+  options: { expanded: boolean },
+  theme: any,
+): Component | undefined {
   const preview = entry.data;
-  if (!preview || typeof preview.title !== "string" || typeof preview.body !== "string") return undefined;
+  if (
+    !preview ||
+    typeof preview.title !== "string" ||
+    typeof preview.body !== "string"
+  )
+    return undefined;
   const capturedExpanded = options.expanded;
   return {
     render(width: number): string[] {
-      const id = typeof preview.toolCallId === "string" ? preview.toolCallId : undefined;
+      const id =
+        typeof preview.toolCallId === "string" ? preview.toolCallId : undefined;
       const override = id ? previewReviewOverrides.get(id) : undefined;
       const pending = id !== undefined && pendingPreviewReviews.has(id);
       const expanded = override ?? (pending ? true : capturedExpanded);
       const header = theme.fg("accent", theme.bold(preview.title));
-      const stickyHeader = typeof preview.stickyHeader === "string" ? `\n${theme.fg("muted", preview.stickyHeader)}` : "";
+      const stickyHeader =
+        typeof preview.stickyHeader === "string"
+          ? `\n${theme.fg("muted", preview.stickyHeader)}`
+          : "";
       if (pending && expanded) {
         // Review phase: the prompt frame below already carries title, path, and hints.
         return new Text(preview.body, 0, 0).render(width);
@@ -1426,7 +2737,11 @@ function renderRegisteredPermissionPreview(entry: { data?: PermissionPreview }, 
   };
 }
 
-async function handleRegisteredToolCall(event: any, extensionContext: any, pi: ExtensionAPI): Promise<ToolCallEventResult> {
+async function handleRegisteredToolCall(
+  event: any,
+  extensionContext: any,
+  pi: ExtensionAPI,
+): Promise<ToolCallEventResult> {
   // Bind the pi tool-call identity to this invocation so prompts and
   // steering messages can reference the exact call.
   const ctx = { ...extensionContext, toolCallId: event.toolCallId };
@@ -1450,11 +2765,18 @@ async function handleRegisteredToolCall(event: any, extensionContext: any, pi: E
     return handleReadPermission(event.input, ctx, pi);
   }
 
-  if (isToolCallEventType("grep", event) || isToolCallEventType("find", event) || isToolCallEventType("ls", event)) {
+  if (
+    isToolCallEventType("grep", event) ||
+    isToolCallEventType("find", event) ||
+    isToolCallEventType("ls", event)
+  ) {
     return handlePathPermission(event.toolName, event.input, ctx, pi);
   }
 
-  if (isToolCallEventType("write", event) || isToolCallEventType("edit", event)) {
+  if (
+    isToolCallEventType("write", event) ||
+    isToolCallEventType("edit", event)
+  ) {
     return handleFileEditPermission(event.toolName, event.input, ctx, pi);
   }
 
@@ -1467,8 +2789,14 @@ async function handleRegisteredToolCall(event: any, extensionContext: any, pi: E
   }
 
   if (event.toolName === "subagent_result") {
-    if (typeof (event.input as Record<string, unknown>)?.full_context === "string") {
-      return handleSubagentResultExportPermission(event.input as SubagentResultExportInput, ctx, pi);
+    if (
+      typeof (event.input as Record<string, unknown>)?.full_context === "string"
+    ) {
+      return handleSubagentResultExportPermission(
+        event.input as SubagentResultExportInput,
+        ctx,
+        pi,
+      );
     }
     return undefined;
   }
@@ -1478,20 +2806,45 @@ async function handleRegisteredToolCall(event: any, extensionContext: any, pi: E
 
 export default function toolPermissionPolicy(pi: ExtensionAPI) {
   const nativeRegistration = registerNativeToolPermissionsCallbacks(pi, {
-    renderPermissionPreview: (entry, options, theme) => renderRegisteredPermissionPreview(entry as { data?: PermissionPreview }, options as { expanded: boolean }, theme),
-    handleSessionStart: (_event, ctx) => handleRegisteredSessionStart(ctx as PermissionContext, { reportNativeProbe: false }),
+    renderPermissionPreview: (entry, options, theme) =>
+      renderRegisteredPermissionPreview(
+        entry as { data?: PermissionPreview },
+        options as { expanded: boolean },
+        theme,
+      ),
+    handleSessionStart: (_event, ctx) =>
+      handleRegisteredSessionStart(ctx as PermissionContext, {
+        reportNativeProbe: false,
+      }),
     handleToolCall: (event, ctx) => handleRegisteredToolCall(event, ctx, pi),
-    handleToolResult: (event) => handleRegisteredToolResult(event as ToolResultEvent),
-    handleSessionShutdown: (_event, ctx) => handleRegisteredSessionShutdown(ctx),
-    handlePermissionsCommand: (args, ctx) => handleRegisteredPermissionsCommand(String(args), ctx as ExtensionCommandContext),
+    handleToolResult: (event) =>
+      handleRegisteredToolResult(event as ToolResultEvent),
+    handleSessionShutdown: (_event, ctx) =>
+      handleRegisteredSessionShutdown(ctx),
+    handlePermissionsCommand: (args, ctx) =>
+      handleRegisteredPermissionsCommand(
+        String(args),
+        ctx as ExtensionCommandContext,
+      ),
   });
 
-  if (!hasNativeRegistration(nativeRegistration, "entry_renderer:permission-preview") && typeof (pi as Partial<ExtensionAPI>).registerEntryRenderer === "function") {
-    pi.registerEntryRenderer<PermissionPreview>("permission-preview", renderRegisteredPermissionPreview);
+  if (
+    !hasNativeRegistration(
+      nativeRegistration,
+      "entry_renderer:permission-preview",
+    ) &&
+    typeof (pi as Partial<ExtensionAPI>).registerEntryRenderer === "function"
+  ) {
+    pi.registerEntryRenderer<PermissionPreview>(
+      "permission-preview",
+      renderRegisteredPermissionPreview,
+    );
   }
 
   if (!hasNativeRegistration(nativeRegistration, "session_start")) {
-    pi.on("session_start", async (_event, ctx) => handleRegisteredSessionStart(ctx));
+    pi.on("session_start", async (_event, ctx) =>
+      handleRegisteredSessionStart(ctx),
+    );
   }
 
   if (!hasNativeRegistration(nativeRegistration, "command:permissions")) {
@@ -1502,7 +2855,9 @@ export default function toolPermissionPolicy(pi: ExtensionAPI) {
   }
 
   if (!hasNativeRegistration(nativeRegistration, "session_shutdown")) {
-    pi.on("session_shutdown", (_event, ctx) => handleRegisteredSessionShutdown(ctx));
+    pi.on("session_shutdown", (_event, ctx) =>
+      handleRegisteredSessionShutdown(ctx),
+    );
   }
 
   if (!hasNativeRegistration(nativeRegistration, "tool_result")) {
@@ -1510,6 +2865,8 @@ export default function toolPermissionPolicy(pi: ExtensionAPI) {
   }
 
   if (!hasNativeRegistration(nativeRegistration, "tool_call")) {
-    pi.on("tool_call", (event, extensionContext) => handleRegisteredToolCall(event, extensionContext, pi));
+    pi.on("tool_call", (event, extensionContext) =>
+      handleRegisteredToolCall(event, extensionContext, pi),
+    );
   }
 }

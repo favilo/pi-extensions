@@ -32,7 +32,9 @@ function findContextDirs(cwd: string): string[] {
   return dirs.reverse();
 }
 
-function loadLocalContextFiles(cwd: string): Array<{ path: string; content: string }> {
+function loadLocalContextFiles(
+  cwd: string,
+): Array<{ path: string; content: string }> {
   const files: Array<{ path: string; content: string }> = [];
 
   for (const dir of findContextDirs(cwd)) {
@@ -54,7 +56,10 @@ export default function localAgentContext(pi: ExtensionAPI) {
     if (files.length === 0) return;
 
     const appended = files
-      .map(({ path, content }) => `# Additional local context: ${path}\n\n${content}`)
+      .map(
+        ({ path, content }) =>
+          `# Additional local context: ${path}\n\n${content}`,
+      )
       .join("\n\n---\n\n");
 
     return {

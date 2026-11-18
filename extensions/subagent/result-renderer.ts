@@ -10,11 +10,14 @@ export type SubagentResultDisplay = {
 };
 
 function prettyJson(value: unknown): string {
-  return JSON.stringify(
-    value,
-    (_key, nested) => typeof nested === "bigint" ? nested.toString() : nested,
-    2,
-  ) ?? "null";
+  return (
+    JSON.stringify(
+      value,
+      (_key, nested) =>
+        typeof nested === "bigint" ? nested.toString() : nested,
+      2,
+    ) ?? "null"
+  );
 }
 
 function truncateUtf8(value: string, maximum: number): string {
@@ -26,8 +29,13 @@ function truncateUtf8(value: string, maximum: number): string {
   return truncated;
 }
 
-function presentationSnapshot(result: Exclude<BackgroundResult, { found: false } | { exported: true }>): unknown {
-  if (result.output === undefined || Buffer.byteLength(result.output, "utf8") <= MAX_EXPANDED_OUTPUT_BYTES) {
+function presentationSnapshot(
+  result: Exclude<BackgroundResult, { found: false } | { exported: true }>,
+): unknown {
+  if (
+    result.output === undefined ||
+    Buffer.byteLength(result.output, "utf8") <= MAX_EXPANDED_OUTPUT_BYTES
+  ) {
     return result;
   }
 
@@ -68,6 +76,8 @@ export function subagentResultDisplay(
 
   return {
     summary,
-    ...(expanded ? { expandedJson: prettyJson(presentationSnapshot(result)) } : {}),
+    ...(expanded
+      ? { expandedJson: prettyJson(presentationSnapshot(result)) }
+      : {}),
   };
 }

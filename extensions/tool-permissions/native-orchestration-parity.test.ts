@@ -7,13 +7,19 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { NATIVE_CONTRACT_VERSION } from "./native-contract.ts";
 import { setNativePackagePathForTests } from "./native-package.ts";
-import { permissionDecision, permissionKeyForTool, type Permissions } from "./config.ts";
+import {
+  permissionDecision,
+  permissionKeyForTool,
+  type Permissions,
+} from "./config.ts";
 import { evaluatePermissionOrchestrationWithNative } from "./native-orchestration-loader.ts";
 
 function withNativeOrchestrationModule(source: string, run: () => void): void {
   const previousPackage = process.env.PI_TOOL_PERMISSIONS_NATIVE_PACKAGE;
   const previousDisable = process.env.PI_TOOL_PERMISSIONS_NATIVE_DISABLE;
-  const directory = mkdtempSync(join(tmpdir(), "tool-permissions-native-orchestration-"));
+  const directory = mkdtempSync(
+    join(tmpdir(), "tool-permissions-native-orchestration-"),
+  );
   const packagePath = join(directory, "index.cjs");
   writeFileSync(packagePath, source, "utf8");
   process.env.PI_TOOL_PERMISSIONS_NATIVE_PACKAGE = "1";
@@ -23,9 +29,11 @@ function withNativeOrchestrationModule(source: string, run: () => void): void {
     run();
   } finally {
     restorePackagePath();
-    if (previousPackage === undefined) delete process.env.PI_TOOL_PERMISSIONS_NATIVE_PACKAGE;
+    if (previousPackage === undefined)
+      delete process.env.PI_TOOL_PERMISSIONS_NATIVE_PACKAGE;
     else process.env.PI_TOOL_PERMISSIONS_NATIVE_PACKAGE = previousPackage;
-    if (previousDisable === undefined) delete process.env.PI_TOOL_PERMISSIONS_NATIVE_DISABLE;
+    if (previousDisable === undefined)
+      delete process.env.PI_TOOL_PERMISSIONS_NATIVE_DISABLE;
     else process.env.PI_TOOL_PERMISSIONS_NATIVE_DISABLE = previousDisable;
     rmSync(directory, { recursive: true, force: true });
   }
@@ -83,9 +91,18 @@ exports.evaluatePermissionOrchestration = (request) => {
 test("native permission orchestration matches TypeScript key mapping and decisions", () => {
   const permissions: Permissions = {
     read: { allow: [{ path: "^/workspace" }], deny: [{ path: "secret" }] },
-    write: { allow: [{ path: "^/workspace/out" }], deny: [{ path: "\\.env$" }] },
-    subagent: { allow: [{ prompt: "review" }], deny: [{ prompt: "exfiltrate" }] },
-    "mcp__example__search": { allow: [{ query: "safe" }], deny: [{ query: "token" }] },
+    write: {
+      allow: [{ path: "^/workspace/out" }],
+      deny: [{ path: "\\.env$" }],
+    },
+    subagent: {
+      allow: [{ prompt: "review" }],
+      deny: [{ prompt: "exfiltrate" }],
+    },
+    mcp__example__search: {
+      allow: [{ query: "safe" }],
+      deny: [{ query: "token" }],
+    },
     custom_tool: { allow: [{ nested: "true" }], deny: [] },
   };
   const cases: Array<{ toolName: string; input: unknown }> = [
@@ -106,7 +123,10 @@ test("native permission orchestration matches TypeScript key mapping and decisio
       const permissionKey = permissionKeyForTool(toolName);
       assert.deepEqual(
         evaluatePermissionOrchestrationWithNative(toolName, permissions, input),
-        { permissionKey, decision: permissionDecision(permissions[permissionKey], input) },
+        {
+          permissionKey,
+          decision: permissionDecision(permissions[permissionKey], input),
+        },
         toolName,
       );
     }
@@ -114,9 +134,20 @@ test("native permission orchestration matches TypeScript key mapping and decisio
 });
 
 test("bundled native permission orchestration matches TypeScript key mapping and decisions", (t) => {
-  let evaluate: ((request: unknown) => { ok: boolean; operation: string; permissionKey: string; decision: string }) | undefined;
+  let evaluate:
+    | ((request: unknown) => {
+        ok: boolean;
+        operation: string;
+        permissionKey: string;
+        decision: string;
+      })
+    | undefined;
   try {
-    evaluate = (createRequire(import.meta.url)("./native/generated/index.js") as { evaluatePermissionOrchestration?: typeof evaluate }).evaluatePermissionOrchestration;
+    evaluate = (
+      createRequire(import.meta.url)("./native/generated/index.js") as {
+        evaluatePermissionOrchestration?: typeof evaluate;
+      }
+    ).evaluatePermissionOrchestration;
   } catch {
     t.skip("native artifact is not built; run npm run build:native");
     return;
@@ -124,8 +155,14 @@ test("bundled native permission orchestration matches TypeScript key mapping and
   assert.ok(evaluate);
   const permissions: Permissions = {
     read: { allow: [{ path: "^/workspace" }], deny: [{ path: "secret" }] },
-    write: { allow: [{ path: "^/workspace/out" }], deny: [{ path: "\\.env$" }] },
-    "mcp__example__search": { allow: [{ query: "safe" }], deny: [{ query: "token" }] },
+    write: {
+      allow: [{ path: "^/workspace/out" }],
+      deny: [{ path: "\\.env$" }],
+    },
+    mcp__example__search: {
+      allow: [{ query: "safe" }],
+      deny: [{ query: "token" }],
+    },
   };
   for (const { toolName, input } of [
     { toolName: "ls", input: { path: "/workspace" } },
@@ -148,6 +185,10 @@ test("bundled native permission orchestration matches TypeScript key mapping and
     assert.equal(native.ok, true, toolName);
     assert.equal(native.operation, "orchestrate_permission", toolName);
     assert.equal(native.permissionKey, permissionKey, toolName);
-    assert.equal(native.decision, permissionDecision(permissions[permissionKey], input), toolName);
+    assert.equal(
+      native.decision,
+      permissionDecision(permissions[permissionKey], input),
+      toolName,
+    );
   }
 });

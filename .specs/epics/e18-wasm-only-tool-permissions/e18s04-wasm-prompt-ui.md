@@ -29,7 +29,7 @@ An agent requests a protected tool and the decision is ask. WASM opens the exist
 
 ## 7. Preconditions
 - e10 steering behavior and e09 invocation binding remain the user-visible contract.
-- e18s00 has recorded adopt or reject for `pi-oxidized-ext`. This story uses that host.
+- e18s00 recorded `decision: reject` for `pi-oxidized-ext`. This story stays on the standalone NAPI package and calls Pi through `pi-api`.
 - Pi still exposes the prompt and editor widgets the extension uses today.
 
 ## 8. Inputs
@@ -56,7 +56,7 @@ Rust calls host-supplied Pi UI operations for open, input, and close. The host v
 Queue and steering state are process-local and cleared on the existing session shutdown path. Saved rules remain the concern of e18s03.
 
 ## 14. Dependencies
-- Current prompt-queue, prompt-input, and steering tests.
+- Current prompt-queue and steering tests.
 - e09 invocation binding and e10 editor behavior as oracles.
 - `.specs/security/epics/e18/THREAT_MODEL.md` threat 5.
 
@@ -83,7 +83,7 @@ Tests report tool-call id, queue position, decision, and steering text. A mismat
 **Then** the tool call is denied and is not left queued as an allow.
 
 ## 18. Automated verification
-- `node --test extensions/tool-permissions/native-prompt-queue.test.ts`
+- `tsx --test extensions/tool-permissions/native-prompt-queue.test.ts`
 - `cargo test --manifest-path extensions/tool-permissions/native/Cargo.toml`
 - `npm run build:native && npm run check`
 

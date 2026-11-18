@@ -1,0 +1,24 @@
+[package]
+name = "tool-permissions-native"
+version = "0.1.0"
+edition.workspace = true
+publish.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+pi-api.workspace = true
+napi.workspace = true
+napi-derive.workspace = true
+bash-ast.workspace = true
+toml.workspace = true
+serde.workspace = true
+regex.workspace = true
+serde_json.workspace = true
+derive_more.workspace = true
+ignore.workspace = true
+thiserror.workspace = true
+
+[build-dependencies]
+napi-build.workspace = true

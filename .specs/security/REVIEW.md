@@ -64,3 +64,75 @@ Parent and requested child directories are resolved with `realpathSync`, verifie
 - Result: **PASS — no reportable HIGH findings**
 
 Unlisted child actions fail closed when the parent has no dialog-capable UI: the real parent adapter now omits its prompt callback, causing the shared boundary to return a structured `denied` result with reason `unavailable_ui` without executing or persisting policy. The result exposes only actor, tool name, effective cwd, a fixed action summary, and optional steering; raw tool input is excluded. Explicit allow and deny rules remain authoritative before the prompt path. Escape resolves the existing TUI prompt as `cancel`, and the boundary maps that result to `cancelled` without execution. No dependency, shell, network, credential, path, or deserialization boundary changed, and no injection, authorization-bypass, secret-exposure, or unsafe-deserialization finding met the reporting threshold.
+
+## e18s01 WASM path trust and .aiignore
+
+- Reviewed: 2026-11-07T02:59:49Z
+- Scope: `main..@-` path-trust changes in `extensions/tool-permissions/native/crates/tool-permissions-native/src/path_trust.rs`, `extensions/tool-permissions/native-path-trust.ts`, and the path decision in `extensions/tool-permissions/index.ts`
+- Result: **PASS — no reportable HIGH findings**
+
+The WASM path-trust operation canonicalizes through a host `realpath` callback, reads only project policy files and `.aiignore`, and does not spawn a process or open a network connection. Invalid contract output becomes `deny` on the shared boundary and a blocked path resolution on the registered tool handler. Project policy is skipped when the canonical policy path is outside the trusted root. A gitignore build or line error denies. An unreadable trust record does not become an allow.
+
+No command injection, path-traversal allow, authorization bypass, secret exposure, or unsafe deserialization finding reached confidence 8.
+
+## e18s01 registered handler re-review
+
+- Reviewed: 2026-11-09T17:05:08Z
+- Scope: `canonicalPermissionPath`, `handlePathPermission`, and `handleFileEditPermission` in `extensions/tool-permissions/index.ts`, plus `adoptPathTrust` in `extensions/tool-permissions/native-path-trust.ts`
+- Result: **PASS — no reportable HIGH findings**
+
+On a ready WASM result, the registered read, write, and edit handlers keep the WASM canonical path and apply `nativeDecision` before the prompt. A configured deny still returns before a WASM allow. A WASM deny, including an `.aiignore` match on write or edit, returns before the no-UI ask. An invalid `.aiignore` line or an unreadable project policy returns ask with a diagnostic. That ask blocks when no UI is available and prompts when a UI is available, so the user can allow one call that fixes the file. Invalid contract output throws and the handler blocks path resolution. A missing native package stays on the TypeScript path decision. The WASM evaluator does not spawn a process. The host `readFile` callback remains limited to the path the native package requests for policy and `.aiignore` reads.
+
+The earlier note that the registered handler ignored the WASM decision is closed. No new HIGH finding at confidence 8 or above.
+
+## e18s02 WASM audit writes
+
+- Reviewed: 2026-11-10T22:43:30Z
+- Scope: `wlpruqvu..@` audit changes in `extensions/tool-permissions/native/crates/tool-permissions-native/src/audit.rs`, `extensions/tool-permissions/native-audit-write.ts`, `extensions/tool-permissions/audit.ts`, and `audit()` in `extensions/tool-permissions/index.ts`
+- Result: **PASS — no reportable HIGH findings**
+
+WASM builds one JSON line from the supplied decision fields and appends it through the host callback. It does not open the log itself, spawn a shell, open a network connection, or copy `permissions.toml` into the record. The host chooses the dated log path from its own home directory. A failed append returns `ok: false`, `records: 0`, and `decision: deny`. Invalid contract output is not accepted as a successful write. When the native package path resolves, the host skips the TypeScript writer, so the success path does not append a second copy.
+
+`index.ts` `audit()` does not apply the returned deny to the tool result. The permission decision is made before the audit write, and the existing TypeScript logger also warns and leaves that decision unchanged. Moving tool execution is outside this story. No command injection, path-traversal allow, authorization bypass, secret exposure, or unsafe deserialization finding reached confidence 8.
+
+## e18s03 WASM rule saves
+
+- Reviewed: 2026-11-13T00:24:52Z
+- Scope: `txkuorvq..nzmoroxu` rule-save changes in `extensions/tool-permissions/native/crates/tool-permissions-native/src/rule_save.rs`, `extensions/tool-permissions/native-rule-save.ts`, `saveToolPermissionRule` in `extensions/tool-permissions/index.ts`, and `saveSubcommandAllowRules` in `extensions/tool-permissions/bash-subcommands.ts`
+- Result: **PASS — no reportable HIGH findings**
+
+WASM `save_rule` returns patched TOML text. It does not open the destination, spawn a process, or open a network connection. The host reads the selected file, accepts the patched text only when the contract, nonce, `ok`, and `allowed` match, and replaces the destination through a temporary file and `rename`. A failed read, patch, or replace returns `ok: false` and `allowed: false`. The failed-save test kept the previous file bytes. The prompt returns before `allow_pattern` when that save returns false.
+
+When the native package path resolves, the host does not also call `saveAllowedRule`, so the success path does not append a second copy. A missing package still uses the TypeScript saver until e18s06. The host chooses the destination: a project save uses the trusted project policy path, and an untrusted directory is refused before the save. Rule values are parsed as a JSON object of strings, checked as regular expressions, and written as TOML strings. An invalid rule or file shape errors and is not written. A repeated rule stays one allow entry.
+
+No command injection, path-traversal allow, authorization bypass, secret exposure, or unsafe deserialization finding reached confidence 8.
+
+## e18s04 WASM prompt queue
+
+- Reviewed: 2026-11-16T18:56:11Z
+- Scope: `uqppwwxz..@-` prompt changes in `extensions/tool-permissions/native/crates/tool-permissions-native/src/prompt_queue.rs`, `extensions/tool-permissions/native-prompt-queue.ts`, and `askScrollablePermission` in `extensions/tool-permissions/index.ts`
+- Result: **PASS — no reportable HIGH findings**
+
+The native queue binds each host callback to the tool-call id captured when that prompt opens. A UI rejection or a thrown presenter resolves `ok: false`, `decision: deny`, and no steering, then releases the next queued prompt. `presentBoundPrompt` accepts a result only when the version, operation, nonce, and tool-call id match the request. A mismatched or malformed result becomes deny. The queue rejects a second N-API environment while work is queued. The `FunctionRef` lifetime erasure is confined to that queue, checked against the captured environment, and used only to attach `then` and `catch`.
+
+`askScrollablePermission` does not call this queue yet. The live prompt still uses `PermissionPromptQueue`. That is a missing integration, not an allow bypass: the existing TypeScript queue still serializes the visible prompt. No command injection, path-traversal allow, authorization bypass, secret exposure, or unsafe deserialization finding reached confidence 8.
+
+## e18s04 live prompt routing
+
+- Reviewed: 2026-11-17T19:42:40Z
+- Scope: `vuwmxvln` in `askScrollablePermission` and `presentBoundPrompt` (`extensions/tool-permissions/index.ts`, `extensions/tool-permissions/native-prompt-queue.ts`)
+- Result: **PASS — no reportable HIGH findings**
+
+On a loaded native package, `askScrollablePermission` sends the prompt through `presentBoundPrompt` and keeps `PermissionPromptQueue` for load failure only. The host accepts a result only when `ok` is true and the tool-call id, decision, and steering match the prompt that opened. A mismatched id, a malformed result, or a thrown presenter becomes deny. A parent abort or session shutdown cancels the open prompt before the next queued prompt is presented. The queue id is the tool-call id when one exists, and otherwise a fresh `randomUUID` request id. The nonce remains the existing host/module contract value, not a credential.
+
+No command injection, path-traversal allow, authorization bypass, secret exposure, or unsafe deserialization finding reached confidence 8. The earlier missing-integration note is closed.
+
+## e18s05 WASM tool execution sequencing
+
+- Reviewed: 2026-11-18T19:54:49Z
+- Scope: `extensions/tool-permissions/native/crates/tool-permissions-native/src/execution.rs`, `native-tool-execution.ts`, and related tests vs `main..favilo/e18s00-pi-oxidized-host`
+- Result: **PASS — no reportable HIGH findings**
+
+On a successful WASM load, Rust decides whether to call the host Pi execution callback. Only a validated `allow` calls the callback once with the original tool name and input JSON. Deny, cancel, and invalid decisions return zero executions and never call the host. Host callback failures stay `ok: false` with the error string and are not rewritten as successful tool results. The module has no `std::process` / spawn path for this story; execution authority remains the host callback. TypeScript validates the native result shape (version, operation, nonce, executions) before accepting it and fails closed on a malformed or unavailable package.
+
+No command injection, path-traversal allow, authorization bypass, secret exposure, or unsafe deserialization finding reached confidence 8.

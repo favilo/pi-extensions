@@ -74,7 +74,7 @@ Dialog control shortcuts use modifier keys (`Ctrl`):
 - `Ctrl+D`: Deny with steering text.
 - `Ctrl+A`: Allow & save project rule with steering text.
 - `Ctrl+Shift+A`: Allow & save user rule with steering text.
-- `Escape` (in normal mode): Exit steering mode and return to main prompt navigation.
+- `Tab` (in Vim normal mode): Leave steering and return to the permission prompt. Further Escape presses stay in the editor so an extra Escape cannot cancel the prompt.
 
 Because dialog actions rely on `Ctrl` modifiers, single-character Normal mode Vim keys (`d`, `y`, `a`) operate strictly on the text buffer without inadvertently triggering permission decisions.
 

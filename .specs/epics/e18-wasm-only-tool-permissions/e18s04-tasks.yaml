@@ -1,16 +1,16 @@
 story_id: e18s04
 title: Move the prompt UI, steering editor, and prompt queue into WASM
-status: failing
+status: passing
 bcps: 8
 delta: MODIFIED
 spec: e18s04-wasm-prompt-ui.md
 tasks:
   - id: 1
     description: Add failing tests for bound prompt decisions, queue order, steering isolation, and UI failure. No new security findings in affected paths.
-    verify: node --test extensions/tool-permissions/native-prompt-queue.test.ts
+    verify: tsx --test extensions/tool-permissions/native-prompt-queue.test.ts
     risk: P0
     security: high
-    status: failing
+    status: passing
     allure:
       severity: critical
       categories:
@@ -21,7 +21,7 @@ tasks:
     verify: cargo test --manifest-path extensions/tool-permissions/native/Cargo.toml
     risk: P0
     security: high
-    status: failing
+    status: passing
     allure:
       severity: critical
       categories:
@@ -29,10 +29,10 @@ tasks:
         - "Security Review"
   - id: 3
     description: Route the success-path prompt through WASM. No new security findings in affected paths.
-    verify: node --test extensions/tool-permissions/native-prompt-queue.test.ts
+    verify: tsx --test extensions/tool-permissions/native-prompt-queue.test.ts
     risk: P0
     security: high
-    status: failing
+    status: passing
     allure:
       severity: critical
       categories:
@@ -43,7 +43,7 @@ tasks:
     verify: npm run build:native && npm run check
     risk: P1
     security: high
-    status: failing
+    status: passing
     allure:
       severity: high
       categories:

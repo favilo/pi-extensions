@@ -8,7 +8,10 @@ import type { McpToolProvider } from "./registry.ts";
 
 function fakePi() {
   const handlers = new Map<string, Set<(data: unknown) => void>>();
-  const commands = new Map<string, { handler(args: string, ctx: unknown): Promise<void> | void }>();
+  const commands = new Map<
+    string,
+    { handler(args: string, ctx: unknown): Promise<void> | void }
+  >();
   const tools: string[] = [];
   const messages: string[] = [];
   let activeTools: string[] = [];
@@ -26,7 +29,10 @@ function fakePi() {
       },
     },
     on() {},
-    registerCommand(name: string, command: { handler(args: string, ctx: unknown): Promise<void> | void }) {
+    registerCommand(
+      name: string,
+      command: { handler(args: string, ctx: unknown): Promise<void> | void },
+    ) {
       commands.set(name, command);
     },
     registerTool(tool: { name: string }) {
@@ -42,7 +48,13 @@ function fakePi() {
     },
   };
 
-  return { pi: pi as unknown as ExtensionAPI, commands, tools, messages, activeTools: () => activeTools };
+  return {
+    pi: pi as unknown as ExtensionAPI,
+    commands,
+    tools,
+    messages,
+    activeTools: () => activeTools,
+  };
 }
 
 const mockProvider: McpToolProvider = {
@@ -53,7 +65,11 @@ const mockProvider: McpToolProvider = {
       name: "mcp__mock__ping",
       label: "mock ping",
       description: "Return a mock response",
-      parameters: { type: "object", properties: {}, additionalProperties: false } as never,
+      parameters: {
+        type: "object",
+        properties: {},
+        additionalProperties: false,
+      } as never,
       async execute() {
         return { content: [{ type: "text", text: "pong" }], details: {} };
       },
@@ -63,7 +79,9 @@ const mockProvider: McpToolProvider = {
 };
 
 test("the package loads the provider registry without replacing built-in /mcp", async () => {
-  const packageJson = JSON.parse(await readFile(new URL("../../package.json", import.meta.url), "utf8")) as {
+  const packageJson = JSON.parse(
+    await readFile(new URL("../../package.json", import.meta.url), "utf8"),
+  ) as {
     pi?: { extensions?: string[] };
   };
   const harness = fakePi();

@@ -28,7 +28,7 @@ The user accepts a prompt and chooses the existing user or project save action. 
 
 ## 7. Preconditions
 - Existing user and project save commands and their tests describe the patch.
-- e18s00 has recorded adopt or reject for `pi-oxidized-ext`. This story uses that host.
+- e18s00 recorded `decision: reject` for `pi-oxidized-ext`. This story stays on the standalone NAPI package and calls Pi through `pi-api`.
 - e18s01 is the planned owner of path trust. This story consumes the current trust result and does not widen which file may be patched.
 
 ## 8. Inputs

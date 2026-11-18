@@ -1,6 +1,12 @@
 import "../test-support/forbid-fetch.ts";
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, realpathSync, symlinkSync, writeFileSync } from "node:fs";
+import {
+  mkdtempSync,
+  mkdirSync,
+  realpathSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import test from "node:test";
@@ -21,12 +27,18 @@ test("inherits the parent cwd when no child cwd is supplied", () => {
 
 test("canonicalizes a nested explicit child cwd relative to the parent", () => {
   const root = fixture();
-  assert.equal(resolveSubagentCwd(root, "nested"), realpathSync(join(root, "nested")));
+  assert.equal(
+    resolveSubagentCwd(root, "nested"),
+    realpathSync(join(root, "nested")),
+  );
 });
 
 test("supports alternate workspace directories without a name-specific rule", () => {
   const root = fixture();
-  assert.equal(resolveSubagentCwd(root, "workspace"), realpathSync(join(root, "workspace")));
+  assert.equal(
+    resolveSubagentCwd(root, "workspace"),
+    realpathSync(join(root, "workspace")),
+  );
 });
 
 test("rejects missing and non-directory child cwds before startup", () => {

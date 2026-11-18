@@ -6,7 +6,10 @@ import { join } from "node:path";
 import test from "node:test";
 import { stringify as stringifyToml } from "smol-toml";
 
-type ToolCallHandler = (event: { toolName: string; input: Record<string, unknown> }, ctx: unknown) => Promise<unknown>;
+type ToolCallHandler = (
+  event: { toolName: string; input: Record<string, unknown> },
+  ctx: unknown,
+) => Promise<unknown>;
 
 type Harness = {
   toolCall: ToolCallHandler;
@@ -17,7 +20,10 @@ type Harness = {
 
 async function reasonHarness(): Promise<Harness> {
   const agentDir = mkdtempSync(join(tmpdir(), "pi-reason-agent-"));
-  writeFileSync(join(agentDir, "permissions.toml"), stringifyToml({ permissions: {} }));
+  writeFileSync(
+    join(agentDir, "permissions.toml"),
+    stringifyToml({ permissions: {} }),
+  );
   const project = mkdtempSync(join(tmpdir(), "pi-reason-project-"));
   writeFileSync(join(project, "file.txt"), "alpha\nbeta\n");
 
@@ -26,7 +32,9 @@ async function reasonHarness(): Promise<Harness> {
 
   const handlers = new Map<string, ToolCallHandler>();
   const prompts: Array<{ title: string; body: string }> = [];
-  const { default: toolPermissionPolicy } = await import(`./index.ts?reason-display=${encodeURIComponent(agentDir)}`);
+  const { default: toolPermissionPolicy } = await import(
+    `./index.ts?reason-display=${encodeURIComponent(agentDir)}`
+  );
   toolPermissionPolicy({
     registerCommand() {},
     on(event: string, handler: ToolCallHandler) {
@@ -40,7 +48,8 @@ async function reasonHarness(): Promise<Harness> {
     prompts,
     project,
     cleanup: () => {
-      if (previousAgentDir === undefined) delete process.env.PI_CODING_AGENT_DIR;
+      if (previousAgentDir === undefined)
+        delete process.env.PI_CODING_AGENT_DIR;
       else process.env.PI_CODING_AGENT_DIR = previousAgentDir;
       rmSync(agentDir, { recursive: true, force: true });
       rmSync(project, { recursive: true, force: true });
@@ -48,7 +57,10 @@ async function reasonHarness(): Promise<Harness> {
   };
 }
 
-function confirmingCtx(project: string, prompts: Array<{ title: string; body: string }>): unknown {
+function confirmingCtx(
+  project: string,
+  prompts: Array<{ title: string; body: string }>,
+): unknown {
   return {
     cwd: project,
     hasUI: true,
@@ -68,7 +80,14 @@ test("an edit request with a reason shows it in the permission prompt", async ()
   const harness = await reasonHarness();
   try {
     await harness.toolCall(
-      { toolName: "edit", input: { path: join(harness.project, "file.txt"), edits: [{ oldText: "beta", newText: "BETA" }], reason: "normalize casing before the rename" } },
+      {
+        toolName: "edit",
+        input: {
+          path: join(harness.project, "file.txt"),
+          edits: [{ oldText: "beta", newText: "BETA" }],
+          reason: "normalize casing before the rename",
+        },
+      },
       confirmingCtx(harness.project, harness.prompts),
     );
 
@@ -83,7 +102,10 @@ test("a bash request with a reason shows it in the permission prompt", async () 
   const harness = await reasonHarness();
   try {
     await harness.toolCall(
-      { toolName: "bash", input: { command: "npm test", reason: "verify the refactor is green" } },
+      {
+        toolName: "bash",
+        input: { command: "npm test", reason: "verify the refactor is green" },
+      },
       confirmingCtx(harness.project, harness.prompts),
     );
 
@@ -98,7 +120,13 @@ test("a request without a reason renders no reason line", async () => {
   const harness = await reasonHarness();
   try {
     await harness.toolCall(
-      { toolName: "edit", input: { path: join(harness.project, "file.txt"), edits: [{ oldText: "beta", newText: "BETA" }] } },
+      {
+        toolName: "edit",
+        input: {
+          path: join(harness.project, "file.txt"),
+          edits: [{ oldText: "beta", newText: "BETA" }],
+        },
+      },
       confirmingCtx(harness.project, harness.prompts),
     );
 

@@ -1,21 +1,21 @@
-[package]
-name = "tool-permissions-native"
-version = "0.1.0"
-edition = "2021"
+[workspace]
+members = ["crates/pi-api", "crates/tool-permissions-native"]
+resolver = "2"
+
+[workspace.package]
+edition = "2024"
 publish = false
 
-[lib]
-crate-type = ["cdylib", "rlib"]
-
-[dependencies]
-napi = { version = "3.12.2", features = ["napi8"] }
+[workspace.dependencies]
+pi-api = { path = "crates/pi-api" }
+napi = { version = "3.16.2", features = ["napi8"] }
 napi-derive = "3.6.3"
+napi-build = "2.6.0"
 bash-ast = "0.8.22"
 toml = "1.1.5"
 serde = { version = "1.0.229", features = ["derive"] }
 regex = "1.13.1"
 serde_json = "1.0.145"
 derive_more = { version = "2.1.1", features = ["from_str"] }
-
-[build-dependencies]
-napi-build = "2.2.3"
+ignore = "0.4.34"
+thiserror = "2.0.21"

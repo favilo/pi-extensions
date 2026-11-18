@@ -43,7 +43,13 @@ test("session start enables extra tools once while preserving active tools", () 
   harness.startSession();
   harness.startSession();
 
-  assert.deepEqual(harness.activeTools(), ["read", "grep", "find", "ls", "bash_task"]);
+  assert.deepEqual(harness.activeTools(), [
+    "read",
+    "grep",
+    "find",
+    "ls",
+    "bash_task",
+  ]);
 });
 
 test("tools-debug reports active and configured tool names", async () => {

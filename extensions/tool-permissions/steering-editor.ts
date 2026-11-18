@@ -1,8 +1,19 @@
-import { Editor, type Component, type EditorTheme, type Focusable, type TUI, matchesKey } from "@earendil-works/pi-tui";
+import {
+  Editor,
+  type Component,
+  type EditorTheme,
+  type Focusable,
+  type TUI,
+  matchesKey,
+} from "@earendil-works/pi-tui";
 
 export type SteeringEditorMode = "normal" | "insert";
 
-export type CustomEditorFactory = (tui: TUI, theme: any, keybindings: any) => Component;
+export type CustomEditorFactory = (
+  tui: TUI,
+  theme: any,
+  keybindings: any,
+) => Component;
 
 export interface SteeringEditorOptions {
   tui?: TUI;
@@ -44,7 +55,11 @@ export class SteeringEditor implements Component, Focusable {
 
     if (options.customEditorFactory) {
       try {
-        const customComp = options.customEditorFactory(tui as TUI, theme, options.keybindings);
+        const customComp = options.customEditorFactory(
+          tui as TUI,
+          theme,
+          options.keybindings,
+        );
         if (customComp) {
           this.customEditor = customComp;
         }
@@ -111,7 +126,10 @@ export class SteeringEditor implements Component, Focusable {
   }
 
   setValue(text: string): void {
-    if (this.customEditor && typeof (this.customEditor as any).setText === "function") {
+    if (
+      this.customEditor &&
+      typeof (this.customEditor as any).setText === "function"
+    ) {
       (this.customEditor as any).setText(text);
       return;
     }
@@ -195,7 +213,11 @@ export class SteeringEditor implements Component, Focusable {
 
     if (!this.editor) return [""];
 
-    const modeLabel = this.vimMode ? (this.mode === "normal" ? " [NORMAL]" : " [INSERT]") : "";
+    const modeLabel = this.vimMode
+      ? this.mode === "normal"
+        ? " [NORMAL]"
+        : " [INSERT]"
+      : "";
     const effectiveWidth = Math.max(1, width - modeLabel.length);
     const lines = this.editor.render(effectiveWidth);
     if (!this.vimMode) {

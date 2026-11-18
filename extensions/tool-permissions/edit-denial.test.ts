@@ -6,7 +6,10 @@ import { join } from "node:path";
 import test from "node:test";
 import { stringify as stringifyToml } from "smol-toml";
 
-type ToolCallHandler = (event: { toolName: string; input: Record<string, unknown> }, ctx: unknown) => Promise<unknown>;
+type ToolCallHandler = (
+  event: { toolName: string; input: Record<string, unknown> },
+  ctx: unknown,
+) => Promise<unknown>;
 
 type Harness = {
   toolCall: ToolCallHandler;
@@ -16,13 +19,22 @@ type Harness = {
 };
 
 // Identity theme: strip colors/formatting so the prompt component renders plainly.
-const theme = new Proxy({}, {
-  get: () => (...args: unknown[]) => String(args[args.length - 1]),
-});
+const theme = new Proxy(
+  {},
+  {
+    get:
+      () =>
+      (...args: unknown[]) =>
+        String(args[args.length - 1]),
+  },
+);
 
 async function denialHarness(): Promise<Harness> {
   const agentDir = mkdtempSync(join(tmpdir(), "pi-edit-denial-agent-"));
-  writeFileSync(join(agentDir, "permissions.toml"), stringifyToml({ permissions: {} }));
+  writeFileSync(
+    join(agentDir, "permissions.toml"),
+    stringifyToml({ permissions: {} }),
+  );
   const project = mkdtempSync(join(tmpdir(), "pi-edit-denial-project-"));
   writeFileSync(join(project, "file.txt"), "alpha\nbeta\n");
 
@@ -31,7 +43,9 @@ async function denialHarness(): Promise<Harness> {
 
   const handlers = new Map<string, ToolCallHandler>();
   const steerMessages: Array<{ text: string; options: unknown }> = [];
-  const { default: toolPermissionPolicy } = await import(`./index.ts?edit-denial=${encodeURIComponent(agentDir)}`);
+  const { default: toolPermissionPolicy } = await import(
+    `./index.ts?edit-denial=${encodeURIComponent(agentDir)}`
+  );
   toolPermissionPolicy({
     registerCommand() {},
     on(event: string, handler: ToolCallHandler) {
@@ -48,7 +62,8 @@ async function denialHarness(): Promise<Harness> {
     steerMessages,
     project,
     cleanup: () => {
-      if (previousAgentDir === undefined) delete process.env.PI_CODING_AGENT_DIR;
+      if (previousAgentDir === undefined)
+        delete process.env.PI_CODING_AGENT_DIR;
       else process.env.PI_CODING_AGENT_DIR = previousAgentDir;
       rmSync(agentDir, { recursive: true, force: true });
       rmSync(project, { recursive: true, force: true });
@@ -56,7 +71,10 @@ async function denialHarness(): Promise<Harness> {
   };
 }
 
-type PromptComponent = { handleInput(data: string): void; render(width: number): string[] };
+type PromptComponent = {
+  handleInput(data: string): void;
+  render(width: number): string[];
+};
 
 /** A ctx whose TUI prompt captures the component and feeds it the given key inputs. */
 function promptingCtx(project: string, keys: string[]): unknown {
@@ -67,7 +85,14 @@ function promptingCtx(project: string, keys: string[]): unknown {
     sessionId: "edit-denial-test",
     ui: {
       notify() {},
-      custom(factory: (tui: unknown, t: unknown, kb: unknown, finish: (result: unknown) => void) => PromptComponent) {
+      custom(
+        factory: (
+          tui: unknown,
+          t: unknown,
+          kb: unknown,
+          finish: (result: unknown) => void,
+        ) => PromptComponent,
+      ) {
         return new Promise((resolve) => {
           const component = factory({ requestRender() {} }, theme, {}, resolve);
           for (const key of keys) component.handleInput(key);
@@ -81,7 +106,10 @@ function typeText(text: string): string[] {
   return [...text];
 }
 
-const VALID_EDIT = () => ({ path: "", edits: [{ oldText: "beta", newText: "BETA" }] });
+const VALID_EDIT = () => ({
+  path: "",
+  edits: [{ oldText: "beta", newText: "BETA" }],
+});
 
 test("a denied edit without steering blocks with the canonical denial reason", async () => {
   const harness = await denialHarness();
@@ -107,14 +135,22 @@ test("a denied edit with steering embeds the reason in the invocation-bound resu
     // Tab enters steering mode, type the reason, Ctrl+D denies with steering.
     const result = await harness.toolCall(
       { toolName: "edit", input },
-      promptingCtx(harness.project, ["\t", ...typeText("do not touch this file"), "\x04"]),
+      promptingCtx(harness.project, [
+        "\t",
+        ...typeText("do not touch this file"),
+        "\x04",
+      ]),
     );
 
     assert.deepEqual(result, {
       block: true,
       reason: "User denied edit. (reason: do not touch this file)",
     });
-    assert.deepEqual(harness.steerMessages, [], "denial steering belongs in the invocation-bound result, not a floating steer message");
+    assert.deepEqual(
+      harness.steerMessages,
+      [],
+      "denial steering belongs in the invocation-bound result, not a floating steer message",
+    );
   } finally {
     harness.cleanup();
   }
@@ -125,7 +161,11 @@ test("a denied bash command with steering embeds the reason in the result", asyn
   try {
     const result = await harness.toolCall(
       { toolName: "bash", input: { command: "rm -rf build" } },
-      promptingCtx(harness.project, ["\t", ...typeText("never delete the build dir"), "\x04"]),
+      promptingCtx(harness.project, [
+        "\t",
+        ...typeText("never delete the build dir"),
+        "\x04",
+      ]),
     );
 
     assert.deepEqual(result, {

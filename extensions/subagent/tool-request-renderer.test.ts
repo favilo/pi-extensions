@@ -2,7 +2,10 @@ import "../test-support/forbid-fetch.ts";
 import assert from "node:assert/strict";
 import test from "node:test";
 import { visibleWidth } from "@earendil-works/pi-tui";
-import { renderSubagentToolRequestCall, type SubagentToolRequestCallArgs } from "./tool-request-renderer.ts";
+import {
+  renderSubagentToolRequestCall,
+  type SubagentToolRequestCallArgs,
+} from "./tool-request-renderer.ts";
 
 const dummyTheme = {
   fg: (_color: string, text: string) => text,
@@ -46,7 +49,11 @@ test("renders file tool calls cleanly with formatted arguments and width bounds"
   assert.equal(lines.length > 0, true);
   for (let i = 0; i < lines.length; i++) {
     const w = visibleWidth(lines[i] ?? "");
-    assert.equal(w <= width, true, `Line ${i + 1} exceeds width ${width}: ${w} chars`);
+    assert.equal(
+      w <= width,
+      true,
+      `Line ${i + 1} exceeds width ${width}: ${w} chars`,
+    );
   }
 
   const text = lines.join("\n");

@@ -4,7 +4,11 @@ import { performance } from "node:perf_hooks";
 import test from "node:test";
 import { McpProviderRegistry, type McpToolProvider } from "./registry.ts";
 
-function provider(id: string, toolName: string, title: string): McpToolProvider {
+function provider(
+  id: string,
+  toolName: string,
+  title: string,
+): McpToolProvider {
   return {
     id,
     name: title,
@@ -13,7 +17,11 @@ function provider(id: string, toolName: string, title: string): McpToolProvider 
         name: toolName,
         label: toolName,
         description: `Tool from ${title}`,
-        parameters: { type: "object", properties: {}, additionalProperties: false } as never,
+        parameters: {
+          type: "object",
+          properties: {},
+          additionalProperties: false,
+        } as never,
         async execute() {
           return { content: [{ type: "text", text: title }], details: {} };
         },
@@ -27,7 +35,8 @@ function provider(id: string, toolName: string, title: string): McpToolProvider 
 
 test("a provider can contribute tools after registration", () => {
   const registeredTools: string[] = [];
-  let contributeTool: ((tool: McpToolProvider["tools"][number]) => void) | undefined;
+  let contributeTool:
+    ((tool: McpToolProvider["tools"][number]) => void) | undefined;
   const dynamicProvider: McpToolProvider = {
     id: "dynamic",
     name: "Dynamic provider",
@@ -37,25 +46,47 @@ test("a provider can contribute tools after registration", () => {
     },
     getStatusSections: () => [],
   };
-  const registry = new McpProviderRegistry((tool) => registeredTools.push(tool.name));
+  const registry = new McpProviderRegistry((tool) =>
+    registeredTools.push(tool.name),
+  );
 
   registry.register(dynamicProvider);
-  contributeTool?.(provider("source", "mcp__dynamic__later", "Dynamic").tools[0]);
+  contributeTool?.(
+    provider("source", "mcp__dynamic__later", "Dynamic").tools[0],
+  );
 
   assert.deepEqual(registeredTools, ["mcp__dynamic__later"]);
 });
 
 test("multiple MCP providers contribute tools and named status sections", async () => {
   const registeredTools: string[] = [];
-  const registry = new McpProviderRegistry((tool) => registeredTools.push(tool.name));
+  const registry = new McpProviderRegistry((tool) =>
+    registeredTools.push(tool.name),
+  );
 
-  assert.deepEqual(registry.register(provider("alpha", "mcp__alpha__ping", "Alpha")), { ok: true });
-  assert.deepEqual(registry.register(provider("beta", "mcp__beta__ping", "Beta")), { ok: true });
+  assert.deepEqual(
+    registry.register(provider("alpha", "mcp__alpha__ping", "Alpha")),
+    { ok: true },
+  );
+  assert.deepEqual(
+    registry.register(provider("beta", "mcp__beta__ping", "Beta")),
+    { ok: true },
+  );
 
   assert.deepEqual(registeredTools, ["mcp__alpha__ping", "mcp__beta__ping"]);
   assert.deepEqual(await registry.getStatusSections(), [
-    { providerId: "alpha", providerName: "Alpha", title: "Alpha", lines: ["ready"] },
-    { providerId: "beta", providerName: "Beta", title: "Beta", lines: ["ready"] },
+    {
+      providerId: "alpha",
+      providerName: "Alpha",
+      title: "Alpha",
+      lines: ["ready"],
+    },
+    {
+      providerId: "beta",
+      providerName: "Beta",
+      title: "Beta",
+      lines: ["ready"],
+    },
   ]);
 });
 
@@ -109,5 +140,8 @@ test("status collection for 100 synchronous providers completes within 50 ms", a
   const elapsedMs = performance.now() - startedAt;
 
   assert.equal(sections.length, 100);
-  assert.ok(elapsedMs < 50, `expected status collection under 50 ms, received ${elapsedMs.toFixed(2)} ms`);
+  assert.ok(
+    elapsedMs < 50,
+    `expected status collection under 50 ms, received ${elapsedMs.toFixed(2)} ms`,
+  );
 });

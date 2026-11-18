@@ -1,0 +1,37 @@
+{
+  "story_id": "e18s01",
+  "verified_at": "2026-11-09T17:05:08Z",
+  "status": "PASS",
+  "threshold_source": {
+    "status": "WAIVED",
+    "reason": "No e18 TEST_PLAN_LATEST artifact defines numeric NFR thresholds. Evidence uses the story quality attributes: parity, fail closed, and one path result per request."
+  },
+  "dimensions": {
+    "performance": {
+      "status": "PASS",
+      "threshold": "One path-trust result per request, with fixture checks completing inside the existing test run.",
+      "evidence": [
+        "node --test extensions/tool-permissions/native-path-trust.test.ts extensions/tool-permissions/permission-boundary.test.ts finished in 986 ms with 20 passing tests.",
+        "npm run test:preflight finished in 4879.837583 ms with 327 passing tests.",
+        "cargo test path_trust cases finished inside npm run check with 12 passing native tests."
+      ]
+    },
+    "reliability": {
+      "status": "PASS",
+      "threshold": "A malformed or failed WASM path-trust result denies the request and is not recorded as an allow.",
+      "evidence": [
+        "invalid WASM path output denies and is not recorded as an allow passed.",
+        "adoptPathTrust returns invalid unless version, operation, ok, nonce, path, cwd, and decision match the request contract.",
+        "A registered read blocks when WASM denies a path the host would allow, and a registered write uses a WASM deny instead of the no-UI ask."
+      ]
+    },
+    "operability": {
+      "status": "PASS",
+      "threshold": "Tests report the tool, requested path, canonical path, trust root, .aiignore match, decision, and whether WASM produced the accepted result.",
+      "evidence": [
+        "native-path-trust tests assert canonical path, cwd, trustEligible, aiignoreMatch, and decision.",
+        "A disabled native package keeps the TypeScript path decision."
+      ]
+    }
+  }
+}

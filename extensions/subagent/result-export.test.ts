@@ -1,11 +1,22 @@
 import "../test-support/forbid-fetch.ts";
 import assert from "node:assert/strict";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import { SessionManager } from "@earendil-works/pi-coding-agent";
-import { createSubagentResultExporter, type SubagentExportSnapshot } from "./result-export.ts";
+import {
+  createSubagentResultExporter,
+  type SubagentExportSnapshot,
+} from "./result-export.ts";
 
 test("builds a schema-v1 snapshot from a SessionManager instance with full untruncated exposed events and no thinking blocks", async () => {
   const cwd = "/workspace/project";
@@ -23,7 +34,12 @@ test("builds a schema-v1 snapshot from a SessionManager instance with full untru
       content: [
         { type: "thinking", thinking: "private internal chain-of-thought" },
         { type: "text", text: "I will read the file." },
-        { type: "toolCall", id: "call-1", name: "read", args: { path: "src/index.ts" } },
+        {
+          type: "toolCall",
+          id: "call-1",
+          name: "read",
+          args: { path: "src/index.ts" },
+        },
       ],
       timestamp: 1005,
     },
@@ -38,9 +54,7 @@ test("builds a schema-v1 snapshot from a SessionManager instance with full untru
     },
     {
       role: "assistant",
-      content: [
-        { type: "text", text: "Final answer after reading." },
-      ],
+      content: [{ type: "text", text: "Final answer after reading." }],
       timestamp: 1015,
     },
   ];
@@ -146,7 +160,9 @@ test("exportToFile streams JSON atomically with 0600 mode and refuses improper o
     if (process.platform !== "win32") {
       assert.equal(statSync(destPath).mode & 0o077, 0);
     }
-    const read1 = JSON.parse(readFileSync(destPath, "utf8")) as SubagentExportSnapshot;
+    const read1 = JSON.parse(
+      readFileSync(destPath, "utf8"),
+    ) as SubagentExportSnapshot;
     assert.equal(read1.childId, "child-101");
 
     // Overwrite default false fails when file exists

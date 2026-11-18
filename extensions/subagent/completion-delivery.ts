@@ -1,9 +1,15 @@
 import type { BackgroundCompletionSignal } from "./background-lifecycle.ts";
 
-export type CompletionDeliveryOptions = { deliverAs: "steer"; triggerTurn: true };
+export type CompletionDeliveryOptions = {
+  deliverAs: "steer";
+  triggerTurn: true;
+};
 
 export type CompletionSignalDispatcher = {
-  notify(message: BackgroundCompletionSignal, options: CompletionDeliveryOptions): void;
+  notify(
+    message: BackgroundCompletionSignal,
+    options: CompletionDeliveryOptions,
+  ): void;
   observeMessage(message: unknown): void;
   parentSettled(): void;
   close(): void;
@@ -15,7 +21,10 @@ type PendingCompletion = {
   attempts: number;
 };
 
-function acknowledgedId(message: unknown, pending: Map<string, PendingCompletion>): string | undefined {
+function acknowledgedId(
+  message: unknown,
+  pending: Map<string, PendingCompletion>,
+): string | undefined {
   if (!message || typeof message !== "object") return undefined;
   const candidate = message as {
     role?: unknown;
@@ -23,17 +32,28 @@ function acknowledgedId(message: unknown, pending: Map<string, PendingCompletion
     content?: unknown;
     details?: { id?: unknown; status?: unknown };
   };
-  if (candidate.role !== "custom" || candidate.customType !== "subagent_finished") return undefined;
+  if (
+    candidate.role !== "custom" ||
+    candidate.customType !== "subagent_finished"
+  )
+    return undefined;
   if (typeof candidate.details?.id !== "string") return undefined;
   const expected = pending.get(candidate.details.id)?.message;
   if (!expected) return undefined;
-  if (candidate.content !== expected.content || candidate.details.status !== expected.details.status) return undefined;
+  if (
+    candidate.content !== expected.content ||
+    candidate.details.status !== expected.details.status
+  )
+    return undefined;
   return candidate.details.id;
 }
 
 /** Keeps terminal signals pending until the parent message stream acknowledges them. */
 export function createCompletionSignalDispatcher(
-  send: (message: BackgroundCompletionSignal, options: CompletionDeliveryOptions) => void,
+  send: (
+    message: BackgroundCompletionSignal,
+    options: CompletionDeliveryOptions,
+  ) => void,
   debug: (event: string, details: Record<string, unknown>) => void = () => {},
 ): CompletionSignalDispatcher {
   const pending = new Map<string, PendingCompletion>();

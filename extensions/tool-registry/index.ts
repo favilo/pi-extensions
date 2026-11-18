@@ -1,4 +1,7 @@
-import type { ExtensionAPI, ToolDefinition } from "@earendil-works/pi-coding-agent";
+import type {
+  ExtensionAPI,
+  ToolDefinition,
+} from "@earendil-works/pi-coding-agent";
 
 export type RegisteredToolDefinition = ToolDefinition<any, any, any>;
 
@@ -17,10 +20,11 @@ export function getPublishedToolDefinitions(): RegisteredToolDefinition[] {
 }
 
 /** Register a tool with Pi and make its callable definition available to subagents. */
-export function registerPublishedTool<TParams extends ToolDefinition["parameters"], TDetails, TState>(
-  pi: ExtensionAPI,
-  tool: ToolDefinition<TParams, TDetails, TState>,
-): void {
+export function registerPublishedTool<
+  TParams extends ToolDefinition["parameters"],
+  TDetails,
+  TState,
+>(pi: ExtensionAPI, tool: ToolDefinition<TParams, TDetails, TState>): void {
   publishToolDefinition(tool);
   pi.registerTool(tool);
 }

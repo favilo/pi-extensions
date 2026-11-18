@@ -5,15 +5,24 @@ import { mkdtempSync, writeFileSync, rmSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { stringify as stringifyToml } from "smol-toml";
-import { evaluateBashSubcommands, saveSubcommandAllowRules } from "./bash-subcommands.ts";
+import {
+  evaluateBashSubcommands,
+  saveSubcommandAllowRules,
+} from "./bash-subcommands.ts";
 
-function createPolicyDir(policyObj: unknown): { tmpDir: string; userPermissionsPath: string } {
+function createPolicyDir(policyObj: unknown): {
+  tmpDir: string;
+  userPermissionsPath: string;
+} {
   const tmpDir = mkdtempSync(join(tmpdir(), "bash-subcommands-test-"));
   const configDir = join(tmpDir, ".config", "pi");
   mkdirSync(configDir, { recursive: true });
   const userPermissionsPath = join(configDir, "permissions.toml");
-  
-  writeFileSync(userPermissionsPath, stringifyToml({ permissions: policyObj as any }));
+
+  writeFileSync(
+    userPermissionsPath,
+    stringifyToml({ permissions: policyObj as any }),
+  );
   return { tmpDir, userPermissionsPath };
 }
 
@@ -25,7 +34,9 @@ test("evaluates simple command against allow rules", () => {
     },
   });
   try {
-    const result = evaluateBashSubcommands("jj status", tmpDir, { userPermissionsPath });
+    const result = evaluateBashSubcommands("jj status", tmpDir, {
+      userPermissionsPath,
+    });
     assert.equal(result.decision, "allow");
     assert.equal(result.subcommands.length, 1);
     assert.equal(result.subcommands[0].normalized, "jj status");
@@ -42,7 +53,11 @@ test("evaluates compound list commands (&&, ||, ;) when all subcommands are allo
     },
   });
   try {
-    const result = evaluateBashSubcommands("jj status && jj diff --stat", tmpDir, { userPermissionsPath });
+    const result = evaluateBashSubcommands(
+      "jj status && jj diff --stat",
+      tmpDir,
+      { userPermissionsPath },
+    );
     assert.equal(result.decision, "allow");
     assert.equal(result.subcommands.length, 2);
     assert.equal(result.subcommands[0].normalized, "jj status");
@@ -60,7 +75,9 @@ test("evaluates pipeline commands when all subcommands are allowed", () => {
     },
   });
   try {
-    const result = evaluateBashSubcommands("jj log | grep feat", tmpDir, { userPermissionsPath });
+    const result = evaluateBashSubcommands("jj log | grep feat", tmpDir, {
+      userPermissionsPath,
+    });
     assert.equal(result.decision, "allow");
     assert.equal(result.subcommands.length, 2);
   } finally {
@@ -76,7 +93,11 @@ test("evaluates explicit bash -c payloads recursively", () => {
     },
   });
   try {
-    const result = evaluateBashSubcommands("bash -c 'jj status; jj diff --summary'", tmpDir, { userPermissionsPath });
+    const result = evaluateBashSubcommands(
+      "bash -c 'jj status; jj diff --summary'",
+      tmpDir,
+      { userPermissionsPath },
+    );
     assert.equal(result.decision, "allow");
     assert.equal(result.subcommands.length, 2);
     assert.equal(result.subcommands[0].normalized, "jj status");
@@ -94,7 +115,9 @@ test("denies entire command atomically if one subcommand matches a deny rule", (
     },
   });
   try {
-    const result = evaluateBashSubcommands("jj status && rm -rf /", tmpDir, { userPermissionsPath });
+    const result = evaluateBashSubcommands("jj status && rm -rf /", tmpDir, {
+      userPermissionsPath,
+    });
     assert.equal(result.decision, "deny");
     assert.ok(result.deniedSubcommand);
     assert.equal(result.deniedSubcommand?.normalized, "rm -rf /");
@@ -111,7 +134,9 @@ test("defaults to ask if any subcommand has no matching allow or deny rule", () 
     },
   });
   try {
-    const result = evaluateBashSubcommands("jj status && cargo check", tmpDir, { userPermissionsPath });
+    const result = evaluateBashSubcommands("jj status && cargo check", tmpDir, {
+      userPermissionsPath,
+    });
     assert.equal(result.decision, "ask");
     assert.equal(result.subcommands.length, 2);
   } finally {
@@ -127,7 +152,11 @@ test("fails asking (ask) when command contains unsupported syntax or parse error
     },
   });
   try {
-    const result = evaluateBashSubcommands("for f in *.ts; do echo $f; done", tmpDir, { userPermissionsPath });
+    const result = evaluateBashSubcommands(
+      "for f in *.ts; do echo $f; done",
+      tmpDir,
+      { userPermissionsPath },
+    );
     assert.equal(result.decision, "ask");
     assert.match(result.reason ?? "", /unsupported/i);
   } finally {
@@ -143,7 +172,9 @@ test("asks instead of allowing process-substitution syntax through a broad rule"
     },
   });
   try {
-    const result = evaluateBashSubcommands("echo hi > >(cat)", tmpDir, { userPermissionsPath });
+    const result = evaluateBashSubcommands("echo hi > >(cat)", tmpDir, {
+      userPermissionsPath,
+    });
     assert.equal(result.decision, "ask");
   } finally {
     rmSync(tmpDir, { recursive: true, force: true });
@@ -158,10 +189,17 @@ test("returns detailed reason identifying denied subcommand for agent error repo
     },
   });
   try {
-    const result = evaluateBashSubcommands("jj status && rm -rf /tmp/test", tmpDir, { userPermissionsPath });
+    const result = evaluateBashSubcommands(
+      "jj status && rm -rf /tmp/test",
+      tmpDir,
+      { userPermissionsPath },
+    );
     assert.equal(result.decision, "deny");
     assert.equal(result.deniedSubcommand?.normalized, "rm -rf /tmp/test");
-    assert.match(result.reason ?? "", /subcommand "rm -rf \/tmp\/test" matches a configured deny rule/);
+    assert.match(
+      result.reason ?? "",
+      /subcommand "rm -rf \/tmp\/test" matches a configured deny rule/,
+    );
   } finally {
     rmSync(tmpDir, { recursive: true, force: true });
   }
@@ -170,12 +208,17 @@ test("returns detailed reason identifying denied subcommand for agent error repo
 test("raw allow does not upgrade an unapproved parsed subcommand", () => {
   const { tmpDir, userPermissionsPath } = createPolicyDir({
     bash: {
-      allow: [{ command: "^jj status && cargo check$" }, { command: "^jj status$" }],
+      allow: [
+        { command: "^jj status && cargo check$" },
+        { command: "^jj status$" },
+      ],
       deny: [],
     },
   });
   try {
-    const result = evaluateBashSubcommands("jj status && cargo check", tmpDir, { userPermissionsPath });
+    const result = evaluateBashSubcommands("jj status && cargo check", tmpDir, {
+      userPermissionsPath,
+    });
     assert.equal(result.decision, "ask");
   } finally {
     rmSync(tmpDir, { recursive: true, force: true });
@@ -190,7 +233,9 @@ test("combined shell -c options are recursively inspected before broad bash allo
     },
   });
   try {
-    const result = evaluateBashSubcommands("bash -lc 'rm -rf /'", tmpDir, { userPermissionsPath });
+    const result = evaluateBashSubcommands("bash -lc 'rm -rf /'", tmpDir, {
+      userPermissionsPath,
+    });
     assert.equal(result.decision, "deny");
     assert.equal(result.deniedSubcommand?.normalized, "rm -rf /");
   } finally {
@@ -206,7 +251,9 @@ test("dynamic command names fail asking even under broad bash allow", () => {
     },
   });
   try {
-    const result = evaluateBashSubcommands("$(echo rm) -rf /", tmpDir, { userPermissionsPath });
+    const result = evaluateBashSubcommands("$(echo rm) -rf /", tmpDir, {
+      userPermissionsPath,
+    });
     assert.equal(result.decision, "ask");
     assert.match(result.reason ?? "", /unsupported|dynamic/i);
   } finally {
@@ -228,7 +275,10 @@ test("audits each evaluated subcommand when audit option is supplied", () => {
       audit: (entry) => audited.push(entry),
     });
     assert.equal(result.decision, "deny");
-    assert.ok(audited.length >= 2, "must audit subcommands and aggregate decision");
+    assert.ok(
+      audited.length >= 2,
+      "must audit subcommands and aggregate decision",
+    );
     const subAudit = audited.find((e) => e.subcommand === "rm -rf /");
     assert.ok(subAudit);
     assert.equal(subAudit.decision, "deny");
@@ -245,10 +295,15 @@ test("saveSubcommandAllowRules persists individual subcommand allow rules to per
     },
   });
   try {
-    const success = saveSubcommandAllowRules(userPermissionsPath, ["jj status", "cargo test"]);
+    const success = saveSubcommandAllowRules(userPermissionsPath, [
+      "jj status",
+      "cargo test",
+    ]);
     assert.equal(success, true);
 
-    const result = evaluateBashSubcommands("jj status && cargo test", tmpDir, { userPermissionsPath });
+    const result = evaluateBashSubcommands("jj status && cargo test", tmpDir, {
+      userPermissionsPath,
+    });
     assert.equal(result.decision, "allow");
   } finally {
     rmSync(tmpDir, { recursive: true, force: true });

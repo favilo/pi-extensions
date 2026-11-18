@@ -1,4 +1,15 @@
-import { chmodSync, closeSync, constants as fsConstants, existsSync, fchmodSync, lstatSync, openSync, renameSync, rmSync, writeSync } from "node:fs";
+import {
+  chmodSync,
+  closeSync,
+  constants as fsConstants,
+  existsSync,
+  fchmodSync,
+  lstatSync,
+  openSync,
+  renameSync,
+  rmSync,
+  writeSync,
+} from "node:fs";
 import { randomUUID } from "node:crypto";
 import { basename, dirname, join } from "node:path";
 import type { SessionManager } from "@earendil-works/pi-coding-agent";
@@ -24,7 +35,12 @@ export type ExportedEvent = ExportedAssistantEvent | ExportedToolResultEvent;
 type MessageContentBlock =
   | { type: "text"; text: string }
   | { type: "thinking"; thinking: string }
-  | { type: "toolCall"; id: string; name: string; args: Record<string, unknown> }
+  | {
+      type: "toolCall";
+      id: string;
+      name: string;
+      args: Record<string, unknown>;
+    }
   | { type: string; [key: string]: unknown };
 
 type StoredMessage = {
@@ -78,7 +94,13 @@ export type SubagentResultExporter = {
 function extractText(content: MessageContentBlock[]): string | undefined {
   const parts: string[] = [];
   for (const block of content) {
-    if (block && typeof block === "object" && block.type === "text" && typeof block.text === "string" && block.text.length > 0) {
+    if (
+      block &&
+      typeof block === "object" &&
+      block.type === "text" &&
+      typeof block.text === "string" &&
+      block.text.length > 0
+    ) {
       parts.push(block.text);
     }
   }
@@ -108,7 +130,10 @@ export function createSubagentResultExporter(): SubagentResultExporter {
         throw new Error("Destination directory does not exist.");
       }
 
-      const tempPath = join(parentDir, `.${basename(destinationPath)}.tmp-${randomUUID()}`);
+      const tempPath = join(
+        parentDir,
+        `.${basename(destinationPath)}.tmp-${randomUUID()}`,
+      );
       let fd: number | undefined;
 
       try {
@@ -116,10 +141,14 @@ export function createSubagentResultExporter(): SubagentResultExporter {
         const json = JSON.stringify(snapshot, null, 2);
         const bytesWritten = Buffer.byteLength(json, "utf8");
 
-        const noFollow = process.platform === "win32" ? 0 : fsConstants.O_NOFOLLOW;
+        const noFollow =
+          process.platform === "win32" ? 0 : fsConstants.O_NOFOLLOW;
         fd = openSync(
           tempPath,
-          fsConstants.O_CREAT | fsConstants.O_EXCL | fsConstants.O_WRONLY | noFollow,
+          fsConstants.O_CREAT |
+            fsConstants.O_EXCL |
+            fsConstants.O_WRONLY |
+            noFollow,
           0o600,
         );
 
@@ -145,10 +174,18 @@ export function createSubagentResultExporter(): SubagentResultExporter {
         };
       } catch (error) {
         if (fd !== undefined) {
-          try { closeSync(fd); } catch { /* Ignore file descriptor close error */ }
+          try {
+            closeSync(fd);
+          } catch {
+            /* Ignore file descriptor close error */
+          }
         }
         if (existsSync(tempPath)) {
-          try { rmSync(tempPath, { force: true }); } catch { /* Ignore temp file cleanup error */ }
+          try {
+            rmSync(tempPath, { force: true });
+          } catch {
+            /* Ignore temp file cleanup error */
+          }
         }
         throw error;
       }
@@ -165,7 +202,12 @@ export function createSubagentResultExporter(): SubagentResultExporter {
         if (message.role === "assistant") {
           const text = extractText(message.content);
           const toolCalls = message.content
-            .filter((block): block is Extract<MessageContentBlock, { type: "toolCall" }> => block.type === "toolCall")
+            .filter(
+              (
+                block,
+              ): block is Extract<MessageContentBlock, { type: "toolCall" }> =>
+                block.type === "toolCall",
+            )
             .map((call) => ({
               id: call.id,
               name: call.name,

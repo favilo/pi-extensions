@@ -11,7 +11,10 @@ type RegisteredTool = {
   name: string;
   description: string;
   promptGuidelines?: string[];
-  execute(toolCallId: string, params: { name: string }): Promise<{
+  execute(
+    toolCallId: string,
+    params: { name: string },
+  ): Promise<{
     content: Array<{ type: string; text?: string }>;
     details?: unknown;
   }>;
@@ -44,7 +47,11 @@ function extensionHarness() {
   };
 }
 
-function makeSkill(name: string, filePath: string, disableModelInvocation = false): Skill {
+function makeSkill(
+  name: string,
+  filePath: string,
+  disableModelInvocation = false,
+): Skill {
   return {
     name,
     description: `${name} description`,
@@ -66,7 +73,9 @@ test("registers activate_skill as a normal Pi tool with model guidance", () => {
   assert.ok(tool);
   assert.equal(tool.name, "activate_skill");
   assert.match(tool.description, /Load full Pi Agent Skill instructions/);
-  assert.ok(tool.promptGuidelines?.some((line) => line.includes("activate_skill")));
+  assert.ok(
+    tool.promptGuidelines?.some((line) => line.includes("activate_skill")),
+  );
 });
 
 test("loads a visible skill and returns its base directory through Pi tool execution", async () => {
@@ -75,7 +84,10 @@ test("loads a visible skill and returns its base directory through Pi tool execu
     const skillDir = join(root, "proof");
     await mkdir(skillDir);
     const skillPath = join(skillDir, "SKILL.md");
-    await writeFile(skillPath, "---\nname: proof\ndescription: Proof skill\n---\nFollow the proof instructions.\n");
+    await writeFile(
+      skillPath,
+      "---\nname: proof\ndescription: Proof skill\n---\nFollow the proof instructions.\n",
+    );
     const harness = extensionHarness();
     harness.setSkills([makeSkill("proof", skillPath)]);
 
@@ -83,8 +95,17 @@ test("loads a visible skill and returns its base directory through Pi tool execu
     const text = result.content.map((block) => block.text ?? "").join("\n");
 
     assert.match(text, /Follow the proof instructions/);
-    assert.match(text, new RegExp(`Skill directory: ${skillDir.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`));
-    assert.deepEqual(result.details, { name: "proof", filePath: skillPath, baseDir: skillDir });
+    assert.match(
+      text,
+      new RegExp(
+        `Skill directory: ${skillDir.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`,
+      ),
+    );
+    assert.deepEqual(result.details, {
+      name: "proof",
+      filePath: skillPath,
+      baseDir: skillDir,
+    });
   } finally {
     await rm(root, { recursive: true, force: true });
   }

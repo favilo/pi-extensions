@@ -31,7 +31,9 @@ const CONFIG_HEADER = [
 ].join("\n");
 
 function object(value: unknown): Record<string, unknown> | undefined {
-  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : undefined;
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : undefined;
 }
 
 function parseRules(value: unknown, field: string): PermissionRule[] {
@@ -42,7 +44,8 @@ function parseRules(value: unknown, field: string): PermissionRule[] {
     if (!rule) throw new Error(`${field}[${index}] must be a table`);
     const decoded: PermissionRule = {};
     for (const [path, pattern] of Object.entries(rule)) {
-      if (!path || typeof pattern !== "string") throw new Error(`${field}[${index}] must contain string patterns`);
+      if (!path || typeof pattern !== "string")
+        throw new Error(`${field}[${index}] must contain string patterns`);
       new RegExp(pattern);
       decoded[path] = pattern;
     }
@@ -55,25 +58,39 @@ export function parsePermissionsTypescript(source: string): Permissions {
   const table = object(root?.permissions);
   if (!table) return {};
 
-  return Object.fromEntries(Object.entries(table).map(([toolName, value]) => {
-    const permission = object(value);
-    if (!permission) throw new Error(`permissions.${toolName} must be a table`);
-    return [toolName, {
-      allow: parseRules(permission.allow, `permissions.${toolName}.allow`),
-      deny: parseRules(permission.deny, `permissions.${toolName}.deny`),
-    }];
-  }));
+  return Object.fromEntries(
+    Object.entries(table).map(([toolName, value]) => {
+      const permission = object(value);
+      if (!permission)
+        throw new Error(`permissions.${toolName} must be a table`);
+      return [
+        toolName,
+        {
+          allow: parseRules(permission.allow, `permissions.${toolName}.allow`),
+          deny: parseRules(permission.deny, `permissions.${toolName}.deny`),
+        },
+      ];
+    }),
+  );
 }
 
 export function parsePermissions(source: string): Permissions {
-  return parsePolicyWithNativeFallback(source, () => parsePermissionsTypescript(source));
+  return parsePolicyWithNativeFallback(source, () =>
+    parsePermissionsTypescript(source),
+  );
 }
 
 export function loadPermissions(path: string): Permissions {
   try {
     return parsePermissions(readFileSync(path, "utf8"));
   } catch (error) {
-    if (error && typeof error === "object" && "code" in error && error.code === "ENOENT") return {};
+    if (
+      error &&
+      typeof error === "object" &&
+      "code" in error &&
+      error.code === "ENOENT"
+    )
+      return {};
     throw error;
   }
 }
@@ -90,38 +107,62 @@ function fieldValue(input: unknown, path: string): unknown {
 
 function patternValue(value: unknown): string {
   if (typeof value === "string") return value;
-  if (value === null || typeof value === "number" || typeof value === "boolean") return String(value);
+  if (value === null || typeof value === "number" || typeof value === "boolean")
+    return String(value);
   return JSON.stringify(value);
 }
 
-export function matchesPermissionRule(rule: PermissionRule, input: unknown): boolean {
+export function matchesPermissionRule(
+  rule: PermissionRule,
+  input: unknown,
+): boolean {
   return Object.entries(rule).every(([path, pattern]) => {
     const value = fieldValue(input, path);
     return value !== undefined && new RegExp(pattern).test(patternValue(value));
   });
 }
 
-export function permissionDecision(permission: ToolPermission | undefined, input: unknown): "allow" | "deny" | "ask" {
+export function permissionDecision(
+  permission: ToolPermission | undefined,
+  input: unknown,
+): "allow" | "deny" | "ask" {
   if (!permission) return "ask";
   const nativeDecision = evaluatePermissionWithNative(permission, input);
   if (nativeDecision !== undefined) return nativeDecision;
-  if (permission.deny.some((rule) => matchesPermissionRule(rule, input))) return "deny";
-  if (permission.allow.some((rule) => matchesPermissionRule(rule, input))) return "allow";
+  if (permission.deny.some((rule) => matchesPermissionRule(rule, input)))
+    return "deny";
+  if (permission.allow.some((rule) => matchesPermissionRule(rule, input)))
+    return "allow";
   return "ask";
 }
 
-export function saveAllowedRule(path: string, toolName: string, rule: PermissionRule): void {
+export function saveAllowedRule(
+  path: string,
+  toolName: string,
+  rule: PermissionRule,
+): void {
   let source = "";
   try {
     source = readFileSync(path, "utf8");
   } catch (error) {
-    if (!(error && typeof error === "object" && "code" in error && error.code === "ENOENT")) throw error;
+    if (!(
+      error &&
+      typeof error === "object" &&
+      "code" in error &&
+      error.code === "ENOENT"
+    ))
+      throw error;
   }
   if (!source) source = `${CONFIG_HEADER}[permissions]\n`;
   const root = object(parseToml(source)) ?? {};
   const permissions = parsePermissions(source);
   const permission = permissions[toolName] ?? { allow: [], deny: [] };
-  if (permission.allow.some((candidate) => JSON.stringify(candidate) === JSON.stringify(rule))) return;
+  if (
+    permission.allow.some(
+      (candidate) => JSON.stringify(candidate) === JSON.stringify(rule),
+    )
+  )
+    return;
   permission.allow.push(rule);
   permissions[toolName] = permission;
 
@@ -134,7 +175,9 @@ export function saveAllowedRule(path: string, toolName: string, rule: Permission
   renameSync(temporaryPath, path);
 }
 
-export function parsePermissionRuleJson(source: string): PermissionRule | undefined {
+export function parsePermissionRuleJson(
+  source: string,
+): PermissionRule | undefined {
   try {
     const parsed = object(JSON.parse(source));
     if (!parsed) return undefined;

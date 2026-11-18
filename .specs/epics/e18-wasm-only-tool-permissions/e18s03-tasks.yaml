@@ -1,27 +1,36 @@
 story_id: e18s03
 title: Move rule saves and permissions.toml patches into WASM
-status: failing
+status: passing
 bcps: 5
 delta: MODIFIED
 spec: e18s03-wasm-rule-saves.md
+dependencies:
+  - name: thiserror
+    version: 2.0.21
+    registry: crates.io
+    tag: "[OK]"
+    note: Standard Rust error-type crate. No slopcheck binary is installed in this environment. The lockfile already contained thiserror 1.0.69 through another crate.
 tasks:
   - id: 1
-    description: Add failing tests for user save, project save, duplicate protection, and failed-save denial. No new security findings in affected paths.
+    description: Add failing tests for user save, project save, duplicate
+      protection, and failed-save denial. No new security findings in affected
+      paths.
     verify: node --test extensions/tool-permissions/native-rule-save.test.ts
     risk: P0
     security: high
-    status: failing
+    status: passing
     allure:
       severity: critical
       categories:
         - "Contract Tests"
         - "Security Review"
   - id: 2
-    description: Add the Rust TOML patch operation for an already authorized destination and rule. No new security findings in affected paths.
+    description: Add the Rust TOML patch operation for an already authorized
+      destination and rule. No new security findings in affected paths.
     verify: cargo test --manifest-path extensions/tool-permissions/native/Cargo.toml
     risk: P0
     security: high
-    status: failing
+    status: passing
     allure:
       severity: critical
       categories:
@@ -32,7 +41,7 @@ tasks:
     verify: node --test extensions/tool-permissions/native-rule-save.test.ts
     risk: P0
     security: high
-    status: failing
+    status: passing
     allure:
       severity: critical
       categories:
@@ -43,7 +52,7 @@ tasks:
     verify: npm run build:native && npm run check
     risk: P1
     security: high
-    status: failing
+    status: passing
     allure:
       severity: high
       categories:

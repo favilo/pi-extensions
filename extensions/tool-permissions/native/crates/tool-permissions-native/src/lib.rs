@@ -1,16 +1,27 @@
+mod audit;
 mod contract;
+mod execution;
 mod parser;
+mod path_trust;
 mod policy;
+mod prompt_queue;
 mod registration;
+mod rule_save;
 
 pub use contract::{
-    EvaluateRequest, EvaluateResponse, NativeOperation, NativeRegistrationRequest,
-    NativeRegistrationResponse, ParseRequest, ParseResponse, ParsedSubcommand, PermissionDecision,
+    AuditWriteRequest, AuditWriteResponse, EvaluateRequest, EvaluateResponse, NativeOperation,
+    NativeRegistrationRequest, NativeRegistrationResponse, ParseRequest, ParseResponse,
+    ParsedSubcommand, PathTrustRequest, PathTrustResponse, PermissionDecision,
     PermissionEvaluationRequest, PermissionOrchestrationRequest, PermissionOrchestrationResponse,
     PolicyPermission, PolicyRequest, PolicyResponse, ProbeRequest, ProbeResponse,
+    PromptQueueDecision, PromptQueueRequest, PromptQueueResolution, PromptQueueResponse,
+    RuleSaveRequest, RuleSaveResponse, ToolExecutionDecision, ToolExecutionRequest,
+    ToolExecutionResponse,
 };
+use napi::bindgen_prelude::{FnArgs, Function, PromiseRaw};
 use napi::{Env, Error, Result};
 use napi_derive::napi;
+use pi_api::RealpathCallback;
 
 pub(crate) const CONTRACT_VERSION: i64 = 1;
 
@@ -98,12 +109,67 @@ pub fn evaluate_permission(request: PermissionEvaluationRequest) -> Result<Evalu
     Ok(policy::evaluate_permission(request))
 }
 
+#[napi]
+pub fn evaluate_path_trust(
+    request: PathTrustRequest,
+    realpath: Function<String, String>,
+    read_file: Function<String, String>,
+    is_dir: Function<String, bool>,
+) -> Result<PathTrustResponse> {
+    path_trust::evaluate(
+        request,
+        &RealpathCallback::new(&realpath, &read_file, &is_dir),
+    )
+    .map_err(Error::from_reason)
+}
+
+#[napi]
+pub fn write_audit(
+    request: AuditWriteRequest,
+    append: Function<String, bool>,
+) -> Result<AuditWriteResponse> {
+    audit::write(request, &audit::AppendCallback::new(&append)).map_err(Error::from_reason)
+}
+
+#[napi]
+pub fn save_rule(request: RuleSaveRequest) -> Result<RuleSaveResponse> {
+    rule_save::save(request).map_err(|error| Error::from_reason(error.to_string()))
+}
+
+#[napi]
+pub fn decide_prompt<'env>(
+    env: Env,
+    request: PromptQueueRequest,
+    present: Function<'env, String, PromiseRaw<'env, PromptQueueResolution>>,
+) -> Result<PromiseRaw<'env, PromptQueueResponse>> {
+    prompt_queue::decide(env, request, present)
+}
+
+#[napi]
+pub fn execute_tool<'env>(
+    env: Env,
+    request: ToolExecutionRequest,
+    execute: Function<'env, FnArgs<(String, String)>, PromiseRaw<'env, String>>,
+) -> Result<PromiseRaw<'env, ToolExecutionResponse>> {
+    execution::execute(&env, request, execute)
+}
+
 #[cfg(test)]
 mod tests {
     use super::{
-        evaluate_permission_orchestration, evaluate_policy, parse, parse_policy, probe,
         EvaluateRequest, ParseRequest, PermissionOrchestrationRequest, PolicyRequest, ProbeRequest,
+        evaluate_permission_orchestration, evaluate_policy, parse, parse_policy, probe,
     };
+
+    #[test]
+    fn tool_execution_source_stays_a_host_callback() {
+        let source = include_str!("execution.rs");
+        assert!(!source.contains("std::process"));
+        assert!(!source.contains("std::net"));
+        assert!(!source.contains("FunctionRef"));
+        assert!(!source.contains("mem::transmute"));
+    }
+
     #[test]
     fn probe_returns_a_distinct_typed_response() {
         let response = probe(ProbeRequest {

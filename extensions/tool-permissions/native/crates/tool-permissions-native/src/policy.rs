@@ -81,7 +81,7 @@ pub fn evaluate_permission(request: PermissionEvaluationRequest) -> EvaluateResp
                 false,
                 PermissionDecision::Ask,
                 &format!("invalid input JSON: {error}"),
-            )
+            );
         }
     };
     let permission = PolicyPermission {
@@ -96,7 +96,7 @@ pub fn evaluate_permission(request: PermissionEvaluationRequest) -> EvaluateResp
                 false,
                 PermissionDecision::Ask,
                 &format!("invalid native regex: {error}"),
-            )
+            );
         }
     };
     evaluate_response_with_operation(
@@ -108,7 +108,9 @@ pub fn evaluate_permission(request: PermissionEvaluationRequest) -> EvaluateResp
     )
 }
 
-pub fn evaluate_orchestration(request: PermissionOrchestrationRequest) -> PermissionOrchestrationResponse {
+pub fn evaluate_orchestration(
+    request: PermissionOrchestrationRequest,
+) -> PermissionOrchestrationResponse {
     let input: serde_json::Value = match serde_json::from_str(&request.input_json) {
         Ok(value) => value,
         Err(error) => {
@@ -118,21 +120,22 @@ pub fn evaluate_orchestration(request: PermissionOrchestrationRequest) -> Permis
                 permission_key_for_tool(&request.tool_name),
                 PermissionDecision::Ask,
                 &format!("invalid input JSON: {error}"),
-            )
+            );
         }
     };
-    let permissions: HashMap<String, PolicyPermission> = match serde_json::from_str(&request.permissions_json) {
-        Ok(value) => value,
-        Err(error) => {
-            return orchestration_response(
-                request.nonce,
-                false,
-                permission_key_for_tool(&request.tool_name),
-                PermissionDecision::Ask,
-                &format!("invalid permissions JSON: {error}"),
-            )
-        }
-    };
+    let permissions: HashMap<String, PolicyPermission> =
+        match serde_json::from_str(&request.permissions_json) {
+            Ok(value) => value,
+            Err(error) => {
+                return orchestration_response(
+                    request.nonce,
+                    false,
+                    permission_key_for_tool(&request.tool_name),
+                    PermissionDecision::Ask,
+                    &format!("invalid permissions JSON: {error}"),
+                );
+            }
+        };
     let permission_key = permission_key_for_tool(&request.tool_name);
     let decision = match permissions.get(&permission_key) {
         Some(permission) => match permission_decision(permission, &input) {
@@ -144,12 +147,18 @@ pub fn evaluate_orchestration(request: PermissionOrchestrationRequest) -> Permis
                     permission_key,
                     PermissionDecision::Ask,
                     &format!("invalid native regex: {error}"),
-                )
+                );
             }
         },
         None => PermissionDecision::Ask,
     };
-    orchestration_response(request.nonce, true, permission_key, decision, "orchestrated permission decision")
+    orchestration_response(
+        request.nonce,
+        true,
+        permission_key,
+        decision,
+        "orchestrated permission decision",
+    )
 }
 
 pub fn evaluate(request: EvaluateRequest) -> EvaluateResponse {
@@ -161,13 +170,13 @@ pub fn evaluate(request: EvaluateRequest) -> EvaluateResponse {
                 false,
                 PermissionDecision::Ask,
                 &format!("invalid input JSON: {error}"),
-            )
+            );
         }
     };
     let permissions = match decode(&request.source) {
         Ok(value) => value,
         Err(error) => {
-            return evaluate_response(request.nonce, false, PermissionDecision::Ask, &error)
+            return evaluate_response(request.nonce, false, PermissionDecision::Ask, &error);
         }
     };
     let Some(permission) = permissions.get(&request.tool) else {
@@ -204,6 +213,18 @@ pub fn evaluate(request: EvaluateRequest) -> EvaluateResponse {
             &format!("invalid native regex: {error}"),
         ),
     }
+}
+
+pub(crate) fn decision_for_tool_path(
+    tool: &str,
+    source: &str,
+    path: &str,
+) -> Result<PermissionDecision, String> {
+    let permissions = decode(source)?;
+    let Some(permission) = permissions.get(&permission_key_for_tool(tool)) else {
+        return Ok(PermissionDecision::Ask);
+    };
+    permission_decision(permission, &serde_json::json!({ "path": path }))
 }
 
 fn permission_key_for_tool(tool_name: &str) -> String {

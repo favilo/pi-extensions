@@ -38,10 +38,21 @@ const runJj: JjRunner = (cwd, args) => {
 };
 
 function jjStatusArgs(): string[] {
-  return ["log", "--ignore-working-copy", "--no-graph", "-r", "@", "-T", JJ_TEMPLATE];
+  return [
+    "log",
+    "--ignore-working-copy",
+    "--no-graph",
+    "-r",
+    "@",
+    "-T",
+    JJ_TEMPLATE,
+  ];
 }
 
-export function resolveJjStatus(cwd: string, runner: JjRunner = runJj): string | null {
+export function resolveJjStatus(
+  cwd: string,
+  runner: JjRunner = runJj,
+): string | null {
   const result = runner(cwd, jjStatusArgs());
   if (result.status !== 0) return null;
 
@@ -60,7 +71,10 @@ function findJjOperationsPath(cwd: string): string | null {
   }
 }
 
-function patchDetachedLabel(footerData: FooterData, getJjStatus: () => string | null): () => void {
+function patchDetachedLabel(
+  footerData: FooterData,
+  getJjStatus: () => string | null,
+): () => void {
   if (footerData[PATCH_STATE]) return () => {};
 
   const original = footerData.getGitBranch;
@@ -91,7 +105,9 @@ export default function (pi: ExtensionAPI) {
   let restoreFooterData: (() => void) | undefined;
 
   async function refresh(cwd: string) {
-    const result = await pi.exec("jj", jjStatusArgs(), { timeout: JJ_TIMEOUT_MS });
+    const result = await pi.exec("jj", jjStatusArgs(), {
+      timeout: JJ_TIMEOUT_MS,
+    });
     jjStatus = result.code === 0 ? result.stdout.trim() || null : null;
     requestRender?.();
   }
@@ -102,7 +118,10 @@ export default function (pi: ExtensionAPI) {
     await refresh(ctx.cwd);
     ctx.ui.setFooter((tui, _theme, footerData) => {
       requestRender = () => tui.requestRender();
-      restoreFooterData = patchDetachedLabel(footerData as FooterData, () => jjStatus);
+      restoreFooterData = patchDetachedLabel(
+        footerData as FooterData,
+        () => jjStatus,
+      );
       return { render: () => [], invalidate() {} };
     });
     ctx.ui.setFooter(undefined);
@@ -112,7 +131,10 @@ export default function (pi: ExtensionAPI) {
 
     operationsWatcher = watch(operationsPath, () => {
       if (refreshTimer) clearTimeout(refreshTimer);
-      refreshTimer = setTimeout(() => void refresh(ctx.cwd), REFRESH_DEBOUNCE_MS);
+      refreshTimer = setTimeout(
+        () => void refresh(ctx.cwd),
+        REFRESH_DEBOUNCE_MS,
+      );
     });
     operationsWatcher.on("error", () => operationsWatcher?.close());
   });

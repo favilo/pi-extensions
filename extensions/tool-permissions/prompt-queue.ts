@@ -27,7 +27,10 @@ type QueuedPrompt<T = unknown> = PermissionPromptJob<T> & {
 function safeInputHash(input: unknown): string {
   let serialized: string;
   try {
-    serialized = JSON.stringify(input, (_key, value) => typeof value === "bigint" ? value.toString() : value) ?? "null";
+    serialized =
+      JSON.stringify(input, (_key, value) =>
+        typeof value === "bigint" ? value.toString() : value,
+      ) ?? "null";
   } catch {
     serialized = "[unserializable]";
   }
@@ -56,11 +59,17 @@ export class PermissionPromptQueue {
     if (this.#closed || job.signal?.aborted) return Promise.resolve(job.cancel);
 
     return new Promise<T>((resolve, reject) => {
-      const queued: QueuedPrompt<T> = { ...job, resolve, reject, settled: false };
+      const queued: QueuedPrompt<T> = {
+        ...job,
+        resolve,
+        reject,
+        settled: false,
+      };
       if (job.signal) {
         const cancel = () => this.#cancel(queued);
         job.signal.addEventListener("abort", cancel, { once: true });
-        queued.removeAbortListener = () => job.signal?.removeEventListener("abort", cancel);
+        queued.removeAbortListener = () =>
+          job.signal?.removeEventListener("abort", cancel);
       }
       this.#pending.push(queued as QueuedPrompt);
       this.#pump();
@@ -74,7 +83,8 @@ export class PermissionPromptQueue {
       this.#settle(this.#active, this.#active.cancel);
       this.#active.controller?.abort();
     }
-    for (const queued of this.#pending.splice(0)) this.#settle(queued, queued.cancel);
+    for (const queued of this.#pending.splice(0))
+      this.#settle(queued, queued.cancel);
   }
 
   #cancel<T>(queued: QueuedPrompt<T>): void {
@@ -106,7 +116,8 @@ export class PermissionPromptQueue {
 
     this.#active = queued;
     queued.controller = new AbortController();
-    void queued.present(queued.controller.signal)
+    void queued
+      .present(queued.controller.signal)
       .then((value) => this.#settle(queued, value))
       .catch((error) => {
         if (queued.settled) return;
@@ -121,14 +132,17 @@ export class PermissionPromptQueue {
   }
 }
 
-const SESSION_QUEUES_KEY = Symbol.for("pi-extensions.tool-permissions.session-prompt-queues");
+const SESSION_QUEUES_KEY = Symbol.for(
+  "pi-extensions.tool-permissions.session-prompt-queues",
+);
 
 type ProcessGlobal = { [key: symbol]: unknown };
 type SessionQueueRegistry = Map<string, PermissionPromptQueue>;
 
 function sessionQueueRegistry(): SessionQueueRegistry {
   const processGlobal = globalThis as ProcessGlobal;
-  const current = processGlobal[SESSION_QUEUES_KEY] as SessionQueueRegistry | undefined;
+  const current = processGlobal[SESSION_QUEUES_KEY] as
+    SessionQueueRegistry | undefined;
   if (current) return current;
   const registry: SessionQueueRegistry = new Map();
   processGlobal[SESSION_QUEUES_KEY] = registry;
@@ -140,7 +154,9 @@ function sessionQueueRegistry(): SessionQueueRegistry {
  * global only hosts a registry; each active top-level parent session owns an
  * independent queue selected by its stable Pi session ID.
  */
-export function permissionPromptQueueFor(parentSessionId: string): PermissionPromptQueue {
+export function permissionPromptQueueFor(
+  parentSessionId: string,
+): PermissionPromptQueue {
   const registry = sessionQueueRegistry();
   const current = registry.get(parentSessionId);
   if (current) return current;
@@ -153,5 +169,6 @@ export function closePermissionPromptQueue(parentSessionId: string): void {
   const registry = sessionQueueRegistry();
   registry.get(parentSessionId)?.close();
   registry.delete(parentSessionId);
-  if (registry.size === 0) delete (globalThis as ProcessGlobal)[SESSION_QUEUES_KEY];
+  if (registry.size === 0)
+    delete (globalThis as ProcessGlobal)[SESSION_QUEUES_KEY];
 }

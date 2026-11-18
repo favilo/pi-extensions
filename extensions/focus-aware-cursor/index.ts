@@ -28,7 +28,9 @@ export default function focusAwareCursor(pi: ExtensionAPI): void {
 
         if (!nextFocus) focusedVisibility = tui.getShowHardwareCursor();
         terminalFocused = nextFocus;
-        tui.setShowHardwareCursor(hardwareCursorVisibility(terminalFocused, focusedVisibility));
+        tui.setShowHardwareCursor(
+          hardwareCursorVisibility(terminalFocused, focusedVisibility),
+        );
         tui.requestRender();
         return { consume: true };
       });
@@ -46,7 +48,7 @@ export default function focusAwareCursor(pi: ExtensionAPI): void {
         render(): string[] {
           return [];
         },
-        invalidate(): void { },
+        invalidate(): void {},
         dispose(): void {
           disposeWidget();
         },

@@ -1,7 +1,10 @@
 import "../test-support/forbid-fetch.ts";
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createBackgroundBashMonitor, type BackgroundBashMonitorEvent } from "./monitor.ts";
+import {
+  createBackgroundBashMonitor,
+  type BackgroundBashMonitorEvent,
+} from "./monitor.ts";
 import { createBackgroundBashController } from "./lifecycle.ts";
 
 test("emits one ordered event for each completed stdout and stderr line", () => {
@@ -22,8 +25,10 @@ test("emits one ordered event for each completed stdout and stderr line", () => 
 
 test("a monitored task forwards completed output changes while an unmonitored task stays silent", () => {
   const events: BackgroundBashMonitorEvent[] = [];
-  let monitoredEmit: ((stream: "stdout" | "stderr", chunk: string) => void) | undefined;
-  let unmonitoredEmit: ((stream: "stdout" | "stderr", chunk: string) => void) | undefined;
+  let monitoredEmit:
+    ((stream: "stdout" | "stderr", chunk: string) => void) | undefined;
+  let unmonitoredEmit:
+    ((stream: "stdout" | "stderr", chunk: string) => void) | undefined;
   const monitored = createBackgroundBashController({
     spawn({ onOutput }) {
       monitoredEmit = onOutput;
@@ -37,12 +42,24 @@ test("a monitored task forwards completed output changes while an unmonitored ta
     },
   });
 
-  monitored.launch({ command: "watch", cwd: "/workspace", monitor: true, onMonitorEvent: (event) => events.push(event) });
-  unmonitored.launch({ command: "quiet", cwd: "/workspace", monitor: false, onMonitorEvent: (event) => events.push(event) });
+  monitored.launch({
+    command: "watch",
+    cwd: "/workspace",
+    monitor: true,
+    onMonitorEvent: (event) => events.push(event),
+  });
+  unmonitored.launch({
+    command: "quiet",
+    cwd: "/workspace",
+    monitor: false,
+    onMonitorEvent: (event) => events.push(event),
+  });
   monitoredEmit?.("stdout", "changed\n");
   unmonitoredEmit?.("stdout", "should stay silent\n");
 
-  assert.deepEqual(events, [{ stream: "stdout", sequence: 1, line: "changed" }]);
+  assert.deepEqual(events, [
+    { stream: "stdout", sequence: 1, line: "changed" },
+  ]);
   monitored.close();
   unmonitored.close();
 });
@@ -50,7 +67,12 @@ test("a monitored task forwards completed output changes while an unmonitored ta
 test("a monitored task emits one terminal completion callback after final output is flushed", () => {
   const completions: Array<{ id: string; status: string }> = [];
   let emit: ((stream: "stdout" | "stderr", chunk: string) => void) | undefined;
-  let exit: ((outcome: { code: number | null; signal: NodeJS.Signals | null }) => void) | undefined;
+  let exit:
+    | ((outcome: {
+        code: number | null;
+        signal: NodeJS.Signals | null;
+      }) => void)
+    | undefined;
   const controller = createBackgroundBashController({
     spawn({ onOutput, onExit }) {
       emit = onOutput;
@@ -62,7 +84,8 @@ test("a monitored task emits one terminal completion callback after final output
     command: "watch",
     cwd: "/workspace",
     monitor: true,
-    onMonitorComplete: (completed) => completions.push({ id: completed.id, status: completed.status }),
+    onMonitorComplete: (completed) =>
+      completions.push({ id: completed.id, status: completed.status }),
   });
 
   emit?.("stdout", "last change");
@@ -81,7 +104,12 @@ test("stopping a task monitor suppresses later output events without cancelling 
       return { terminate() {} };
     },
   });
-  const task = controller.launch({ command: "watch", cwd: "/workspace", monitor: true, onMonitorEvent: (event) => events.push(event) });
+  const task = controller.launch({
+    command: "watch",
+    cwd: "/workspace",
+    monitor: true,
+    onMonitorEvent: (event) => events.push(event),
+  });
 
   assert.equal(controller.stopMonitor(task.id), true);
   emit?.("stdout", "ignored\n");
@@ -100,5 +128,7 @@ test("flushes a final partial line and ignores output after close", () => {
   monitor.close();
   monitor.append("stdout", "late\n");
 
-  assert.deepEqual(events, [{ stream: "stdout", sequence: 1, line: "final change" }]);
+  assert.deepEqual(events, [
+    { stream: "stdout", sequence: 1, line: "final change" },
+  ]);
 });

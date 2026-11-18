@@ -1,6 +1,6 @@
 story_id: e18s00
 title: Re-evaluate pi-oxidized and pi-oxidized-ext
-status: failing
+status: passing
 bcps: 3
 delta: ADDED
 spec: e18s00-pi-oxidized-host.md
@@ -10,7 +10,7 @@ tasks:
     verify: node --test extensions/tool-permissions/native-pi-oxidized-decision.test.ts
     risk: P1
     security: medium
-    status: failing
+    status: passing
     allure:
       severity: high
       categories:
@@ -21,7 +21,7 @@ tasks:
     verify: node --test extensions/tool-permissions/native-pi-oxidized-decision.test.ts
     risk: P1
     security: medium
-    status: failing
+    status: passing
     allure:
       severity: high
       categories:
@@ -32,7 +32,7 @@ tasks:
     verify: node --test extensions/tool-permissions/native-pi-oxidized-decision.test.ts
     risk: P1
     security: medium
-    status: failing
+    status: passing
     allure:
       severity: high
       categories:
@@ -43,7 +43,7 @@ tasks:
     verify: npm run check
     risk: P1
     security: medium
-    status: failing
+    status: passing
     allure:
       severity: high
       categories:
