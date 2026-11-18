@@ -2623,7 +2623,7 @@ async function handleRegisteredSessionStart(
       ctx.ui.notify?.(
         nativeResult.engine === "native"
           ? "Native tool-permissions probe active (contract v1)."
-          : `Tool-permissions using TypeScript fallback: ${nativeResult.reason}`,
+          : `WASM tool-permissions probe failed; no alternate engine ran. ${nativeResult.reason}`,
         nativeResult.engine === "native" ? "info" : "warning",
       );
     }
@@ -2834,45 +2834,9 @@ export default function toolPermissionPolicy(pi: ExtensionAPI) {
     );
   }
 
-  if (
-    !hasNativeRegistration(
-      nativeRegistration,
-      "entry_renderer:permission-preview",
-    ) &&
-    typeof (pi as Partial<ExtensionAPI>).registerEntryRenderer === "function"
-  ) {
-    pi.registerEntryRenderer<PermissionPreview>(
-      "permission-preview",
-      renderRegisteredPermissionPreview,
-    );
-  }
-
-  if (!hasNativeRegistration(nativeRegistration, "session_start")) {
-    pi.on("session_start", async (_event, ctx) =>
-      handleRegisteredSessionStart(ctx),
-    );
-  }
-
-  if (!hasNativeRegistration(nativeRegistration, "command:permissions")) {
-    pi.registerCommand("permissions", {
-      description: `Edit user or local tool permissions`,
-      handler: handleRegisteredPermissionsCommand,
-    });
-  }
-
-  if (!hasNativeRegistration(nativeRegistration, "session_shutdown")) {
-    pi.on("session_shutdown", (_event, ctx) =>
-      handleRegisteredSessionShutdown(ctx),
-    );
-  }
-
-  if (!hasNativeRegistration(nativeRegistration, "tool_result")) {
-    pi.on("tool_result", (event) => handleRegisteredToolResult(event));
-  }
-
   if (!hasNativeRegistration(nativeRegistration, "tool_call")) {
-    pi.on("tool_call", (event, extensionContext) =>
-      handleRegisteredToolCall(event, extensionContext, pi),
+    throw new Error(
+      "WASM permission engine incomplete; missing tool_call; no alternate engine ran.",
     );
   }
 }
