@@ -8,9 +8,9 @@ publish = false
 
 [workspace.dependencies]
 pi-api = { path = "crates/pi-api" }
-napi = { version = "3.12.2", features = ["napi8"] }
+napi = { version = "3.16.2", features = ["napi8"] }
 napi-derive = "3.6.3"
-napi-build = "2.2.3"
+napi-build = "2.6.0"
 bash-ast = "0.8.22"
 toml = "1.1.5"
 serde = { version = "1.0.229", features = ["derive"] }
