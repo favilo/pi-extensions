@@ -2828,6 +2828,12 @@ export default function toolPermissionPolicy(pi: ExtensionAPI) {
       ),
   });
 
+  if (nativeRegistration.mode !== "native") {
+    throw new Error(
+      `WASM permission engine unavailable; no alternate engine ran. ${nativeRegistration.reason}`,
+    );
+  }
+
   if (
     !hasNativeRegistration(
       nativeRegistration,
