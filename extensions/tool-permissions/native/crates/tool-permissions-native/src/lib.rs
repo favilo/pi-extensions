@@ -15,7 +15,8 @@ pub use contract::{
     PermissionEvaluationRequest, PermissionOrchestrationRequest, PermissionOrchestrationResponse,
     PolicyPermission, PolicyRequest, PolicyResponse, ProbeRequest, ProbeResponse,
     PromptQueueDecision, PromptQueueRequest, PromptQueueResolution, PromptQueueResponse,
-    RuleSaveRequest, RuleSaveResponse, ToolExecutionRequest, ToolExecutionResponse,
+    RuleSaveRequest, RuleSaveResponse, ToolExecutionDecision, ToolExecutionRequest,
+    ToolExecutionResponse,
 };
 use napi::bindgen_prelude::{FnArgs, Function, PromiseRaw};
 use napi::{Env, Error, Result};

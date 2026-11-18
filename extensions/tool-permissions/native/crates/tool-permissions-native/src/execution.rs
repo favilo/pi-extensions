@@ -1,5 +1,7 @@
 use crate::CONTRACT_VERSION;
-use crate::contract::{NativeOperation, ToolExecutionRequest, ToolExecutionResponse};
+use crate::contract::{
+    NativeOperation, ToolExecutionDecision, ToolExecutionRequest, ToolExecutionResponse,
+};
 use napi::bindgen_prelude::{
     CallbackContext, FnArgs, Function, JsObjectValue, Object, PromiseRaw, Unknown,
 };
@@ -21,6 +23,30 @@ pub trait HostExecutor {
     fn execute(&self, tool_name: &str, input_json: &str) -> Result<String, String>;
 }
 
+enum HostOutcome {
+    Success(String),
+    Failure(String),
+    Skipped,
+}
+
+fn response(request: ToolExecutionRequest, outcome: HostOutcome) -> ToolExecutionResponse {
+    let (ok, executions, value_json, error) = match outcome {
+        HostOutcome::Success(value_json) => (true, 1, Some(value_json), None),
+        HostOutcome::Failure(error) => (false, 1, None, Some(error)),
+        HostOutcome::Skipped => (false, 0, None, None),
+    };
+    ToolExecutionResponse {
+        version: CONTRACT_VERSION,
+        operation: NativeOperation::ToolExecution,
+        ok,
+        nonce: request.nonce,
+        decision: request.decision,
+        executions,
+        value_json,
+        error,
+    }
+}
+
 pub fn prepare(request: ToolExecutionRequest) -> Result<ToolExecutionRequest, ToolExecutionError> {
     if request.version != CONTRACT_VERSION || request.operation != "tool_execution" {
         return Err(ToolExecutionError::Incompatible);
@@ -34,35 +60,6 @@ pub fn prepare(request: ToolExecutionRequest) -> Result<ToolExecutionRequest, To
     Ok(request)
 }
 
-pub fn success_response(
-    request: ToolExecutionRequest,
-    value_json: String,
-) -> ToolExecutionResponse {
-    ToolExecutionResponse {
-        version: CONTRACT_VERSION,
-        operation: NativeOperation::ToolExecution,
-        ok: true,
-        nonce: request.nonce,
-        decision: request.decision,
-        executions: 1,
-        value_json: Some(value_json),
-        error: None,
-    }
-}
-
-fn skipped_response(request: ToolExecutionRequest) -> ToolExecutionResponse {
-    ToolExecutionResponse {
-        version: CONTRACT_VERSION,
-        operation: NativeOperation::ToolExecution,
-        ok: false,
-        nonce: request.nonce,
-        decision: request.decision,
-        executions: 0,
-        value_json: None,
-        error: None,
-    }
-}
-
 pub enum ExecutionDecision {
     Run(ToolExecutionRequest),
     Skip(ToolExecutionResponse),
@@ -72,23 +69,14 @@ pub fn decide_execution(
     request: ToolExecutionRequest,
 ) -> Result<ExecutionDecision, ToolExecutionError> {
     let request = prepare(request)?;
-    if request.decision == "allow" {
-        Ok(ExecutionDecision::Run(request))
-    } else {
-        Ok(ExecutionDecision::Skip(skipped_response(request)))
-    }
-}
-
-fn host_failure(request: ToolExecutionRequest, error: String) -> ToolExecutionResponse {
-    ToolExecutionResponse {
-        version: CONTRACT_VERSION,
-        operation: NativeOperation::ToolExecution,
-        ok: false,
-        nonce: request.nonce,
-        decision: request.decision,
-        executions: 1,
-        value_json: None,
-        error: Some(error),
+    match request.decision {
+        ToolExecutionDecision::Allow => Ok(ExecutionDecision::Run(request)),
+        ToolExecutionDecision::Deny
+        | ToolExecutionDecision::Cancel
+        | ToolExecutionDecision::Invalid => Ok(ExecutionDecision::Skip(response(
+            request,
+            HostOutcome::Skipped,
+        ))),
     }
 }
 
@@ -125,11 +113,11 @@ pub fn sequence(
         ExecutionDecision::Skip(response) => return Ok(response),
         ExecutionDecision::Run(request) => request,
     };
-    let value = match host.execute(&request.tool_name, &request.input_json) {
-        Ok(value) => value,
-        Err(error) => return Ok(host_failure(request, error)),
+    let outcome = match host.execute(&request.tool_name, &request.input_json) {
+        Ok(value) => HostOutcome::Success(value),
+        Err(error) => HostOutcome::Failure(error),
     };
-    Ok(success_response(request, value))
+    Ok(response(request, outcome))
 }
 
 pub fn execute<'env>(
@@ -147,19 +135,28 @@ pub fn execute<'env>(
         request.input_json.clone(),
     ))) {
         Ok(pending) => pending,
-        Err(error) => return PromiseRaw::resolve(env, host_failure(request, error.to_string())),
+        Err(error) => {
+            return PromiseRaw::resolve(
+                env,
+                response(request, HostOutcome::Failure(error.to_string())),
+            );
+        }
     };
     let failed = request.clone();
-    let settled = pending.then(move |context| Ok(success_response(request, context.value)))?;
+    let settled =
+        pending.then(move |context| Ok(response(request, HostOutcome::Success(context.value))))?;
     settled.catch(move |context: CallbackContext<Unknown>| {
-        Ok(host_failure(failed, host_error_message(&context.value)))
+        Ok(response(
+            failed,
+            HostOutcome::Failure(host_error_message(&context.value)),
+        ))
     })
 }
 
 #[cfg(test)]
 mod tests {
     use super::{HostExecutor, sequence};
-    use crate::contract::ToolExecutionRequest;
+    use crate::contract::{ToolExecutionDecision, ToolExecutionRequest};
     use std::sync::Mutex;
 
     struct CountingHost {
@@ -181,7 +178,7 @@ mod tests {
             version: 1,
             operation: "tool_execution".into(),
             nonce: "tool-permissions-tool-execution".into(),
-            decision: "allow".into(),
+            decision: ToolExecutionDecision::Allow,
             tool_name: "read".into(),
             input_json: "{\"path\":\"/tmp/note.txt\"}".into(),
         }
@@ -200,18 +197,22 @@ mod tests {
         );
         assert!(response.ok);
         assert_eq!(response.executions, 1);
-        assert_eq!(response.decision, "allow");
+        assert_eq!(response.decision, ToolExecutionDecision::Allow);
         assert_eq!(response.value_json.as_deref(), Some("\"file-body\""));
     }
 
     #[test]
     fn deny_cancel_and_invalid_do_not_call_the_host() {
-        for decision in ["deny", "cancel", "invalid"] {
+        for decision in [
+            ToolExecutionDecision::Deny,
+            ToolExecutionDecision::Cancel,
+            ToolExecutionDecision::Invalid,
+        ] {
             let host = CountingHost {
                 calls: Mutex::new(Vec::new()),
             };
             let mut request = allow_request();
-            request.decision = decision.to_owned();
+            request.decision = decision;
             let response = sequence(request, &host).unwrap();
             assert!(
                 host.calls.lock().expect("host call lock").is_empty(),
@@ -219,6 +220,7 @@ mod tests {
             );
             assert_eq!(response.executions, 0, "{decision}");
             assert!(response.value_json.is_none(), "{decision}");
+            assert_eq!(response.decision, decision);
         }
     }
 

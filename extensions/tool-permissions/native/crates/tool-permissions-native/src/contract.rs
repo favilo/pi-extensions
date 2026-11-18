@@ -268,13 +268,33 @@ pub struct PromptQueueResponse {
     pub steering: Option<String>,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[napi(string_enum = "snake_case")]
+pub enum ToolExecutionDecision {
+    Allow,
+    Deny,
+    Cancel,
+    Invalid,
+}
+
+impl std::fmt::Display for ToolExecutionDecision {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            Self::Allow => "allow",
+            Self::Deny => "deny",
+            Self::Cancel => "cancel",
+            Self::Invalid => "invalid",
+        })
+    }
+}
+
 #[derive(Clone)]
 #[napi(object)]
 pub struct ToolExecutionRequest {
     pub version: i64,
     pub operation: String,
     pub nonce: String,
-    pub decision: String,
+    pub decision: ToolExecutionDecision,
     pub tool_name: String,
     pub input_json: String,
 }
@@ -285,7 +305,7 @@ pub struct ToolExecutionResponse {
     pub operation: NativeOperation,
     pub ok: bool,
     pub nonce: String,
-    pub decision: String,
+    pub decision: ToolExecutionDecision,
     pub executions: i64,
     pub value_json: Option<String>,
     pub error: Option<String>,

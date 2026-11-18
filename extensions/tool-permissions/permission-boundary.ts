@@ -1,6 +1,7 @@
 import { NATIVE_CONTRACT_VERSION } from "./native-contract.ts";
 import {
   NATIVE_TOOL_EXECUTION_NONCE,
+  ToolExecutionDecision,
   executeSequencedTool,
 } from "./native-tool-execution.ts";
 
@@ -97,7 +98,7 @@ async function executeAllowedRequest(
       version: NATIVE_CONTRACT_VERSION,
       operation: "tool_execution",
       nonce: NATIVE_TOOL_EXECUTION_NONCE,
-      decision: "allow",
+      decision: ToolExecutionDecision.Allow,
       toolName: request.toolName,
       inputJson: JSON.stringify(request.input),
     },

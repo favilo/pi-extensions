@@ -7,11 +7,18 @@ import {
 export const NATIVE_TOOL_EXECUTION_NONCE =
   "tool-permissions-tool-execution" as const;
 
+export enum ToolExecutionDecision {
+  Allow = "allow",
+  Deny = "deny",
+  Cancel = "cancel",
+  Invalid = "invalid",
+}
+
 export type SequencedToolRequest = {
   version: typeof NATIVE_CONTRACT_VERSION;
   operation: "tool_execution";
   nonce: string;
-  decision: string;
+  decision: ToolExecutionDecision;
   toolName: string;
   inputJson: string;
 };
@@ -21,7 +28,7 @@ export type SequencedToolResult = {
   operation: "tool_execution";
   ok: boolean;
   nonce: string;
-  decision: string;
+  decision: ToolExecutionDecision;
   executions: number;
   valueJson?: string;
   error?: string;
@@ -56,6 +63,14 @@ function nativeUnavailable(request: SequencedToolRequest): SequencedToolResult {
   return { ...failedResult(request), unavailable: true };
 }
 
+function isToolExecutionDecision(
+  value: unknown,
+): value is ToolExecutionDecision {
+  return Object.values(ToolExecutionDecision).includes(
+    value as ToolExecutionDecision,
+  );
+}
+
 function isSequencedResult(
   value: unknown,
   request: SequencedToolRequest,
@@ -69,7 +84,7 @@ function isSequencedResult(
     result.operation === "tool_execution" &&
     typeof result.ok === "boolean" &&
     result.nonce === request.nonce &&
-    typeof result.decision === "string" &&
+    isToolExecutionDecision(result.decision) &&
     typeof result.executions === "number" &&
     Number.isInteger(result.executions) &&
     result.executions >= 0 &&

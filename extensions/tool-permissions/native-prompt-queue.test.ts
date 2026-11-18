@@ -317,7 +317,9 @@ test("promptToolPermissionRequest holds the native queue until the visible promp
         nonce: string;
         toolCallId: string;
       },
-      present: (toolCallId: string) => Promise<{ decision: PromptQueueDecision }>,
+      present: (
+        toolCallId: string,
+      ) => Promise<{ decision: PromptQueueDecision }>,
     ): Promise<unknown>;
   };
   let nativePresented = false;

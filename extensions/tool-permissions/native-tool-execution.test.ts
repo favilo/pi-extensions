@@ -4,6 +4,7 @@ import test from "node:test";
 import { NATIVE_CONTRACT_VERSION } from "./native-contract.ts";
 import {
   NATIVE_TOOL_EXECUTION_NONCE,
+  ToolExecutionDecision,
   executeSequencedTool,
 } from "./native-tool-execution.ts";
 
@@ -14,7 +15,7 @@ function allowRequest() {
     version: NATIVE_CONTRACT_VERSION,
     operation: "tool_execution" as const,
     nonce: NATIVE_TOOL_EXECUTION_NONCE,
-    decision: "allow",
+    decision: ToolExecutionDecision.Allow,
     toolName: "read",
     inputJson: originalInput,
   };
@@ -31,7 +32,7 @@ test("an allow executes the host callback once with the original request", async
   );
   console.log(
     JSON.stringify({
-      decision: "allow",
+      decision: ToolExecutionDecision.Allow,
       executions: calls.length,
       toolName: calls[0]?.toolName,
       inputJson: calls[0]?.inputJson,
@@ -49,14 +50,18 @@ test("an allow executes the host callback once with the original request", async
     {
       ok: true,
       executions: 1,
-      decision: "allow",
+      decision: ToolExecutionDecision.Allow,
       valueJson: JSON.stringify("file-body"),
     },
   );
 });
 
 test("a deny, a cancellation, or an invalid decision executes nothing", async () => {
-  for (const decision of ["deny", "cancel", "invalid"]) {
+  for (const decision of [
+    ToolExecutionDecision.Deny,
+    ToolExecutionDecision.Cancel,
+    ToolExecutionDecision.Invalid,
+  ]) {
     const calls: string[] = [];
     const result = await executeSequencedTool(
       { ...allowRequest(), decision },
@@ -70,6 +75,7 @@ test("a deny, a cancellation, or an invalid decision executes nothing", async ()
     assert.equal(calls.length, 0, decision);
     assert.equal(result.executions, 0, decision);
     assert.equal(result.valueJson, undefined, decision);
+    assert.equal(result.decision, decision);
   }
 });
 
@@ -81,7 +87,7 @@ test("a host execution error is returned and is not a successful tool result", a
   });
   console.log(
     JSON.stringify({
-      decision: "allow",
+      decision: ToolExecutionDecision.Allow,
       executions,
       ok: result.ok,
       error: result.error,
