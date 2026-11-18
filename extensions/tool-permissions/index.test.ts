@@ -157,31 +157,53 @@ exports.registerToolPermissionsCallbacks = (request, pi, bridge) => {
   }
 });
 
-test("reports native package selection or TypeScript fallback at session start", async () => {
+test("startup uses WASM registration and does not install a TypeScript engine", async () => {
   const directory = mkdtempSync(
     join(tmpdir(), "pi-permissions-native-runtime-"),
   );
   const packagePath = join(directory, "native.cjs");
   writeFileSync(
     packagePath,
-    "module.exports = { probe(request) { return { version: 1, operation: request.operation, ok: true, nonce: request.nonce }; } };",
+    `
+exports.probe = (request) => ({ version: 1, operation: request.operation, ok: true, nonce: request.nonce });
+exports.registerToolPermissionsCallbacks = (request, pi, bridge) => {
+  pi.on("session_start", (event, ctx) => {
+    if (ctx.hasUI) ctx.ui.notify("WASM tool-permissions active.", "info");
+    return bridge.handleSessionStart(event, ctx);
+  });
+  pi.on("tool_call", (event, ctx) => bridge.handleToolCall(event, ctx));
+  return {
+    version: 1,
+    operation: "register_callbacks",
+    ok: true,
+    nonce: request.nonce,
+    registrations: ["session_start", "tool_call"],
+  };
+};
+`,
     "utf8",
   );
   const previousPackage = process.env.PI_TOOL_PERMISSIONS_NATIVE_PACKAGE;
   const previousDisable = process.env.PI_TOOL_PERMISSIONS_NATIVE_DISABLE;
   const notices: string[] = [];
-  const handlers = new Map<string, (event: unknown, ctx: unknown) => unknown>();
+  const handlers = new Map<
+    string,
+    Array<(event: unknown, ctx: unknown) => unknown>
+  >();
   delete process.env.PI_TOOL_PERMISSIONS_NATIVE_PACKAGE;
   delete process.env.PI_TOOL_PERMISSIONS_NATIVE_DISABLE;
   const restoreNativePackagePath = setNativePackagePathForTests(packagePath);
   try {
     toolPermissionPolicy({
       registerCommand() {},
+      registerEntryRenderer() {},
       on(event: string, handler: (event: unknown, ctx: unknown) => unknown) {
-        handlers.set(event, handler);
+        handlers.set(event, [...(handlers.get(event) ?? []), handler]);
       },
     } as never);
-    await handlers.get("session_start")?.(
+    assert.equal(handlers.get("session_start")?.length, 1);
+    assert.equal(handlers.get("tool_call")?.length, 1);
+    await handlers.get("session_start")?.[0]?.(
       {},
       {
         hasUI: true,
@@ -193,9 +215,11 @@ test("reports native package selection or TypeScript fallback at session start",
         },
       },
     );
-    assert.deepEqual(notices, [
-      "Native tool-permissions probe active (contract v1).",
-    ]);
+    assert.deepEqual(notices, ["WASM tool-permissions active."]);
+    assert.equal(
+      notices.some((message) => /TypeScript fallback/i.test(message)),
+      false,
+    );
   } finally {
     restoreNativePackagePath();
     if (previousPackage === undefined)
@@ -208,40 +232,28 @@ test("reports native package selection or TypeScript fallback at session start",
   }
 });
 
-test("reports fallback when the default bundled native package cannot load", async () => {
+test("missing WASM fails at load instead of using a TypeScript fallback", () => {
   const previousPackage = process.env.PI_TOOL_PERMISSIONS_NATIVE_PACKAGE;
   const previousDisable = process.env.PI_TOOL_PERMISSIONS_NATIVE_DISABLE;
-  const notices: string[] = [];
-  const handlers = new Map<string, (event: unknown, ctx: unknown) => unknown>();
+  const handlers: string[] = [];
   const restoreNativePackagePath = setNativePackagePathForTests(
     "/definitely/missing/tool-permissions-native.cjs",
   );
   delete process.env.PI_TOOL_PERMISSIONS_NATIVE_PACKAGE;
   delete process.env.PI_TOOL_PERMISSIONS_NATIVE_DISABLE;
   try {
-    toolPermissionPolicy({
-      registerCommand() {},
-      on(event: string, handler: (event: unknown, ctx: unknown) => unknown) {
-        handlers.set(event, handler);
-      },
-    } as never);
-    await handlers.get("session_start")?.(
-      {},
-      {
-        hasUI: true,
-        cwd: "/tmp",
-        ui: {
-          notify(message: string) {
-            notices.push(message);
+    assert.throws(
+      () =>
+        toolPermissionPolicy({
+          registerCommand() {},
+          registerEntryRenderer() {},
+          on(event: string) {
+            handlers.push(event);
           },
-        },
-      },
+        } as never),
+      /wasm|native|unavailable|did not load|no alternate/i,
     );
-    assert.equal(notices.length, 1);
-    assert.match(
-      notices[0] ?? "",
-      /^Tool-permissions using TypeScript fallback: /,
-    );
+    assert.equal(handlers.includes("tool_call"), false);
   } finally {
     restoreNativePackagePath();
     if (previousPackage === undefined)
@@ -253,38 +265,26 @@ test("reports fallback when the default bundled native package cannot load", asy
   }
 });
 
-test("explicit native disable suppresses native startup probing", async () => {
+test("explicit native disable fails at load instead of probing TypeScript", () => {
   const previousPackage = process.env.PI_TOOL_PERMISSIONS_NATIVE_PACKAGE;
   const previousDisable = process.env.PI_TOOL_PERMISSIONS_NATIVE_DISABLE;
-  const notices: string[] = [];
-  const handlers = new Map<string, (event: unknown, ctx: unknown) => unknown>();
-  const restoreNativePackagePath = setNativePackagePathForTests(
-    "/definitely/missing/tool-permissions-native.cjs",
-  );
+  const handlers: string[] = [];
   process.env.PI_TOOL_PERMISSIONS_NATIVE_DISABLE = "1";
   delete process.env.PI_TOOL_PERMISSIONS_NATIVE_PACKAGE;
   try {
-    toolPermissionPolicy({
-      registerCommand() {},
-      on(event: string, handler: (event: unknown, ctx: unknown) => unknown) {
-        handlers.set(event, handler);
-      },
-    } as never);
-    await handlers.get("session_start")?.(
-      {},
-      {
-        hasUI: true,
-        cwd: "/tmp",
-        ui: {
-          notify(message: string) {
-            notices.push(message);
+    assert.throws(
+      () =>
+        toolPermissionPolicy({
+          registerCommand() {},
+          registerEntryRenderer() {},
+          on(event: string) {
+            handlers.push(event);
           },
-        },
-      },
+        } as never),
+      /wasm|native|unavailable|did not load|no alternate/i,
     );
-    assert.deepEqual(notices, []);
+    assert.equal(handlers.includes("tool_call"), false);
   } finally {
-    restoreNativePackagePath();
     if (previousPackage === undefined)
       delete process.env.PI_TOOL_PERMISSIONS_NATIVE_PACKAGE;
     else process.env.PI_TOOL_PERMISSIONS_NATIVE_PACKAGE = previousPackage;
@@ -384,11 +384,12 @@ test("announces the debug log location only to interactive sessions", async () =
   const handlers = new Map<string, (event: unknown, ctx: unknown) => unknown>();
   const notices: Array<{ message: string; level: string }> = [];
   process.env.PI_SUBAGENT_DEBUG = "1";
-  process.env.PI_TOOL_PERMISSIONS_NATIVE_DISABLE = "1";
+  delete process.env.PI_TOOL_PERMISSIONS_NATIVE_DISABLE;
 
   try {
     toolPermissionPolicy({
       registerCommand() {},
+      registerEntryRenderer() {},
       on(event: string, handler: (event: unknown, ctx: unknown) => unknown) {
         handlers.set(event, handler);
       },
@@ -397,7 +398,10 @@ test("announces the debug log location only to interactive sessions", async () =
     assert.ok(onSessionStart);
 
     await onSessionStart({}, { hasUI: false, ui: { notify() {} } });
-    assert.equal(notices.length, 0);
+    assert.equal(
+      notices.some((notice) => /^Subagent debug log:/.test(notice.message)),
+      false,
+    );
 
     await onSessionStart(
       {},
@@ -409,13 +413,14 @@ test("announces the debug log location only to interactive sessions", async () =
         },
       },
     );
-    assert.equal(notices.length, 1);
-    assert.match(
-      notices[0]?.message ?? "",
-      /^Subagent debug log: .+events\.jsonl$/,
+    const debugNotices = notices.filter((notice) =>
+      /^Subagent debug log: .+events\.jsonl$/.test(notice.message),
     );
-    assert.equal(notices[0]?.level, "info");
-    const debugPath = notices[0]?.message.slice("Subagent debug log: ".length);
+    assert.equal(debugNotices.length, 1);
+    assert.equal(debugNotices[0]?.level, "info");
+    const debugPath = debugNotices[0]?.message.slice(
+      "Subagent debug log: ".length,
+    );
     assert.ok(debugPath);
     assert.equal(existsSync(dirname(debugPath)), true);
     rmSync(dirname(debugPath), { recursive: true, force: true });
@@ -518,6 +523,7 @@ test("configured custom tools allow non-interactive calls", async () => {
     );
     toolPermissionPolicy({
       registerCommand() {},
+      registerEntryRenderer() {},
       on(
         event: string,
         handler: (
@@ -615,6 +621,7 @@ test("configured subagent deny wins before child runtime resolution or a permiss
     );
     toolPermissionPolicy({
       registerCommand() {},
+      registerEntryRenderer() {},
       on(
         event: string,
         handler: (
@@ -718,6 +725,7 @@ test("resolved child runtime fails closed without a UI despite a broad subagent 
     );
     toolPermissionPolicy({
       registerCommand() {},
+      registerEntryRenderer() {},
       on(
         event: string,
         handler: (
@@ -818,6 +826,7 @@ test("resolves and displays the selected runtime before approving a broadly allo
     );
     toolPermissionPolicy({
       registerCommand() {},
+      registerEntryRenderer() {},
       on(
         event: string,
         handler: (
@@ -932,6 +941,7 @@ test("subagent_result with full_context evaluates under write permission policy"
     );
     toolPermissionPolicy({
       registerCommand() {},
+      registerEntryRenderer() {},
       on(
         event: string,
         handler: (
@@ -1048,6 +1058,7 @@ test("find_tools and find_skills policy evaluation matches generic custom-tool b
     );
     toolPermissionPolicy({
       registerCommand() {},
+      registerEntryRenderer() {},
       on(
         event: string,
         handler: (
@@ -1093,6 +1104,7 @@ test("find_tools and find_skills policy evaluation matches generic custom-tool b
     );
     emptyPermissionPolicy({
       registerCommand() {},
+      registerEntryRenderer() {},
       on(
         event: string,
         handler: (
@@ -1146,6 +1158,7 @@ test("normally registered Pi MCP tools pass through the tool_call permission bou
     );
     permissionPolicy({
       registerCommand() {},
+      registerEntryRenderer() {},
       on(
         event: string,
         handler: (
@@ -1199,6 +1212,7 @@ test("tool requests exceeding 1000 lines are automatically denied with instructi
     );
     permissionPolicy({
       registerCommand() {},
+      registerEntryRenderer() {},
       on(
         event: string,
         handler: (
