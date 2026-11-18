@@ -25,6 +25,8 @@ export type SequencedToolResult = {
   executions: number;
   valueJson?: string;
   error?: string;
+  /** Set when the native package cannot sequence the call. */
+  unavailable?: boolean;
 };
 
 export type HostToolExecution = (
@@ -48,6 +50,10 @@ function failedResult(request: SequencedToolRequest): SequencedToolResult {
     decision: request.decision,
     executions: 0,
   };
+}
+
+function nativeUnavailable(request: SequencedToolRequest): SequencedToolResult {
+  return { ...failedResult(request), unavailable: true };
 }
 
 function isSequencedResult(
@@ -116,7 +122,7 @@ export async function executeSequencedTool(
     return failedResult(request);
   }
   const native = loadNativeToolExecution();
-  if (!native) return failedResult(request);
+  if (!native) return nativeUnavailable(request);
   try {
     const result = await native.executeTool(
       {

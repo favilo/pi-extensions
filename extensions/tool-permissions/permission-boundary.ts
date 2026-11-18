@@ -1,3 +1,9 @@
+import { NATIVE_CONTRACT_VERSION } from "./native-contract.ts";
+import {
+  NATIVE_TOOL_EXECUTION_NONCE,
+  executeSequencedTool,
+} from "./native-tool-execution.ts";
+
 export type ToolActor = { kind: "main" } | { kind: "child"; childId: string };
 
 export type ToolRequest = {
@@ -82,6 +88,49 @@ function unavailableUiResult(request: ToolRequest): ToolExecutionResult {
   };
 }
 
+async function executeAllowedRequest(
+  request: ToolRequest,
+  boundary: ToolPermissionBoundary,
+): Promise<{ ok: true; value: unknown } | { ok: false; reason: string }> {
+  const sequenced = await executeSequencedTool(
+    {
+      version: NATIVE_CONTRACT_VERSION,
+      operation: "tool_execution",
+      nonce: NATIVE_TOOL_EXECUTION_NONCE,
+      decision: "allow",
+      toolName: request.toolName,
+      inputJson: JSON.stringify(request.input),
+    },
+    async (toolName, inputJson) => {
+      if (
+        toolName !== request.toolName ||
+        inputJson !== JSON.stringify(request.input)
+      )
+        throw new Error(
+          "native tool execution request did not match the allowed call",
+        );
+      return JSON.stringify(await boundary.execute(request)) ?? "null";
+    },
+  );
+  if (sequenced.unavailable) {
+    return { ok: true, value: await boundary.execute(request) };
+  }
+  if (!sequenced.ok) {
+    return {
+      ok: false,
+      reason: sequenced.error ?? "Native tool execution failed.",
+    };
+  }
+  try {
+    return { ok: true, value: JSON.parse(sequenced.valueJson ?? "null") };
+  } catch {
+    return {
+      ok: false,
+      reason: "Native tool execution returned invalid JSON.",
+    };
+  }
+}
+
 export async function executeToolRequest(
   request: ToolRequest,
   boundary: ToolPermissionBoundary,
@@ -157,9 +206,13 @@ export async function executeToolRequest(
     );
   audit(boundary, request, decision);
   try {
-    const value = await boundary.execute(request);
+    const executed = await executeAllowedRequest(request, boundary);
+    if (!executed.ok) {
+      audit(boundary, request, "failed", executed.reason);
+      return result(request, "failed", executed.reason);
+    }
     audit(boundary, request, "executed");
-    return result(request, "allowed", undefined, value);
+    return result(request, "allowed", undefined, executed.value);
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error);
     audit(boundary, request, "failed", reason);
