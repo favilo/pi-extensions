@@ -1,10 +1,10 @@
-active_flow: commit-message
+active_flow: develop-tdd
 active_epic_id: e18
-active_story_id: e18s05
-active_story: Move tool execution sequencing into WASM
+active_story_id: e18s06
+active_story: Remove the TypeScript permission fallback
 active_bug_id: null
 git:
-  bookmark: favilo/e18s00-pi-oxidized-host
+  bookmark: favilo/e18s06-remove-typescript-fallback
   parent_bookmark: main
 planning:
   e16:
@@ -93,26 +93,21 @@ planning:
     constraints:
     - Do not modify the e06 repair flow or child-private bridge catalog.
 handoff:
-  last_step_completed: e18s05 audit-code passed
+  last_step_completed: e18s06 develop-tdd plan approved; tracer RED in progress
   open_decisions:
   - e18s07 proves the prompt-queue FunctionRef lifetime erasure under Miri before that
-    pattern is copied. e18s05 must not copy it.
+    pattern is copied.
   required_reading:
   - .specs/planning-context.yaml
   - .specs/product/SCOPE-e18-wasm-only-tool-permissions.yaml
   - .specs/epics/e18-wasm-only-tool-permissions/epic.yaml
-  - .specs/epics/e18-wasm-only-tool-permissions/e18s05-wasm-tool-execution.md
-  - .specs/epics/e18-wasm-only-tool-permissions/e18s05-tasks.yaml
+  - .specs/epics/e18-wasm-only-tool-permissions/e18s06-remove-typescript-fallback.md
+  - .specs/epics/e18-wasm-only-tool-permissions/e18s06-tasks.yaml
   - .specs/security/epics/e18/THREAT_MODEL.md
-  - .specs/security/REVIEW.md
-  - .specs/verifications/e18s05-verify.yaml
-  - .specs/verifications/NFR-e18s05.json
-  - .specs/verifications/AUDIT-e18s05.md
-  next_skill: commit-message
-  context: 'Work in .workspaces/e18s04-prompt-queue. e18s05 audit-code PASS. Evidence in
-    .specs/verifications/AUDIT-e18s05.md. Story tests re-confirmed (13 TS + 4 cargo
-    execution). Next is commit-message. Do not use git, push, or create bookmarks unless
-    asked.'
+  next_skill: develop-tdd
+  context: 'Work in .workspaces/e18s04-prompt-queue on favilo/e18s06-remove-typescript-fallback.
+    Tracer bullet: missing WASM denies protected calls without a TypeScript engine.
+    Use jj only; do not push unless asked.'
   blocker: null
   deferred_work:
   - Consolidate safeStringify and JSON formatting helpers into a shared utility module
