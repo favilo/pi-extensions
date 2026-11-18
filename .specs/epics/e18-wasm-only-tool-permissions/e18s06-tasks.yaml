@@ -10,7 +10,7 @@ tasks:
     verify: node --test extensions/tool-permissions/native-no-typescript-fallback.test.ts extensions/tool-permissions/native-package.test.ts
     risk: P0
     security: high
-    status: failing
+    status: passing
     allure:
       severity: critical
       categories:
@@ -21,7 +21,7 @@ tasks:
     verify: node --test extensions/tool-permissions/native-no-typescript-fallback.test.ts
     risk: P0
     security: high
-    status: failing
+    status: passing
     allure:
       severity: critical
       categories:
