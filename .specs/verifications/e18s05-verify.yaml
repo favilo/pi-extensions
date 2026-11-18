@@ -1,93 +1,101 @@
 story_id: e18s05
-verified_at: "2026-11-18T18:43:51Z"
+verified_at: "2026-11-18T19:54:49Z"
 verifier: verify-work
-status: blocked
+status: passed
 risk: P0
 vcs:
   kind: jj
-  working_copy: txsysvzrrtro
-  commit: fc8d6e31cb88
+  working_copy: tuopznppzmrz
+  commit: 62604708e7ec
   bookmark_ancestor: favilo/e18s00-pi-oxidized-host
-  bookmark_commit: 3896235ea6c2
+  bookmark_commit: 543333dde325
   not_main: true
 phases:
   branch:
     passed: true
-    note: "Working copy is not main/master. Descends from favilo/e18s00-pi-oxidized-host."
+    note: "Working copy descends from favilo/e18s00-pi-oxidized-host and is not main."
   preflight:
     passed: true
     command: "\"$BIGPOWERS_ROOT/scripts/bp-read-agents.sh\""
     note: "AGENTS.md has no Preflight section. bp-timing.sh could not start because python3 lacks PyYAML. Mechanical commands came from package.json and the story tasks."
   ci_green:
-    passed: false
+    passed: true
     pr: "https://github.com/favilo/pi-extensions/pull/20"
     command: "gh pr checks 20"
-    note: |
-      HARD GATE (e51s03): open PR CI is still red. Remaining verify-work phases did not run.
-      secrets PASS (fixture curl-auth-header fixed in sqskyoukvtss).
-      quality FAIL on run 44372568187: npm ci → prepare → build:native fails with missing
-      rustc target wasm32-wasip1-threads (error[E0463]: can't find crate for `core`).
-      .github/workflows/quality.yml does not install rustup target or wasi-sdk before npm ci.
+    note: "actionlint, python, quality, secrets, and shellcheck all pass on run 44379132857."
   smoke:
-    passed: false
-    note: "Skipped — CI green hard gate blocked further phases."
+    passed: true
+    note: "Library extension. No server process and no CLI binary. Cold-start is the native release rebuild inside the terminal verdict."
   task_verification:
     passed: true
-    note: "Prior local pre-UAT only; not used as a PASS gate while CI is red. Not re-run this attempt."
     tasks:
       - id: 1
         command: "tsx --test extensions/tool-permissions/native-tool-execution.test.ts extensions/tool-permissions/permission-boundary.test.ts"
         exit_code: 0
-        note: "13 passed on prior attempt."
+        note: "13 passed, 0 failed, duration_ms 917.290542. Allow→1; deny/cancel/invalid→0; host error visible."
       - id: 2
         command: "cargo test --manifest-path extensions/tool-permissions/native/Cargo.toml"
         exit_code: 0
-        note: "27 library tests passed on prior attempt."
+        note: "27 library tests passed, including execution::tests."
       - id: 3
         command: "tsx --test extensions/tool-permissions/native-tool-execution.test.ts extensions/tool-permissions/permission-boundary.test.ts"
         exit_code: 0
         note: "Same contiguous run as task 1."
       - id: 4
         command: "npm run build:native && npm run check"
-        exit_code: null
-        note: "Not run — blocked by CI green hard gate."
+        exit_code: 0
   build:
-    passed: false
-    note: "Skipped — CI green hard gate."
+    passed: true
+    command: "npm run build:native"
   typecheck:
-    passed: false
-    note: "Skipped — CI green hard gate."
+    passed: true
+    command: "tsc --noEmit"
   lint:
-    passed: false
-    note: "Skipped — CI green hard gate."
+    passed: true
+    note: "package.json has no lint script. tsc --noEmit passed inside npm run check."
   tests:
-    passed: false
-    note: "Skipped — CI green hard gate."
+    passed: true
+    command: "npm run test:preflight"
+    coverage: "358 passed, 0 failed"
   terminal_verdict:
-    command: "gh pr checks 20"
-    exit_code: 1
-    captured_at: "2026-11-18T18:43:51Z"
-    note: "Single contiguous CI-status run. quality failed; secrets passed."
+    command: "npm run build:native && npm run check"
+    exit_code: 0
+    captured_at: "2026-11-18T19:49:02Z"
+    note: "Single contiguous run from 2026-11-18T19:48:52Z to 2026-11-18T19:49:02Z. Release WASM build finished. tsc --noEmit passed. cargo test passed 27 tests. tsx passed 358 tests in 3699.236458 ms. check-test-guard printed PASS."
   security:
-    passed: false
-    note: "Skipped — CI green hard gate."
+    passed: true
+    report: ".specs/security/REVIEW.md"
+    note: "No HIGH finding at confidence 8 or above. WASM calls only the host callback; deny/cancel/invalid execute nothing; host errors stay visible."
   blind_spots:
-    passed: false
-    note: "Skipped — CI green hard gate."
+    passed: true
+    command: "bash \"$BIGPOWERS_ROOT/scripts/check-blind-spots.sh\""
+    note: "0 HIGH, 7 MEDIUM double-tag findings on older stories. Exit 0."
   completeness_critic:
-    passed: false
-    note: "Skipped — CI green hard gate."
+    passed: true
+    blockers: 0
+    warnings: 1
+    note: "WARNING: the critic reads the first word of the prose active_story title (Move) instead of active_story_id e18s05, so the zero-tag check was skipped. FILLED verification bundles on disk. Exit 0."
   nfr:
-    passed: false
-    note: "Skipped — CI green hard gate. P0 NFR evidence was not collected."
+    passed: true
+    report: ".specs/verifications/NFR-e18s05.json"
+  wiki_lint:
+    passed: true
+    note: "No specs/skills-wiki or specs/conventions-wiki directory exists, so there are no stale skill pages and no orphan convention pages."
   manual:
-    passed: false
-    note: "Skipped — CI green hard gate."
-    steps: []
+    passed: true
+    steps:
+      - step: "Allow executes the Pi host callback once with the original request"
+        expected: "WASM sequences one host execution for a validated allow"
+        actual: "TS printed decision allow executions 1 with toolName read and the original inputJson. Rust CountingHost recorded one (read, input) call. permission-boundary ask-after-approval still executes only after approval."
+        passed: true
+      - step: "Deny, cancel, or invalid executes nothing"
+        expected: "Zero host callback invocations"
+        actual: "TS printed deny/cancel/invalid with executions 0. Rust deny_cancel_and_invalid_do_not_call_the_host left the host call list empty."
+        passed: true
+      - step: "Host execution failure remains visible"
+        expected: "Error returned to Pi; not replaced with a successful tool result"
+        actual: "TS printed allow with ok false and error disk full. Rust a_host_error_is_not_a_successful_result asserts !ok, executions 1, no value_json, error disk full."
+        passed: true
   gaps:
-    closed: false
-    items:
-      - id: ci-quality-wasm-target
-        expected: "PR #20 quality job installs deps and runs npm run check"
-        actual: "prepare/build:native fails because CI lacks wasm32-wasip1-threads (and likely wasi-sdk)"
-        status: FAIL
+    closed: true
+    items: []

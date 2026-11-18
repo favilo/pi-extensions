@@ -1,0 +1,37 @@
+{
+  "story_id": "e18s05",
+  "verified_at": "2026-11-18T19:54:49Z",
+  "status": "PASS",
+  "threshold_source": {
+    "status": "WAIVED",
+    "reason": "No e18 TEST_PLAN_LATEST artifact defines numeric NFR thresholds. Evidence uses the story quality attributes: exactly-once allow execution, fail-closed non-allow, visible host errors, no WASM process authority."
+  },
+  "dimensions": {
+    "performance": {
+      "status": "PASS",
+      "threshold": "Allow/deny/host-error sequencing checks complete inside the existing test run.",
+      "evidence": [
+        "tsx --test native-tool-execution.test.ts permission-boundary.test.ts finished in 917.290542 ms with 13 passing tests.",
+        "npm run build:native && npm run check finished in ~10s with 358 preflight tests and 27 native library tests.",
+        "cargo test finished with 27 passing library tests including execution::tests."
+      ]
+    },
+    "reliability": {
+      "status": "PASS",
+      "threshold": "Validated allow executes the host callback once. Deny, cancel, and invalid execute zero times. Host errors remain visible failures.",
+      "evidence": [
+        "execution::decide_execution runs the host only for decision allow; other decisions return executions 0.",
+        "TS tests printed allow→executions 1; deny/cancel/invalid→0; allow with host error→ok false error disk full.",
+        "tool_execution_source_stays_a_host_callback cargo test asserts no native process spawn for this story."
+      ]
+    },
+    "operability": {
+      "status": "PASS",
+      "threshold": "Tests count host callback invocations and record the decision that preceded each invocation.",
+      "evidence": [
+        "native-tool-execution tests log decision and executions for allow, deny, cancel, invalid, and host failure.",
+        "CountingHost in execution.rs records tool_name and input_json for the single allow call."
+      ]
+    }
+  }
+}

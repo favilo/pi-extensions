@@ -126,3 +126,13 @@ The native queue binds each host callback to the tool-call id captured when that
 On a loaded native package, `askScrollablePermission` sends the prompt through `presentBoundPrompt` and keeps `PermissionPromptQueue` for load failure only. The host accepts a result only when `ok` is true and the tool-call id, decision, and steering match the prompt that opened. A mismatched id, a malformed result, or a thrown presenter becomes deny. A parent abort or session shutdown cancels the open prompt before the next queued prompt is presented. The queue id is the tool-call id when one exists, and otherwise a fresh `randomUUID` request id. The nonce remains the existing host/module contract value, not a credential.
 
 No command injection, path-traversal allow, authorization bypass, secret exposure, or unsafe deserialization finding reached confidence 8. The earlier missing-integration note is closed.
+
+## e18s05 WASM tool execution sequencing
+
+- Reviewed: 2026-11-18T19:54:49Z
+- Scope: `extensions/tool-permissions/native/crates/tool-permissions-native/src/execution.rs`, `native-tool-execution.ts`, and related tests vs `main..favilo/e18s00-pi-oxidized-host`
+- Result: **PASS — no reportable HIGH findings**
+
+On a successful WASM load, Rust decides whether to call the host Pi execution callback. Only a validated `allow` calls the callback once with the original tool name and input JSON. Deny, cancel, and invalid decisions return zero executions and never call the host. Host callback failures stay `ok: false` with the error string and are not rewritten as successful tool results. The module has no `std::process` / spawn path for this story; execution authority remains the host callback. TypeScript validates the native result shape (version, operation, nonce, executions) before accepting it and fails closed on a malformed or unavailable package.
+
+No command injection, path-traversal allow, authorization bypass, secret exposure, or unsafe deserialization finding reached confidence 8.

@@ -1,4 +1,4 @@
-active_flow: verify-work
+active_flow: commit-message
 active_epic_id: e18
 active_story_id: e18s05
 active_story: Move tool execution sequencing into WASM
@@ -93,7 +93,7 @@ planning:
     constraints:
     - Do not modify the e06 repair flow or child-private bridge catalog.
 handoff:
-  last_step_completed: e18s05 verify-work recheck blocked — secrets green, quality still red
+  last_step_completed: e18s05 audit-code passed
   open_decisions:
   - e18s07 proves the prompt-queue FunctionRef lifetime erasure under Miri before that
     pattern is copied. e18s05 must not copy it.
@@ -106,14 +106,14 @@ handoff:
   - .specs/security/epics/e18/THREAT_MODEL.md
   - .specs/security/REVIEW.md
   - .specs/verifications/e18s05-verify.yaml
-  next_skill: quick-fix
-  context: 'Work in .workspaces/e18s04-prompt-queue. verify-work recheck on e18s05: secrets
-    now PASS after fixture squash; quality still FAIL (missing wasm32-wasip1-threads / wasi-sdk
-    before npm ci prepare). Evidence: .specs/verifications/e18s05-verify.yaml. Next is
-    quick-fix for .github/workflows/quality.yml, push, then re-run verify-work. Do not use
-    git, push, or create bookmarks unless asked.'
-  blocker: 'PR #20 quality job red — runner lacks wasm32-wasip1-threads (and likely wasi-sdk)
-    before npm ci. Blocks verify-work PASS.'
+  - .specs/verifications/NFR-e18s05.json
+  - .specs/verifications/AUDIT-e18s05.md
+  next_skill: commit-message
+  context: 'Work in .workspaces/e18s04-prompt-queue. e18s05 audit-code PASS. Evidence in
+    .specs/verifications/AUDIT-e18s05.md. Story tests re-confirmed (13 TS + 4 cargo
+    execution). Next is commit-message. Do not use git, push, or create bookmarks unless
+    asked.'
+  blocker: null
   deferred_work:
   - Consolidate safeStringify and JSON formatting helpers into a shared utility module
   - Persist completed and active child sessions for later external analysis
@@ -122,7 +122,7 @@ handoff:
   - Add real Pi process integration tests after unit contracts are established
   - Apply yolo mode after the WASM path decision without bypassing an .aiignore deny
     or a path-trust diagnostic
-  verified_at: '2026-11-17T19:42:40Z'
+  verified_at: '2026-11-18T19:54:49Z'
 release:
   pr: https://github.com/favilo/pi-extensions/pull/14
   merged_commit: 841d91a0
