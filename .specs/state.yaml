@@ -1,4 +1,4 @@
-active_flow: develop-tdd
+active_flow: verify-work
 active_epic_id: e18
 active_story_id: e18s05
 active_story: Move tool execution sequencing into WASM
@@ -93,7 +93,7 @@ planning:
     constraints:
     - Do not modify the e06 repair flow or child-private bridge catalog.
 handoff:
-  last_step_completed: e18s05 develop-tdd passed; npm run build:native && npm run check passed
+  last_step_completed: e18s05 verify-work recheck blocked — secrets green, quality still red
   open_decisions:
   - e18s07 proves the prompt-queue FunctionRef lifetime erasure under Miri before that
     pattern is copied. e18s05 must not copy it.
@@ -105,14 +105,15 @@ handoff:
   - .specs/epics/e18-wasm-only-tool-permissions/e18s05-tasks.yaml
   - .specs/security/epics/e18/THREAT_MODEL.md
   - .specs/security/REVIEW.md
-  next_skill: verify-work
-  context: 'Work in .workspaces/e18s04-prompt-queue. e18s05 is implemented and its
-    automated checks pass. WASM calls Pi through the host callback once for a validated
-    allow; deny, cancel, and invalid decisions call zero times; host failures remain
-    visible. The TypeScript fallback remains only when native loading fails, pending e18s06.
-    A separate committed fix makes edit previews normalize CRLF to LF so Unix oldText
-    shows the real diff. Next is verify-work. Do not use git, push, or create bookmarks.'
-  blocker: null
+  - .specs/verifications/e18s05-verify.yaml
+  next_skill: quick-fix
+  context: 'Work in .workspaces/e18s04-prompt-queue. verify-work recheck on e18s05: secrets
+    now PASS after fixture squash; quality still FAIL (missing wasm32-wasip1-threads / wasi-sdk
+    before npm ci prepare). Evidence: .specs/verifications/e18s05-verify.yaml. Next is
+    quick-fix for .github/workflows/quality.yml, push, then re-run verify-work. Do not use
+    git, push, or create bookmarks unless asked.'
+  blocker: 'PR #20 quality job red — runner lacks wasm32-wasip1-threads (and likely wasi-sdk)
+    before npm ci. Blocks verify-work PASS.'
   deferred_work:
   - Consolidate safeStringify and JSON formatting helpers into a shared utility module
   - Persist completed and active child sessions for later external analysis

@@ -1,0 +1,93 @@
+story_id: e18s05
+verified_at: "2026-11-18T18:43:51Z"
+verifier: verify-work
+status: blocked
+risk: P0
+vcs:
+  kind: jj
+  working_copy: txsysvzrrtro
+  commit: fc8d6e31cb88
+  bookmark_ancestor: favilo/e18s00-pi-oxidized-host
+  bookmark_commit: 3896235ea6c2
+  not_main: true
+phases:
+  branch:
+    passed: true
+    note: "Working copy is not main/master. Descends from favilo/e18s00-pi-oxidized-host."
+  preflight:
+    passed: true
+    command: "\"$BIGPOWERS_ROOT/scripts/bp-read-agents.sh\""
+    note: "AGENTS.md has no Preflight section. bp-timing.sh could not start because python3 lacks PyYAML. Mechanical commands came from package.json and the story tasks."
+  ci_green:
+    passed: false
+    pr: "https://github.com/favilo/pi-extensions/pull/20"
+    command: "gh pr checks 20"
+    note: |
+      HARD GATE (e51s03): open PR CI is still red. Remaining verify-work phases did not run.
+      secrets PASS (fixture curl-auth-header fixed in sqskyoukvtss).
+      quality FAIL on run 44372568187: npm ci → prepare → build:native fails with missing
+      rustc target wasm32-wasip1-threads (error[E0463]: can't find crate for `core`).
+      .github/workflows/quality.yml does not install rustup target or wasi-sdk before npm ci.
+  smoke:
+    passed: false
+    note: "Skipped — CI green hard gate blocked further phases."
+  task_verification:
+    passed: true
+    note: "Prior local pre-UAT only; not used as a PASS gate while CI is red. Not re-run this attempt."
+    tasks:
+      - id: 1
+        command: "tsx --test extensions/tool-permissions/native-tool-execution.test.ts extensions/tool-permissions/permission-boundary.test.ts"
+        exit_code: 0
+        note: "13 passed on prior attempt."
+      - id: 2
+        command: "cargo test --manifest-path extensions/tool-permissions/native/Cargo.toml"
+        exit_code: 0
+        note: "27 library tests passed on prior attempt."
+      - id: 3
+        command: "tsx --test extensions/tool-permissions/native-tool-execution.test.ts extensions/tool-permissions/permission-boundary.test.ts"
+        exit_code: 0
+        note: "Same contiguous run as task 1."
+      - id: 4
+        command: "npm run build:native && npm run check"
+        exit_code: null
+        note: "Not run — blocked by CI green hard gate."
+  build:
+    passed: false
+    note: "Skipped — CI green hard gate."
+  typecheck:
+    passed: false
+    note: "Skipped — CI green hard gate."
+  lint:
+    passed: false
+    note: "Skipped — CI green hard gate."
+  tests:
+    passed: false
+    note: "Skipped — CI green hard gate."
+  terminal_verdict:
+    command: "gh pr checks 20"
+    exit_code: 1
+    captured_at: "2026-11-18T18:43:51Z"
+    note: "Single contiguous CI-status run. quality failed; secrets passed."
+  security:
+    passed: false
+    note: "Skipped — CI green hard gate."
+  blind_spots:
+    passed: false
+    note: "Skipped — CI green hard gate."
+  completeness_critic:
+    passed: false
+    note: "Skipped — CI green hard gate."
+  nfr:
+    passed: false
+    note: "Skipped — CI green hard gate. P0 NFR evidence was not collected."
+  manual:
+    passed: false
+    note: "Skipped — CI green hard gate."
+    steps: []
+  gaps:
+    closed: false
+    items:
+      - id: ci-quality-wasm-target
+        expected: "PR #20 quality job installs deps and runs npm run check"
+        actual: "prepare/build:native fails because CI lacks wasm32-wasip1-threads (and likely wasi-sdk)"
+        status: FAIL
