@@ -8,7 +8,7 @@ stories:
   - id: e19s01
     title: Prove safe Rust Pi callback lifetime and dispatch
     bcps: 5
-    status: todo
+    status: passing
     delta: ADDED
     spec: e19s01-safe-rust-callback-lifetime.md
     tasks: e19s01-tasks.yaml

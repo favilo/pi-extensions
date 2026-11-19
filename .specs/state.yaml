@@ -1,7 +1,7 @@
-active_flow: plan_work
+active_flow: build_epic
 active_epic_id: e19
-active_story_id: e19s01
-active_story: Prove safe Rust Pi callback lifetime and dispatch
+active_story_id: e19s02
+active_story: Validate prompt queue FunctionRef lifetime under Miri
 active_bug_id: null
 git:
   bookmark: favilo/e18s06-remove-typescript-fallback
@@ -93,7 +93,7 @@ planning:
     constraints:
     - Do not modify the e06 repair flow or child-private bridge catalog.
 handoff:
-  last_step_completed: e19 scope, story slices, task ledgers, and countable story specifications written
+  last_step_completed: e19s01 callback-lifetime spike accepted by user
   open_decisions: []
   required_reading:
   - .specs/planning-context.yaml
@@ -106,7 +106,7 @@ handoff:
   - extensions/tool-permissions/index.ts
   - extensions/tool-permissions/native/crates/tool-permissions-native/src/registration.rs
   - extensions/tool-permissions/native/crates/pi-api/src/lib.rs
-  next_skill: kickoff-branch
+  next_skill: develop-tdd
   context: 'e18 is cancelled after passing e18s05; e18s06 and e18s07 are cancelled and their
     remaining work is resliced into e19. e19 makes Rust own Pi callback registration and all
     permission behavior. e19s01 is a blocking safe callback-lifetime proof; e19s02 immediately
@@ -135,7 +135,7 @@ release:
 epic_cycle:
   step: 1
   current_step: 1
-  story_bcps: 8
+  story_bcps: 3
   security_review: pass
   plan_consistency: pass
 metrics:

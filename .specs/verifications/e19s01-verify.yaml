@@ -1,7 +1,7 @@
 story_id: e19s01
 verified_at: '2026-11-19T21:35:25Z'
 verifier: verify-work
-status: awaiting_manual_confirmation
+status: passed
 risk: P0
 phases:
   build:
@@ -34,9 +34,8 @@ phases:
     passed: null
     note: Exploratory child-process probe temporarily injected an asynchronous WASM panic; the Promise rejected with WebAssembly.RuntimeError unreachable, health probe succeeded, and the scoped callback became unavailable. Injection was removed. This does not prove safe recovery; e19s07 owns reproducible characterization and fail-closed recovery.
   manual:
-    passed: null
-    note: Awaiting user confirmation of the demonstrated verification results.
+    passed: true
+    note: User accepted the callback-lifetime spike and its demonstrated verification results on 2026-11-19.
   gaps:
-    closed: false
-    items:
-      - User confirmation of manual UAT remains outstanding.
+    closed: true
+    items: []
