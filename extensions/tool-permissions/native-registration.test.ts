@@ -330,6 +330,25 @@ test("failed tracer initialization leaves no live callback state", () => {
   assert.equal(shutdown({}, {}), false);
 });
 
+test("Rust tracer owns asynchronous dispatch after callback return", async () => {
+  const native = createRequire(import.meta.url)("./native/generated/index.js") as {
+    registerCallbackTracer: (pi: unknown) => boolean;
+  };
+  const handlers = new Map<string, (event: unknown, ctx: unknown) => unknown>();
+  native.registerCallbackTracer({
+    on(eventName: string, handler: (event: unknown, ctx: unknown) => unknown) {
+      handlers.set(eventName, handler);
+    },
+    registerCommand() {},
+    registerEntryRenderer() {},
+  });
+  const handler = handlers.get("session_info_changed");
+  assert.ok(handler);
+  const pending = handler({ message: "asynchronous" }, {});
+  assert.ok(pending instanceof Promise);
+  assert.deepEqual(await pending, { message: "asynchronous", dispatchCount: 1 });
+});
+
 test("native registration falls back without installing duplicate callbacks", () => {
   const handlers: Array<string> = [];
   withNativeRegistrationModule(compatibleProbe, () => {
