@@ -93,26 +93,31 @@ planning:
     constraints:
     - Do not modify the e06 repair flow or child-private bridge catalog.
 handoff:
-  last_step_completed: e19s01 callback-lifetime spike accepted by user
-  open_decisions: []
+  last_step_completed: e19s01 accepted; e19s02 removed presenter transmute and unsafe deferred Send, added Clippy defaults, and researched Tokio-free Promise integration
+  open_decisions:
+  - Verify that napi-async-runtime CurrentThread works with the generated WASI loader and preserves queue and teardown behavior before committing to it.
   required_reading:
-  - .specs/planning-context.yaml
   - .specs/product/SCOPE_LATEST.yaml
-  - .specs/IMPACT_LATEST.md
   - .specs/epics/e19-full-rust-pi-event-orchestration/epic.yaml
-  - .specs/epics/e19-full-rust-pi-event-orchestration/e19s01-safe-rust-callback-lifetime.md
-  - .specs/epics/e19-full-rust-pi-event-orchestration/e19s01-tasks.yaml
-  - .specs/security/epics/e18/THREAT_MODEL.md
-  - extensions/tool-permissions/index.ts
-  - extensions/tool-permissions/native/crates/tool-permissions-native/src/registration.rs
-  - extensions/tool-permissions/native/crates/pi-api/src/lib.rs
+  - .specs/epics/e19-full-rust-pi-event-orchestration/e19s02-miri-prompt-queue.md
+  - .specs/epics/e19-full-rust-pi-event-orchestration/e19s02-tasks.yaml
+  - extensions/tool-permissions/native/crates/tool-permissions-native/src/prompt_queue.rs
+  - extensions/tool-permissions/native/crates/tool-permissions-native/src/lib.rs
+  - extensions/tool-permissions/native-prompt-queue.test.ts
+  - extensions/tool-permissions/native/Cargo.toml
+  - extensions/tool-permissions/native/package.json
+  - node_modules/@napi-rs/cli/src/utils/config.ts
   next_skill: develop-tdd
-  context: 'e18 is cancelled after passing e18s05; e18s06 and e18s07 are cancelled and their
-    remaining work is resliced into e19. e19 makes Rust own Pi callback registration and all
-    permission behavior. e19s01 is a blocking safe callback-lifetime proof; e19s02 immediately
-    runs the Miri prompt-queue FunctionRef validation before production callback migration. The
-    TypeScript entrypoint remains only as native/WASM loader plus one Pi handoff. Use jj only; do
-    not push unless asked.'
+  context: |-
+    User accepted e19s01 and approved the following direction for e19s02, but requested implementation start next session. Use Rust async/await with napi::Promise<PromptQueueResolution> and a single FIFO queue. Investigate napi-async-runtime 0.2.10 (Tokio-free), preferably CurrentThread, with napi's async-runtime feature and generated WASI loader host bootstrap (napi.wasm.asyncRuntime: true and @napi-rs/async-runtime). Register the runtime through module_init. Declare Rust dependencies under workspace.dependencies and member dependencies with workspace = true. Confirm compatible napi-derive and npm package versions before changing dependencies.
+
+    Use a ThreadsafeFunction with call_async_catch to invoke the presenter on its owning JavaScript thread; await the callback invocation and then the returned typed Promise. Do not retain Env or borrowed JavaScript handles across suspension. Do not block_on the Pi JavaScript thread. Preserve single-queue FIFO, identity binding, cancellation, shutdown, and fail-closed behavior. Test synchronous throws, rejected and malformed results, cancellation, teardown, and the real WASM loader. Keep runtime bootstrap separate from production TypeScript permission callback glue. TypeScript currently calls decidePrompt through native-prompt-queue.ts; production migration is later e19 work.
+
+    Current committed state: presenter FunctionRef transmute was removed; a typed PromiseRaw<'static, ...> signature marker remains and is narrowed to invocation lifetime. Raw deferred handles and unsafe impl Send were replaced with napi::JsDeferred; the queue remains process-global and uses an environment cleanup hook. Generated TypeScript declares Promise<PromptQueueResponse>. Workspace Clippy all and pedantic are warnings; undocumented_unsafe_blocks is denied and npm run check runs Clippy. e19s02 remains in progress, not complete. Miri passed Rust-owned queue tests only; it does not validate N-API or JavaScript environment lifetimes. The original Miri-specific story and task descriptions are stale relative to the user's updated direction; reconcile them without claiming host-lifetime proof.
+
+    Prior art: local napi 3.16.2 promise.rs and threadsafe_function.rs; napi-async-runtime 0.2.10 src/lib.rs, src/adapter.rs and src/js_callback.rs in the Cargo registry; https://napi.rs/docs/concepts/async-runtime and https://docs.rs/napi-async-runtime/0.2.10/napi_async_runtime/. CurrentThread on WASM needs loader task and timer hosts; the runtime crate does not install itself. The user's desired approach does not require Tokio.
+
+    Follow repository TDD: behavioral RED and GREEN in separate jj changes; run tests and jj commit in separate Bash calls. No raw git commands. No push unless asked. Keep working directory at project root for Bigpowers scripts and invoke them only via $BIGPOWERS_ROOT/scripts absolute path.
   blocker: 'Bigpowers plan-consistency-check.sh currently depends on host Python PyYAML and must
     be migrated to the planned repository-local uv environment before the e19 plan consistency
     gate can pass in this environment.'
