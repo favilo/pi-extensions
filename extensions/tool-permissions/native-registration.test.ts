@@ -388,6 +388,32 @@ test("shutdown cancels Rust tracer work before its asynchronous dispatch", async
   await assert.rejects(pending, /callback tracer state is unavailable/);
 });
 
+test("Rust tracer accepts the Pi session info changed event shape", async () => {
+  const native = createRequire(import.meta.url)(
+    "./native/generated/index.js",
+  ) as {
+    registerCallbackTracer: (pi: unknown) => boolean;
+  };
+  const handlers = new Map<string, (event: unknown, ctx: unknown) => unknown>();
+  native.registerCallbackTracer({
+    on(eventName: string, handler: (event: unknown, ctx: unknown) => unknown) {
+      handlers.set(eventName, handler);
+    },
+    registerCommand() {},
+    registerEntryRenderer() {},
+  });
+  const handler = handlers.get("session_info_changed");
+  assert.ok(handler);
+  assert.deepEqual(
+    await handler({ type: "session_info_changed", name: "session" }, {}),
+    { name: "session", dispatchCount: 1 },
+  );
+  assert.deepEqual(
+    await handler({ type: "session_info_changed", name: undefined }, {}),
+    { name: null, dispatchCount: 2 },
+  );
+});
+
 test("native registration falls back without installing duplicate callbacks", () => {
   const handlers: Array<string> = [];
   withNativeRegistrationModule(compatibleProbe, () => {
