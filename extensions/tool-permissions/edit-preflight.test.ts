@@ -142,6 +142,7 @@ test("a doomed edit is blocked before the permission prompt is shown", async () 
     );
     toolPermissionPolicy({
       registerCommand() {},
+      registerEntryRenderer() {},
       on(
         event: string,
         handler: (
@@ -220,6 +221,7 @@ test("a CRLF file still shows the edit diff for a Unix oldText", async () => {
     initTheme("dark");
     toolPermissionPolicy({
       registerCommand() {},
+      registerEntryRenderer() {},
       on(
         event: string,
         handler: (

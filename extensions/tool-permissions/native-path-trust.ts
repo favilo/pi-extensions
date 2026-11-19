@@ -70,7 +70,7 @@ function isPathTrustResult(
 
 export type AdoptedPathTrust =
   | { status: "unavailable" }
-  | { status: "invalid" }
+  | { status: "invalid"; diagnostic: string }
   | { status: "ready"; result: PathTrustResult };
 
 /** Load the WASM path-trust result. A missing package stays unavailable after load-time fail-closed. */
@@ -104,9 +104,15 @@ export function adoptPathTrust(request: PathTrustRequest): AdoptedPathTrust {
     );
     return isPathTrustResult(result, request)
       ? { status: "ready", result }
-      : { status: "invalid" };
-  } catch {
-    return { status: "invalid" };
+      : {
+          status: "invalid",
+          diagnostic: "Native path trust returned an invalid result.",
+        };
+  } catch (error) {
+    return {
+      status: "invalid",
+      diagnostic: `Native path trust failed: ${error instanceof Error ? error.message : String(error)}`,
+    };
   }
 }
 

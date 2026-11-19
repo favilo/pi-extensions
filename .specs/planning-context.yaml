@@ -1,13 +1,17 @@
-feature_name: wasm_only_tool_permissions
+feature_name: full_rust_pi_event_orchestration
 problem_statement: >-
-  Epic e16 moved pure permission computation into Rust/WASM and left prompts,
-  rule saves, audit writes, filesystem trust, and tool execution in TypeScript,
-  with a TypeScript fallback. The extension should run entirely from the WASM
-  module. Pi still loads this package through a TypeScript entry, so that entry
-  only instantiates WASM.
+  The existing Rust/WASM registration layer can call pi.on, registerCommand, and
+  registerEntryRenderer, but it forwards every Pi event to named TypeScript
+  bridge handlers. Therefore, extensions/tool-permissions/index.ts still owns
+  callback implementations and orchestration, so it cannot be reduced to a
+  loader-only entrypoint. Tool-permissions needs a Rust-owned event orchestration
+  layer that directly registers and implements all callbacks.
 constraints:
-  - Pi package entry remains extensions/tool-permissions/index.ts. That file loads the WASM module and does not implement permission behavior.
-  - Do not delete the TypeScript entry. There is no supported path that removes it.
+  - Pi package entry remains extensions/tool-permissions/index.ts. It only loads the WASM module and passes Pi to one Rust initialization export; it implements no callbacks or permission behavior.
+  - Rust calls pi.on, registerCommand, and registerEntryRenderer and owns every registered callback implementation.
+  - Rust-created callback adapters use supported safe napi-rs APIs and capture only owned Rust-managed state. Do not use unsafe code to extend a callback, Env, or JavaScript-value lifetime.
+  - Do not retain borrowed Env, Object, Function, FunctionRef, or other JavaScript values across callback boundaries or asynchronous suspension. Convert event inputs to owned Rust domain types at callback entry.
+  - The first migration story is a blocking spike that proves Rust callbacks remain callable after initialization, safely settle required asynchronous work, clean up at shutdown, and validates the pure Rust state/lifetime design under Miri where applicable.
   - No TypeScript permission fallback after the last story. A missing or invalid WASM module fails closed.
   - Do not reopen or rewrite passing e16 stories. Their non-goals stay historical.
   - NAPI-RS target remains wasm32-wasip1-threads. The flavor id remains wasm32-wasi. wasm32-unknown-unknown is not a supported target.
@@ -19,6 +23,8 @@ out_of_scope:
   - Porting extensions other than tool-permissions
   - Changing permission rule syntax, save shortcuts, or user-visible prompt semantics
   - Replacing Pi's TUI or tool runtime inside the WASM module
+  - Retaining TypeScript callback handlers or a TypeScript bridge object
+  - Unsafe pointer, static-lifetime, or callback-lifetime workarounds
 key_decisions:
   - decision: Add epic e18 after e17 instead of editing e16.
     rationale: e16 is passing and its non-goals require the TypeScript host boundary this epic removes.
@@ -32,3 +38,9 @@ key_decisions:
     rationale: pi-oxidized 0.1.1 is the product runtime. pi-oxidized-ext 0.1.1 is a Bun JSONL host client and cannot register pi.on from Rust. .specs/epics/e18-wasm-only-tool-permissions/e18s00-pi-oxidized-decision.md records decision reject. Later stories call Pi through extensions/tool-permissions/native/crates/pi-api.
   - decision: Earlier stories keep load-failure fallback until e18s06.
     rationale: Each host area can ship on the WASM success path while the extension still starts if that area's module call fails. e18s06 deletes that fallback.
+  - decision: Create a follow-on full-Rust Pi-event orchestration epic before completing e18s06 task 3.
+    rationale: Existing Rust registration calls pi.on but forwards every event to TypeScript handlers, so task 3 cannot truthfully make index.ts loader-only.
+  - decision: Start the orchestration epic with a safe callback-lifetime spike.
+    rationale: The Rust registration mechanism must prove that Rust-created callbacks can outlive initialization, perform required asynchronous work, and clean up safely without unsafe lifetime extension before behavior is migrated.
+  - decision: Use safe napi-rs callback adapters with typed Rust orchestration state.
+    rationale: The adapters are boundary plumbing only; they capture owned Rust state and use the invocation callback context for transient JavaScript values. TypeScript contains no callback behavior.

@@ -1,0 +1,49 @@
+id: e19
+title: Full-Rust Pi event orchestration
+wsjf: 7.5
+total_bcps: 34
+status: planning
+scope: .specs/product/SCOPE_LATEST.yaml
+stories:
+  - id: e19s01
+    title: Prove safe Rust Pi callback lifetime and dispatch
+    bcps: 5
+    status: todo
+    delta: ADDED
+    spec: e19s01-safe-rust-callback-lifetime.md
+    tasks: e19s01-tasks.yaml
+  - id: e19s02
+    title: Validate prompt queue FunctionRef lifetime under Miri
+    bcps: 3
+    status: todo
+    delta: ADDED
+    spec: e19s02-miri-prompt-queue.md
+    tasks: e19s02-tasks.yaml
+  - id: e19s03
+    title: Register Pi callbacks directly from Rust
+    bcps: 5
+    status: todo
+    delta: MODIFIED
+    spec: e19s03-rust-direct-pi-registration.md
+    tasks: e19s03-tasks.yaml
+  - id: e19s04
+    title: Move lifecycle and tool authorization orchestration into Rust
+    bcps: 8
+    status: todo
+    delta: MODIFIED
+    spec: e19s04-rust-lifecycle-and-tool-orchestration.md
+    tasks: e19s04-tasks.yaml
+  - id: e19s05
+    title: Move interactive permission surfaces into Rust
+    bcps: 8
+    status: todo
+    delta: MODIFIED
+    spec: e19s05-rust-interactive-permission-surfaces.md
+    tasks: e19s05-tasks.yaml
+  - id: e19s06
+    title: Reduce TypeScript to the WASM loader and one-time handoff
+    bcps: 5
+    status: todo
+    delta: REMOVED
+    spec: e19s06-loader-only-typescript-entrypoint.md
+    tasks: e19s06-tasks.yaml

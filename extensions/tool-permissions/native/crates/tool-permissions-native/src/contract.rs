@@ -176,8 +176,11 @@ pub struct PathTrustResponse {
     pub nonce: String,
     pub path: String,
     pub cwd: String,
+    #[napi(js_name = "trustEligible")]
     pub trust_eligible: bool,
+    #[napi(js_name = "aiignoreMatch")]
     pub aiignore_match: bool,
+    #[napi(js_name = "projectMatched")]
     pub project_matched: bool,
     pub decision: PermissionDecision,
     pub diagnostic: Option<String>,

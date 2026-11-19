@@ -120,7 +120,14 @@ epics:
     wsjf: 2.1
     bcps: 38
     note: >-
-      WSJF = (business value 8 + time criticality 5 + risk reduction 8) / job size 10 = 2.1. First record whether to adopt pi-oxidized-ext. Then move path trust, audit writes, rule saves, prompts, and tool execution into WASM, and remove the TypeScript permission fallback. e18s07 proves the prompt-queue FunctionRef lifetime erasure under Miri before that pattern is copied. The package entry still only loads WASM. Passing e16 stories stay closed.
+      Cancelled after e18s05. Passing stories establish the WASM-native framework. Remaining fallback removal and Miri work move to e19, whose full-Rust callback ownership boundary replaces the incomplete e18 plan.
+  - id: e19
+    title: Full-Rust Pi event orchestration
+    capsule_dir: epics/e19-full-rust-pi-event-orchestration
+    wsjf: 7.5
+    bcps: 34
+    note: >-
+      Provisional WSJF = (business value 10 + time criticality 10 + risk reduction 10) / job size 4 = 7.5. Build on e18's completed WASM framework to make Rust own Pi callback registration and all permission orchestration. Start with safe callback-lifetime proof and the Miri prompt-queue validation moved from e18s07.
 bugs:
   total: 1
   fixed: 0

@@ -31,7 +31,9 @@ test("documents native tool-permissions runtime build, packaging, and fallback b
     "utf8",
   );
 
-  assert.match(readme, /bundled native Rust core is enabled by default/);
+  assert.match(readme, /bundled native Rust core is required/);
+  assert.match(readme, /no TypeScript permission fallback/i);
+  assert.match(readme, /Pi exits with a fatal error/);
   assert.match(readme, /PI_TOOL_PERMISSIONS_NATIVE_DISABLE=1/);
   assert.match(readme, /npm run build:native/);
   assert.match(

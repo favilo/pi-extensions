@@ -1,0 +1,41 @@
+story_id: e19s04
+title: Move lifecycle and tool authorization orchestration into Rust
+status: failing
+bcps: 8
+tasks:
+  - id: 1
+    description: Add parity contracts for Rust-owned session start, tool-call authorization, tool-result annotation, and session shutdown behavior.
+    verify: npm test -- extensions/tool-permissions
+    risk: P0
+    security: high
+    status: failing
+    allure:
+      severity: critical
+      categories:
+        - Permission parity
+        - Authorization
+        - Security Review
+  - id: 2
+    description: Implement typed Rust lifecycle and tool-call orchestration using the safe callback mechanism proven by e19s01 and e19s02.
+    verify: npm test -- extensions/tool-permissions
+    risk: P0
+    security: high
+    status: failing
+    allure:
+      severity: critical
+      categories:
+        - Authorization
+        - Native integration
+        - Security Review
+  - id: 3
+    description: Remove migrated lifecycle and tool authorization implementations from TypeScript while preserving observable permission outcomes.
+    verify: npm run check
+    risk: P0
+    security: high
+    status: failing
+    allure:
+      severity: critical
+      categories:
+        - Typecheck
+        - Permission parity
+        - Security Review

@@ -1724,7 +1724,7 @@ function canonicalPermissionPath(
     ),
   );
   if (adopted.status === "invalid") {
-    throw new Error(`invalid native path-trust result for ${toolName}`);
+    throw new Error(adopted.diagnostic);
   }
   if (adopted.status === "ready") {
     return {

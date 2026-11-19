@@ -66,6 +66,7 @@ async function steeringHarness(): Promise<Harness> {
   );
   toolPermissionPolicy({
     registerCommand() {},
+    registerEntryRenderer() {},
     on(event: string, handler: unknown) {
       handlers.set(event, handler);
     },

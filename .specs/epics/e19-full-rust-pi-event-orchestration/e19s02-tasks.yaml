@@ -1,0 +1,29 @@
+story_id: e19s02
+title: Validate prompt queue FunctionRef lifetime under Miri
+status: failing
+bcps: 3
+tasks:
+  - id: 1
+    description: Move the e18s07 Miri lifetime contract and its documented FunctionRef safety assumptions into e19.
+    verify: cargo miri test -p tool-permissions-native prompt_queue
+    risk: P0
+    security: high
+    status: failing
+    allure:
+      severity: critical
+      categories:
+        - Miri
+        - Lifetime safety
+        - Security Review
+  - id: 2
+    description: Run Miri against the prompt queue lifetime scenario and correct safe ownership boundaries until the contract passes.
+    verify: cargo miri test -p tool-permissions-native prompt_queue
+    risk: P0
+    security: high
+    status: failing
+    allure:
+      severity: critical
+      categories:
+        - Miri
+        - Lifetime safety
+        - Security Review

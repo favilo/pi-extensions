@@ -1,0 +1,101 @@
+feature_name: full_rust_pi_event_orchestration
+core_value: >-
+  Tool-permissions has one Rust-owned implementation for Pi event registration
+  and permission behavior, so the TypeScript entrypoint is only a WASM loader
+  and one-time Pi handoff.
+summary: |-
+  Epic e18 establishes the WASM-native framework for tool-permissions, but its
+  Rust registration layer currently forwards Pi events to named TypeScript
+  handlers. That leaves callback implementations, callback orchestration, and
+  permission behavior split across runtimes.
+
+  This initiative builds on the completed e18 framework. Rust directly registers
+  every Pi lifecycle, tool, command, and renderer callback and implements all
+  resulting permission behavior. The TypeScript entrypoint remains because Pi
+  loads extensions through it, but it only loads the WASM module and provides
+  the Pi API to one Rust initialization export.
+
+  The first two stories remove lifetime uncertainty before behavior migration:
+  a safe callback-lifetime spike proves the registration mechanism, followed
+  immediately by the Miri prompt-queue FunctionRef validation moved from e18s07.
+in_scope:
+  - future_story_id: e19s01
+    outcome: >-
+      A safe Rust callback-lifetime spike proves that Rust-created Pi callbacks
+      outlive initialization, receive invocation-local JavaScript values,
+      complete required asynchronous work, and release state at shutdown without
+      unsafe lifetime extension.
+  - future_story_id: e19s02
+    outcome: >-
+      Miri validates the prompt queue FunctionRef lifetime design moved from
+      e18s07 before that pattern is used by migrated orchestration callbacks.
+  - future_story_id: e19s03
+    outcome: >-
+      Rust owns direct Pi registration for lifecycle, tool, command, and entry
+      renderer callbacks, with no TypeScript callback bridge or handler lookup.
+  - future_story_id: e19s04
+    outcome: >-
+      Rust owns session lifecycle, tool-call authorization, tool-result
+      annotation, and shutdown cleanup while preserving existing permission
+      outcomes.
+  - future_story_id: e19s05
+    outcome: >-
+      Rust owns permission prompts, steering, prompt serialization, command
+      behavior, and preview rendering while preserving the user-visible
+      interaction contract.
+  - future_story_id: e19s06
+    outcome: >-
+      index.ts is limited to WASM loading and one-time Rust initialization; no
+      TypeScript callback registration, callback behavior, permission bridge,
+      or fallback remains.
+out_of_scope:
+  - item: Completing cancelled e18 stories and tasks
+    reason: >-
+      Their remaining work is resliced into e19, where the full Rust callback
+      ownership boundary can be specified and verified truthfully.
+    disposition: cancelled
+  - item: Deleting extensions/tool-permissions/index.ts
+    reason: Pi loads this extension through its TypeScript package entry.
+    disposition: excluded
+  - item: Changing user-visible permission rules, shortcuts, prompts, audit records, or allow/deny behavior
+    reason: This initiative changes implementation ownership, not the existing product contract.
+    disposition: excluded
+  - item: Replacing Pi's TUI, extension runtime, or tool process runtime
+    reason: Rust uses Pi host capabilities rather than reimplementing the host.
+    disposition: prohibited
+  - item: Retaining TypeScript callback handlers, a callback bridge object, or a TypeScript permission fallback
+    reason: These preserve the split ownership this initiative removes.
+    disposition: prohibited
+  - item: Unsafe pointer, static-lifetime, or callback-lifetime workarounds
+    reason: Callback safety must derive from supported napi-rs ownership and reference facilities.
+    disposition: prohibited
+  - item: Porting extensions other than tool-permissions
+    reason: The initiative is limited to this extension's host boundary.
+    disposition: excluded
+constraints:
+  - Build on the completed e18 WASM-native framework; do not reopen its completed stories.
+  - Pi package entry remains extensions/tool-permissions/index.ts and contains only module loading plus a single Rust initialization handoff.
+  - Rust owns calls to pi.on, registerCommand, and registerEntryRenderer and owns every registered callback implementation.
+  - Rust callback adapters use supported safe napi-rs APIs and capture only owned Rust-managed state.
+  - Do not retain borrowed Env, Object, Function, FunctionRef, or other JavaScript values across callback boundaries or asynchronous suspension.
+  - Convert callback inputs to owned Rust domain types at the boundary.
+  - Complete e19s01 and e19s02 before migrating production callback behavior.
+  - Preserve the current NAPI packaging target: wasm32-wasip1-threads with the wasm32-wasi flavor.
+  - Missing or invalid WASM must fail closed; it must never authorize a tool call.
+success_criteria:
+  - The safe callback-lifetime spike passes its native integration contract without unsafe lifetime code.
+  - Miri passes for the migrated prompt-queue FunctionRef lifetime validation before production migration relies on that pattern.
+  - Rust registers and implements every Pi callback used by tool-permissions.
+  - No TypeScript callback handler, handler lookup, callback bridge object, permission behavior, or fallback remains.
+  - index.ts only loads WASM and invokes the single Rust initialization handoff.
+  - Existing permission parity tests continue to show the same visible allow, deny, prompt, steering, command, renderer, and audit outcomes.
+  - Disabling or removing the WASM artifact prevents the extension from authorizing a tool call.
+references:
+  - .specs/planning-context.yaml
+  - .specs/product/SCOPE-e18-wasm-only-tool-permissions.yaml
+  - .specs/epics/e18-wasm-only-tool-permissions/epic.yaml
+  - .specs/epics/e18-wasm-only-tool-permissions/e18s06-remove-typescript-fallback.md
+  - .specs/security/epics/e18/THREAT_MODEL.md
+  - extensions/tool-permissions/index.ts
+  - extensions/tool-permissions/native/crates/tool-permissions-native/src/registration.rs
+  - extensions/tool-permissions/native/crates/pi-api/src/lib.rs

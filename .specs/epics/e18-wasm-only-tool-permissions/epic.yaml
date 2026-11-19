@@ -2,7 +2,7 @@ id: e18
 title: WASM-only tool-permissions runtime
 wsjf: 2.1
 total_bcps: 38
-status: planning
+status: cancelled
 scope: .specs/product/SCOPE-e18-wasm-only-tool-permissions.yaml
 stories:
   - id: e18s00
@@ -43,21 +43,21 @@ stories:
   - id: e18s05
     title: Move tool execution sequencing into WASM
     bcps: 8
-    status: failing
+    status: passing
     delta: MODIFIED
     spec: e18s05-wasm-tool-execution.md
     tasks: e18s05-tasks.yaml
   - id: e18s06
     title: Remove the TypeScript permission fallback
     bcps: 3
-    status: failing
+    status: cancelled
     delta: REMOVED
     spec: e18s06-remove-typescript-fallback.md
     tasks: e18s06-tasks.yaml
   - id: e18s07
     title: Prove the prompt-queue lifetime erasure under Miri
     bcps: 3
-    status: failing
+    status: cancelled
     delta: ADDED
     spec: e18s07-miri-prompt-queue.md
     tasks: e18s07-tasks.yaml
