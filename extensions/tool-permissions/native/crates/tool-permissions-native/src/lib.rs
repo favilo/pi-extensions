@@ -1,4 +1,5 @@
 mod audit;
+mod callback_tracer;
 mod contract;
 mod execution;
 mod parser;
@@ -77,11 +78,8 @@ pub fn register_tool_permissions_callbacks(
 }
 
 #[napi]
-pub fn register_callback_tracer(
-    _env: Env,
-    _pi: napi::bindgen_prelude::Object,
-) -> Result<bool> {
-    Ok(false)
+pub fn register_callback_tracer(env: Env, pi: napi::bindgen_prelude::Object) -> Result<bool> {
+    callback_tracer::register(&env, pi)
 }
 
 #[napi]

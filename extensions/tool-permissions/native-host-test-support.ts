@@ -53,7 +53,9 @@ export function withNativeHostPackage(
 ): Promise<void> | void {
   const previousPackage = process.env.PI_TOOL_PERMISSIONS_NATIVE_PACKAGE;
   const previousDisable = process.env.PI_TOOL_PERMISSIONS_NATIVE_DISABLE;
-  const directory = mkdtempSync(join(tmpdir(), "tool-permissions-native-host-"));
+  const directory = mkdtempSync(
+    join(tmpdir(), "tool-permissions-native-host-"),
+  );
   const packagePath = join(directory, "index.cjs");
   writeFileSync(packagePath, `${NATIVE_REGISTRATION_STUB}\n${extraSource}\n`);
   process.env.PI_TOOL_PERMISSIONS_NATIVE_PACKAGE = "1";

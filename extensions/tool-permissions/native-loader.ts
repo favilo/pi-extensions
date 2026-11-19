@@ -48,6 +48,9 @@ export async function loadNativeProbe(
       error instanceof Error
         ? error.message
         : "unknown native initialization failure";
-    return { engine: "unavailable", reason: `native probe rejected: ${reason}` };
+    return {
+      engine: "unavailable",
+      reason: `native probe rejected: ${reason}`,
+    };
   }
 }

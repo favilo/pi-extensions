@@ -241,7 +241,9 @@ test("bundled Rust registration calls pi.on and registerCommand for delegated ca
 });
 
 test("Rust callback dispatches after tracer initialization returns", async () => {
-  const native = createRequire(import.meta.url)("./native/generated/index.js") as {
+  const native = createRequire(import.meta.url)(
+    "./native/generated/index.js",
+  ) as {
     registerCallbackTracer: (pi: unknown) => boolean;
   };
   const handlers = new Map<string, (event: unknown, ctx: unknown) => unknown>();

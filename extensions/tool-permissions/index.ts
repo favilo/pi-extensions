@@ -2834,6 +2834,8 @@ export default function toolPermissionPolicy(pi: ExtensionAPI) {
   }
 
   if (!hasNativeRegistration(nativeRegistration, "tool_call")) {
-    fatalNativeEngineUnavailable("native registration is incomplete; missing tool_call");
+    fatalNativeEngineUnavailable(
+      "native registration is incomplete; missing tool_call",
+    );
   }
 }
