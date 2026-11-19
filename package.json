@@ -49,6 +49,7 @@
     "@decimalturn/toml-patch": "^2.1.0",
     "@emnapi/core": "2.0.0-beta.3",
     "@emnapi/runtime": "2.0.0-beta.3",
+    "@napi-rs/async-runtime": "0.2.0",
     "@napi-rs/wasm-runtime": "^1.2.7",
     "emnapi": "2.0.0-beta.3",
     "ignore": "^7.0.6",

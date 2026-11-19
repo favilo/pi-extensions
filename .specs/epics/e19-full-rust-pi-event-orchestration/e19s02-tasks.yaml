@@ -9,7 +9,7 @@ tasks:
     verify: npm run build:native && npx tsx --test extensions/tool-permissions/native-prompt-queue.test.ts
     risk: P0
     security: high
-    status: failing
+    status: passing
     allure:
       severity: critical
       categories:

@@ -19,12 +19,18 @@ pub use contract::{
     RuleSaveRequest, RuleSaveResponse, ToolExecutionDecision, ToolExecutionRequest,
     ToolExecutionResponse,
 };
-use napi::bindgen_prelude::{FnArgs, Function, PromiseRaw};
+use napi::bindgen_prelude::{FnArgs, Function, Promise, PromiseRaw};
 use napi::{Env, Error, Result};
 use napi_derive::napi;
 use pi_api::RealpathCallback;
 
 pub(crate) const CONTRACT_VERSION: i64 = 1;
+
+#[napi_derive::module_init]
+fn initialize_async_runtime() {
+    napi_async_runtime::install(napi_async_runtime::RuntimeOptions::default())
+        .expect("failed to install the async runtime");
+}
 
 fn validate_nonce(nonce: &str) -> Result<()> {
     if nonce.is_empty() || nonce.len() > 256 {
@@ -151,9 +157,13 @@ pub fn decide_prompt<'env>(
     prompt_queue::decide(env, request, present)
 }
 
+/// Await a JavaScript promise through the configured runtime.
+///
+/// # Errors
+/// Returns an error if the JavaScript promise rejects.
 #[napi]
-pub fn trace_async_promise(_promise: PromiseRaw<'_, String>) -> String {
-    String::new()
+pub async fn trace_async_promise(promise: Promise<String>) -> Result<String> {
+    promise.await
 }
 
 #[napi]

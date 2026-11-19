@@ -333,11 +333,17 @@ mod tests {
     #[test]
     fn prompt_queue_rejects_presenter_restoration_after_environment_shutdown() {
         let mut queue = super::PromptQueue::default();
-        assert_eq!(queue.submit(1, "old").unwrap(), super::QueuePosition::Active);
+        assert_eq!(
+            queue.submit(1, "old").unwrap(),
+            super::QueuePosition::Active
+        );
         let opening = queue.take_active_for_opening().unwrap();
         drop(queue.close());
         assert_eq!(queue.restore_active(1, opening), Some("old"));
-        assert_eq!(queue.submit(2, "new").unwrap(), super::QueuePosition::Active);
+        assert_eq!(
+            queue.submit(2, "new").unwrap(),
+            super::QueuePosition::Active
+        );
     }
 
     #[test]
