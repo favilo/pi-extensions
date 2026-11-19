@@ -1,6 +1,6 @@
 use std::sync::{Arc, Mutex};
 
-use napi::bindgen_prelude::{JsObjectValue, Object};
+use napi::bindgen_prelude::{JsObjectValue, Object, PromiseRaw};
 use napi::{Env, Error, Result};
 use pi_api::{OnCallback, Pi};
 use thiserror::Error as ThisError;
@@ -53,13 +53,16 @@ pub fn register(env: &Env, pi: Object) -> Result<bool> {
         let event: Object = ctx.get(0)?;
         let message = TracerMessage::parse(event.get_named_property("message")?)
             .map_err(|error| Error::from_reason(error.to_string()))?;
-        let mut state = callback_state
-            .lock()
-            .map_err(|_| Error::from_reason(TracerError::Unavailable.to_string()))?;
-        let active = state
-            .as_mut()
-            .ok_or_else(|| Error::from_reason(TracerError::Unavailable.to_string()))?;
-        Ok(active.dispatch(message))
+        let callback_state = Arc::clone(&callback_state);
+        PromiseRaw::resolve(ctx.env, ())?.then(move |_| {
+            let mut state = callback_state
+                .lock()
+                .map_err(|_| Error::from_reason(TracerError::Unavailable.to_string()))?;
+            let active = state
+                .as_mut()
+                .ok_or_else(|| Error::from_reason(TracerError::Unavailable.to_string()))?;
+            Ok(active.dispatch(message))
+        })
     })?;
     let shutdown_state = Arc::clone(&state);
     let shutdown = env.create_function_from_closure("toolPermissionsTracerShutdown", move |_| {

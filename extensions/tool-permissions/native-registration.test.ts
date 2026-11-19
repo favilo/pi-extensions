@@ -307,7 +307,7 @@ test("Rust tracer releases session state at shutdown and rejects stale callbacks
     dispatchCount: 1,
   });
   assert.equal(await shutdown({}, {}), true);
-  assert.throws(() => handler({ message: "after shutdown" }, {}));
+  await assert.rejects(Promise.resolve(handler({ message: "after shutdown" }, {})));
   assert.equal(await shutdown({}, {}), false);
 });
 
