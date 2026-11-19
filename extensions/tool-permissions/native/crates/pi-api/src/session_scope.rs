@@ -115,6 +115,15 @@ mod tests {
     }
 
     #[test]
+    fn callbacks_run_without_holding_the_lifecycle_lock() {
+        let scope = SessionScoped::new(1_u32);
+        let observed = scope
+            .with(|_| scope.state.try_lock().is_ok())
+            .expect("active session");
+        assert!(observed, "callback must not hold the lifecycle mutex");
+    }
+
+    #[test]
     fn closing_one_scope_revokes_all_handles_and_drops_state_once() {
         let drops = Arc::new(AtomicUsize::new(0));
         let scope = SessionScoped::new(State {
