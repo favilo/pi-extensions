@@ -65,12 +65,13 @@ pub fn register(env: &Env, pi: Object) -> Result<bool> {
         })
     })?;
     let shutdown_state = Arc::clone(&state);
-    let shutdown = env.create_function_from_closure("toolPermissionsTracerShutdown", move |_| {
-        let mut state = shutdown_state
-            .lock()
-            .map_err(|_| Error::from_reason(TracerError::Unavailable.to_string()))?;
-        Ok(state.take().is_some())
-    })?;
+    let shutdown =
+        env.create_function_from_closure("toolPermissionsTracerShutdown", move |_| {
+            let mut state = shutdown_state
+                .lock()
+                .map_err(|_| Error::from_reason(TracerError::Unavailable.to_string()))?;
+            Ok(state.take().is_some())
+        })?;
     let result = pi
         .on(OnCallback::SessionShutdown, shutdown)
         .and_then(|()| pi.on(OnCallback::SessionInfoChanged, handler));

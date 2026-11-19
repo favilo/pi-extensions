@@ -266,7 +266,9 @@ test("Rust callback dispatches after tracer initialization returns", async () =>
 });
 
 test("Rust tracer rejects malformed events without dispatching", async () => {
-  const native = createRequire(import.meta.url)("./native/generated/index.js") as {
+  const native = createRequire(import.meta.url)(
+    "./native/generated/index.js",
+  ) as {
     registerCallbackTracer: (pi: unknown) => boolean;
   };
   const handlers = new Map<string, (event: unknown, ctx: unknown) => unknown>();
@@ -287,7 +289,9 @@ test("Rust tracer rejects malformed events without dispatching", async () => {
 });
 
 test("Rust tracer releases session state at shutdown and rejects stale callbacks", async () => {
-  const native = createRequire(import.meta.url)("./native/generated/index.js") as {
+  const native = createRequire(import.meta.url)(
+    "./native/generated/index.js",
+  ) as {
     registerCallbackTracer: (pi: unknown) => boolean;
   };
   const handlers = new Map<string, (event: unknown, ctx: unknown) => unknown>();
@@ -307,18 +311,25 @@ test("Rust tracer releases session state at shutdown and rejects stale callbacks
     dispatchCount: 1,
   });
   assert.equal(await shutdown({}, {}), true);
-  await assert.rejects(Promise.resolve(handler({ message: "after shutdown" }, {})));
+  await assert.rejects(
+    Promise.resolve(handler({ message: "after shutdown" }, {})),
+  );
   assert.equal(await shutdown({}, {}), false);
 });
 
 test("failed tracer initialization leaves no live callback state", () => {
-  const native = createRequire(import.meta.url)("./native/generated/index.js") as {
+  const native = createRequire(import.meta.url)(
+    "./native/generated/index.js",
+  ) as {
     registerCallbackTracer: (pi: unknown) => boolean;
   };
   let shutdown: ((event: unknown, ctx: unknown) => unknown) | undefined;
   assert.throws(() =>
     native.registerCallbackTracer({
-      on(eventName: string, handler: (event: unknown, ctx: unknown) => unknown) {
+      on(
+        eventName: string,
+        handler: (event: unknown, ctx: unknown) => unknown,
+      ) {
         if (eventName === "session_shutdown") shutdown = handler;
         else throw new Error("registration failed");
       },
@@ -331,7 +342,9 @@ test("failed tracer initialization leaves no live callback state", () => {
 });
 
 test("Rust tracer owns asynchronous dispatch after callback return", async () => {
-  const native = createRequire(import.meta.url)("./native/generated/index.js") as {
+  const native = createRequire(import.meta.url)(
+    "./native/generated/index.js",
+  ) as {
     registerCallbackTracer: (pi: unknown) => boolean;
   };
   const handlers = new Map<string, (event: unknown, ctx: unknown) => unknown>();
@@ -346,11 +359,16 @@ test("Rust tracer owns asynchronous dispatch after callback return", async () =>
   assert.ok(handler);
   const pending = handler({ message: "asynchronous" }, {});
   assert.ok(pending instanceof Promise);
-  assert.deepEqual(await pending, { message: "asynchronous", dispatchCount: 1 });
+  assert.deepEqual(await pending, {
+    message: "asynchronous",
+    dispatchCount: 1,
+  });
 });
 
 test("shutdown cancels Rust tracer work before its asynchronous dispatch", async () => {
-  const native = createRequire(import.meta.url)("./native/generated/index.js") as {
+  const native = createRequire(import.meta.url)(
+    "./native/generated/index.js",
+  ) as {
     registerCallbackTracer: (pi: unknown) => boolean;
   };
   const handlers = new Map<string, (event: unknown, ctx: unknown) => unknown>();
