@@ -286,6 +286,31 @@ test("Rust tracer rejects malformed events without dispatching", async () => {
   });
 });
 
+test("Rust tracer releases session state at shutdown and rejects stale callbacks", async () => {
+  const native = createRequire(import.meta.url)("./native/generated/index.js") as {
+    registerCallbackTracer: (pi: unknown) => boolean;
+  };
+  const handlers = new Map<string, (event: unknown, ctx: unknown) => unknown>();
+  native.registerCallbackTracer({
+    on(eventName: string, handler: (event: unknown, ctx: unknown) => unknown) {
+      handlers.set(eventName, handler);
+    },
+    registerCommand() {},
+    registerEntryRenderer() {},
+  });
+  const handler = handlers.get("session_info_changed");
+  const shutdown = handlers.get("session_shutdown");
+  assert.ok(handler);
+  assert.ok(shutdown);
+  assert.deepEqual(await handler({ message: "before shutdown" }, {}), {
+    message: "before shutdown",
+    dispatchCount: 1,
+  });
+  assert.equal(await shutdown({}, {}), true);
+  assert.throws(() => handler({ message: "after shutdown" }, {}));
+  assert.equal(await shutdown({}, {}), false);
+});
+
 test("native registration falls back without installing duplicate callbacks", () => {
   const handlers: Array<string> = [];
   withNativeRegistrationModule(compatibleProbe, () => {
