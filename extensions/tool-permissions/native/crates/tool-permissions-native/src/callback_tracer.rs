@@ -47,16 +47,28 @@ pub struct TracerResponse {
 
 pub fn register(env: &Env, pi: Object) -> Result<bool> {
     let pi = Pi::new(env, pi)?;
-    let state = Arc::new(Mutex::new(TracerState::default()));
+    let state = Arc::new(Mutex::new(Some(TracerState::default())));
+    let callback_state = Arc::clone(&state);
     let handler = env.create_function_from_closure("toolPermissionsTracer", move |ctx| {
         let event: Object = ctx.get(0)?;
         let message = TracerMessage::parse(event.get_named_property("message")?)
             .map_err(|error| Error::from_reason(error.to_string()))?;
-        let mut state = state
+        let mut state = callback_state
             .lock()
             .map_err(|_| Error::from_reason(TracerError::Unavailable.to_string()))?;
-        Ok(state.dispatch(message))
+        let active = state
+            .as_mut()
+            .ok_or_else(|| Error::from_reason(TracerError::Unavailable.to_string()))?;
+        Ok(active.dispatch(message))
     })?;
+    let shutdown_state = Arc::clone(&state);
+    let shutdown = env.create_function_from_closure("toolPermissionsTracerShutdown", move |_| {
+        let mut state = shutdown_state
+            .lock()
+            .map_err(|_| Error::from_reason(TracerError::Unavailable.to_string()))?;
+        Ok(state.take().is_some())
+    })?;
+    pi.on(OnCallback::SessionShutdown, shutdown)?;
     pi.on(OnCallback::SessionInfoChanged, handler)?;
     Ok(true)
 }
