@@ -12,7 +12,8 @@
     "pi-package"
   ],
   "scripts": {
-    "check": "npm run typecheck && npm run test:native && npm run test:preflight && npm run check:test-guard",
+    "check": "npm run typecheck && npm run lint:rust && npm run test:native && npm run test:preflight && npm run check:test-guard",
+    "lint:rust": "cargo clippy --manifest-path extensions/tool-permissions/native/Cargo.toml --workspace --all-targets",
     "check:test-guard": "bash .github/scripts/check-test-guard.sh",
     "check:ci": "npm run check && npm run check:plans && npm run check:portability",
     "check:plans": "bash .github/scripts/check-active-plans.sh",
