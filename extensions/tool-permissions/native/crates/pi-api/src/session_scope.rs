@@ -160,6 +160,46 @@ mod tests {
     }
 
     #[test]
+    fn reentrant_access_is_busy_and_shutdown_drops_the_active_object_after_return() {
+        let drops = Arc::new(AtomicUsize::new(0));
+        let scope = SessionScoped::new(State {
+            drops: Arc::clone(&drops),
+            count: 0,
+        });
+        let nested = scope.clone();
+        scope
+            .with(|state| {
+                assert!(matches!(
+                    nested.with(|_| ()),
+                    Err(super::SessionScopeError::Busy)
+                ));
+                assert!(nested.close().unwrap());
+                assert!(matches!(
+                    nested.with(|_| ()),
+                    Err(super::SessionScopeError::Unavailable)
+                ));
+                assert_eq!(drops.load(Ordering::SeqCst), 0);
+                state.count += 1;
+            })
+            .unwrap();
+        assert_eq!(drops.load(Ordering::SeqCst), 1);
+        assert!(!scope.close().unwrap());
+    }
+
+    #[test]
+    fn panicking_callback_returns_the_object_to_the_active_scope() {
+        let scope = SessionScoped::new(0_u32);
+        let outcome = std::panic::catch_unwind(|| {
+            let _ = scope.with(|state| {
+                *state = 7;
+                panic!("test panic");
+            });
+        });
+        assert!(outcome.is_err());
+        assert_eq!(scope.with(|state| *state).unwrap(), 7);
+    }
+
+    #[test]
     fn closing_one_scope_revokes_all_handles_and_drops_state_once() {
         let drops = Arc::new(AtomicUsize::new(0));
         let scope = SessionScoped::new(State {
