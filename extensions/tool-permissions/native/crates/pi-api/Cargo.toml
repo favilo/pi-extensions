@@ -7,3 +7,4 @@ description = "Typed helpers for the Pi JavaScript extension object"
 
 [dependencies]
 napi.workspace = true
+thiserror.workspace = true
