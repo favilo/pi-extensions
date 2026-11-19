@@ -345,6 +345,24 @@ test("Rust tracer releases session state at shutdown and rejects stale callbacks
   assert.equal(await shutdown({}, {}), false);
 });
 
+test("shutdown during initialization prevents a live scoped registration", () => {
+  const native = createRequire(import.meta.url)(
+    "./native/generated/index.js",
+  ) as { registerCallbackTracer: (pi: unknown) => boolean };
+  const registrations: string[] = [];
+  assert.throws(() =>
+    native.registerCallbackTracer({
+      on(eventName: string, handler: (event: unknown, ctx: unknown) => unknown) {
+        registrations.push(eventName);
+        if (eventName === "session_shutdown") handler({}, {});
+      },
+      registerCommand() {},
+      registerEntryRenderer() {},
+    }),
+  );
+  assert.deepEqual(registrations, ["session_shutdown"]);
+});
+
 test("failed tracer initialization leaves no live callback state", () => {
   const native = createRequire(import.meta.url)(
     "./native/generated/index.js",
