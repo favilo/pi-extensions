@@ -46,7 +46,7 @@ test("loads a generated native package by path through the host seam", async () 
   }
 });
 
-test("falls back when the native package cannot load or returns invalid output", async () => {
+test("reports unavailable when the native package cannot load or returns invalid output", async () => {
   for (const load of [
     async () => {
       throw new Error("package missing");
@@ -54,7 +54,7 @@ test("falls back when the native package cannot load or returns invalid output",
     async () => ({ probe: () => ({ version: NATIVE_CONTRACT_VERSION + 1 }) }),
   ]) {
     const result = await loadNativeProbe({ load });
-    assert.equal(result.engine, "typescript");
+    assert.equal(result.engine, "unavailable");
     assert.match(result.reason, /native|package|version|contract/i);
   }
 });

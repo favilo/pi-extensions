@@ -248,12 +248,12 @@ test("native registration falls back without installing duplicate callbacks", ()
         handlers.push(eventName);
       },
     } as never);
-    assert.equal(result.mode, "typescript");
+    assert.equal(result.mode, "unavailable");
   });
   assert.deepEqual(handlers, []);
 });
 
-test("hasNativeRegistration identifies registered capabilities when native, false when typescript fallback", () => {
+test("hasNativeRegistration identifies registered capabilities when native, false when unavailable", () => {
   assert.equal(
     hasNativeRegistration(
       { mode: "native", registrations: ["session_start", "tool_call"] },
@@ -270,7 +270,7 @@ test("hasNativeRegistration identifies registered capabilities when native, fals
   );
   assert.equal(
     hasNativeRegistration(
-      { mode: "typescript", reason: "disabled" },
+      { mode: "unavailable", reason: "disabled" },
       "session_start",
     ),
     false,

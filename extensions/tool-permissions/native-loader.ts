@@ -18,7 +18,7 @@ export type NativeLoaderOptions = {
 
 export type NativeLoadResult =
   | { engine: "native"; response: NativeProbeResponse }
-  | { engine: "typescript"; reason: string };
+  | { engine: "unavailable"; reason: string };
 
 export async function loadNativePackageProbe(
   packagePath: string,
@@ -48,6 +48,6 @@ export async function loadNativeProbe(
       error instanceof Error
         ? error.message
         : "unknown native initialization failure";
-    return { engine: "typescript", reason: `native probe rejected: ${reason}` };
+    return { engine: "unavailable", reason: `native probe rejected: ${reason}` };
   }
 }

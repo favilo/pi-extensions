@@ -13,7 +13,7 @@ import {
 
 export type NativeRegistrationResult =
   | { mode: "native"; registrations: string[] }
-  | { mode: "typescript"; reason: string };
+  | { mode: "unavailable"; reason: string };
 
 type NativeRegistrationHost = Pick<
   ExtensionAPI,
@@ -52,7 +52,7 @@ export function registerNativeToolPermissionsCallbacks(
 ): NativeRegistrationResult {
   const packagePath = resolveNativePackagePath();
   if (!packagePath)
-    return { mode: "typescript", reason: "native package disabled" };
+    return { mode: "unavailable", reason: "native package disabled" };
   try {
     const loaded = requireNativePackage(
       packagePath,
@@ -62,7 +62,7 @@ export function registerNativeToolPermissionsCallbacks(
       typeof loaded.registerToolPermissionsCallbacks !== "function"
     ) {
       return {
-        mode: "typescript",
+        mode: "unavailable",
         reason: "native registration export unavailable",
       };
     }
@@ -71,7 +71,7 @@ export function registerNativeToolPermissionsCallbacks(
     );
     if (probe.nonce !== NATIVE_REGISTRATION_NONCE)
       return {
-        mode: "typescript",
+        mode: "unavailable",
         reason: "native registration probe nonce mismatch",
       };
     const response = loaded.registerToolPermissionsCallbacks(
@@ -85,7 +85,7 @@ export function registerNativeToolPermissionsCallbacks(
     ) as Record<string, unknown>;
     if (!response || typeof response !== "object" || Array.isArray(response))
       return {
-        mode: "typescript",
+        mode: "unavailable",
         reason: "native registration response is invalid",
       };
     if (
@@ -95,7 +95,7 @@ export function registerNativeToolPermissionsCallbacks(
       response.nonce !== NATIVE_REGISTRATION_NONCE
     ) {
       return {
-        mode: "typescript",
+        mode: "unavailable",
         reason: "native registration response contract mismatch",
       };
     }
@@ -104,14 +104,14 @@ export function registerNativeToolPermissionsCallbacks(
       !response.registrations.every((item) => typeof item === "string")
     ) {
       return {
-        mode: "typescript",
+        mode: "unavailable",
         reason: "native registration list is invalid",
       };
     }
     return { mode: "native", registrations: response.registrations };
   } catch (error) {
     return {
-      mode: "typescript",
+      mode: "unavailable",
       reason: error instanceof Error ? error.message : String(error),
     };
   }
