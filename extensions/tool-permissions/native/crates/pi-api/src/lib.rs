@@ -8,7 +8,7 @@ mod on_callback;
 mod path_host;
 mod session_scope;
 
-pub use session_scope::{SessionScope, SessionScopeError};
+pub use session_scope::{SessionCallbacks, SessionScopeError, SessionScoped};
 pub use bridge::{Bridge, CallbackPresence};
 pub use on_callback::OnCallback;
 pub use path_host::{PathHost, RealpathCallback};

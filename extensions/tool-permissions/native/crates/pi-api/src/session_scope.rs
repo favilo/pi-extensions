@@ -1,7 +1,12 @@
 use std::sync::{Arc, Mutex};
 
-use napi::bindgen_prelude::Function;
 use napi::{Env, Result};
+
+use crate::Pi;
+
+pub trait SessionCallbacks: Sized + 'static {
+    fn register_callbacks(scope: &SessionScoped<Self>, env: &Env, pi: &Pi) -> Result<()>;
+}
 
 #[derive(Debug, thiserror::Error)]
 pub enum SessionScopeError {
@@ -9,11 +14,11 @@ pub enum SessionScopeError {
     Unavailable,
 }
 
-pub struct SessionScope<T> {
+pub struct SessionScoped<T> {
     state: Arc<Mutex<Option<T>>>,
 }
 
-impl<T> Clone for SessionScope<T> {
+impl<T> Clone for SessionScoped<T> {
     fn clone(&self) -> Self {
         Self {
             state: Arc::clone(&self.state),
@@ -21,7 +26,7 @@ impl<T> Clone for SessionScope<T> {
     }
 }
 
-impl<T: 'static> SessionScope<T> {
+impl<T: 'static> SessionScoped<T> {
     pub fn new(state: T) -> Self {
         Self {
             state: Arc::new(Mutex::new(Some(state))),
@@ -39,17 +44,18 @@ impl<T: 'static> SessionScope<T> {
         Ok(state.take().is_some())
     }
 
-    pub fn shutdown_handler<'env>(&self, env: &'env Env) -> Result<Function<'env, (), bool>> {
-        let scope = self.clone();
-        env.create_function_from_closure("piSessionShutdown", move |_| {
-            scope.close().map_err(|error| napi::Error::from_reason(error.to_string()))
-        })
+    pub fn register(self, env: &Env, pi: &Pi) -> Result<()>
+    where
+        T: SessionCallbacks,
+    {
+        let _ = (env, pi);
+        Ok(())
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::SessionScope;
+    use super::SessionScoped;
     use std::sync::{Arc, atomic::{AtomicUsize, Ordering}};
 
     struct State {
@@ -66,7 +72,7 @@ mod tests {
     #[test]
     fn closing_one_scope_revokes_all_handles_and_drops_state_once() {
         let drops = Arc::new(AtomicUsize::new(0));
-        let scope = SessionScope::new(State { drops: Arc::clone(&drops), count: 0 });
+        let scope = SessionScoped::new(State { drops: Arc::clone(&drops), count: 0 });
         let callback = scope.clone();
         assert_eq!(callback.with(|state| { state.count += 1; state.count }).unwrap(), 1);
         assert!(scope.close().unwrap());

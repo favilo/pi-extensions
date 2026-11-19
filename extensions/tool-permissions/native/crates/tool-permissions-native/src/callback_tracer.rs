@@ -1,8 +1,6 @@
-use std::sync::{Arc, Mutex};
-
 use napi::bindgen_prelude::{JsObjectValue, Object, PromiseRaw};
 use napi::{Env, Error, Result};
-use pi_api::{OnCallback, Pi};
+use pi_api::{OnCallback, Pi, SessionCallbacks, SessionScoped};
 use thiserror::Error as ThisError;
 
 #[derive(Debug, ThisError)]
@@ -27,11 +25,11 @@ impl TracerEvent {
 }
 
 #[derive(Default)]
-struct TracerState {
+struct Tracer {
     dispatch_count: u32,
 }
 
-impl TracerState {
+impl Tracer {
     fn dispatch(&mut self, event: TracerEvent) -> TracerResponse {
         self.dispatch_count += 1;
         TracerResponse {
@@ -47,10 +45,9 @@ pub struct TracerResponse {
     pub dispatch_count: u32,
 }
 
-pub fn register(env: &Env, pi: Object) -> Result<bool> {
-    let pi = Pi::new(env, pi)?;
-    let state = Arc::new(Mutex::new(Some(TracerState::default())));
-    let callback_state = Arc::clone(&state);
+impl SessionCallbacks for Tracer {
+    fn register_callbacks(scope: &SessionScoped<Self>, env: &Env, pi: &Pi) -> Result<()> {
+    let callback_state = scope.clone();
     let handler = env.create_function_from_closure("toolPermissionsTracer", move |ctx| {
         let event: Object = ctx.get(0)?;
         let event = TracerEvent::parse(
@@ -58,33 +55,19 @@ pub fn register(env: &Env, pi: Object) -> Result<bool> {
             event.get_named_property("name")?,
         )
         .map_err(|error| Error::from_reason(error.to_string()))?;
-        let callback_state = Arc::clone(&callback_state);
+        let callback_state = callback_state.clone();
         PromiseRaw::resolve(ctx.env, ())?.then(move |_| {
-            let mut state = callback_state
-                .lock()
-                .map_err(|_| Error::from_reason(TracerError::Unavailable.to_string()))?;
-            let active = state
-                .as_mut()
-                .ok_or_else(|| Error::from_reason(TracerError::Unavailable.to_string()))?;
-            Ok(active.dispatch(event))
+            callback_state
+                .with(|state| state.dispatch(event))
+                .map_err(|_| Error::from_reason(TracerError::Unavailable.to_string()))
         })
     })?;
-    let shutdown_state = Arc::clone(&state);
-    let shutdown =
-        env.create_function_from_closure("toolPermissionsTracerShutdown", move |_| {
-            let mut state = shutdown_state
-                .lock()
-                .map_err(|_| Error::from_reason(TracerError::Unavailable.to_string()))?;
-            Ok(state.take().is_some())
-        })?;
-    let result = pi
-        .on(OnCallback::SessionShutdown, shutdown)
-        .and_then(|()| pi.on(OnCallback::SessionInfoChanged, handler));
-    if let Err(error) = result {
-        if let Ok(mut state) = state.lock() {
-            state.take();
-        }
-        return Err(error);
+    pi.on(OnCallback::SessionInfoChanged, handler)
     }
+}
+
+pub fn register(env: &Env, pi: Object) -> Result<bool> {
+    let pi = Pi::new(env, pi)?;
+    SessionScoped::new(Tracer::default()).register(env, &pi)?;
     Ok(true)
 }
