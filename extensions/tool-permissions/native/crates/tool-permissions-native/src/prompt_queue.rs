@@ -335,6 +335,16 @@ mod tests {
     }
 
     #[test]
+    fn presenter_reference_does_not_erase_a_promise_lifetime() {
+        let source = include_str!("prompt_queue.rs");
+        let implementation = source.split("#[cfg(test)]\nmod tests").next().unwrap();
+        assert!(
+            !implementation.contains("std::mem::transmute(reference)"),
+            "the presenter reference must not forge a static promise lifetime"
+        );
+    }
+
+    #[test]
     fn allow_stays_bound_to_the_tool_call_that_opened_the_prompt() {
         let response = complete(
             PromptQueueRequest {
