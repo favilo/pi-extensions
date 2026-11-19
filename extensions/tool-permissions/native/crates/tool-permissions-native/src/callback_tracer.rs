@@ -1,6 +1,6 @@
 use napi::bindgen_prelude::{JsObjectValue, Object, PromiseRaw};
 use napi::{Env, Error, Result};
-use pi_api::{OnCallback, Pi, SessionCallbacks, SessionScoped};
+use pi_api::{OnCallback, Pi, ScopedCallbacks, SessionCallbacks, SessionScoped};
 use thiserror::Error as ThisError;
 
 #[derive(Debug, ThisError)]
@@ -45,8 +45,8 @@ pub struct TracerResponse {
     pub dispatch_count: u32,
 }
 
-impl SessionCallbacks for Tracer {
-    fn register_callbacks(scope: &SessionScoped<Self>, env: &Env, pi: &Pi) -> Result<()> {
+impl ScopedCallbacks for Tracer {
+    fn register_scoped(scope: &SessionScoped<Self>, env: &Env, pi: &Pi) -> Result<()> {
         let callback_state = scope.clone();
         let handler = env.create_function_from_closure("toolPermissionsTracer", move |ctx| {
             let event: Object = ctx.get(0)?;
@@ -68,6 +68,6 @@ impl SessionCallbacks for Tracer {
 
 pub fn register(env: &Env, pi: Object) -> Result<bool> {
     let pi = Pi::new(env, pi)?;
-    SessionScoped::new(Tracer::default()).register(env, &pi)?;
+    SessionScoped::new(Tracer::default()).register_callbacks(env, &pi)?;
     Ok(true)
 }

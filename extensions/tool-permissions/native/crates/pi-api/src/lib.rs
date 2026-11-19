@@ -11,7 +11,7 @@ mod session_scope;
 pub use bridge::{Bridge, CallbackPresence};
 pub use on_callback::OnCallback;
 pub use path_host::{PathHost, RealpathCallback};
-pub use session_scope::{SessionCallbacks, SessionScopeError, SessionScoped};
+pub use session_scope::{ScopedCallbacks, SessionCallbacks, SessionScopeError, SessionScoped};
 
 use napi::bindgen_prelude::{
     FnArgs, FromNapiValue, Function, JsObjectValue, JsValue, Object, Unknown,

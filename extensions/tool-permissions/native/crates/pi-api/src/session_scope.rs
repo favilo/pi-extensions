@@ -4,16 +4,28 @@ use napi::{Env, Result};
 
 use crate::{OnCallback, Pi};
 
-pub trait SessionCallbacks: Sized + 'static {
-    fn register_callbacks(scope: &SessionScoped<Self>, env: &Env, pi: &Pi) -> Result<()>;
+/// An object that can register its Pi callbacks.
+pub trait SessionCallbacks {
+    fn register_callbacks(self, env: &Env, pi: &Pi) -> Result<()>;
+}
+
+/// Defines the callbacks installed for one revocable session object.
+pub trait ScopedCallbacks: Sized + 'static {
+    fn register_scoped(scope: &SessionScoped<Self>, env: &Env, pi: &Pi) -> Result<()>;
 }
 
 #[derive(Debug, thiserror::Error)]
 pub enum SessionScopeError {
     #[error("session state is unavailable")]
     Unavailable,
+    #[error("session state is busy")]
+    Busy,
 }
 
+/// Shares an owned session object across callbacks and revokes it on shutdown.
+///
+/// This temporarily retains the original lock-based implementation while the
+/// lifecycle contract is being introduced.
 pub struct SessionScoped<T> {
     state: Arc<Mutex<Option<T>>>,
 }
@@ -50,13 +62,16 @@ impl<T: 'static> SessionScoped<T> {
             .state
             .lock()
             .map_err(|_| SessionScopeError::Unavailable)?;
-        Ok(state.take().is_some())
+        let removed = state.take();
+        drop(state);
+        let was_active = removed.is_some();
+        drop(removed);
+        Ok(was_active)
     }
+}
 
-    pub fn register(self, env: &Env, pi: &Pi) -> Result<()>
-    where
-        T: SessionCallbacks,
-    {
+impl<T: ScopedCallbacks> SessionCallbacks for SessionScoped<T> {
+    fn register_callbacks(self, env: &Env, pi: &Pi) -> Result<()> {
         let shutdown_scope = self.clone();
         let handler = env.create_function_from_closure("piSessionShutdown", move |_| {
             shutdown_scope
@@ -70,7 +85,7 @@ impl<T: 'static> SessionScoped<T> {
         let result = pi
             .on(OnCallback::SessionShutdown, handler)
             .and_then(|()| ensure_active())
-            .and_then(|()| T::register_callbacks(&self, env, pi))
+            .and_then(|()| T::register_scoped(&self, env, pi))
             .and_then(|()| ensure_active());
         if let Err(error) = result {
             let _ = self.close();
