@@ -77,6 +77,14 @@ pub fn register_tool_permissions_callbacks(
 }
 
 #[napi]
+pub fn register_callback_tracer(
+    _env: Env,
+    _pi: napi::bindgen_prelude::Object,
+) -> Result<bool> {
+    Ok(false)
+}
+
+#[napi]
 pub fn evaluate_permission_orchestration(
     request: PermissionOrchestrationRequest,
 ) -> Result<PermissionOrchestrationResponse> {
