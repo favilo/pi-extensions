@@ -240,6 +240,29 @@ test("bundled Rust registration calls pi.on and registerCommand for delegated ca
   assert.deepEqual(handledCommands, [{ args: "local", ctx: commandContext }]);
 });
 
+test("Rust callback dispatches after tracer initialization returns", async () => {
+  const native = createRequire(import.meta.url)("./native/generated/index.js") as {
+    registerCallbackTracer: (pi: unknown) => boolean;
+  };
+  const handlers = new Map<string, (event: unknown, ctx: unknown) => unknown>();
+  const registered = native.registerCallbackTracer({
+    on(eventName: string, handler: (event: unknown, ctx: unknown) => unknown) {
+      handlers.set(eventName, handler);
+    },
+    registerCommand() {},
+    registerEntryRenderer() {},
+  });
+
+  assert.equal(registered, true);
+  const handler = handlers.get("session_info_changed");
+  assert.ok(handler);
+  await Promise.resolve();
+  assert.deepEqual(await handler({ message: "after initialization" }, {}), {
+    message: "after initialization",
+    dispatchCount: 1,
+  });
+});
+
 test("native registration falls back without installing duplicate callbacks", () => {
   const handlers: Array<string> = [];
   withNativeRegistrationModule(compatibleProbe, () => {
