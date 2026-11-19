@@ -71,10 +71,16 @@ struct QueuedPrompt {
 }
 
 #[cfg(test)]
-#[derive(Default)]
-struct PromptQueue {
-    active: Option<ToolCallId>,
-    pending: VecDeque<ToolCallId>,
+struct PromptQueue<T = ToolCallId> {
+    active: Option<T>,
+    pending: VecDeque<T>,
+}
+
+#[cfg(test)]
+impl<T> Default for PromptQueue<T> {
+    fn default() -> Self {
+        Self { active: None, pending: VecDeque::new() }
+    }
 }
 
 #[derive(Debug, Eq, PartialEq)]
@@ -84,8 +90,8 @@ enum QueuePosition {
 }
 
 #[cfg(test)]
-impl PromptQueue {
-    fn submit(&mut self, tool_call_id: ToolCallId) -> QueuePosition {
+impl<T> PromptQueue<T> {
+    fn submit(&mut self, tool_call_id: T) -> QueuePosition {
         if self.active.is_none() {
             self.active = Some(tool_call_id);
             QueuePosition::Active
@@ -95,13 +101,18 @@ impl PromptQueue {
         }
     }
 
-    fn complete(&mut self, tool_call_id: &ToolCallId) -> Option<ToolCallId> {
+    fn complete(&mut self, tool_call_id: &T) -> Option<T>
+    where
+        T: PartialEq + Clone,
+    {
         if self.active.as_ref() != Some(tool_call_id) {
             return None;
         }
         self.active = self.pending.pop_front();
         self.active.clone()
     }
+
+    fn close(&mut self) {}
 }
 
 #[derive(Default)]
