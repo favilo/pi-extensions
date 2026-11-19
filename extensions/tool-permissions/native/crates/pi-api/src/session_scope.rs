@@ -2,7 +2,7 @@ use std::sync::{Arc, Mutex};
 
 use napi::{Env, Result};
 
-use crate::Pi;
+use crate::{OnCallback, Pi};
 
 pub trait SessionCallbacks: Sized + 'static {
     fn register_callbacks(scope: &SessionScoped<Self>, env: &Env, pi: &Pi) -> Result<()>;
@@ -33,14 +33,23 @@ impl<T: 'static> SessionScoped<T> {
         }
     }
 
-    pub fn with<R>(&self, action: impl FnOnce(&mut T) -> R) -> std::result::Result<R, SessionScopeError> {
-        let mut state = self.state.lock().map_err(|_| SessionScopeError::Unavailable)?;
+    pub fn with<R>(
+        &self,
+        action: impl FnOnce(&mut T) -> R,
+    ) -> std::result::Result<R, SessionScopeError> {
+        let mut state = self
+            .state
+            .lock()
+            .map_err(|_| SessionScopeError::Unavailable)?;
         let active = state.as_mut().ok_or(SessionScopeError::Unavailable)?;
         Ok(action(active))
     }
 
     pub fn close(&self) -> std::result::Result<bool, SessionScopeError> {
-        let mut state = self.state.lock().map_err(|_| SessionScopeError::Unavailable)?;
+        let mut state = self
+            .state
+            .lock()
+            .map_err(|_| SessionScopeError::Unavailable)?;
         Ok(state.take().is_some())
     }
 
@@ -48,7 +57,19 @@ impl<T: 'static> SessionScoped<T> {
     where
         T: SessionCallbacks,
     {
-        let _ = (env, pi);
+        let shutdown_scope = self.clone();
+        let handler = env.create_function_from_closure("piSessionShutdown", move |_| {
+            shutdown_scope
+                .close()
+                .map_err(|error| napi::Error::from_reason(error.to_string()))
+        })?;
+        let result = pi
+            .on(OnCallback::SessionShutdown, handler)
+            .and_then(|()| T::register_callbacks(&self, env, pi));
+        if let Err(error) = result {
+            let _ = self.close();
+            return Err(error);
+        }
         Ok(())
     }
 }
@@ -56,7 +77,10 @@ impl<T: 'static> SessionScoped<T> {
 #[cfg(test)]
 mod tests {
     use super::SessionScoped;
-    use std::sync::{Arc, atomic::{AtomicUsize, Ordering}};
+    use std::sync::{
+        Arc,
+        atomic::{AtomicUsize, Ordering},
+    };
 
     struct State {
         drops: Arc<AtomicUsize>,
@@ -72,9 +96,20 @@ mod tests {
     #[test]
     fn closing_one_scope_revokes_all_handles_and_drops_state_once() {
         let drops = Arc::new(AtomicUsize::new(0));
-        let scope = SessionScoped::new(State { drops: Arc::clone(&drops), count: 0 });
+        let scope = SessionScoped::new(State {
+            drops: Arc::clone(&drops),
+            count: 0,
+        });
         let callback = scope.clone();
-        assert_eq!(callback.with(|state| { state.count += 1; state.count }).unwrap(), 1);
+        assert_eq!(
+            callback
+                .with(|state| {
+                    state.count += 1;
+                    state.count
+                })
+                .unwrap(),
+            1
+        );
         assert!(scope.close().unwrap());
         assert_eq!(drops.load(Ordering::SeqCst), 1);
         assert!(callback.with(|state| state.count).is_err());

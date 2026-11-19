@@ -47,22 +47,22 @@ pub struct TracerResponse {
 
 impl SessionCallbacks for Tracer {
     fn register_callbacks(scope: &SessionScoped<Self>, env: &Env, pi: &Pi) -> Result<()> {
-    let callback_state = scope.clone();
-    let handler = env.create_function_from_closure("toolPermissionsTracer", move |ctx| {
-        let event: Object = ctx.get(0)?;
-        let event = TracerEvent::parse(
-            event.get_named_property("type")?,
-            event.get_named_property("name")?,
-        )
-        .map_err(|error| Error::from_reason(error.to_string()))?;
-        let callback_state = callback_state.clone();
-        PromiseRaw::resolve(ctx.env, ())?.then(move |_| {
-            callback_state
-                .with(|state| state.dispatch(event))
-                .map_err(|_| Error::from_reason(TracerError::Unavailable.to_string()))
-        })
-    })?;
-    pi.on(OnCallback::SessionInfoChanged, handler)
+        let callback_state = scope.clone();
+        let handler = env.create_function_from_closure("toolPermissionsTracer", move |ctx| {
+            let event: Object = ctx.get(0)?;
+            let event = TracerEvent::parse(
+                event.get_named_property("type")?,
+                event.get_named_property("name")?,
+            )
+            .map_err(|error| Error::from_reason(error.to_string()))?;
+            let callback_state = callback_state.clone();
+            PromiseRaw::resolve(ctx.env, ())?.then(move |_| {
+                callback_state
+                    .with(|state| state.dispatch(event))
+                    .map_err(|_| Error::from_reason(TracerError::Unavailable.to_string()))
+            })
+        })?;
+        pi.on(OnCallback::SessionInfoChanged, handler)
     }
 }
 
