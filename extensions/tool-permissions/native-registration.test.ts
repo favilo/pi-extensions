@@ -260,7 +260,10 @@ test("Rust callback dispatches after tracer initialization returns", async () =>
   assert.ok(handler);
   await Promise.resolve();
   assert.deepEqual(
-    await handler({ type: "session_info_changed", name: "after initialization" }, {}),
+    await handler(
+      { type: "session_info_changed", name: "after initialization" },
+      {},
+    ),
     { name: "after initialization", dispatchCount: 1 },
   );
 });
@@ -307,12 +310,17 @@ test("Rust tracer releases session state at shutdown and rejects stale callbacks
   assert.ok(handler);
   assert.ok(shutdown);
   assert.deepEqual(
-    await handler({ type: "session_info_changed", name: "before shutdown" }, {}),
+    await handler(
+      { type: "session_info_changed", name: "before shutdown" },
+      {},
+    ),
     { name: "before shutdown", dispatchCount: 1 },
   );
   assert.equal(await shutdown({}, {}), true);
   await assert.rejects(
-    Promise.resolve(handler({ type: "session_info_changed", name: "after shutdown" }, {})),
+    Promise.resolve(
+      handler({ type: "session_info_changed", name: "after shutdown" }, {}),
+    ),
   );
   assert.equal(await shutdown({}, {}), false);
 });
@@ -357,7 +365,10 @@ test("Rust tracer owns asynchronous dispatch after callback return", async () =>
   });
   const handler = handlers.get("session_info_changed");
   assert.ok(handler);
-  const pending = handler({ type: "session_info_changed", name: "asynchronous" }, {});
+  const pending = handler(
+    { type: "session_info_changed", name: "asynchronous" },
+    {},
+  );
   assert.ok(pending instanceof Promise);
   assert.deepEqual(await pending, {
     name: "asynchronous",
