@@ -1,7 +1,7 @@
-active_flow: develop-tdd
-active_epic_id: e18
-active_story_id: e18s06
-active_story: Remove the TypeScript permission fallback
+active_flow: elaborate-spec
+active_epic_id: null
+active_story_id: null
+active_story: Design a full-Rust tool-permissions orchestration epic
 active_bug_id: null
 git:
   bookmark: favilo/e18s06-remove-typescript-fallback
@@ -93,8 +93,11 @@ planning:
     constraints:
     - Do not modify the e06 repair flow or child-private bridge catalog.
 handoff:
-  last_step_completed: e18s06 develop-tdd plan approved; tracer RED in progress
+  last_step_completed: e18s06 tasks 1-2 implemented; task 3 scope corrected
   open_decisions:
+  - Define the target Rust-owned Pi event orchestration API and the minimum JavaScript host bridge.
+  - Decide story slicing for session start, tool calls, prompts/steering, tool results, shutdown,
+    commands, and entry rendering.
   - e18s07 proves the prompt-queue FunctionRef lifetime erasure under Miri before that
     pattern is copied.
   required_reading:
@@ -104,11 +107,17 @@ handoff:
   - .specs/epics/e18-wasm-only-tool-permissions/e18s06-remove-typescript-fallback.md
   - .specs/epics/e18-wasm-only-tool-permissions/e18s06-tasks.yaml
   - .specs/security/epics/e18/THREAT_MODEL.md
-  next_skill: develop-tdd
-  context: 'Work in .workspaces/e18s04-prompt-queue on favilo/e18s06-remove-typescript-fallback.
-    Tracer bullet: missing WASM denies protected calls without a TypeScript engine.
-    Use jj only; do not push unless asked.'
-  blocker: null
+  - extensions/tool-permissions/index.ts
+  - extensions/tool-permissions/native/crates/tool-permissions-native/src/registration.rs
+  next_skill: elaborate-spec
+  context: 'Scope correction: e18 moved individual operations into Rust but its registration
+    layer still forwards every Pi lifecycle/tool callback to TypeScript. e18s06 task 3 cannot
+    truthfully reduce index.ts to a WASM loader without a new epic that moves complete Pi-event
+    orchestration into Rust. e18s06 tasks 1-2 are implemented: no TS fallback, load failure is
+    fatal with npm run build:native guidance. Defer task 3 and task 4 until the new epic is
+    designed in a fresh context. Use jj only; do not push unless asked.'
+  blocker: 'e18s06 task 3 requires a new full-Rust orchestration epic; the existing e18 plan
+    understates this work.'
   deferred_work:
   - Consolidate safeStringify and JSON formatting helpers into a shared utility module
   - Persist completed and active child sessions for later external analysis

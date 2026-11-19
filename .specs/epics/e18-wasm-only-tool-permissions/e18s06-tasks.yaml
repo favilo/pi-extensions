@@ -28,22 +28,22 @@ tasks:
         - "Native Boundary"
         - "Security Review"
   - id: 3
-    description: Reduce extensions/tool-permissions/index.ts to WASM instantiation and registration. No new security findings in affected paths.
+    description: Reduce extensions/tool-permissions/index.ts to WASM instantiation and registration. Deferred: requires a new full-Rust Pi-event orchestration epic because registration still forwards lifecycle and tool callbacks into TypeScript. No new security findings in affected paths.
     verify: node --test extensions/tool-permissions/native-no-typescript-fallback.test.ts extensions/tool-permissions/native-package.test.ts
     risk: P0
     security: high
-    status: failing
+    status: deferred
     allure:
       severity: critical
       categories:
         - "Integration"
         - "Security Review"
   - id: 4
-    description: Run the native build and full checks. No new security findings in affected paths.
+    description: Run the native build and full checks. Deferred until task 3's replacement epic delivers Rust-owned Pi-event orchestration. No new security findings in affected paths.
     verify: npm run build:native && npm run check
     risk: P1
     security: high
-    status: failing
+    status: deferred
     allure:
       severity: high
       categories:
