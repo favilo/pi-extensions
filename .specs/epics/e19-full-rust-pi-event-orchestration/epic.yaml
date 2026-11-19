@@ -13,7 +13,7 @@ stories:
     spec: e19s01-safe-rust-callback-lifetime.md
     tasks: e19s01-tasks.yaml
   - id: e19s02
-    title: Validate prompt queue FunctionRef lifetime under Miri
+    title: Use typed async prompt orchestration
     bcps: 3
     status: todo
     delta: ADDED

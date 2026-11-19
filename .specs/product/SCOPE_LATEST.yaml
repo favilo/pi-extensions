@@ -15,9 +15,9 @@ summary: |-
   loads extensions through it, but it only loads the WASM module and provides
   the Pi API to one Rust initialization export.
 
-  The first two stories remove lifetime uncertainty before behavior migration:
+  The first two stories reduce lifetime uncertainty before behavior migration:
   a safe callback-lifetime spike proves the registration mechanism, followed
-  immediately by the Miri prompt-queue FunctionRef validation moved from e18s07.
+  by typed async prompt orchestration and host-boundary lifecycle tests.
 in_scope:
   - future_story_id: e19s01
     outcome: >-
@@ -27,8 +27,9 @@ in_scope:
       unsafe lifetime extension.
   - future_story_id: e19s02
     outcome: >-
-      Miri validates the prompt queue FunctionRef lifetime design moved from
-      e18s07 before that pattern is used by migrated orchestration callbacks.
+      A Tokio-free runtime and typed Rust async prompt queue preserve FIFO,
+      JavaScript-thread dispatch, cancellation, and fail-closed lifecycle behavior.
+      Miri may supplement Rust-owned tests but does not prove N-API host lifetimes.
   - future_story_id: e19s03
     outcome: >-
       Rust owns direct Pi registration for lifecycle, tool, command, and entry
@@ -84,7 +85,7 @@ constraints:
   - Missing or invalid WASM must fail closed; it must never authorize a tool call.
 success_criteria:
   - The safe callback-lifetime spike passes its native integration contract without unsafe lifetime code.
-  - Miri passes for the migrated prompt-queue FunctionRef lifetime validation before production migration relies on that pattern.
+  - Typed async prompt orchestration passes WASM integration, lifecycle, and fail-closed tests before production migration relies on it.
   - Rust registers and implements every Pi callback used by tool-permissions.
   - No TypeScript callback handler, handler lookup, callback bridge object, permission behavior, or fallback remains.
   - index.ts only loads WASM and invokes the single Rust initialization handoff.

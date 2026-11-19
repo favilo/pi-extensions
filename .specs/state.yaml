@@ -1,7 +1,7 @@
 active_flow: build_epic
 active_epic_id: e19
 active_story_id: e19s02
-active_story: Validate prompt queue FunctionRef lifetime under Miri
+active_story: Use typed async prompt orchestration
 active_bug_id: null
 git:
   bookmark: favilo/e18s06-remove-typescript-fallback
@@ -93,11 +93,12 @@ planning:
     constraints:
     - Do not modify the e06 repair flow or child-private bridge catalog.
 handoff:
-  last_step_completed: e19s01 accepted; e19s02 removed presenter transmute and unsafe deferred Send, added Clippy defaults, and researched Tokio-free Promise integration
+  last_step_completed: e19s01 accepted; e19s02 Tokio-free async runtime story and task ledger updated for develop-tdd
   open_decisions:
   - Verify that napi-async-runtime CurrentThread works with the generated WASI loader and preserves queue and teardown behavior before committing to it.
   required_reading:
   - .specs/product/SCOPE_LATEST.yaml
+  - .specs/IMPACT-e19-e19s02.md
   - .specs/epics/e19-full-rust-pi-event-orchestration/epic.yaml
   - .specs/epics/e19-full-rust-pi-event-orchestration/e19s02-miri-prompt-queue.md
   - .specs/epics/e19-full-rust-pi-event-orchestration/e19s02-tasks.yaml
@@ -113,14 +114,12 @@ handoff:
 
     Use a ThreadsafeFunction with call_async_catch to invoke the presenter on its owning JavaScript thread; await the callback invocation and then the returned typed Promise. Do not retain Env or borrowed JavaScript handles across suspension. Do not block_on the Pi JavaScript thread. Preserve single-queue FIFO, identity binding, cancellation, shutdown, and fail-closed behavior. Test synchronous throws, rejected and malformed results, cancellation, teardown, and the real WASM loader. Keep runtime bootstrap separate from production TypeScript permission callback glue. TypeScript currently calls decidePrompt through native-prompt-queue.ts; production migration is later e19 work.
 
-    Current committed state: presenter FunctionRef transmute was removed; a typed PromiseRaw<'static, ...> signature marker remains and is narrowed to invocation lifetime. Raw deferred handles and unsafe impl Send were replaced with napi::JsDeferred; the queue remains process-global and uses an environment cleanup hook. Generated TypeScript declares Promise<PromptQueueResponse>. Workspace Clippy all and pedantic are warnings; undocumented_unsafe_blocks is denied and npm run check runs Clippy. e19s02 remains in progress, not complete. Miri passed Rust-owned queue tests only; it does not validate N-API or JavaScript environment lifetimes. The original Miri-specific story and task descriptions are stale relative to the user's updated direction; reconcile them without claiming host-lifetime proof.
+    Current committed state: presenter FunctionRef transmute was removed; a typed PromiseRaw<'static, ...> signature marker remains and is narrowed to invocation lifetime. Raw deferred handles and unsafe impl Send were replaced with napi::JsDeferred; the queue remains process-global and uses an environment cleanup hook. Generated TypeScript declares Promise<PromptQueueResponse>. Workspace Clippy all and pedantic are warnings; undocumented_unsafe_blocks is denied and npm run check runs Clippy. e19s02 remains in progress, not complete. Miri passed Rust-owned queue tests only; it does not validate N-API or JavaScript environment lifetimes. The story and task ledger reflect the user's updated direction; do not claim Miri proves host-lifetime safety.
 
     Prior art: local napi 3.16.2 promise.rs and threadsafe_function.rs; napi-async-runtime 0.2.10 src/lib.rs, src/adapter.rs and src/js_callback.rs in the Cargo registry; https://napi.rs/docs/concepts/async-runtime and https://docs.rs/napi-async-runtime/0.2.10/napi_async_runtime/. CurrentThread on WASM needs loader task and timer hosts; the runtime crate does not install itself. The user's desired approach does not require Tokio.
 
     Follow repository TDD: behavioral RED and GREEN in separate jj changes; run tests and jj commit in separate Bash calls. No raw git commands. No push unless asked. Keep working directory at project root for Bigpowers scripts and invoke them only via $BIGPOWERS_ROOT/scripts absolute path.
-  blocker: 'Bigpowers plan-consistency-check.sh currently depends on host Python PyYAML and must
-    be migrated to the planned repository-local uv environment before the e19 plan consistency
-    gate can pass in this environment.'
+  blocker: 'Bigpowers plan-consistency-check.sh exited 1 without findings when invoked with the e19 capsule on 2026-11-19. Its Python environment resolved to the Bigpowers .venv; diagnose the early exit and resolve the plan gate before implementation. The earlier missing-PyYAML observation may be stale.'
   deferred_work:
   - Consolidate safeStringify and JSON formatting helpers into a shared utility module
   - Persist completed and active child sessions for later external analysis

@@ -1,29 +1,52 @@
 story_id: e19s02
-title: Validate prompt queue FunctionRef lifetime under Miri
+title: Use typed async prompt orchestration
 status: failing
 bcps: 3
+spec: e19s02-miri-prompt-queue.md
 tasks:
   - id: 1
-    description: Move the e18s07 Miri lifetime contract and its documented FunctionRef safety assumptions into e19.
-    verify: cargo miri test -p tool-permissions-native prompt_queue
+    description: Prove the Tokio-free CurrentThread runtime and generated WASM loader execute and settle an asynchronous tracer; verify compatible dependency versions and no new security findings in affected paths.
+    verify: npm run build:native && npx tsx --test extensions/tool-permissions/native-prompt-queue.test.ts
     risk: P0
     security: high
     status: failing
     allure:
       severity: critical
       categories:
-        - Miri
-        - Lifetime safety
+        - WASM runtime
         - Security Review
   - id: 2
-    description: Run Miri against the prompt queue lifetime scenario and correct safe ownership boundaries until the contract passes.
-    verify: cargo miri test -p tool-permissions-native prompt_queue
+    description: Use a typed threadsafe presenter callback and Rust-awaitable Promise while retaining one FIFO queue and request identity; verify no new security findings in affected paths.
+    verify: npm run build:native && npx tsx --test extensions/tool-permissions/native-prompt-queue.test.ts
     risk: P0
     security: high
     status: failing
     allure:
       severity: critical
       categories:
-        - Miri
-        - Lifetime safety
+        - Callback safety
+        - Native integration
+        - Security Review
+  - id: 3
+    description: Prove synchronous throws, rejections, malformed results, cancellation, shutdown, and late settlements fail closed without stranding later prompts; verify no new security findings in affected paths.
+    verify: npm run build:native && npx tsx --test extensions/tool-permissions/native-prompt-queue.test.ts
+    risk: P0
+    security: high
+    status: failing
+    allure:
+      severity: critical
+      categories:
+        - Fail-closed authorization
+        - Lifecycle safety
+        - Security Review
+  - id: 4
+    description: Run the complete project quality gate and review affected code for new security findings.
+    verify: npm run check
+    risk: P0
+    security: high
+    status: failing
+    allure:
+      severity: critical
+      categories:
+        - Regression
         - Security Review
