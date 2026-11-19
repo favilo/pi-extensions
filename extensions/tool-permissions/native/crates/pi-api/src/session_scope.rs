@@ -63,9 +63,15 @@ impl<T: 'static> SessionScoped<T> {
                 .close()
                 .map_err(|error| napi::Error::from_reason(error.to_string()))
         })?;
+        let ensure_active = || {
+            self.with(|_| ())
+                .map_err(|error| napi::Error::from_reason(error.to_string()))
+        };
         let result = pi
             .on(OnCallback::SessionShutdown, handler)
-            .and_then(|()| T::register_callbacks(&self, env, pi));
+            .and_then(|()| ensure_active())
+            .and_then(|()| T::register_callbacks(&self, env, pi))
+            .and_then(|()| ensure_active());
         if let Err(error) = result {
             let _ = self.close();
             return Err(error);
