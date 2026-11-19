@@ -22,6 +22,7 @@ import toolPermissionPolicy, {
   resolveToolPermissionDecision,
 } from "./index.ts";
 import { setNativePackagePathForTests } from "./native-package.ts";
+import { withCapturedProcessExit } from "./native-host-test-support.ts";
 
 test("native registration owns lifecycle, command, and tool callback wiring without duplicates", async () => {
   const directory = mkdtempSync(
@@ -241,20 +242,22 @@ test("missing WASM fails at load instead of using a TypeScript fallback", () => 
   );
   delete process.env.PI_TOOL_PERMISSIONS_NATIVE_PACKAGE;
   delete process.env.PI_TOOL_PERMISSIONS_NATIVE_DISABLE;
+  const previousError = console.error;
+  console.error = () => {};
   try {
-    assert.throws(
-      () =>
-        toolPermissionPolicy({
-          registerCommand() {},
-          registerEntryRenderer() {},
-          on(event: string) {
-            handlers.push(event);
-          },
-        } as never),
-      /wasm|native|unavailable|did not load|no alternate/i,
+    const { exitCode } = withCapturedProcessExit(() =>
+      toolPermissionPolicy({
+        registerCommand() {},
+        registerEntryRenderer() {},
+        on(event: string) {
+          handlers.push(event);
+        },
+      } as never),
     );
+    assert.equal(exitCode, 1);
     assert.equal(handlers.includes("tool_call"), false);
   } finally {
+    console.error = previousError;
     restoreNativePackagePath();
     if (previousPackage === undefined)
       delete process.env.PI_TOOL_PERMISSIONS_NATIVE_PACKAGE;
@@ -271,20 +274,22 @@ test("explicit native disable fails at load instead of probing TypeScript", () =
   const handlers: string[] = [];
   process.env.PI_TOOL_PERMISSIONS_NATIVE_DISABLE = "1";
   delete process.env.PI_TOOL_PERMISSIONS_NATIVE_PACKAGE;
+  const previousError = console.error;
+  console.error = () => {};
   try {
-    assert.throws(
-      () =>
-        toolPermissionPolicy({
-          registerCommand() {},
-          registerEntryRenderer() {},
-          on(event: string) {
-            handlers.push(event);
-          },
-        } as never),
-      /wasm|native|unavailable|did not load|no alternate/i,
+    const { exitCode } = withCapturedProcessExit(() =>
+      toolPermissionPolicy({
+        registerCommand() {},
+        registerEntryRenderer() {},
+        on(event: string) {
+          handlers.push(event);
+        },
+      } as never),
     );
+    assert.equal(exitCode, 1);
     assert.equal(handlers.includes("tool_call"), false);
   } finally {
+    console.error = previousError;
     if (previousPackage === undefined)
       delete process.env.PI_TOOL_PERMISSIONS_NATIVE_PACKAGE;
     else process.env.PI_TOOL_PERMISSIONS_NATIVE_PACKAGE = previousPackage;

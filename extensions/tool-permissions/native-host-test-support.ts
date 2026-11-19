@@ -81,6 +81,28 @@ export function withNativeHostPackage(
   }
 }
 
+/** Capture process.exit so fatal native-load crashes are testable. */
+export function withCapturedProcessExit(run: () => void): {
+  exitCode: number | undefined;
+  error: Error | undefined;
+} {
+  const previousExit = process.exit;
+  let exitCode: number | undefined;
+  let error: Error | undefined;
+  process.exit = ((code?: number) => {
+    exitCode = code ?? 0;
+    throw new Error(`process.exit(${exitCode})`);
+  }) as typeof process.exit;
+  try {
+    run();
+  } catch (caught) {
+    error = caught instanceof Error ? caught : new Error(String(caught));
+  } finally {
+    process.exit = previousExit;
+  }
+  return { exitCode, error };
+}
+
 /** Minimal ExtensionAPI surface that satisfies native registration. */
 export function createTestExtensionHost(options?: {
   on?: (event: string, handler: (...args: never[]) => unknown) => void;

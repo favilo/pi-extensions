@@ -18,7 +18,10 @@ import {
 import toolPermissionPolicy, { createToolPermissionBoundary } from "./index.ts";
 import { evaluatePathTrust } from "./native-path-trust.ts";
 import { setNativePackagePathForTests } from "./native-package.ts";
-import { NATIVE_REGISTRATION_STUB } from "./native-host-test-support.ts";
+import {
+  NATIVE_REGISTRATION_STUB,
+  withCapturedProcessExit,
+} from "./native-host-test-support.ts";
 import { executeToolRequest, type ToolRequest } from "./permission-boundary.ts";
 import { resolveScopedPermissionDecision } from "./scope.ts";
 
@@ -844,21 +847,23 @@ test("a disabled native package fails at load instead of using TypeScript .aiign
   const previous = process.env.PI_TOOL_PERMISSIONS_NATIVE_DISABLE;
   process.env.PI_TOOL_PERMISSIONS_NATIVE_DISABLE = "1";
   const handlers: string[] = [];
+  const previousError = console.error;
+  console.error = () => {};
   try {
-    assert.throws(
-      () =>
-        toolPermissionPolicy({
-          registerCommand() {},
-          registerEntryRenderer() {},
-          on(event: string) {
-            handlers.push(event);
-          },
-          getAllTools: () => [],
-        } as never),
-      /wasm|native|unavailable|did not load|no alternate/i,
+    const { exitCode } = withCapturedProcessExit(() =>
+      toolPermissionPolicy({
+        registerCommand() {},
+        registerEntryRenderer() {},
+        on(event: string) {
+          handlers.push(event);
+        },
+        getAllTools: () => [],
+      } as never),
     );
+    assert.equal(exitCode, 1);
     assert.equal(handlers.includes("tool_call"), false);
   } finally {
+    console.error = previousError;
     if (previous === undefined)
       delete process.env.PI_TOOL_PERMISSIONS_NATIVE_DISABLE;
     else process.env.PI_TOOL_PERMISSIONS_NATIVE_DISABLE = previous;

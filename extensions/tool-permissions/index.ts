@@ -83,6 +83,7 @@ import {
   hasNativeRegistration,
   registerNativeToolPermissionsCallbacks,
 } from "./native-registration-loader.ts";
+import { fatalNativeEngineUnavailable } from "./native-load-fatal.ts";
 import type {
   PermissionDecision,
   ToolPermissionBoundary,
@@ -2829,14 +2830,10 @@ export default function toolPermissionPolicy(pi: ExtensionAPI) {
   });
 
   if (nativeRegistration.mode !== "native") {
-    throw new Error(
-      `WASM permission engine unavailable; no alternate engine ran. ${nativeRegistration.reason}`,
-    );
+    fatalNativeEngineUnavailable(nativeRegistration.reason);
   }
 
   if (!hasNativeRegistration(nativeRegistration, "tool_call")) {
-    throw new Error(
-      "WASM permission engine incomplete; missing tool_call; no alternate engine ran.",
-    );
+    fatalNativeEngineUnavailable("native registration is incomplete; missing tool_call");
   }
 }

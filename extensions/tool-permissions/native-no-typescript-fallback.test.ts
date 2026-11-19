@@ -6,7 +6,10 @@ import { join } from "node:path";
 import test from "node:test";
 import toolPermissionPolicy from "./index.ts";
 import { setNativePackagePathForTests } from "./native-package.ts";
-import { createTestExtensionHost } from "./native-host-test-support.ts";
+import {
+  createTestExtensionHost,
+  withCapturedProcessExit,
+} from "./native-host-test-support.ts";
 import { registerNativeToolPermissionsCallbacks } from "./native-registration-loader.ts";
 import { loadNativeProbe } from "./native-loader.ts";
 
@@ -39,27 +42,6 @@ test("a rejected native probe reports unavailable instead of a TypeScript engine
   assert.equal(result.engine, "unavailable");
   assert.match(result.reason, /package missing/);
 });
-
-function withCapturedProcessExit(run: () => void): {
-  exitCode: number | undefined;
-  error: Error | undefined;
-} {
-  const previousExit = process.exit;
-  let exitCode: number | undefined;
-  let error: Error | undefined;
-  process.exit = ((code?: number) => {
-    exitCode = code ?? 0;
-    throw new Error(`process.exit(${exitCode})`);
-  }) as typeof process.exit;
-  try {
-    run();
-  } catch (caught) {
-    error = caught instanceof Error ? caught : new Error(String(caught));
-  } finally {
-    process.exit = previousExit;
-  }
-  return { exitCode, error };
-}
 
 test("missing WASM crashes Pi with build instructions and does not authorize through TypeScript", () => {
   const previousDisable = process.env.PI_TOOL_PERMISSIONS_NATIVE_DISABLE;
@@ -131,20 +113,22 @@ exports.registerToolPermissionsCallbacks = (request, pi, bridge) => {
   delete process.env.PI_TOOL_PERMISSIONS_NATIVE_DISABLE;
   const restore = setNativePackagePathForTests(packagePath);
   const handlers: string[] = [];
+  const previousError = console.error;
+  console.error = () => {};
   try {
-    assert.throws(
-      () =>
-        toolPermissionPolicy(
-          createTestExtensionHost({
-            on(event) {
-              handlers.push(event);
-            },
-          }) as never,
-        ),
-      /wasm|native|unavailable|incomplete|tool_call|no alternate/i,
+    const { exitCode } = withCapturedProcessExit(() =>
+      toolPermissionPolicy(
+        createTestExtensionHost({
+          on(event) {
+            handlers.push(event);
+          },
+        }) as never,
+      ),
     );
+    assert.equal(exitCode, 1);
     assert.equal(handlers.includes("tool_call"), false);
   } finally {
+    console.error = previousError;
     restore();
     if (previousPackage === undefined)
       delete process.env.PI_TOOL_PERMISSIONS_NATIVE_PACKAGE;
@@ -169,20 +153,22 @@ test("invalid WASM fails at load and does not authorize through TypeScript", () 
   delete process.env.PI_TOOL_PERMISSIONS_NATIVE_DISABLE;
   const restore = setNativePackagePathForTests(packagePath);
   const handlers: string[] = [];
+  const previousError = console.error;
+  console.error = () => {};
   try {
-    assert.throws(
-      () =>
-        toolPermissionPolicy(
-          createTestExtensionHost({
-            on(event) {
-              handlers.push(event);
-            },
-          }) as never,
-        ),
-      /wasm|native|unavailable|did not load|no alternate/i,
+    const { exitCode } = withCapturedProcessExit(() =>
+      toolPermissionPolicy(
+        createTestExtensionHost({
+          on(event) {
+            handlers.push(event);
+          },
+        }) as never,
+      ),
     );
+    assert.equal(exitCode, 1);
     assert.equal(handlers.includes("tool_call"), false);
   } finally {
+    console.error = previousError;
     restore();
     if (previousPackage === undefined)
       delete process.env.PI_TOOL_PERMISSIONS_NATIVE_PACKAGE;
