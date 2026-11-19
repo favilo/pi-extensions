@@ -24,10 +24,17 @@ pub enum SessionScopeError {
 
 /// Shares an owned session object across callbacks and revokes it on shutdown.
 ///
-/// This temporarily retains the original lock-based implementation while the
-/// lifecycle contract is being introduced.
+/// Calls never run while the lifecycle mutex is held. Concurrent or reentrant
+/// access returns `Busy`; shutdown revokes access and drops an in-flight object
+/// when its current synchronous operation returns.
 pub struct SessionScoped<T> {
-    state: Arc<Mutex<Option<T>>>,
+    state: Arc<Mutex<Lifecycle<T>>>,
+}
+
+enum Lifecycle<T> {
+    Active(T),
+    Busy,
+    Closed,
 }
 
 impl<T> Clone for SessionScoped<T> {
@@ -41,7 +48,7 @@ impl<T> Clone for SessionScoped<T> {
 impl<T: 'static> SessionScoped<T> {
     pub fn new(state: T) -> Self {
         Self {
-            state: Arc::new(Mutex::new(Some(state))),
+            state: Arc::new(Mutex::new(Lifecycle::Active(state))),
         }
     }
 
@@ -53,8 +60,22 @@ impl<T: 'static> SessionScoped<T> {
             .state
             .lock()
             .map_err(|_| SessionScopeError::Unavailable)?;
-        let active = state.as_mut().ok_or(SessionScopeError::Unavailable)?;
-        Ok(action(active))
+        let object = match std::mem::replace(&mut *state, Lifecycle::Busy) {
+            Lifecycle::Active(object) => object,
+            Lifecycle::Busy => return Err(SessionScopeError::Busy),
+            Lifecycle::Closed => {
+                *state = Lifecycle::Closed;
+                return Err(SessionScopeError::Unavailable);
+            }
+        };
+        drop(state);
+        let mut lease = SessionLease {
+            scope: self,
+            object: Some(object),
+        };
+        Ok(action(
+            lease.object.as_mut().expect("session lease owns object"),
+        ))
     }
 
     pub fn close(&self) -> std::result::Result<bool, SessionScopeError> {
@@ -62,11 +83,26 @@ impl<T: 'static> SessionScoped<T> {
             .state
             .lock()
             .map_err(|_| SessionScopeError::Unavailable)?;
-        let removed = state.take();
+        let removed = std::mem::replace(&mut *state, Lifecycle::Closed);
         drop(state);
-        let was_active = removed.is_some();
+        let was_active = !matches!(removed, Lifecycle::Closed);
         drop(removed);
         Ok(was_active)
+    }
+}
+
+struct SessionLease<'a, T: 'static> {
+    scope: &'a SessionScoped<T>,
+    object: Option<T>,
+}
+
+impl<T> Drop for SessionLease<'_, T> {
+    fn drop(&mut self) {
+        if let Ok(mut state) = self.scope.state.lock() {
+            if matches!(*state, Lifecycle::Busy) {
+                *state = Lifecycle::Active(self.object.take().expect("session lease owns object"));
+            }
+        }
     }
 }
 
