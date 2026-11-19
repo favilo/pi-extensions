@@ -152,6 +152,11 @@ pub fn decide_prompt<'env>(
 }
 
 #[napi]
+pub fn trace_async_promise(_promise: PromiseRaw<'_, String>) -> String {
+    String::new()
+}
+
+#[napi]
 pub fn execute_tool<'env>(
     env: Env,
     request: ToolExecutionRequest,
