@@ -5,6 +5,11 @@ import assert from "node:assert/strict";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import {
+  createAgentSession,
+  DefaultResourceLoader,
+  SessionManager,
+} from "@earendil-works/pi-coding-agent";
 import { NATIVE_CONTRACT_VERSION } from "./native-contract.ts";
 import { setNativePackagePathForTests } from "./native-package.ts";
 import {
@@ -425,6 +430,73 @@ test("Rust tracer accepts the Pi session info changed event shape", async () => 
     await handler({ type: "session_info_changed", name: undefined }, {}),
     { dispatchCount: 2 },
   );
+});
+
+test("real Pi extension runner invokes and shuts down Rust tracer", async () => {
+  const native = createRequire(import.meta.url)(
+    "./native/generated/index.js",
+  ) as {
+    registerCallbackTracer: (pi: unknown) => boolean;
+  };
+  const directory = mkdtempSync(join(tmpdir(), "pi-tracer-runner-"));
+  const loader = new DefaultResourceLoader({
+    cwd: directory,
+    agentDir: directory,
+    noExtensions: true,
+    noSkills: true,
+    noPromptTemplates: true,
+    noThemes: true,
+    noContextFiles: true,
+    extensionFactories: [
+      (pi) => {
+        assert.equal(native.registerCallbackTracer(pi), true);
+      },
+    ],
+  });
+  await loader.reload();
+  const { session } = await createAgentSession({
+    cwd: directory,
+    noTools: "all",
+    resourceLoader: loader,
+    sessionManager: SessionManager.inMemory(directory),
+  });
+  try {
+    const extension = loader
+      .getExtensions()
+      .extensions.find((entry) => entry.handlers.has("session_info_changed"));
+    assert.ok(extension);
+    const tracer = extension.handlers.get("session_info_changed")?.[0];
+    assert.ok(tracer);
+    const errors: string[] = [];
+    session.extensionRunner.onError((error) => errors.push(error.error));
+    await session.extensionRunner.emit({
+      type: "session_info_changed",
+      name: "runner event",
+    });
+    assert.deepEqual(errors, []);
+    assert.deepEqual(
+      await tracer(
+        { type: "session_info_changed", name: "probe" },
+        {} as never,
+      ),
+      {
+        name: "probe",
+        dispatchCount: 2,
+      },
+    );
+    await session.extensionRunner.emit({
+      type: "session_shutdown",
+      reason: "quit",
+    });
+    await assert.rejects(
+      Promise.resolve(
+        tracer({ type: "session_info_changed", name: "stale" }, {} as never),
+      ),
+    );
+  } finally {
+    session.dispose();
+    rmSync(directory, { recursive: true, force: true });
+  }
 });
 
 test("native registration falls back without installing duplicate callbacks", () => {
