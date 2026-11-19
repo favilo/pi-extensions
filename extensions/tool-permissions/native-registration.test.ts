@@ -349,6 +349,27 @@ test("Rust tracer owns asynchronous dispatch after callback return", async () =>
   assert.deepEqual(await pending, { message: "asynchronous", dispatchCount: 1 });
 });
 
+test("shutdown cancels Rust tracer work before its asynchronous dispatch", async () => {
+  const native = createRequire(import.meta.url)("./native/generated/index.js") as {
+    registerCallbackTracer: (pi: unknown) => boolean;
+  };
+  const handlers = new Map<string, (event: unknown, ctx: unknown) => unknown>();
+  native.registerCallbackTracer({
+    on(eventName: string, handler: (event: unknown, ctx: unknown) => unknown) {
+      handlers.set(eventName, handler);
+    },
+    registerCommand() {},
+    registerEntryRenderer() {},
+  });
+  const handler = handlers.get("session_info_changed");
+  const shutdown = handlers.get("session_shutdown");
+  assert.ok(handler);
+  assert.ok(shutdown);
+  const pending = Promise.resolve(handler({ message: "pending" }, {}));
+  assert.equal(shutdown({}, {}), true);
+  await assert.rejects(pending, /callback tracer state is unavailable/);
+});
+
 test("native registration falls back without installing duplicate callbacks", () => {
   const handlers: Array<string> = [];
   withNativeRegistrationModule(compatibleProbe, () => {
