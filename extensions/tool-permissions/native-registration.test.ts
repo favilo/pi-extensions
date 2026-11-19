@@ -265,6 +265,27 @@ test("Rust callback dispatches after tracer initialization returns", async () =>
   });
 });
 
+test("Rust tracer rejects malformed events without dispatching", async () => {
+  const native = createRequire(import.meta.url)("./native/generated/index.js") as {
+    registerCallbackTracer: (pi: unknown) => boolean;
+  };
+  const handlers = new Map<string, (event: unknown, ctx: unknown) => unknown>();
+  native.registerCallbackTracer({
+    on(eventName: string, handler: (event: unknown, ctx: unknown) => unknown) {
+      handlers.set(eventName, handler);
+    },
+    registerCommand() {},
+    registerEntryRenderer() {},
+  });
+  const handler = handlers.get("session_info_changed");
+  assert.ok(handler);
+  assert.throws(() => handler({ message: "" }, {}));
+  assert.deepEqual(await handler({ message: "valid" }, {}), {
+    message: "valid",
+    dispatchCount: 1,
+  });
+});
+
 test("native registration falls back without installing duplicate callbacks", () => {
   const handlers: Array<string> = [];
   withNativeRegistrationModule(compatibleProbe, () => {
