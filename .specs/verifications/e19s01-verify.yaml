@@ -1,0 +1,42 @@
+story_id: e19s01
+verified_at: '2026-11-19T21:35:25Z'
+verifier: verify-work
+status: awaiting_manual_confirmation
+risk: P0
+phases:
+  build:
+    passed: true
+    command: npm run build:native
+    note: Normal WASM rebuilt after removal of temporary panic injection.
+  focused_integration:
+    passed: true
+    command: npx tsx --test extensions/tool-permissions/native-registration.test.ts
+    note: 14 tests passed, including the real Pi SDK extension runner, Rust callback dispatch, initialization failure, shutdown, and asynchronous cancellation.
+  task_verification:
+    passed: true
+    command: npm test -- extensions/tool-permissions/native-registration.test.ts
+    note: 378 passed, 0 failed, 1 unrelated optional integration skipped; includes cargo tests.
+  terminal_verdict:
+    command: npm run check
+    exit_code: 0
+    captured_at: '2026-11-19T21:35:25Z'
+    output: |-
+      tests 373
+      pass 373
+      fail 0
+      skipped 0
+      PASS: all test files import the fetch guard
+    note: Single contiguous run included TypeScript typecheck, Rust tests, preflight tests, and test guard.
+  safety:
+    passed: true
+    note: Added callback and session-scope Rust code contains no unsafe blocks. SessionScoped captures owned Rust state; callback JavaScript values are invocation-local. Existing dependencies and pre-existing code may use unsafe internally.
+  panic_probe:
+    passed: null
+    note: Exploratory child-process probe temporarily injected an asynchronous WASM panic; the Promise rejected with WebAssembly.RuntimeError unreachable, health probe succeeded, and the scoped callback became unavailable. Injection was removed. This does not prove safe recovery; e19s07 owns reproducible characterization and fail-closed recovery.
+  manual:
+    passed: null
+    note: Awaiting user confirmation of the demonstrated verification results.
+  gaps:
+    closed: false
+    items:
+      - User confirmation of manual UAT remains outstanding.
