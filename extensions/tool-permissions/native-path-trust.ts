@@ -73,7 +73,7 @@ export type AdoptedPathTrust =
   | { status: "invalid" }
   | { status: "ready"; result: PathTrustResult };
 
-/** Load the WASM path-trust result. A missing package stays unavailable so the host can deny. */
+/** Load the WASM path-trust result. A missing package stays unavailable after load-time fail-closed. */
 export function adoptPathTrust(request: PathTrustRequest): AdoptedPathTrust {
   const packagePath = resolveNativePackagePath();
   if (!packagePath) return { status: "unavailable" };
