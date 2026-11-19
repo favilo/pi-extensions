@@ -259,10 +259,10 @@ test("Rust callback dispatches after tracer initialization returns", async () =>
   const handler = handlers.get("session_info_changed");
   assert.ok(handler);
   await Promise.resolve();
-  assert.deepEqual(await handler({ message: "after initialization" }, {}), {
-    message: "after initialization",
-    dispatchCount: 1,
-  });
+  assert.deepEqual(
+    await handler({ type: "session_info_changed", name: "after initialization" }, {}),
+    { name: "after initialization", dispatchCount: 1 },
+  );
 });
 
 test("Rust tracer rejects malformed events without dispatching", async () => {
@@ -281,11 +281,11 @@ test("Rust tracer rejects malformed events without dispatching", async () => {
   });
   const handler = handlers.get("session_info_changed");
   assert.ok(handler);
-  assert.throws(() => handler({ message: "" }, {}));
-  assert.deepEqual(await handler({ message: "valid" }, {}), {
-    message: "valid",
-    dispatchCount: 1,
-  });
+  assert.throws(() => handler({ type: "invalid", name: "ignored" }, {}));
+  assert.deepEqual(
+    await handler({ type: "session_info_changed", name: "valid" }, {}),
+    { name: "valid", dispatchCount: 1 },
+  );
 });
 
 test("Rust tracer releases session state at shutdown and rejects stale callbacks", async () => {
@@ -306,13 +306,13 @@ test("Rust tracer releases session state at shutdown and rejects stale callbacks
   const shutdown = handlers.get("session_shutdown");
   assert.ok(handler);
   assert.ok(shutdown);
-  assert.deepEqual(await handler({ message: "before shutdown" }, {}), {
-    message: "before shutdown",
-    dispatchCount: 1,
-  });
+  assert.deepEqual(
+    await handler({ type: "session_info_changed", name: "before shutdown" }, {}),
+    { name: "before shutdown", dispatchCount: 1 },
+  );
   assert.equal(await shutdown({}, {}), true);
   await assert.rejects(
-    Promise.resolve(handler({ message: "after shutdown" }, {})),
+    Promise.resolve(handler({ type: "session_info_changed", name: "after shutdown" }, {})),
   );
   assert.equal(await shutdown({}, {}), false);
 });
@@ -357,10 +357,10 @@ test("Rust tracer owns asynchronous dispatch after callback return", async () =>
   });
   const handler = handlers.get("session_info_changed");
   assert.ok(handler);
-  const pending = handler({ message: "asynchronous" }, {});
+  const pending = handler({ type: "session_info_changed", name: "asynchronous" }, {});
   assert.ok(pending instanceof Promise);
   assert.deepEqual(await pending, {
-    message: "asynchronous",
+    name: "asynchronous",
     dispatchCount: 1,
   });
 });
@@ -383,7 +383,9 @@ test("shutdown cancels Rust tracer work before its asynchronous dispatch", async
   const shutdown = handlers.get("session_shutdown");
   assert.ok(handler);
   assert.ok(shutdown);
-  const pending = Promise.resolve(handler({ message: "pending" }, {}));
+  const pending = Promise.resolve(
+    handler({ type: "session_info_changed", name: "pending" }, {}),
+  );
   assert.equal(shutdown({}, {}), true);
   await assert.rejects(pending, /callback tracer state is unavailable/);
 });
@@ -410,7 +412,7 @@ test("Rust tracer accepts the Pi session info changed event shape", async () => 
   );
   assert.deepEqual(
     await handler({ type: "session_info_changed", name: undefined }, {}),
-    { name: null, dispatchCount: 2 },
+    { dispatchCount: 2 },
   );
 });
 

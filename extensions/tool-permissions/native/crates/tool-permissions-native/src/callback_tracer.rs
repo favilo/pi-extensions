@@ -7,20 +7,22 @@ use thiserror::Error as ThisError;
 
 #[derive(Debug, ThisError)]
 enum TracerError {
-    #[error("tracer message must not be empty")]
-    EmptyMessage,
+    #[error("tracer event has an invalid type")]
+    InvalidEvent,
     #[error("callback tracer state is unavailable")]
     Unavailable,
 }
 
-struct TracerMessage(String);
+struct TracerEvent {
+    name: Option<String>,
+}
 
-impl TracerMessage {
-    fn parse(message: String) -> std::result::Result<Self, TracerError> {
-        if message.is_empty() {
-            return Err(TracerError::EmptyMessage);
+impl TracerEvent {
+    fn parse(event_type: String, name: Option<String>) -> std::result::Result<Self, TracerError> {
+        if event_type != "session_info_changed" {
+            return Err(TracerError::InvalidEvent);
         }
-        Ok(Self(message))
+        Ok(Self { name })
     }
 }
 
@@ -30,10 +32,10 @@ struct TracerState {
 }
 
 impl TracerState {
-    fn dispatch(&mut self, message: TracerMessage) -> TracerResponse {
+    fn dispatch(&mut self, event: TracerEvent) -> TracerResponse {
         self.dispatch_count += 1;
         TracerResponse {
-            message: message.0,
+            name: event.name,
             dispatch_count: self.dispatch_count,
         }
     }
@@ -41,7 +43,7 @@ impl TracerState {
 
 #[napi_derive::napi(object)]
 pub struct TracerResponse {
-    pub message: String,
+    pub name: Option<String>,
     pub dispatch_count: u32,
 }
 
@@ -51,8 +53,11 @@ pub fn register(env: &Env, pi: Object) -> Result<bool> {
     let callback_state = Arc::clone(&state);
     let handler = env.create_function_from_closure("toolPermissionsTracer", move |ctx| {
         let event: Object = ctx.get(0)?;
-        let message = TracerMessage::parse(event.get_named_property("message")?)
-            .map_err(|error| Error::from_reason(error.to_string()))?;
+        let event = TracerEvent::parse(
+            event.get_named_property("type")?,
+            event.get_named_property("name")?,
+        )
+        .map_err(|error| Error::from_reason(error.to_string()))?;
         let callback_state = Arc::clone(&callback_state);
         PromiseRaw::resolve(ctx.env, ())?.then(move |_| {
             let mut state = callback_state
@@ -61,7 +66,7 @@ pub fn register(env: &Env, pi: Object) -> Result<bool> {
             let active = state
                 .as_mut()
                 .ok_or_else(|| Error::from_reason(TracerError::Unavailable.to_string()))?;
-            Ok(active.dispatch(message))
+            Ok(active.dispatch(event))
         })
     })?;
     let shutdown_state = Arc::clone(&state);
