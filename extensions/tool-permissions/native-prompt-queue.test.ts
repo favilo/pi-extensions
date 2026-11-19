@@ -28,6 +28,18 @@ function deferred<T>() {
   return { promise, resolve, reject };
 }
 
+test("the WASM runtime awaits a JavaScript promise without blocking the event loop", async () => {
+  const native = requireNativePackage(bundledNativePackagePath()) as {
+    traceAsyncPromise(promise: Promise<string>): Promise<string>;
+  };
+  const input = deferred<string>();
+  const result = native.traceAsyncPromise(input.promise);
+
+  assert.ok(result instanceof Promise, "the Rust tracer must return a promise");
+  setImmediate(() => input.resolve("async runtime progressed"));
+  assert.equal(await result, "async runtime progressed");
+});
+
 test("an allow stays bound to the tool-call that opened the prompt", async () => {
   const toolCallId = "call-allow";
   const result = await presentBoundPrompt(
