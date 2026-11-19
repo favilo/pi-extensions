@@ -1,0 +1,23 @@
+story_id: e19s07
+title: Handle WASM callback traps without authorizing tools
+status: failing
+bcps: 5
+tasks:
+  - id: 1
+    description: Build an isolated test-only WASM panic fixture and characterize synchronous and asynchronous host-visible outcomes without terminating or hanging the parent test process.
+    verify: npm test -- extensions/tool-permissions/native-registration.test.ts
+    risk: P0
+    security: high
+    status: failing
+  - id: 2
+    description: Prove the real permission boundary blocks tool execution and reports an actionable diagnostic when a WASM callback traps.
+    verify: npm test -- extensions/tool-permissions/native-no-typescript-fallback.test.ts
+    risk: P0
+    security: high
+    status: failing
+  - id: 3
+    description: Prove recovery uses fresh verified runtime state or explicitly requires restart; never reuse unknown state to authorize.
+    verify: npm run check
+    risk: P0
+    security: high
+    status: failing

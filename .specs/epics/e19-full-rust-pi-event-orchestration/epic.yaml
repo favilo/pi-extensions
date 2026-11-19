@@ -1,7 +1,7 @@
 id: e19
 title: Full-Rust Pi event orchestration
 wsjf: 7.5
-total_bcps: 34
+total_bcps: 39
 status: planning
 scope: .specs/product/SCOPE_LATEST.yaml
 stories:
@@ -47,3 +47,10 @@ stories:
     delta: REMOVED
     spec: e19s06-loader-only-typescript-entrypoint.md
     tasks: e19s06-tasks.yaml
+  - id: e19s07
+    title: Handle WASM callback traps without authorizing tools
+    bcps: 5
+    status: todo
+    delta: ADDED
+    spec: e19s07-wasm-panic-recovery.md
+    tasks: e19s07-tasks.yaml

@@ -125,9 +125,9 @@ epics:
     title: Full-Rust Pi event orchestration
     capsule_dir: epics/e19-full-rust-pi-event-orchestration
     wsjf: 7.5
-    bcps: 34
+    bcps: 39
     note: >-
-      Provisional WSJF = (business value 10 + time criticality 10 + risk reduction 10) / job size 4 = 7.5. Build on e18's completed WASM framework to make Rust own Pi callback registration and all permission orchestration. Start with safe callback-lifetime proof and the Miri prompt-queue validation moved from e18s07.
+      Provisional WSJF = (business value 10 + time criticality 10 + risk reduction 10) / job size 4 = 7.5. Build on e18's completed WASM framework to make Rust own Pi callback registration and all permission orchestration. Start with safe callback-lifetime proof and the Miri prompt-queue validation moved from e18s07. Deferred e19s07 adds 5 BCP for WASM panic characterization and fail-closed recovery after the authorization boundary is available; priority and epic WSJF remain unchanged.
 bugs:
   total: 1
   fixed: 0
