@@ -296,6 +296,21 @@ test("Rust tracer rejects malformed events without dispatching", async () => {
   );
 });
 
+test("session-scoped tracer installs shutdown before its event callbacks", () => {
+  const native = createRequire(import.meta.url)(
+    "./native/generated/index.js",
+  ) as { registerCallbackTracer: (pi: unknown) => boolean };
+  const registrations: string[] = [];
+  native.registerCallbackTracer({
+    on(eventName: string) {
+      registrations.push(eventName);
+    },
+    registerCommand() {},
+    registerEntryRenderer() {},
+  });
+  assert.deepEqual(registrations, ["session_shutdown", "session_info_changed"]);
+});
+
 test("Rust tracer releases session state at shutdown and rejects stale callbacks", async () => {
   const native = createRequire(import.meta.url)(
     "./native/generated/index.js",
