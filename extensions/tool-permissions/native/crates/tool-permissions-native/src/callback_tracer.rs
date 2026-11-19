@@ -68,7 +68,14 @@ pub fn register(env: &Env, pi: Object) -> Result<bool> {
             .map_err(|_| Error::from_reason(TracerError::Unavailable.to_string()))?;
         Ok(state.take().is_some())
     })?;
-    pi.on(OnCallback::SessionShutdown, shutdown)?;
-    pi.on(OnCallback::SessionInfoChanged, handler)?;
+    let result = pi
+        .on(OnCallback::SessionShutdown, shutdown)
+        .and_then(|()| pi.on(OnCallback::SessionInfoChanged, handler));
+    if let Err(error) = result {
+        if let Ok(mut state) = state.lock() {
+            state.take();
+        }
+        return Err(error);
+    }
     Ok(true)
 }
