@@ -350,6 +350,26 @@ mod tests {
     }
 
     #[test]
+    fn prompt_queue_releases_owned_presenters_on_environment_shutdown() {
+        use std::cell::Cell;
+        use std::rc::Rc;
+
+        struct Presenter(Rc<Cell<usize>>);
+        impl Drop for Presenter {
+            fn drop(&mut self) {
+                self.0.set(self.0.get() + 1);
+            }
+        }
+
+        let released = Rc::new(Cell::new(0));
+        let mut queue = super::PromptQueue::default();
+        assert_eq!(queue.submit(Presenter(Rc::clone(&released))), super::QueuePosition::Active);
+        assert_eq!(queue.submit(Presenter(Rc::clone(&released))), super::QueuePosition::Waiting);
+        queue.close();
+        assert_eq!(released.get(), 2);
+    }
+
+    #[test]
     fn presenter_reference_does_not_erase_a_promise_lifetime() {
         let source = include_str!("prompt_queue.rs");
         let implementation = source.split("#[cfg(test)]\nmod tests").next().unwrap();
