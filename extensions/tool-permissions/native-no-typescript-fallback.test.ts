@@ -7,6 +7,38 @@ import test from "node:test";
 import toolPermissionPolicy from "./index.ts";
 import { setNativePackagePathForTests } from "./native-package.ts";
 import { createTestExtensionHost } from "./native-host-test-support.ts";
+import { registerNativeToolPermissionsCallbacks } from "./native-registration-loader.ts";
+import { loadNativeProbe } from "./native-loader.ts";
+
+test("a missing native package reports unavailable instead of a TypeScript engine", () => {
+  const previousDisable = process.env.PI_TOOL_PERMISSIONS_NATIVE_DISABLE;
+  process.env.PI_TOOL_PERMISSIONS_NATIVE_DISABLE = "1";
+  try {
+    const result = registerNativeToolPermissionsCallbacks({
+      registerCommand() {},
+      registerEntryRenderer() {},
+      on() {},
+    } as never);
+    assert.deepEqual(result, {
+      mode: "unavailable",
+      reason: "native package disabled",
+    });
+  } finally {
+    if (previousDisable === undefined)
+      delete process.env.PI_TOOL_PERMISSIONS_NATIVE_DISABLE;
+    else process.env.PI_TOOL_PERMISSIONS_NATIVE_DISABLE = previousDisable;
+  }
+});
+
+test("a rejected native probe reports unavailable instead of a TypeScript engine", async () => {
+  const result = await loadNativeProbe({
+    load: async () => {
+      throw new Error("package missing");
+    },
+  });
+  assert.equal(result.engine, "unavailable");
+  assert.match(result.reason, /package missing/);
+});
 
 test("missing WASM fails at load and does not authorize through TypeScript", () => {
   const previousDisable = process.env.PI_TOOL_PERMISSIONS_NATIVE_DISABLE;
