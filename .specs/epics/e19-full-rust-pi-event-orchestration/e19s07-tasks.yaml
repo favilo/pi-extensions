@@ -2,6 +2,7 @@ story_id: e19s07
 title: Handle WASM callback traps without authorizing tools
 status: failing
 bcps: 5
+spec: e19s07-wasm-panic-recovery.md
 tasks:
   - id: 1
     description: Build an isolated test-only WASM panic fixture and characterize synchronous and asynchronous host-visible outcomes without terminating or hanging the parent test process.

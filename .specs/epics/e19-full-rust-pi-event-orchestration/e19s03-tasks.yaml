@@ -2,6 +2,7 @@ story_id: e19s03
 title: Register Pi callbacks directly from Rust
 status: failing
 bcps: 5
+spec: e19s03-rust-direct-pi-registration.md
 tasks:
   - id: 1
     description: Add integration contracts that prove Rust directly registers lifecycle, tool, command, and renderer callbacks without TypeScript handler lookup.

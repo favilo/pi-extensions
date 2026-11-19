@@ -2,6 +2,7 @@ story_id: e19s06
 title: Reduce TypeScript to the WASM loader and one-time handoff
 status: failing
 bcps: 5
+spec: e19s06-loader-only-typescript-entrypoint.md
 tasks:
   - id: 1
     description: Add a contract asserting that index.ts contains only native module loading and the single Rust initialization handoff.

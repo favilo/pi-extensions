@@ -2,6 +2,7 @@ story_id: e19s01
 title: Prove safe Rust Pi callback lifetime and dispatch
 status: passing
 bcps: 5
+spec: e19s01-safe-rust-callback-lifetime.md
 tasks:
   - id: 1
     description: Add a native integration contract that initializes Rust registration, invokes a Rust-created Pi callback after initialization returns, and observes typed Rust dispatch.

@@ -2,6 +2,7 @@ story_id: e19s05
 title: Move interactive permission surfaces into Rust
 status: failing
 bcps: 8
+spec: e19s05-rust-interactive-permission-surfaces.md
 tasks:
   - id: 1
     description: Add parity contracts for prompt serialization, steering, command behavior, and permission-preview rendering through Rust-owned callbacks.
