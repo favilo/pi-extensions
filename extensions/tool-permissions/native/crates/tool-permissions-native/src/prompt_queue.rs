@@ -1,8 +1,8 @@
 use std::collections::VecDeque;
 use std::sync::{LazyLock, Mutex};
 
-use napi::bindgen_prelude::{Function, FunctionRef, PromiseRaw, ToNapiValue, Unknown};
-use napi::{Env, Error, Result as NapiResult, Status};
+use napi::bindgen_prelude::{Function, FunctionRef, Object, PromiseRaw, Unknown};
+use napi::{Env, Error, JsDeferred, Result as NapiResult};
 use thiserror::Error;
 
 use crate::CONTRACT_VERSION;
@@ -51,13 +51,8 @@ pub fn complete(
     })
 }
 
-struct DeferredPrompt {
-    env: napi::sys::napi_env,
-    deferred: napi::sys::napi_deferred,
-}
-
-// Deferred handles are created and settled only on their owning JavaScript thread.
-unsafe impl Send for DeferredPrompt {}
+type PromptResolver = Box<dyn FnOnce(Env) -> NapiResult<PromptQueueResponse> + Send>;
+type DeferredPrompt = JsDeferred<PromptQueueResponse, PromptResolver>;
 
 // `FunctionRef` fixes its return type at storage time. The `'static` is only a
 // signature marker: it stores no PromiseRaw. `call_presenter` narrows every
@@ -68,18 +63,24 @@ struct QueuedPrompt {
     request: PromptQueueRequest,
     present: PresenterRef,
     deferred: DeferredPrompt,
+    environment: usize,
 }
 
-#[cfg(test)]
-struct PromptQueue<T = ToolCallId> {
+struct PromptQueue<T> {
+    environment: Option<usize>,
     active: Option<T>,
     pending: VecDeque<T>,
+    opening: bool,
 }
 
-#[cfg(test)]
 impl<T> Default for PromptQueue<T> {
     fn default() -> Self {
-        Self { active: None, pending: VecDeque::new() }
+        Self {
+            environment: None,
+            active: None,
+            pending: VecDeque::new(),
+            opening: false,
+        }
     }
 }
 
@@ -89,45 +90,11 @@ enum QueuePosition {
     Waiting,
 }
 
-#[cfg(test)]
 impl<T> PromptQueue<T> {
-    fn submit(&mut self, tool_call_id: T) -> QueuePosition {
-        if self.active.is_none() {
-            self.active = Some(tool_call_id);
-            QueuePosition::Active
-        } else {
-            self.pending.push_back(tool_call_id);
-            QueuePosition::Waiting
-        }
-    }
-
-    fn complete(&mut self, tool_call_id: &T) -> Option<T>
-    where
-        T: PartialEq + Clone,
-    {
-        if self.active.as_ref() != Some(tool_call_id) {
-            return None;
-        }
-        self.active = self.pending.pop_front();
-        self.active.clone()
-    }
-
-    fn close(&mut self) {}
-}
-
-#[derive(Default)]
-struct NativePromptQueue {
-    environment: Option<usize>,
-    active: Option<QueuedPrompt>,
-    pending: VecDeque<QueuedPrompt>,
-    opening: bool,
-}
-
-impl NativePromptQueue {
     fn submit(
         &mut self,
         environment: usize,
-        prompt: QueuedPrompt,
+        prompt: T,
     ) -> std::result::Result<QueuePosition, PromptQueueError> {
         match self.environment {
             Some(current) if current != environment => return Err(PromptQueueError::Environment),
@@ -143,7 +110,7 @@ impl NativePromptQueue {
         }
     }
 
-    fn take_active_for_opening(&mut self) -> Option<QueuedPrompt> {
+    fn take_active_for_opening(&mut self) -> Option<T> {
         if self.opening || self.active.is_none() {
             return None;
         }
@@ -151,13 +118,17 @@ impl NativePromptQueue {
         self.active.take()
     }
 
-    fn restore_active(&mut self, prompt: QueuedPrompt) {
+    fn restore_active(&mut self, environment: usize, prompt: T) -> Option<T> {
+        if !self.opening || self.environment != Some(environment) {
+            return Some(prompt);
+        }
         self.active = Some(prompt);
         self.opening = false;
+        None
     }
 
-    fn finish_active(&mut self, tool_call_id: &str) -> Option<QueuedPrompt> {
-        if self.active.as_ref()?.request.tool_call_id != tool_call_id {
+    fn finish_active(&mut self, matches: impl FnOnce(&T) -> bool) -> Option<T> {
+        if !matches(self.active.as_ref()?) {
             return None;
         }
         let completed = self.active.take();
@@ -167,33 +138,56 @@ impl NativePromptQueue {
         }
         completed
     }
+
+    fn close(&mut self) -> Vec<T> {
+        let mut released = Vec::with_capacity(self.pending.len() + 1);
+        released.extend(self.active.take());
+        released.extend(self.pending.drain(..));
+        self.opening = false;
+        self.environment = None;
+        released
+    }
 }
 
-static NATIVE_PROMPT_QUEUE: LazyLock<Mutex<NativePromptQueue>> =
-    LazyLock::new(|| Mutex::new(NativePromptQueue::default()));
+static NATIVE_PROMPT_QUEUE: LazyLock<Mutex<PromptQueue<QueuedPrompt>>> =
+    LazyLock::new(|| Mutex::new(PromptQueue::default()));
 
 pub fn decide<'env>(
-    env: Env,
+    env: &'env Env,
     request: PromptQueueRequest,
     present: Function<'env, String, PromiseRaw<'static, PromptQueueResolution>>,
-) -> NapiResult<PromiseRaw<'env, PromptQueueResponse>> {
+) -> NapiResult<Object<'env>> {
     validate(&request).map_err(|error| Error::from_reason(error.to_string()))?;
-    let (deferred, promise) = create_deferred(env)?;
+    let environment = env.raw() as usize;
+    let (deferred, promise) = env.create_deferred::<PromptQueueResponse, PromptResolver>()?;
     let queued = QueuedPrompt {
         request,
         present: persistent_present(present)?,
         deferred,
+        environment,
     };
     let should_open = NATIVE_PROMPT_QUEUE
         .lock()
         .expect("native prompt queue lock poisoned")
-        .submit(env.raw() as usize, queued)
+        .submit(environment, queued)
         .map_err(|error| Error::from_reason(error.to_string()))?
         == QueuePosition::Active;
+    if let Err(error) = env.add_env_cleanup_hook(environment, cleanup_environment) {
+        cleanup_environment(environment);
+        return Err(error);
+    }
     if should_open {
-        open_next(&env)?;
+        open_next(env)?;
     }
     Ok(promise)
+}
+
+fn cleanup_environment(environment: usize) {
+    let released = match NATIVE_PROMPT_QUEUE.lock() {
+        Ok(mut queue) if queue.environment == Some(environment) => queue.close(),
+        _ => Vec::new(),
+    };
+    drop(released);
 }
 
 fn persistent_present(
@@ -210,24 +204,6 @@ fn call_presenter<'env>(
     present.borrow_back(env)?.call(tool_call_id)
 }
 
-fn create_deferred<'env>(
-    env: Env,
-) -> NapiResult<(DeferredPrompt, PromiseRaw<'env, PromptQueueResponse>)> {
-    let mut deferred = std::ptr::null_mut();
-    let mut promise = std::ptr::null_mut();
-    let status = unsafe { napi::sys::napi_create_promise(env.raw(), &mut deferred, &mut promise) };
-    if status != napi::sys::Status::napi_ok {
-        return Err(Error::from_status(Status::from(status as i32)));
-    }
-    Ok((
-        DeferredPrompt {
-            env: env.raw(),
-            deferred,
-        },
-        PromiseRaw::new(env.raw(), promise),
-    ))
-}
-
 fn open_next(env: &Env) -> NapiResult<()> {
     let Some(active) = NATIVE_PROMPT_QUEUE
         .lock()
@@ -237,20 +213,25 @@ fn open_next(env: &Env) -> NapiResult<()> {
         return Ok(());
     };
     let tool_call_id = active.request.tool_call_id.clone();
-    if active.deferred.env != env.raw() {
+    if active.environment != env.raw() as usize {
         NATIVE_PROMPT_QUEUE
             .lock()
             .expect("native prompt queue lock poisoned")
-            .restore_active(active);
+            .restore_active(active.environment, active);
         return Err(Error::from_reason(
             "native prompt queue environment mismatch",
         ));
     }
     let presentation = call_presenter(env, &active.present, tool_call_id.clone());
-    NATIVE_PROMPT_QUEUE
+    let abandoned = NATIVE_PROMPT_QUEUE
         .lock()
         .expect("native prompt queue lock poisoned")
-        .restore_active(active);
+        .restore_active(active.environment, active);
+    if abandoned.is_some() {
+        return Err(Error::from_reason(
+            "prompt queue environment closed while opening",
+        ));
+    }
 
     match presentation {
         Ok(presentation) => {
@@ -279,7 +260,7 @@ fn settle_active(
     let Some(completed) = NATIVE_PROMPT_QUEUE
         .lock()
         .expect("native prompt queue lock poisoned")
-        .finish_active(tool_call_id)
+        .finish_active(|prompt| prompt.request.tool_call_id == tool_call_id)
     else {
         return Ok(());
     };
@@ -288,7 +269,7 @@ fn settle_active(
             .unwrap_or_else(|_| failed_response(&completed.request)),
         Err(()) => failed_response(&completed.request),
     };
-    resolve(&completed.deferred, response)?;
+    completed.deferred.resolve(Box::new(move |_| Ok(response)));
     open_next(env)
 }
 
@@ -302,16 +283,6 @@ fn failed_response(request: &PromptQueueRequest) -> PromptQueueResponse {
         decision: PromptQueueDecision::Deny,
         steering: None,
     }
-}
-
-fn resolve(deferred: &DeferredPrompt, response: PromptQueueResponse) -> NapiResult<()> {
-    let value = unsafe { PromptQueueResponse::to_napi_value(deferred.env, response) }?;
-    let status =
-        unsafe { napi::sys::napi_resolve_deferred(deferred.env, deferred.deferred, value) };
-    if status != napi::sys::Status::napi_ok {
-        return Err(Error::from_status(Status::from(status as i32)));
-    }
-    Ok(())
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -341,10 +312,20 @@ mod tests {
         let first = super::ToolCallId::parse("call-first").unwrap();
         let second = super::ToolCallId::parse("call-second").unwrap();
 
-        assert_eq!(queue.submit(first), super::QueuePosition::Active);
-        assert_eq!(queue.submit(second), super::QueuePosition::Waiting);
         assert_eq!(
-            queue.complete(&super::ToolCallId::parse("call-first").unwrap()),
+            queue.submit(1, first).unwrap(),
+            super::QueuePosition::Active
+        );
+        assert_eq!(
+            queue.submit(1, second).unwrap(),
+            super::QueuePosition::Waiting
+        );
+        assert_eq!(
+            queue.finish_active(|id| id == &super::ToolCallId::parse("call-first").unwrap()),
+            Some(super::ToolCallId::parse("call-first").unwrap())
+        );
+        assert_eq!(
+            queue.active,
             Some(super::ToolCallId::parse("call-second").unwrap())
         );
     }
@@ -363,9 +344,15 @@ mod tests {
 
         let released = Rc::new(Cell::new(0));
         let mut queue = super::PromptQueue::default();
-        assert_eq!(queue.submit(Presenter(Rc::clone(&released))), super::QueuePosition::Active);
-        assert_eq!(queue.submit(Presenter(Rc::clone(&released))), super::QueuePosition::Waiting);
-        queue.close();
+        assert_eq!(
+            queue.submit(1, Presenter(Rc::clone(&released))).unwrap(),
+            super::QueuePosition::Active
+        );
+        assert_eq!(
+            queue.submit(1, Presenter(Rc::clone(&released))).unwrap(),
+            super::QueuePosition::Waiting
+        );
+        drop(queue.close());
         assert_eq!(released.get(), 2);
     }
 

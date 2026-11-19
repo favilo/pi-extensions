@@ -142,12 +142,12 @@ pub fn save_rule(request: RuleSaveRequest) -> Result<RuleSaveResponse> {
     rule_save::save(request).map_err(|error| Error::from_reason(error.to_string()))
 }
 
-#[napi]
+#[napi(ts_return_type = "Promise<PromptQueueResponse>")]
 pub fn decide_prompt<'env>(
-    env: Env,
+    env: &'env Env,
     request: PromptQueueRequest,
     present: Function<'env, String, PromiseRaw<'static, PromptQueueResolution>>,
-) -> Result<PromiseRaw<'env, PromptQueueResponse>> {
+) -> Result<napi::bindgen_prelude::Object<'env>> {
     prompt_queue::decide(env, request, present)
 }
 
