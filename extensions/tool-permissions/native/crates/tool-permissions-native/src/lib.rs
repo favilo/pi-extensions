@@ -146,7 +146,7 @@ pub fn save_rule(request: RuleSaveRequest) -> Result<RuleSaveResponse> {
 pub fn decide_prompt<'env>(
     env: Env,
     request: PromptQueueRequest,
-    present: Function<'env, String, PromiseRaw<'env, PromptQueueResolution>>,
+    present: Function<'env, String, PromiseRaw<'static, PromptQueueResolution>>,
 ) -> Result<PromiseRaw<'env, PromptQueueResponse>> {
     prompt_queue::decide(env, request, present)
 }

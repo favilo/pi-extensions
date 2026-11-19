@@ -59,9 +59,14 @@ struct DeferredPrompt {
 // Deferred handles are created and settled only on their owning JavaScript thread.
 unsafe impl Send for DeferredPrompt {}
 
+// `FunctionRef` fixes its return type at storage time. The `'static` is only a
+// signature marker: it stores no PromiseRaw. `call_presenter` narrows every
+// actual returned promise to the current Env before it can be used.
+type PresenterRef = FunctionRef<String, PromiseRaw<'static, PromptQueueResolution>>;
+
 struct QueuedPrompt {
     request: PromptQueueRequest,
-    present: FunctionRef<String, PromiseRaw<'static, PromptQueueResolution>>,
+    present: PresenterRef,
     deferred: DeferredPrompt,
 }
 
@@ -159,7 +164,7 @@ static NATIVE_PROMPT_QUEUE: LazyLock<Mutex<NativePromptQueue>> =
 pub fn decide<'env>(
     env: Env,
     request: PromptQueueRequest,
-    present: Function<'env, String, PromiseRaw<'env, PromptQueueResolution>>,
+    present: Function<'env, String, PromiseRaw<'static, PromptQueueResolution>>,
 ) -> NapiResult<PromiseRaw<'env, PromptQueueResponse>> {
     validate(&request).map_err(|error| Error::from_reason(error.to_string()))?;
     let (deferred, promise) = create_deferred(env)?;
@@ -180,19 +185,18 @@ pub fn decide<'env>(
     Ok(promise)
 }
 
-fn persistent_present<'env>(
-    present: Function<'env, String, PromiseRaw<'env, PromptQueueResolution>>,
-) -> NapiResult<FunctionRef<String, PromiseRaw<'static, PromptQueueResolution>>> {
-    let reference = present.create_ref()?;
-    // SAFETY: `FunctionRef` owns a `napi_ref`; napi-rs explicitly provides it
-    // to outlive a `Function` call scope. `PromiseRaw` carries its scope only
-    // in `&'env PhantomData<T>`, so this changes no pointer or owned value.
-    // The erased value is private: `open_next` borrows it back only with the
-    // exact `Env` captured in `DeferredPrompt`, immediately attaches `then`
-    // and `catch`, and never stores or returns that `PromiseRaw`. `submit`
-    // rejects a different N-API environment while work is queued, and
-    // `open_next` checks the captured environment before the borrow.
-    Ok(unsafe { std::mem::transmute(reference) })
+fn persistent_present(
+    present: Function<'_, String, PromiseRaw<'static, PromptQueueResolution>>,
+) -> NapiResult<PresenterRef> {
+    present.create_ref()
+}
+
+fn call_presenter<'env>(
+    env: &'env Env,
+    present: &PresenterRef,
+    tool_call_id: String,
+) -> NapiResult<PromiseRaw<'env, PromptQueueResolution>> {
+    present.borrow_back(env)?.call(tool_call_id)
 }
 
 fn create_deferred<'env>(
@@ -231,7 +235,7 @@ fn open_next(env: &Env) -> NapiResult<()> {
             "native prompt queue environment mismatch",
         ));
     }
-    let presentation = active.present.borrow_back(env)?.call(tool_call_id.clone());
+    let presentation = call_presenter(env, &active.present, tool_call_id.clone());
     NATIVE_PROMPT_QUEUE
         .lock()
         .expect("native prompt queue lock poisoned")
