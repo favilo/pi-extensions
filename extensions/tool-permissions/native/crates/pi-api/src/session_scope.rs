@@ -29,16 +29,21 @@ impl<T: 'static> SessionScope<T> {
     }
 
     pub fn with<R>(&self, action: impl FnOnce(&mut T) -> R) -> std::result::Result<R, SessionScopeError> {
-        let _ = action;
-        Err(SessionScopeError::Unavailable)
+        let mut state = self.state.lock().map_err(|_| SessionScopeError::Unavailable)?;
+        let active = state.as_mut().ok_or(SessionScopeError::Unavailable)?;
+        Ok(action(active))
     }
 
     pub fn close(&self) -> std::result::Result<bool, SessionScopeError> {
-        Ok(false)
+        let mut state = self.state.lock().map_err(|_| SessionScopeError::Unavailable)?;
+        Ok(state.take().is_some())
     }
 
     pub fn shutdown_handler<'env>(&self, env: &'env Env) -> Result<Function<'env, (), bool>> {
-        env.create_function_from_closure("piSessionShutdown", |_| Ok(false))
+        let scope = self.clone();
+        env.create_function_from_closure("piSessionShutdown", move |_| {
+            scope.close().map_err(|error| napi::Error::from_reason(error.to_string()))
+        })
     }
 }
 
