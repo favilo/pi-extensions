@@ -1,6 +1,6 @@
 ---
 bug_id: BUG-2026-11-19T165747
-status: in-progress
+status: open
 severity: medium
 scope: tool-permissions-edit-write-errors
 title: Preserve underlying path failure in blocked tool messages
@@ -24,6 +24,10 @@ Security impact: LOW; preserve fail-closed behavior and do not invent underlying
 
 1. RED: verify a thrown path-resolution error appears unchanged in the public adapter diagnostic. GREEN: return the caught error message without the internal prefix. Verify: `npx tsx --test extensions/tool-permissions/native-path-trust.test.ts`.
 2. Verify blocked edit/write retain their existing blocked prefix and malformed native responses still deny. Run `npm run check`.
+
+## Resolution so far
+
+The path-trust adapter now preserves an underlying exception without the redundant native prefix (RED `1b230149`, GREEN `ce5d4810`). The original reported edit/write failure has not been reproduced; keep this bug open until the actual path and parity are verified.
 
 ## Acceptance Criteria
 

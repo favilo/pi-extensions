@@ -3,8 +3,10 @@ active_epic_id: e19
 active_story_id: e19s02
 active_story: Use typed async prompt orchestration
 active_bug_id: null
-git:
-  bookmark: favilo/e18s06-remove-typescript-fallback
+vcs:
+  kind: jj
+  workspace: e18s04-prompt-queue
+  last_completed_change: ylsmvrqy
   parent_bookmark: main
 planning:
   e16:
@@ -93,11 +95,12 @@ planning:
     constraints:
     - Do not modify the e06 repair flow or child-private bridge catalog.
 handoff:
-  last_step_completed: e19s01 accepted; e19s02 Tokio-free async runtime story and
-    task ledger updated for develop-tdd
+  last_step_completed: >-
+    e19s02 Tokio-free runtime and typed async presenter dispatch committed; focused
+    path-error wording fix committed separately. Full npm run check passed.
   open_decisions:
-  - Verify that napi-async-runtime CurrentThread works with the generated WASI loader
-    and preserves queue and teardown behavior before committing to it.
+  - Determine how session cancellation and shutdown revoke native queued and active prompts without late authorization.
+  - Verify environment cleanup, identity reuse, and lifecycle behavior against the real WASM host before accepting the story.
   required_reading:
   - .specs/product/SCOPE_LATEST.yaml
   - .specs/IMPACT-e19-e19s02.md
@@ -172,8 +175,8 @@ handoff:
     (374 preflight and 34 Rust tests), and cargo audit pass. Queue migration and
     lifecycle tests remain; task 1 is passing. No push was performed.
   current_async_draft: >-
-    RED a5a20081 passed the updated jj-aware isolation checker. The current
-    GREEN uses a mutex-owning environment registry, unique prompt IDs, and typed
+    RED a5a20081 passed the updated jj-aware isolation checker. Committed change
+    6f8108fa uses a mutex-owning environment registry, unique prompt IDs, and typed
     ThreadsafeFunction dispatch. Full npm run check now passes (375 TypeScript
     tests and 35 Rust tests) after replacing synchronous presenter assumptions in
     existing tests with explicit readiness signals. A temporary
@@ -184,6 +187,12 @@ handoff:
     added alongside implementation rather than independently RED. Shutdown,
     cancellation, malformed resolutions, cleanup ordering, cross-environment
     isolation, and a full security review remain before claiming the story done.
+    Task 2 remains failing until those identity and security contracts are verified;
+    tasks 3 and 4 also remain failing. Next use develop-tdd for the lifecycle cases,
+    then run verify-work and security review. The separate path wording fix is
+    ce5d4810, with RED 1b230149. Its broader original report remains unconfirmed;
+    registry BUG-2026-11-19T165747 stays open pending real reproduction and edit/write
+    parity investigation. No push or PR was made.
   deferred_work:
   - Consolidate safeStringify and JSON formatting helpers into a shared utility module
   - Persist completed and active child sessions for later external analysis
