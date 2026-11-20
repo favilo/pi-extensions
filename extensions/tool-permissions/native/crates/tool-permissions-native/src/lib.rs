@@ -1,5 +1,5 @@
 mod audit;
-mod callback_tracer;
+mod sample_callback;
 mod contract;
 mod execution;
 mod parser;
@@ -85,12 +85,18 @@ pub fn register_tool_permissions_callbacks(
 
 #[napi]
 pub fn register_direct_callbacks(env: Env, pi: napi::bindgen_prelude::Object) -> Result<bool> {
-    callback_tracer::register(&env, pi)
+    let api = pi_api::Pi::new(&env, pi)?;
+    sample_callback::register_with_pi(&env, &api)?;
+    let handler = env.create_function_from_closure("directPermissionsCommand", |ctx| {
+        ctx.get::<napi::bindgen_prelude::Unknown>(0)
+    })?;
+    api.register_command("registration-sample", "Direct registration sample", handler)?;
+    Ok(true)
 }
 
 #[napi]
 pub fn register_callback_tracer(env: Env, pi: napi::bindgen_prelude::Object) -> Result<bool> {
-    callback_tracer::register(&env, pi)
+    sample_callback::register(&env, pi)
 }
 
 #[napi]

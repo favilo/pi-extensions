@@ -68,6 +68,10 @@ impl ScopedCallbacks for Tracer {
 
 pub fn register(env: &Env, pi: Object) -> Result<bool> {
     let pi = Pi::new(env, pi)?;
-    SessionScoped::new(Tracer::default()).register_callbacks(env, &pi)?;
+    register_with_pi(env, &pi)?;
     Ok(true)
+}
+
+pub fn register_with_pi(env: &Env, pi: &Pi) -> Result<()> {
+    SessionScoped::new(Tracer::default()).register_callbacks(env, pi)
 }
