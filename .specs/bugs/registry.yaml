@@ -35,3 +35,17 @@ bugs:
     summary: WASM misses a repository boundary when .git or .jj cannot be canonicalized
     file: .specs/bugs/BUG-2026-11-09T190800-git-jj-marker-realpath.md
     status: open
+  - bug_id: BUG-2026-11-19T165747
+    date: '2026-11-19'
+    severity: medium
+    priority: medium
+    scope: tool-permissions-edit-write-errors
+    summary: Rust-backed automatic edit and write errors are generic rather than matching TypeScript errors
+    what_happened: Automatic edit or write failures report a generic error instead of the specific TypeScript behavior.
+    what_expected: Report the same actionable error as the TypeScript implementation, including missing oldText and other failure cases.
+    steps_to_reproduce:
+      - Trigger an automatic edit whose oldText does not occur in the target file.
+      - Compare the reported error with the TypeScript implementation; also inspect automatic write failure cases.
+    root_cause: Not yet investigated.
+    risk_level: medium
+    status: open
