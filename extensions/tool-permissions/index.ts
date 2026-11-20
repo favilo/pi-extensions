@@ -1482,7 +1482,9 @@ async function presentOnNativePromptQueue(
         return promptResolution(outcome);
       },
     );
-    const accepted = acceptBoundPermission(bound, outcome, queueId);
+    const accepted = promptWasCancelled(abort.signal)
+      ? { allowed: false as const, decision: "cancel" as const }
+      : acceptBoundPermission(bound, outcome, queueId);
     if (outcome?.allowed && !accepted.allowed && request.toolCallId)
       pendingSteering.delete(request.toolCallId);
     return accepted;
