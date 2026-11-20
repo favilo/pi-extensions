@@ -16,7 +16,7 @@ import {
   NATIVE_PATH_TRUST_NONCE,
 } from "./native-contract.ts";
 import toolPermissionPolicy, { createToolPermissionBoundary } from "./index.ts";
-import { evaluatePathTrust } from "./native-path-trust.ts";
+import { adoptPathTrust, evaluatePathTrust } from "./native-path-trust.ts";
 import { setNativePackagePathForTests } from "./native-package.ts";
 import {
   NATIVE_REGISTRATION_STUB,
@@ -34,6 +34,34 @@ function writePathTrustNativePackage(
     [NATIVE_REGISTRATION_STUB, ...evaluateLines].join("\n"),
   );
 }
+
+test("path failures preserve the underlying error without internal terminology", () => {
+  const packageDir = mkdtempSync(join(tmpdir(), "pi-path-error-"));
+  const packagePath = join(packageDir, "index.cjs");
+  writeFileSync(
+    packagePath,
+    "exports.evaluatePathTrust = () => { throw new Error('permission denied'); };\n",
+  );
+  const restore = setNativePackagePathForTests(packagePath);
+  try {
+    assert.deepEqual(
+      adoptPathTrust({
+        version: NATIVE_CONTRACT_VERSION,
+        operation: "path_trust",
+        nonce: NATIVE_PATH_TRUST_NONCE,
+        tool: "edit",
+        requestedPath: "notes.txt",
+        cwd: "/workspace",
+        trustPath: null,
+        trustDecision: false,
+      }),
+      { status: "invalid", diagnostic: "permission denied" },
+    );
+  } finally {
+    restore();
+    rmSync(packageDir, { recursive: true, force: true });
+  }
+});
 
 test("canonical path and working directory match the current host for an existing read", () => {
   const root = mkdtempSync(join(tmpdir(), "pi-path-trust-"));
