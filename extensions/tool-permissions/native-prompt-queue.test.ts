@@ -568,6 +568,23 @@ test(
       },
     );
     await opened.promise;
+    const later = promptToolPermissionRequest(
+      { sendUserMessage() {} },
+      {
+        cwd: "/workspace/project",
+        hasUI: true,
+        mode: "rpc",
+        sessionId: "after-ignored-abort",
+        ui: { confirm: async () => true },
+      },
+      {
+        actor: { kind: "main" },
+        toolName: "read",
+        input: { path: "other.md" },
+        cwd: "/workspace/project",
+        toolCallId: "after-ignored-abort-call",
+      },
+    );
     controller.abort();
     const result = await Promise.race([
       pending,
@@ -575,12 +592,23 @@ test(
         setTimeout(() => resolve("still-pending"), 100),
       ),
     ]);
-    confirmation.resolve(false);
+    const laterResult = await Promise.race([
+      later,
+      new Promise<"still-pending">((resolve) =>
+        setTimeout(() => resolve("still-pending"), 100),
+      ),
+    ]);
+    confirmation.resolve(true);
     await pending;
     assert.notEqual(
       result,
       "still-pending",
       "cancellation must settle without UI cooperation",
+    );
+    assert.equal(
+      laterResult,
+      "allow",
+      "later prompts must progress before the old UI settles",
     );
   },
 );
