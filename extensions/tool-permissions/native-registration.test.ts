@@ -259,6 +259,7 @@ test("production registration exposes a sample command that notifies the user", 
     string,
     { handler(args: string, ctx: unknown): unknown }
   >();
+  const shutdownHandlers: Array<() => unknown> = [];
   native.registerToolPermissionsCallbacks(
     {
       version: NATIVE_CONTRACT_VERSION,
@@ -266,7 +267,9 @@ test("production registration exposes a sample command that notifies the user", 
       nonce: "sample-live",
     },
     {
-      on() {},
+      on(name: string, handler: () => unknown) {
+        if (name === "session_shutdown") shutdownHandlers.push(handler);
+      },
       registerCommand(
         name: string,
         options: { handler(args: string, ctx: unknown): unknown },
@@ -289,6 +292,10 @@ test("production registration exposes a sample command that notifies the user", 
     },
   });
   assert.deepEqual(notices, ["Rust sample command works."]);
+  for (const shutdown of shutdownHandlers) shutdown();
+  assert.throws(() =>
+    command.handler("", { hasUI: true, ui: { notify() {} } }),
+  );
 });
 
 test("direct registration installs a Rust-owned session callback without a bridge", () => {
@@ -324,6 +331,45 @@ test("direct registration installs a Rust-owned sample command without a bridge"
     registerEntryRenderer() {},
   });
   assert.ok(commands.has("registration-sample"));
+});
+
+test("one shutdown revokes all direct-registration callbacks", async () => {
+  const native = createRequire(import.meta.url)(
+    "./native/generated/index.js",
+  ) as { registerDirectCallbacks(pi: unknown): boolean };
+  const handlers = new Map<
+    string,
+    Array<(event: unknown, context: unknown) => unknown>
+  >();
+  const commands = new Map<
+    string,
+    { handler(args: string, context: unknown): unknown }
+  >();
+  native.registerDirectCallbacks({
+    on(name: string, handler: (event: unknown, context: unknown) => unknown) {
+      handlers.set(name, [...(handlers.get(name) ?? []), handler]);
+    },
+    registerCommand(
+      name: string,
+      options: { handler(args: string, context: unknown): unknown },
+    ) {
+      commands.set(name, options);
+    },
+    registerEntryRenderer() {},
+  });
+  const shutdown = handlers.get("session_shutdown") ?? [];
+  assert.equal(shutdown.length, 1);
+  const event = handlers.get("session_info_changed")?.[0];
+  const command = commands.get("registration-sample");
+  assert.ok(event);
+  assert.ok(command);
+  shutdown[0]({}, {});
+  await assert.rejects(
+    Promise.resolve(event({ type: "session_info_changed" }, {})),
+  );
+  assert.throws(() =>
+    command.handler("", { hasUI: true, ui: { notify() {} } }),
+  );
 });
 
 test("Rust callback dispatches after tracer initialization returns", async () => {
@@ -520,7 +566,7 @@ test("shutdown cancels Rust tracer work before its asynchronous dispatch", async
     handler({ type: "session_info_changed", name: "pending" }, {}),
   );
   assert.equal(shutdown({}, {}), true);
-  await assert.rejects(pending, /callback tracer state is unavailable/);
+  await assert.rejects(pending, /session state is unavailable/);
 });
 
 test("Rust tracer accepts the Pi session info changed event shape", async () => {
