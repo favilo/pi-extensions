@@ -1478,7 +1478,7 @@ async function presentOnNativePromptQueue(
   const release = trackSessionPromptAbort(sessionId, abort);
   let outcome: PermissionResult | undefined;
   try {
-    const bound = await presentBoundPrompt(
+    const prompt = presentBoundPrompt(
       {
         version: NATIVE_CONTRACT_VERSION,
         operation: "prompt_queue",
@@ -1497,7 +1497,19 @@ async function presentOnNativePromptQueue(
         return promptResolution(outcome);
       },
     );
-    const accepted = promptWasCancelled(abort.signal)
+    let onAbort: (() => void) | undefined;
+    const cancelled = new Promise<undefined>((resolve) => {
+      onAbort = () => resolve(undefined);
+      abort.signal.addEventListener("abort", onAbort, { once: true });
+      if (promptWasCancelled(abort.signal)) onAbort();
+    });
+    let bound: Awaited<typeof prompt> | undefined;
+    try {
+      bound = await Promise.race([prompt, cancelled]);
+    } finally {
+      if (onAbort) abort.signal.removeEventListener("abort", onAbort);
+    }
+    const accepted = !bound || promptWasCancelled(abort.signal)
       ? { allowed: false as const, decision: "cancel" as const }
       : acceptBoundPermission(bound, outcome, queueId);
     if (outcome?.allowed && !accepted.allowed && request.toolCallId)
