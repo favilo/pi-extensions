@@ -263,6 +263,23 @@ test("direct registration installs a Rust-owned session callback without a bridg
   assert.equal(typeof handlers.get("session_info_changed"), "function");
 });
 
+test("direct registration installs a Rust-owned sample command without a bridge", () => {
+  const native = createRequire(import.meta.url)(
+    "./native/generated/index.js",
+  ) as {
+    registerDirectCallbacks: (pi: unknown) => boolean;
+  };
+  const commands = new Map<string, unknown>();
+  native.registerDirectCallbacks({
+    on() {},
+    registerCommand(name: string, options: unknown) {
+      commands.set(name, options);
+    },
+    registerEntryRenderer() {},
+  });
+  assert.ok(commands.has("registration-sample"));
+});
+
 test("Rust callback dispatches after tracer initialization returns", async () => {
   const native = createRequire(import.meta.url)(
     "./native/generated/index.js",
