@@ -245,6 +245,24 @@ test("bundled Rust registration calls pi.on and registerCommand for delegated ca
   assert.deepEqual(handledCommands, [{ args: "local", ctx: commandContext }]);
 });
 
+test("direct registration installs a Rust-owned session callback without a bridge", () => {
+  const native = createRequire(import.meta.url)(
+    "./native/generated/index.js",
+  ) as {
+    registerDirectCallbacks: (pi: unknown) => boolean;
+  };
+  const handlers = new Map<string, unknown>();
+  const registered = native.registerDirectCallbacks({
+    on(name: string, handler: unknown) {
+      handlers.set(name, handler);
+    },
+    registerCommand() {},
+    registerEntryRenderer() {},
+  });
+  assert.equal(registered, true);
+  assert.equal(typeof handlers.get("session_info_changed"), "function");
+});
+
 test("Rust callback dispatches after tracer initialization returns", async () => {
   const native = createRequire(import.meta.url)(
     "./native/generated/index.js",
