@@ -245,6 +245,52 @@ test("bundled Rust registration calls pi.on and registerCommand for delegated ca
   assert.deepEqual(handledCommands, [{ args: "local", ctx: commandContext }]);
 });
 
+test("production registration exposes a sample command that notifies the user", async () => {
+  const native = createRequire(import.meta.url)(
+    "./native/generated/index.js",
+  ) as {
+    registerToolPermissionsCallbacks(
+      request: unknown,
+      pi: unknown,
+      bridge: unknown,
+    ): unknown;
+  };
+  const commands = new Map<
+    string,
+    { handler(args: string, ctx: unknown): unknown }
+  >();
+  native.registerToolPermissionsCallbacks(
+    {
+      version: NATIVE_CONTRACT_VERSION,
+      operation: "register_callbacks",
+      nonce: "sample-live",
+    },
+    {
+      on() {},
+      registerCommand(
+        name: string,
+        options: { handler(args: string, ctx: unknown): unknown },
+      ) {
+        commands.set(name, options);
+      },
+      registerEntryRenderer() {},
+    },
+    { handleToolCall() {} },
+  );
+  const command = commands.get("registration-sample");
+  assert.ok(command);
+  const notices: string[] = [];
+  await command.handler("", {
+    hasUI: true,
+    ui: {
+      notify(message: string) {
+        notices.push(message);
+      },
+    },
+  });
+  assert.deepEqual(notices, ["Rust sample command works."]);
+});
+
 test("direct registration installs a Rust-owned session callback without a bridge", () => {
   const native = createRequire(import.meta.url)(
     "./native/generated/index.js",
