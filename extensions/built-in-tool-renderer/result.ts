@@ -12,7 +12,7 @@ export function toolErrorText(
   const content = result.content.find(
     (item) => item.type === "text" && item.text,
   );
-  return content?.text?.split("\n")[0] || fallback;
+  return content?.text || fallback;
 }
 
 /** All text output parts of a tool result, excluding steering annotations (those render via their own line). */
