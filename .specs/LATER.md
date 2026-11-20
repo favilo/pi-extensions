@@ -58,3 +58,12 @@ extension edit tools. Keep the Rust/WASM permission migration in mind: put
 policy/registration semantics behind the native boundary where appropriate,
 while leaving host-specific filesystem resolution in the host adapter.
 
+## Message another running Pi session
+
+Add a tool for sending a message to an independently running Pi session, such
+as an agent working in another project directory. Let the caller identify the
+intended session and choose whether to steer an active turn or queue a
+follow-up. Make the target and message visible for approval, and report whether
+the message was accepted or the session was unavailable. Preserve session
+isolation and avoid writing directly to another session's transcript.
+
