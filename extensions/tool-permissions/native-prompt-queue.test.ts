@@ -238,6 +238,37 @@ test("the native boundary queues a later prompt until the active UI settles", as
   assert.deepEqual(presented, ["call-native-first", "call-native-second"]);
 });
 
+test("the native presenter runs asynchronously on the JavaScript event loop", async () => {
+  const native = requireNativePackage(bundledNativePackagePath()) as {
+    decidePrompt(
+      request: {
+        version: number;
+        operation: string;
+        nonce: string;
+        toolCallId: string;
+      },
+      present: (id: string) => Promise<{ decision: PromptQueueDecision }>,
+    ): Promise<unknown>;
+  };
+  let presenterCalled = false;
+  const result = native.decidePrompt(
+    {
+      version: NATIVE_CONTRACT_VERSION,
+      operation: "prompt_queue",
+      nonce: NATIVE_PROMPT_QUEUE_NONCE,
+      toolCallId: "call-async-presenter",
+    },
+    async () => {
+      presenterCalled = true;
+      return { decision: PromptQueueDecision.Deny };
+    },
+  );
+
+  assert.equal(presenterCalled, false, "presenter must not run inline");
+  await result;
+  assert.equal(presenterCalled, true);
+});
+
 test("steering stays bound to the prompt that submitted it", async () => {
   const toolCallId = "call-steering";
   const result = await presentBoundPrompt(
