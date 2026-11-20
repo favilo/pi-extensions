@@ -51,6 +51,10 @@ test("renders a permission preview as a non-context history entry while keeping 
     ) => PromptComponent | undefined
   >();
   let component: PromptComponent | undefined;
+  let notifyPromptOpened!: () => void;
+  const promptOpened = new Promise<void>((resolve) => {
+    notifyPromptOpened = resolve;
+  });
 
   try {
     const { default: toolPermissionPolicy } = await import(
@@ -117,13 +121,14 @@ test("renders a permission preview as a non-context history entry while keeping 
                 {},
                 resolve,
               );
+              notifyPromptOpened();
             });
           },
         },
       },
     );
 
-    await new Promise((resolve) => setImmediate(resolve));
+    await promptOpened;
     assert.equal(entries.length, 1);
     assert.equal(entries[0]!.customType, "permission-preview");
     const entryData = entries[0]!.data as { title: string; body: string };

@@ -797,6 +797,10 @@ test("resolves and displays the selected runtime before approving a broadly allo
     handleInput(data: string): void;
     render(width: number): string[];
   }> = [];
+  let notifyPromptOpened!: () => void;
+  const promptOpened = new Promise<void>((resolve) => {
+    notifyPromptOpened = resolve;
+  });
   const handlers = new Map<
     string,
     (
@@ -889,13 +893,14 @@ test("resolves and displays the selected runtime before approving a broadly allo
                   render(width: number): string[];
                 },
               );
+              notifyPromptOpened();
             });
           },
         },
       },
     );
 
-    await new Promise((resolve) => setImmediate(resolve));
+    await promptOpened;
     assert.equal(resolveCalls.length, 1);
     const text = components[0].render(120).join("\n");
     assert.match(text, /Account: personal/);

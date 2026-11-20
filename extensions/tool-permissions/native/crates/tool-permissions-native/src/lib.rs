@@ -152,7 +152,7 @@ pub fn save_rule(request: RuleSaveRequest) -> Result<RuleSaveResponse> {
 pub fn decide_prompt<'env>(
     env: &'env Env,
     request: PromptQueueRequest,
-    present: Function<'env, String, PromiseRaw<'static, PromptQueueResolution>>,
+    present: Function<'env, String, Promise<PromptQueueResolution>>,
 ) -> Result<napi::bindgen_prelude::Object<'env>> {
     prompt_queue::decide(env, request, present)
 }

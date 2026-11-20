@@ -1,8 +1,10 @@
-use std::collections::VecDeque;
-use std::sync::{LazyLock, Mutex};
+use std::collections::{HashMap, VecDeque};
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{Arc, LazyLock, Mutex};
 
-use napi::bindgen_prelude::{Function, FunctionRef, Object, PromiseRaw, Unknown};
-use napi::{Env, Error, JsDeferred, Result as NapiResult};
+use napi::bindgen_prelude::{Function, Object, Promise};
+use napi::threadsafe_function::ThreadsafeFunction;
+use napi::{Env, Error, JsDeferred, Result as NapiResult, Status};
 use thiserror::Error;
 
 use crate::CONTRACT_VERSION;
@@ -21,6 +23,8 @@ pub enum PromptQueueError {
     ToolCallId,
     #[error("prompt queue cannot cross N-API environments")]
     Environment,
+    #[error("prompt queue identity space exhausted")]
+    IdentityExhausted,
 }
 
 pub fn validate(request: &PromptQueueRequest) -> std::result::Result<(), PromptQueueError> {
@@ -51,23 +55,84 @@ pub fn complete(
     })
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct EnvironmentId(u64);
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct PromptId(u64);
+
+static NEXT_ENVIRONMENT_ID: AtomicU64 = AtomicU64::new(1);
+static NEXT_PROMPT_ID: AtomicU64 = AtomicU64::new(1);
+static ENVIRONMENTS: LazyLock<EnvironmentRegistry> = LazyLock::new(EnvironmentRegistry::default);
+
+#[derive(Default)]
+struct EnvironmentRegistry {
+    live: Mutex<HashMap<usize, EnvironmentId>>,
+}
+
+impl EnvironmentRegistry {
+    fn get_or_register(
+        &self,
+        key: usize,
+        register_hook: impl FnOnce(EnvironmentId) -> NapiResult<()>,
+    ) -> NapiResult<EnvironmentId> {
+        let mut live = self
+            .live
+            .lock()
+            .map_err(|_| Error::from_reason("environment registry unavailable"))?;
+        if let Some(id) = live.get(&key) {
+            return Ok(*id);
+        }
+        let id = EnvironmentId(
+            next_identity(&NEXT_ENVIRONMENT_ID)
+                .map_err(|error| Error::from_reason(error.to_string()))?,
+        );
+        register_hook(id)?;
+        live.insert(key, id);
+        Ok(id)
+    }
+
+    fn remove(&self, key: usize, id: EnvironmentId) {
+        if let Ok(mut live) = self.live.lock() {
+            if live.get(&key) == Some(&id) {
+                live.remove(&key);
+            }
+        }
+    }
+}
+
+fn next_identity(counter: &AtomicU64) -> Result<u64, PromptQueueError> {
+    counter
+        .try_update(Ordering::Relaxed, Ordering::Relaxed, |value| {
+            value.checked_add(1)
+        })
+        .map_err(|_| PromptQueueError::IdentityExhausted)
+}
+
+fn environment_id(env: &Env) -> NapiResult<EnvironmentId> {
+    let key = env.raw() as usize;
+    ENVIRONMENTS.get_or_register(key, |id| {
+        env.add_env_cleanup_hook((key, id), cleanup_environment)?;
+        Ok(())
+    })
+}
+
 type PromptResolver = Box<dyn FnOnce(Env) -> NapiResult<PromptQueueResponse> + Send>;
 type DeferredPrompt = JsDeferred<PromptQueueResponse, PromptResolver>;
 
-// `FunctionRef` fixes its return type at storage time. The `'static` is only a
-// signature marker: it stores no PromiseRaw. `call_presenter` narrows every
-// actual returned promise to the current Env before it can be used.
-type PresenterRef = FunctionRef<String, PromiseRaw<'static, PromptQueueResolution>>;
+type PresenterRef =
+    ThreadsafeFunction<String, Promise<PromptQueueResolution>, String, Status, false, true>;
 
 struct QueuedPrompt {
     request: PromptQueueRequest,
-    present: PresenterRef,
+    present: Arc<PresenterRef>,
     deferred: DeferredPrompt,
-    environment: usize,
+    environment: EnvironmentId,
+    id: PromptId,
 }
 
 struct PromptQueue<T> {
-    environment: Option<usize>,
+    environment: Option<EnvironmentId>,
     active: Option<T>,
     pending: VecDeque<T>,
     opening: bool,
@@ -93,7 +158,7 @@ enum QueuePosition {
 impl<T> PromptQueue<T> {
     fn submit(
         &mut self,
-        environment: usize,
+        environment: EnvironmentId,
         prompt: T,
     ) -> std::result::Result<QueuePosition, PromptQueueError> {
         match self.environment {
@@ -118,7 +183,7 @@ impl<T> PromptQueue<T> {
         self.active.take()
     }
 
-    fn restore_active(&mut self, environment: usize, prompt: T) -> Option<T> {
+    fn restore_active(&mut self, environment: EnvironmentId, prompt: T) -> Option<T> {
         if !self.opening || self.environment != Some(environment) {
             return Some(prompt);
         }
@@ -155,16 +220,20 @@ static NATIVE_PROMPT_QUEUE: LazyLock<Mutex<PromptQueue<QueuedPrompt>>> =
 pub fn decide<'env>(
     env: &'env Env,
     request: PromptQueueRequest,
-    present: Function<'env, String, PromiseRaw<'static, PromptQueueResolution>>,
+    present: Function<'env, String, Promise<PromptQueueResolution>>,
 ) -> NapiResult<Object<'env>> {
     validate(&request).map_err(|error| Error::from_reason(error.to_string()))?;
-    let environment = env.raw() as usize;
+    let environment = environment_id(env)?;
+    let id = PromptId(
+        next_identity(&NEXT_PROMPT_ID).map_err(|error| Error::from_reason(error.to_string()))?,
+    );
     let (deferred, promise) = env.create_deferred::<PromptQueueResponse, PromptResolver>()?;
     let queued = QueuedPrompt {
         request,
-        present: persistent_present(present)?,
+        present: Arc::new(persistent_present(present)?),
         deferred,
         environment,
+        id,
     };
     let should_open = NATIVE_PROMPT_QUEUE
         .lock()
@@ -172,17 +241,14 @@ pub fn decide<'env>(
         .submit(environment, queued)
         .map_err(|error| Error::from_reason(error.to_string()))?
         == QueuePosition::Active;
-    if let Err(error) = env.add_env_cleanup_hook(environment, cleanup_environment) {
-        cleanup_environment(environment);
-        return Err(error);
-    }
     if should_open {
         open_next(env)?;
     }
     Ok(promise)
 }
 
-fn cleanup_environment(environment: usize) {
+fn cleanup_environment((key, environment): (usize, EnvironmentId)) {
+    ENVIRONMENTS.remove(key, environment);
     let released = match NATIVE_PROMPT_QUEUE.lock() {
         Ok(mut queue) if queue.environment == Some(environment) => queue.close(),
         _ => Vec::new(),
@@ -191,17 +257,12 @@ fn cleanup_environment(environment: usize) {
 }
 
 fn persistent_present(
-    present: Function<'_, String, PromiseRaw<'static, PromptQueueResolution>>,
+    present: Function<'_, String, Promise<PromptQueueResolution>>,
 ) -> NapiResult<PresenterRef> {
-    present.create_ref()
-}
-
-fn call_presenter<'env>(
-    env: &'env Env,
-    present: &PresenterRef,
-    tool_call_id: String,
-) -> NapiResult<PromiseRaw<'env, PromptQueueResolution>> {
-    present.borrow_back(env)?.call(tool_call_id)
+    present
+        .build_threadsafe_function::<String>()
+        .weak::<true>()
+        .build()
 }
 
 fn open_next(env: &Env) -> NapiResult<()> {
@@ -213,7 +274,7 @@ fn open_next(env: &Env) -> NapiResult<()> {
         return Ok(());
     };
     let tool_call_id = active.request.tool_call_id.clone();
-    if active.environment != env.raw() as usize {
+    if active.environment != environment_id(env)? {
         NATIVE_PROMPT_QUEUE
             .lock()
             .expect("native prompt queue lock poisoned")
@@ -222,55 +283,55 @@ fn open_next(env: &Env) -> NapiResult<()> {
             "native prompt queue environment mismatch",
         ));
     }
-    let presentation = call_presenter(env, &active.present, tool_call_id.clone());
+    let presenter = active.present.clone();
+    let environment = active.environment;
+    let id = active.id;
     let abandoned = NATIVE_PROMPT_QUEUE
         .lock()
         .expect("native prompt queue lock poisoned")
-        .restore_active(active.environment, active);
+        .restore_active(environment, active);
     if abandoned.is_some() {
         return Err(Error::from_reason(
             "prompt queue environment closed while opening",
         ));
     }
 
-    match presentation {
-        Ok(presentation) => {
-            let successful_tool_call_id = tool_call_id.clone();
-            let settled = presentation.then(move |context| {
-                settle_active(&context.env, &successful_tool_call_id, Ok(context.value))?;
-                Ok(())
-            })?;
-            settled.catch(
-                move |context: napi::bindgen_prelude::CallbackContext<Unknown>| {
-                    settle_active(&context.env, &tool_call_id, Err(()))?;
-                    Ok(())
-                },
-            )?;
-            Ok(())
-        }
-        Err(_) => settle_active(env, &tool_call_id, Err(())),
+    let future = async move {
+        let resolution = match presenter.call_async_catch(tool_call_id).await {
+            Ok(promise) => promise.await.map_err(|_| ()),
+            Err(_) => Err(()),
+        };
+        settle_active(environment, id, resolution);
+    };
+    if napi_async_runtime::try_spawn_detached(future).is_err() {
+        settle_active(environment, id, Err(()));
     }
+    Ok(())
 }
 
 fn settle_active(
-    env: &Env,
-    tool_call_id: &str,
+    environment: EnvironmentId,
+    id: PromptId,
     resolution: std::result::Result<PromptQueueResolution, ()>,
-) -> NapiResult<()> {
+) {
     let Some(completed) = NATIVE_PROMPT_QUEUE
         .lock()
         .expect("native prompt queue lock poisoned")
-        .finish_active(|prompt| prompt.request.tool_call_id == tool_call_id)
+        .finish_active(|prompt| prompt.environment == environment && prompt.id == id)
     else {
-        return Ok(());
+        return;
     };
     let response = match resolution {
         Ok(resolution) => complete(completed.request.clone(), resolution)
             .unwrap_or_else(|_| failed_response(&completed.request)),
         Err(()) => failed_response(&completed.request),
     };
-    completed.deferred.resolve(Box::new(move |_| Ok(response)));
-    open_next(env)
+    completed.deferred.resolve(Box::new(move |env| {
+        if environment_id(&env)? == environment {
+            open_next(&env)?;
+        }
+        Ok(response)
+    }));
 }
 
 fn failed_response(request: &PromptQueueRequest) -> PromptQueueResponse {
@@ -307,17 +368,39 @@ mod tests {
     use crate::contract::{PromptQueueDecision, PromptQueueRequest, PromptQueueResolution};
 
     #[test]
+    fn reused_environment_address_gets_a_new_identity_and_ignores_old_cleanup() {
+        let registry = super::EnvironmentRegistry::default();
+        let first = registry.get_or_register(42, |_| Ok(())).unwrap();
+        assert_eq!(
+            registry
+                .get_or_register(42, |_| panic!("already registered"))
+                .unwrap(),
+            first
+        );
+        registry.remove(42, first);
+        let second = registry.get_or_register(42, |_| Ok(())).unwrap();
+        assert_ne!(first, second);
+        registry.remove(42, first);
+        assert_eq!(
+            registry
+                .get_or_register(42, |_| panic!("new environment must remain live"))
+                .unwrap(),
+            second
+        );
+    }
+
+    #[test]
     fn releases_the_next_fifo_prompt_when_the_active_prompt_settles() {
         let mut queue = super::PromptQueue::default();
         let first = super::ToolCallId::parse("call-first").unwrap();
         let second = super::ToolCallId::parse("call-second").unwrap();
 
         assert_eq!(
-            queue.submit(1, first).unwrap(),
+            queue.submit(super::EnvironmentId(1), first).unwrap(),
             super::QueuePosition::Active
         );
         assert_eq!(
-            queue.submit(1, second).unwrap(),
+            queue.submit(super::EnvironmentId(1), second).unwrap(),
             super::QueuePosition::Waiting
         );
         assert_eq!(
@@ -334,14 +417,17 @@ mod tests {
     fn prompt_queue_rejects_presenter_restoration_after_environment_shutdown() {
         let mut queue = super::PromptQueue::default();
         assert_eq!(
-            queue.submit(1, "old").unwrap(),
+            queue.submit(super::EnvironmentId(1), "old").unwrap(),
             super::QueuePosition::Active
         );
         let opening = queue.take_active_for_opening().unwrap();
         drop(queue.close());
-        assert_eq!(queue.restore_active(1, opening), Some("old"));
         assert_eq!(
-            queue.submit(2, "new").unwrap(),
+            queue.restore_active(super::EnvironmentId(1), opening),
+            Some("old")
+        );
+        assert_eq!(
+            queue.submit(super::EnvironmentId(2), "new").unwrap(),
             super::QueuePosition::Active
         );
     }
@@ -361,11 +447,15 @@ mod tests {
         let released = Rc::new(Cell::new(0));
         let mut queue = super::PromptQueue::default();
         assert_eq!(
-            queue.submit(1, Presenter(Rc::clone(&released))).unwrap(),
+            queue
+                .submit(super::EnvironmentId(1), Presenter(Rc::clone(&released)))
+                .unwrap(),
             super::QueuePosition::Active
         );
         assert_eq!(
-            queue.submit(1, Presenter(Rc::clone(&released))).unwrap(),
+            queue
+                .submit(super::EnvironmentId(1), Presenter(Rc::clone(&released)))
+                .unwrap(),
             super::QueuePosition::Waiting
         );
         drop(queue.close());

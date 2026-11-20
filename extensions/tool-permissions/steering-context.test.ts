@@ -33,6 +33,8 @@ type Harness = {
   toolResult: ToolResultHandler;
   steerMessages: Array<{ text: string; options: unknown }>;
   prompts: PromptComponent[];
+  promptOpened: Array<Promise<void>>;
+  notifyPromptOpened: Array<() => void>;
   project: string;
   cleanup: () => void;
 };
@@ -61,6 +63,14 @@ async function steeringHarness(): Promise<Harness> {
   const handlers = new Map<string, unknown>();
   const steerMessages: Array<{ text: string; options: unknown }> = [];
   const prompts: PromptComponent[] = [];
+  const notifyPromptOpened: Array<() => void> = [];
+  const promptOpened = Array.from(
+    { length: 2 },
+    (_, index) =>
+      new Promise<void>((resolve) => {
+        notifyPromptOpened[index] = resolve;
+      }),
+  );
   const { default: toolPermissionPolicy } = await import(
     `./index.ts?steering-context=${encodeURIComponent(agentDir)}`
   );
@@ -81,6 +91,8 @@ async function steeringHarness(): Promise<Harness> {
     toolResult: handlers.get("tool_result") as ToolResultHandler,
     steerMessages,
     prompts,
+    promptOpened,
+    notifyPromptOpened,
     project,
     cleanup: () => {
       if (previousAgentDir === undefined)
@@ -111,6 +123,7 @@ function promptingCtx(harness: Harness): unknown {
         return new Promise((resolve) => {
           const component = factory({ requestRender() {} }, theme, {}, resolve);
           harness.prompts.push(component);
+          harness.notifyPromptOpened[harness.prompts.length - 1]?.();
         });
       },
     },
@@ -137,7 +150,7 @@ test("allow-with-steering annotates the invocation-bound tool result", async () 
       },
       promptingCtx(harness),
     );
-    await new Promise((resolve) => setImmediate(resolve));
+    await harness.promptOpened[0];
     assert.equal(harness.prompts.length, 1);
 
     for (const key of [TAB, ...typeText("only this once"), CTRL_Y])
@@ -199,7 +212,7 @@ test("extra Escape presses stay in the Vim steering editor", async () => {
       },
       promptingCtx(harness),
     );
-    await new Promise((resolve) => setImmediate(resolve));
+    await harness.promptOpened[0];
     assert.equal(harness.prompts.length, 1);
 
     for (const key of [TAB, ...typeText("keep this"), ESC, ESC, ESC])
@@ -232,7 +245,7 @@ test("extra Escape presses stay in the Vim steering editor", async () => {
       },
       promptingCtx(harness),
     );
-    await new Promise((resolve) => setImmediate(resolve));
+    await harness.promptOpened[1];
     assert.equal(harness.prompts.length, 2);
     for (const key of [TAB, ...typeText("keep this"), ESC, TAB, CTRL_Y])
       harness.prompts[1].handleInput(key);
@@ -259,7 +272,7 @@ test("parallel prompts never share steering context", async () => {
       { toolName: "bash", input: { command: "npm test" } },
       promptingCtx(harness),
     );
-    await new Promise((resolve) => setImmediate(resolve));
+    await harness.promptOpened[0];
     const second = harness.toolCall(
       { toolName: "bash", input: { command: "npm run build" } },
       promptingCtx(harness),
@@ -275,7 +288,7 @@ test("parallel prompts never share steering context", async () => {
     const firstResult = await first;
 
     // The second prompt is presented next, with pristine steering state.
-    await new Promise((resolve) => setImmediate(resolve));
+    await harness.promptOpened[1];
     assert.equal(harness.prompts.length, 2);
     harness.prompts[1].handleInput(CTRL_D);
     const secondResult = await second;

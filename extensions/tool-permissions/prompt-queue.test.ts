@@ -39,6 +39,7 @@ function request(
 
 function promptHarness() {
   const components: InputComponent[] = [];
+  const opened = [deferred<void>(), deferred<void>()];
   const context = {
     cwd: "/workspace/project",
     hasUI: true,
@@ -69,12 +70,14 @@ function promptHarness() {
             resolve,
           );
           components.push(component as InputComponent);
+          opened[components.length - 1]?.resolve();
         });
       },
     },
   } satisfies PermissionContext;
   return {
     components,
+    opened,
     context,
     mainPi: { sendUserMessage() {} },
     childPi: { sendUserMessage() {} },
@@ -82,7 +85,7 @@ function promptHarness() {
 }
 
 test("renders child permission details with actual line breaks", async () => {
-  const { components, context, childPi } = promptHarness();
+  const { components, opened, context, childPi } = promptHarness();
   const pending = promptToolPermissionRequest(
     childPi,
     context,
@@ -91,6 +94,7 @@ test("renders child permission details with actual line breaks", async () => {
     }),
   );
 
+  await opened[0].promise;
   try {
     const text = components[0].render(100).join("\n");
     assert.match(text, /\nTool: bash\nWorking directory:/);
@@ -112,7 +116,7 @@ for (const actors of [
   ],
 ]) {
   test(`presents ${actors[0].kind} then ${actors[1].kind} prompts FIFO and requires independent decisions`, async () => {
-    const { components, context, mainPi, childPi } = promptHarness();
+    const { components, opened, context, mainPi, childPi } = promptHarness();
     const piFor = (actor: ToolRequest["actor"]) =>
       actor.kind === "main" ? mainPi : childPi;
     const first = promptToolPermissionRequest(
@@ -126,6 +130,7 @@ for (const actors of [
       request(actors[1], "write", { path: "report.md" }),
     );
 
+    await opened[0].promise;
     assert.equal(
       components.length,
       1,
@@ -137,7 +142,7 @@ for (const actors of [
     );
     components[0].handleInput("\x19");
     assert.equal(await first, "allow");
-    await new Promise((resolve) => setImmediate(resolve));
+    await opened[1].promise;
 
     assert.equal(components.length, 2);
     const pending = await Promise.race([

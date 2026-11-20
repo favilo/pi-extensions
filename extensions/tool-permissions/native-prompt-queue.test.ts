@@ -92,151 +92,172 @@ test("an asynchronous prompt allow stays bound to its tool-call", async () => {
   );
 });
 
-test("a second prompt waits until the active prompt settles", async () => {
-  const activeDecision = deferred<PromptQueueDecision>();
-  const presented: string[] = [];
-  const requestFor = (toolCallId: string) => ({
-    version: NATIVE_CONTRACT_VERSION,
-    operation: "prompt_queue" as const,
-    nonce: NATIVE_PROMPT_QUEUE_NONCE,
-    toolCallId,
-  });
-  const first = presentBoundPrompt(requestFor("call-first"), async (prompt) => {
-    presented.push(prompt.toolCallId);
-    return activeDecision.promise.then((decision) => ({ decision }));
-  });
-  const second = presentBoundPrompt(
-    requestFor("call-second"),
-    async (prompt) => {
-      presented.push(prompt.toolCallId);
-      return { decision: PromptQueueDecision.Deny };
-    },
-  );
-
-  await Promise.resolve();
-  assert.deepEqual(presented, ["call-first"]);
-  activeDecision.resolve(PromptQueueDecision.Allow);
-
-  assert.deepEqual(await first, {
-    version: NATIVE_CONTRACT_VERSION,
-    operation: "prompt_queue",
-    ok: true,
-    nonce: NATIVE_PROMPT_QUEUE_NONCE,
-    toolCallId: "call-first",
-    decision: PromptQueueDecision.Allow,
-  });
-  assert.deepEqual(await second, {
-    version: NATIVE_CONTRACT_VERSION,
-    operation: "prompt_queue",
-    ok: true,
-    nonce: NATIVE_PROMPT_QUEUE_NONCE,
-    toolCallId: "call-second",
-    decision: PromptQueueDecision.Deny,
-  });
-  assert.deepEqual(presented, ["call-first", "call-second"]);
-});
-
-test("a native queue fails closed on UI rejection before presenting the next module's prompt", async () => {
-  const firstModule = await import(
-    new URL("./native-prompt-queue.ts?extension=first", import.meta.url).href
-  );
-  const secondModule = await import(
-    new URL("./native-prompt-queue.ts?extension=second", import.meta.url).href
-  );
-  const presented: string[] = [];
-  const rejectedUi = deferred<PromptQueueDecision>();
-  const requestFor = (toolCallId: string) => ({
-    version: NATIVE_CONTRACT_VERSION,
-    operation: "prompt_queue" as const,
-    nonce: NATIVE_PROMPT_QUEUE_NONCE,
-    toolCallId,
-  });
-
-  const first = firstModule.presentBoundPrompt(
-    requestFor("call-rejected-ui"),
-    async (prompt: { toolCallId: string }) => {
-      presented.push(prompt.toolCallId);
-      return rejectedUi.promise.then((decision) => ({ decision }));
-    },
-  );
-  const second = secondModule.presentBoundPrompt(
-    requestFor("call-after-rejection"),
-    async (prompt: { toolCallId: string }) => {
-      presented.push(prompt.toolCallId);
-      return { decision: PromptQueueDecision.Allow };
-    },
-  );
-
-  await Promise.resolve();
-  assert.deepEqual(presented, ["call-rejected-ui"]);
-  rejectedUi.reject(new Error("Pi UI failed"));
-
-  assert.deepEqual(await first, {
-    version: NATIVE_CONTRACT_VERSION,
-    operation: "prompt_queue",
-    ok: false,
-    nonce: NATIVE_PROMPT_QUEUE_NONCE,
-    toolCallId: "call-rejected-ui",
-    decision: PromptQueueDecision.Deny,
-  });
-  assert.deepEqual(await second, {
-    version: NATIVE_CONTRACT_VERSION,
-    operation: "prompt_queue",
-    ok: true,
-    nonce: NATIVE_PROMPT_QUEUE_NONCE,
-    toolCallId: "call-after-rejection",
-    decision: PromptQueueDecision.Allow,
-  });
-  assert.deepEqual(presented, ["call-rejected-ui", "call-after-rejection"]);
-});
-
-test("the native boundary queues a later prompt until the active UI settles", async () => {
-  type NativePromptQueue = {
-    decidePrompt(
-      request: {
-        version: number;
-        operation: string;
-        nonce: string;
-        toolCallId: string;
+test(
+  "a second prompt waits until the active prompt settles",
+  { timeout: 5000 },
+  async () => {
+    const activeDecision = deferred<PromptQueueDecision>();
+    const presented: string[] = [];
+    const opened = deferred<void>();
+    const requestFor = (toolCallId: string) => ({
+      version: NATIVE_CONTRACT_VERSION,
+      operation: "prompt_queue" as const,
+      nonce: NATIVE_PROMPT_QUEUE_NONCE,
+      toolCallId,
+    });
+    const first = presentBoundPrompt(
+      requestFor("call-first"),
+      async (prompt) => {
+        presented.push(prompt.toolCallId);
+        opened.resolve();
+        return activeDecision.promise.then((decision) => ({ decision }));
       },
-      present: (
-        toolCallId: string,
-      ) => Promise<{ decision: PromptQueueDecision }>,
-    ): Promise<unknown>;
-  };
-  const native = requireNativePackage(
-    bundledNativePackagePath(),
-  ) as NativePromptQueue;
-  const activeDecision = deferred<PromptQueueDecision>();
-  const presented: string[] = [];
-  const requestFor = (toolCallId: string) => ({
-    version: NATIVE_CONTRACT_VERSION,
-    operation: "prompt_queue",
-    nonce: NATIVE_PROMPT_QUEUE_NONCE,
-    toolCallId,
-  });
+    );
+    const second = presentBoundPrompt(
+      requestFor("call-second"),
+      async (prompt) => {
+        presented.push(prompt.toolCallId);
+        return { decision: PromptQueueDecision.Deny };
+      },
+    );
 
-  const first = native.decidePrompt(
-    requestFor("call-native-first"),
-    async (id) => {
-      presented.push(id);
-      return activeDecision.promise.then((decision) => ({ decision }));
-    },
-  );
-  const second = native.decidePrompt(
-    requestFor("call-native-second"),
-    async (id) => {
-      presented.push(id);
-      return { decision: PromptQueueDecision.Deny };
-    },
-  );
+    await opened.promise;
+    assert.deepEqual(presented, ["call-first"]);
+    activeDecision.resolve(PromptQueueDecision.Allow);
 
-  await Promise.resolve();
-  assert.deepEqual(presented, ["call-native-first"]);
-  activeDecision.resolve(PromptQueueDecision.Allow);
-  await Promise.all([first, second]);
-  assert.deepEqual(presented, ["call-native-first", "call-native-second"]);
-});
+    assert.deepEqual(await first, {
+      version: NATIVE_CONTRACT_VERSION,
+      operation: "prompt_queue",
+      ok: true,
+      nonce: NATIVE_PROMPT_QUEUE_NONCE,
+      toolCallId: "call-first",
+      decision: PromptQueueDecision.Allow,
+    });
+    assert.deepEqual(await second, {
+      version: NATIVE_CONTRACT_VERSION,
+      operation: "prompt_queue",
+      ok: true,
+      nonce: NATIVE_PROMPT_QUEUE_NONCE,
+      toolCallId: "call-second",
+      decision: PromptQueueDecision.Deny,
+    });
+    assert.deepEqual(presented, ["call-first", "call-second"]);
+  },
+);
+
+test(
+  "a native queue fails closed on UI rejection before presenting the next module's prompt",
+  { timeout: 5000 },
+  async () => {
+    const firstModule = await import(
+      new URL("./native-prompt-queue.ts?extension=first", import.meta.url).href
+    );
+    const secondModule = await import(
+      new URL("./native-prompt-queue.ts?extension=second", import.meta.url).href
+    );
+    const presented: string[] = [];
+    const rejectedUi = deferred<PromptQueueDecision>();
+    const opened = deferred<void>();
+    const requestFor = (toolCallId: string) => ({
+      version: NATIVE_CONTRACT_VERSION,
+      operation: "prompt_queue" as const,
+      nonce: NATIVE_PROMPT_QUEUE_NONCE,
+      toolCallId,
+    });
+
+    const first = firstModule.presentBoundPrompt(
+      requestFor("call-rejected-ui"),
+      async (prompt: { toolCallId: string }) => {
+        presented.push(prompt.toolCallId);
+        opened.resolve();
+        return rejectedUi.promise.then((decision) => ({ decision }));
+      },
+    );
+    const second = secondModule.presentBoundPrompt(
+      requestFor("call-after-rejection"),
+      async (prompt: { toolCallId: string }) => {
+        presented.push(prompt.toolCallId);
+        return { decision: PromptQueueDecision.Allow };
+      },
+    );
+
+    await opened.promise;
+    assert.deepEqual(presented, ["call-rejected-ui"]);
+    rejectedUi.reject(new Error("Pi UI failed"));
+
+    assert.deepEqual(await first, {
+      version: NATIVE_CONTRACT_VERSION,
+      operation: "prompt_queue",
+      ok: false,
+      nonce: NATIVE_PROMPT_QUEUE_NONCE,
+      toolCallId: "call-rejected-ui",
+      decision: PromptQueueDecision.Deny,
+    });
+    assert.deepEqual(await second, {
+      version: NATIVE_CONTRACT_VERSION,
+      operation: "prompt_queue",
+      ok: true,
+      nonce: NATIVE_PROMPT_QUEUE_NONCE,
+      toolCallId: "call-after-rejection",
+      decision: PromptQueueDecision.Allow,
+    });
+    assert.deepEqual(presented, ["call-rejected-ui", "call-after-rejection"]);
+  },
+);
+
+test(
+  "the native boundary queues a later prompt until the active UI settles",
+  { timeout: 5000 },
+  async () => {
+    type NativePromptQueue = {
+      decidePrompt(
+        request: {
+          version: number;
+          operation: string;
+          nonce: string;
+          toolCallId: string;
+        },
+        present: (
+          toolCallId: string,
+        ) => Promise<{ decision: PromptQueueDecision }>,
+      ): Promise<unknown>;
+    };
+    const native = requireNativePackage(
+      bundledNativePackagePath(),
+    ) as NativePromptQueue;
+    const activeDecision = deferred<PromptQueueDecision>();
+    const presented: string[] = [];
+    const opened = deferred<void>();
+    const requestFor = (toolCallId: string) => ({
+      version: NATIVE_CONTRACT_VERSION,
+      operation: "prompt_queue",
+      nonce: NATIVE_PROMPT_QUEUE_NONCE,
+      toolCallId,
+    });
+
+    const first = native.decidePrompt(
+      requestFor("call-native-first"),
+      async (id) => {
+        presented.push(id);
+        opened.resolve();
+        return activeDecision.promise.then((decision) => ({ decision }));
+      },
+    );
+    const second = native.decidePrompt(
+      requestFor("call-native-second"),
+      async (id) => {
+        presented.push(id);
+        return { decision: PromptQueueDecision.Deny };
+      },
+    );
+
+    await opened.promise;
+    assert.deepEqual(presented, ["call-native-first"]);
+    activeDecision.resolve(PromptQueueDecision.Allow);
+    await Promise.all([first, second]);
+    assert.deepEqual(presented, ["call-native-first", "call-native-second"]);
+  },
+);
 
 test("the native presenter runs asynchronously on the JavaScript event loop", async () => {
   const native = requireNativePackage(bundledNativePackagePath()) as {
