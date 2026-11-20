@@ -43,7 +43,10 @@ test(
       let settle;
       let opened;
       const presented = new Promise(resolve => { opened = resolve; });
-      native.decidePrompt(request, () => { opened(); return new Promise(resolve => { settle = resolve; }); });
+      let oldResult;
+      let queuedOpened = false;
+      native.decidePrompt(request, () => { opened(); return new Promise(resolve => { settle = resolve; }); }).then(result => { oldResult = result; }, () => {});
+      native.decidePrompt({ ...request, toolCallId: 'queued-old' }, async () => { queuedOpened = true; return { decision: 'allow' }; }).then(result => { if (result.decision === 'allow') oldResult = result; }, () => {});
       await presented;
       delete require.cache[require.resolve(loader)];
       const parallel = require(loader);
@@ -60,6 +63,8 @@ test(
       await newPresented;
       settle({ decision: 'allow' });
       await new Promise(resolve => setImmediate(resolve));
+      assert.equal(queuedOpened, false, 'queued old presenter must not open after disposal');
+      assert.notEqual(oldResult?.decision, 'allow', 'disposed requests must not authorize');
       finishNew({ decision: 'deny' });
       const result = await pendingNew;
       assert.equal(result.toolCallId, 'reused-id');
