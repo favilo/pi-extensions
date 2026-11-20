@@ -352,7 +352,10 @@ test("shutdown during initialization prevents a live scoped registration", () =>
   const registrations: string[] = [];
   assert.throws(() =>
     native.registerCallbackTracer({
-      on(eventName: string, handler: (event: unknown, ctx: unknown) => unknown) {
+      on(
+        eventName: string,
+        handler: (event: unknown, ctx: unknown) => unknown,
+      ) {
         registrations.push(eventName);
         if (eventName === "session_shutdown") handler({}, {});
       },

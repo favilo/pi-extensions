@@ -188,7 +188,6 @@ impl<T> PromptQueue<T> {
             return Some(prompt);
         }
         self.active = Some(prompt);
-        self.opening = false;
         None
     }
 
@@ -197,6 +196,7 @@ impl<T> PromptQueue<T> {
             return None;
         }
         let completed = self.active.take();
+        self.opening = false;
         self.active = self.pending.pop_front();
         if self.active.is_none() {
             self.environment = None;
@@ -266,11 +266,16 @@ fn persistent_present(
 }
 
 fn open_next(env: &Env) -> NapiResult<()> {
-    let Some(active) = NATIVE_PROMPT_QUEUE
-        .lock()
-        .expect("native prompt queue lock poisoned")
-        .take_active_for_opening()
-    else {
+    let current_environment = environment_id(env)?;
+    let Some(active) = ({
+        let mut queue = NATIVE_PROMPT_QUEUE
+            .lock()
+            .expect("native prompt queue lock poisoned");
+        if queue.environment != Some(current_environment) {
+            return Ok(());
+        }
+        queue.take_active_for_opening()
+    }) else {
         return Ok(());
     };
     let tool_call_id = active.request.tool_call_id.clone();
@@ -418,8 +423,15 @@ mod tests {
         let mut queue = super::PromptQueue::default();
         queue.submit(super::EnvironmentId(1), "prompt").unwrap();
         let prompt = queue.take_active_for_opening().unwrap();
-        assert!(queue.restore_active(super::EnvironmentId(1), prompt).is_none());
-        assert!(queue.take_active_for_opening().is_none(), "an already dispatched prompt must not open twice");
+        assert!(
+            queue
+                .restore_active(super::EnvironmentId(1), prompt)
+                .is_none()
+        );
+        assert!(
+            queue.take_active_for_opening().is_none(),
+            "an already dispatched prompt must not open twice"
+        );
     }
 
     #[test]

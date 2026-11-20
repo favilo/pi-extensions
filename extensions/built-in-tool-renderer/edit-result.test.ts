@@ -83,7 +83,8 @@ test("a failed edit renders its reason, never success text", () => {
 });
 
 test("edit and write validation failures show the missing-field detail", () => {
-  const message = 'Validation failed for tool "edit":\n  edits: required property is missing';
+  const message =
+    'Validation failed for tool "edit":\n  edits: required property is missing';
   for (const name of ["edit", "write"]) {
     const rendered = renderEdit(
       captureTool(name),

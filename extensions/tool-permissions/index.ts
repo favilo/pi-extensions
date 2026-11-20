@@ -1509,9 +1509,10 @@ async function presentOnNativePromptQueue(
     } finally {
       if (onAbort) abort.signal.removeEventListener("abort", onAbort);
     }
-    const accepted = !bound || promptWasCancelled(abort.signal)
-      ? { allowed: false as const, decision: "cancel" as const }
-      : acceptBoundPermission(bound, outcome, queueId);
+    const accepted =
+      !bound || promptWasCancelled(abort.signal)
+        ? { allowed: false as const, decision: "cancel" as const }
+        : acceptBoundPermission(bound, outcome, queueId);
     if (outcome?.allowed && !accepted.allowed && request.toolCallId)
       pendingSteering.delete(request.toolCallId);
     return accepted;
@@ -2863,6 +2864,8 @@ export default function toolPermissionPolicy(pi: ExtensionAPI) {
   }
 
   if (!hasNativeRegistration(nativeRegistration, "tool_call")) {
-    fatalNativeEngineUnavailable("native registration is incomplete; missing tool_call");
+    fatalNativeEngineUnavailable(
+      "native registration is incomplete; missing tool_call",
+    );
   }
 }
