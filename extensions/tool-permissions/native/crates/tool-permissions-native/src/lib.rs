@@ -84,8 +84,8 @@ pub fn register_tool_permissions_callbacks(
 }
 
 #[napi]
-pub fn register_direct_callbacks(_env: Env, _pi: napi::bindgen_prelude::Object) -> Result<bool> {
-    Ok(false)
+pub fn register_direct_callbacks(env: Env, pi: napi::bindgen_prelude::Object) -> Result<bool> {
+    callback_tracer::register(&env, pi)
 }
 
 #[napi]
