@@ -3,6 +3,11 @@
 Unfinished ideas. Add the next idea at the bottom. This file is a holding list,
 not a plan, and it does not start work.
 
+> **Planning in progress (2026-11-20):** the current items are being outlined as
+> e21–e25 under `.specs/epics/`. Keep these notes until story creation and the
+> planning handoff are complete; then clear or replace them with links to the
+> completed capsules.
+
 ## Skip activate_skill after a recent /skill command
 
 Block `activate_skill` when `/skill:<name>` already ran for that skill

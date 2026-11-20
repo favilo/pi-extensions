@@ -1,0 +1,22 @@
+story_id: e22s03
+title: Wire obsidian_edit as the first registered consumer
+status: planned
+bcps: 2
+delta: ADDED
+spec: e22s03-obsidian-edit-consumer.md
+plan_detail: outline
+tasks:
+  - id: 1
+    description: >-
+      Add contracts that obsidian_edit resolves vault/note through the
+      ~/.pi/agent/ settings registration and shows a complete contextual diff.
+    verify: node --test extensions/tool-permissions/
+    status: planned
+    risk: P1
+  - id: 2
+    description: >-
+      Wire the obsidian_edit resolver/settings entry and fail closed on bad
+      vault/note resolution before prompting.
+    verify: node --test extensions/tool-permissions/
+    status: planned
+    risk: P1

@@ -216,6 +216,23 @@ handoff:
     original report remains unconfirmed; registry BUG-2026-11-19T165747 stays open
     pending real reproduction and edit/write parity investigation. No push or PR was
     made.
+  planning_handoff:
+    later_epics_outlined_at: '2026-11-20T14:05:00Z'
+    status: outline_created
+    capsules:
+    - .specs/epics/e21-permission-prompt-authoring-ergonomics
+    - .specs/epics/e22-extension-edit-diff-approval
+    - .specs/epics/e23-cross-session-messaging
+    - .specs/epics/e24-parallel-subagents-navigable-ui
+    - .specs/epics/e25-codemode-mcp-discovery
+    decisions:
+    - e21s01 includes Ctrl+A/Ctrl+Shift+A and Ctrl+E/Ctrl+Shift+E for known non-MCP tools, prefilled current parameters, and shared permission-rule template examples.
+    - e21s04 skips unchanged already-in-context activate_skill loads with the user-specified message, including after /skill, before the reload cost but without bypassing permission prompts.
+    - e22 uses a JSON settings file under ~/.pi/agent/ for extension edit-tool registration; e13/e13s01 is superseded by e22s01.
+    - e25 replaces wholesale MCP tool session injection with codemode discovery/invocation while retaining authorization and audit.
+    next_steps:
+    - Run plan-work against the outlined capsules to deepen acceptance criteria, contracts, dependencies, and task verification.
+    - After all story plans are complete, clear or replace the planning-in-progress marker and migrated notes in .specs/LATER.md.
   deferred_work:
   - Start e20 (live provider quota footer) via plan-work/develop-tdd on e20s01 when
     ready; capsule at .specs/epics/e20-live-provider-quota-footer

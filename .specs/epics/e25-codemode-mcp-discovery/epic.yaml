@@ -1,0 +1,18 @@
+id: e25
+title: Prefer codemode MCP discovery over session injection
+wsjf: 3.2
+total_bcps: 5
+status: planned
+stories:
+  - id: e25s01
+    title: Replace MCP tool injection with codemode discovery
+    bcps: 5
+    status: planned
+    delta: ADDED
+    spec: e25s01-prefer-codemode-over-mcp-injection.md
+    tasks: e25s01-tasks.yaml
+note: >-
+  WSJF = (business value 8 + time criticality 3 + risk reduction 5) / job size 5 = 3.2.
+  Separate epic from e21. Stop injecting MCP tools into the session catalog and prefer
+  the agent discovering and calling them through codemode. Outline from user follow-up
+  to .specs/LATER.md; plan-work details deferred.

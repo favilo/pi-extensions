@@ -1,0 +1,20 @@
+story_id: e24s02
+title: Durable child pane and tab UI
+status: planned
+bcps: 5
+delta: ADDED
+spec: e24s02-child-pane-tab-ui.md
+plan_detail: outline
+tasks:
+  - id: 1
+    description: >-
+      Add UI contracts for per-child tabs/panes, keyboard navigation, live
+      status/output, and permission-waiting badges.
+    verify: node --test extensions/subagent/
+    status: planned
+    risk: P1
+  - id: 2
+    description: Implement the durable child pane/tab UI with in-pane permission prompts.
+    verify: node --test extensions/subagent/
+    status: planned
+    risk: P1
