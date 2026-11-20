@@ -1,8 +1,9 @@
 import "../test-support/forbid-fetch.ts";
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import test from "node:test";
 import { NATIVE_CONTRACT_VERSION } from "./native-contract.ts";
-import { promptToolPermissionRequest } from "./index.ts";
+import toolPermissionPolicy, { promptToolPermissionRequest } from "./index.ts";
 import {
   NATIVE_PROMPT_QUEUE_NONCE,
   PromptQueueDecision,
@@ -27,6 +28,54 @@ function deferred<T>() {
   });
   return { promise, resolve, reject };
 }
+
+test(
+  "disposing a WASM host prevents a late prompt from authorizing a new host",
+  { timeout: 15000 },
+  () => {
+    const script = `
+    const assert = require('node:assert/strict');
+    const path = require('node:path');
+    const loader = path.resolve('extensions/tool-permissions/native/generated/index.wasi.cjs');
+    const request = { version: 1, operation: 'prompt_queue', nonce: 'test', toolCallId: 'reused-id' };
+    (async () => {
+      let native = require(loader);
+      let settle;
+      let opened;
+      const presented = new Promise(resolve => { opened = resolve; });
+      native.decidePrompt(request, () => { opened(); return new Promise(resolve => { settle = resolve; }); });
+      await presented;
+      await native[Symbol.for('napi.rs.wasi.dispose')]();
+      delete require.cache[require.resolve(loader)];
+      native = require(loader);
+      let finishNew;
+      let openNew;
+      const newPresented = new Promise(resolve => { openNew = resolve; });
+      const pendingNew = native.decidePrompt(request, () => { openNew(); return new Promise(resolve => { finishNew = resolve; }); });
+      await newPresented;
+      settle({ decision: 'allow' });
+      await new Promise(resolve => setImmediate(resolve));
+      finishNew({ decision: 'deny' });
+      const result = await pendingNew;
+      assert.equal(result.toolCallId, 'reused-id');
+      assert.equal(result.decision, 'deny');
+      await native[Symbol.for('napi.rs.wasi.dispose')]();
+      console.log('lifecycle-complete');
+    })().catch(error => { console.error(error); process.exitCode = 1; });
+  `;
+    const result = spawnSync(process.execPath, ["-e", script], {
+      cwd: process.cwd(),
+      encoding: "utf8",
+      timeout: 12000,
+    });
+    assert.equal(result.status, 0, result.stderr || String(result.error));
+    assert.match(
+      result.stdout,
+      /lifecycle-complete/,
+      "the lifecycle must finish, not exit with pending promises",
+    );
+  },
+);
 
 test("the WASM runtime awaits a JavaScript promise without blocking the event loop", async () => {
   const native = requireNativePackage(bundledNativePackagePath()) as {
@@ -426,6 +475,161 @@ test(
     );
     await opened.promise;
     controller.abort();
+    confirmation.resolve(true);
+    assert.notEqual(await pending, "allow");
+  },
+);
+
+test(
+  "a cancelled queued request never opens its permission UI",
+  { timeout: 5000 },
+  async () => {
+    const firstConfirmation = deferred<boolean>();
+    const opened = deferred<void>();
+    const controller = new AbortController();
+    let secondOpened = false;
+    const request = (toolCallId: string) => ({
+      actor: { kind: "main" as const },
+      toolName: "read",
+      input: { path: "notes.md" },
+      cwd: "/workspace/project",
+      toolCallId,
+    });
+    const first = promptToolPermissionRequest(
+      { sendUserMessage() {} },
+      {
+        cwd: "/workspace/project",
+        hasUI: true,
+        mode: "rpc",
+        sessionId: "queued-cancel-first",
+        ui: {
+          confirm: async () => {
+            opened.resolve();
+            return firstConfirmation.promise;
+          },
+        },
+      },
+      request("queued-cancel-first"),
+    );
+    await opened.promise;
+    const second = promptToolPermissionRequest(
+      { sendUserMessage() {} },
+      {
+        cwd: "/workspace/project",
+        hasUI: true,
+        mode: "rpc",
+        sessionId: "queued-cancel-second",
+        signal: controller.signal,
+        ui: {
+          confirm: async () => {
+            secondOpened = true;
+            return true;
+          },
+        },
+      },
+      request("queued-cancel-second"),
+    );
+    controller.abort();
+    firstConfirmation.resolve(false);
+    assert.equal(await first, "deny");
+    assert.notEqual(await second, "allow");
+    assert.equal(secondOpened, false);
+  },
+);
+
+test(
+  "cancellation settles even when the UI ignores abort",
+  { timeout: 5000 },
+  async () => {
+    const controller = new AbortController();
+    const confirmation = deferred<boolean>();
+    const opened = deferred<void>();
+    const pending = promptToolPermissionRequest(
+      { sendUserMessage() {} },
+      {
+        cwd: "/workspace/project",
+        hasUI: true,
+        mode: "rpc",
+        sessionId: "ignored-abort",
+        signal: controller.signal,
+        ui: {
+          confirm: async () => {
+            opened.resolve();
+            return confirmation.promise;
+          },
+        },
+      },
+      {
+        actor: { kind: "main" },
+        toolName: "read",
+        input: { path: "notes.md" },
+        cwd: "/workspace/project",
+        toolCallId: "ignored-abort-call",
+      },
+    );
+    await opened.promise;
+    controller.abort();
+    const result = await Promise.race([
+      pending,
+      new Promise<"still-pending">((resolve) =>
+        setTimeout(() => resolve("still-pending"), 100),
+      ),
+    ]);
+    confirmation.resolve(false);
+    await pending;
+    assert.notEqual(
+      result,
+      "still-pending",
+      "cancellation must settle without UI cooperation",
+    );
+  },
+);
+
+test(
+  "session shutdown rejects a late permission confirmation",
+  { timeout: 5000 },
+  async () => {
+    const handlers = new Map<
+      string,
+      (event: unknown, ctx: unknown) => unknown
+    >();
+    toolPermissionPolicy({
+      on(name: string, handler: (event: unknown, ctx: unknown) => unknown) {
+        handlers.set(name, handler);
+      },
+      registerCommand() {},
+      registerEntryRenderer() {},
+    } as never);
+    const confirmation = deferred<boolean>();
+    const opened = deferred<void>();
+    const pending = promptToolPermissionRequest(
+      { sendUserMessage() {} },
+      {
+        cwd: "/workspace/project",
+        hasUI: true,
+        mode: "rpc",
+        sessionId: "shutdown-test",
+        ui: {
+          confirm: async () => {
+            opened.resolve();
+            return confirmation.promise;
+          },
+        },
+      },
+      {
+        actor: { kind: "main" },
+        toolName: "read",
+        input: { path: "notes.md" },
+        cwd: "/workspace/project",
+        toolCallId: "shutdown-test-call",
+      },
+    );
+    await opened.promise;
+    assert.ok(handlers.get("session_shutdown"));
+    await handlers.get("session_shutdown")?.(
+      {},
+      { sessionId: "shutdown-test" },
+    );
     confirmation.resolve(true);
     assert.notEqual(await pending, "allow");
   },
