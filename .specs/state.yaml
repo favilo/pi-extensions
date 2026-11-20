@@ -1,8 +1,11 @@
-active_flow: build_epic
+active_flow: fix_bug
 active_epic_id: e19
 active_story_id: e19s02
 active_story: Use typed async prompt orchestration
-active_bug_id: null
+active_bug_id: BUG-2026-11-20T101309
+bug_cycle:
+  current_step: 1
+  completed_steps: []
 vcs:
   kind: jj
   workspace: e18s04-prompt-queue
@@ -96,12 +99,17 @@ planning:
     - Do not modify the e06 repair flow or child-private bridge catalog.
 handoff:
   last_step_completed: >-
-    e19s02 Tokio-free runtime and typed async presenter dispatch committed; focused
-    path-error wording fix committed separately. Full npm run check passed.
+    e19s02 paused after async presenter dispatch and full check passed. Multiline
+    edit/write validation display fixed in 940c1847. User reported subagent model
+    selection failure; bug recorded for investigation next session.
   open_decisions:
   - Determine how session cancellation and shutdown revoke native queued and active prompts without late authorization.
   - Verify environment cleanup, identity reuse, and lifecycle behavior against the real WASM host before accepting the story.
   required_reading:
+  - .specs/bugs/BUG-2026-11-20T101309-child-model-unavailable.md
+  - extensions/subagent/account-runtime.ts
+  - extensions/subagent/account-runtime.test.ts
+  - /Users/kevin.oberlies/git/agents/pi-account-switcher/src/runtime/child-runtime-api.ts
   - .specs/product/SCOPE_LATEST.yaml
   - .specs/IMPACT-e19-e19s02.md
   - .specs/epics/e19-full-rust-pi-event-orchestration/epic.yaml
@@ -113,7 +121,7 @@ handoff:
   - extensions/tool-permissions/native/Cargo.toml
   - extensions/tool-permissions/native/package.json
   - node_modules/@napi-rs/cli/src/utils/config.ts
-  next_skill: develop-tdd
+  next_skill: investigate-bug
   context: 'User accepted e19s01 and approved the following direction for e19s02,
     but requested implementation start next session. Use Rust async/await with napi::Promise<PromptQueueResolution>
     and a single FIFO queue. Investigate napi-async-runtime 0.2.10 (Tokio-free), preferably
@@ -187,7 +195,7 @@ handoff:
     added alongside implementation rather than independently RED. Shutdown,
     cancellation, malformed resolutions, cleanup ordering, cross-environment
     isolation, and a full security review remain before claiming the story done.
-    Task 2 remains failing until those identity and security contracts are verified;
+    Resume e19s02 after investigating the child-model bug. Task 2 remains failing until those identity and security contracts are verified;
     tasks 3 and 4 also remain failing. Next use develop-tdd for the lifecycle cases,
     then run verify-work and security review. The separate path wording fix is
     ce5d4810, with RED 1b230149. Its broader original report remains unconfirmed;

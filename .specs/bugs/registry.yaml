@@ -49,3 +49,11 @@ bugs:
     root_cause: Not yet investigated.
     risk_level: medium
     status: open
+  - bug_id: BUG-2026-11-20T101309
+    date: '2026-11-20'
+    severity: high
+    priority: high
+    scope: subagent-account-runtime
+    summary: Subagent launches report selected child model unavailable with account-switcher selections
+    file: .specs/bugs/BUG-2026-11-20T101309-child-model-unavailable.md
+    status: open
