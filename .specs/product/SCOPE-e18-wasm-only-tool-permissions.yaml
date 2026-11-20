@@ -57,6 +57,6 @@ success_criteria:
   - e18s00-pi-oxidized-decision.md records adopt or reject before host-area stories start.
 references:
   - .specs/planning-context.yaml
-  - .specs/epics/e16-rust-wasm-tool-permissions-core/epic.yaml
+  - .specs/epics/archive/e16-rust-wasm-tool-permissions-core/epic.yaml
   - .specs/security/epics/e16/THREAT_MODEL.md
   - .specs/security/epics/e18/THREAT_MODEL.md

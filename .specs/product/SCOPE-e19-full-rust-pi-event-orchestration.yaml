@@ -93,8 +93,8 @@ success_criteria:
 references:
   - .specs/planning-context.yaml
   - .specs/product/SCOPE-e18-wasm-only-tool-permissions.yaml
-  - .specs/epics/e18-wasm-only-tool-permissions/epic.yaml
-  - .specs/epics/e18-wasm-only-tool-permissions/e18s06-remove-typescript-fallback.md
+  - .specs/epics/archive/e18-wasm-only-tool-permissions/epic.yaml
+  - .specs/epics/archive/e18-wasm-only-tool-permissions/e18s06-remove-typescript-fallback.md
   - .specs/security/epics/e18/THREAT_MODEL.md
   - extensions/tool-permissions/index.ts
   - extensions/tool-permissions/native/crates/tool-permissions-native/src/registration.rs
