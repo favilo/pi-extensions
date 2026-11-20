@@ -414,6 +414,15 @@ mod tests {
     }
 
     #[test]
+    fn an_active_presenter_cannot_be_opened_twice() {
+        let mut queue = super::PromptQueue::default();
+        queue.submit(super::EnvironmentId(1), "prompt").unwrap();
+        let prompt = queue.take_active_for_opening().unwrap();
+        assert!(queue.restore_active(super::EnvironmentId(1), prompt).is_none());
+        assert!(queue.take_active_for_opening().is_none(), "an already dispatched prompt must not open twice");
+    }
+
+    #[test]
     fn prompt_queue_rejects_presenter_restoration_after_environment_shutdown() {
         let mut queue = super::PromptQueue::default();
         assert_eq!(
