@@ -1,0 +1,40 @@
+id: e20
+title: Live provider quota footer
+wsjf: 3.6
+total_bcps: 9
+status: planned
+stories:
+  - id: e20s01
+    title: Real Codex and OpenAI OAuth usage adapter
+    bcps: 2
+    status: planned
+    delta: ADDED
+    spec: e20s01-codex-openai-usage-adapter.md
+    tasks: e20s01-tasks.yaml
+  - id: e20s02
+    title: Persistent opt-in current-provider quota footer
+    bcps: 2
+    status: planned
+    delta: ADDED
+    spec: e20s02-quota-footer.md
+    tasks: e20s02-tasks.yaml
+  - id: e20s03
+    title: Anthropic and Google quota checkers
+    bcps: 3
+    status: planned
+    delta: ADDED
+    spec: e20s03-anthropic-google-quota-checkers.md
+    tasks: e20s03-tasks.yaml
+  - id: e20s04
+    title: Shared-result rich /usage summary
+    bcps: 2
+    status: planned
+    delta: ADDED
+    spec: e20s04-rich-usage-summary.md
+    tasks: e20s04-tasks.yaml
+note: >-
+  WSJF = (business value 8 + time criticality 5 + risk reduction 5) / job size 5 = 3.6.
+  Extends completed e05 by replacing the broken OAuth Codex usage path with multi-pass-style
+  quota checkers, adding a persistent opt-in footer for the current provider, and covering
+  every provider multi-pass supports (openai-codex, openai, anthropic, google-gemini-cli,
+  google-antigravity). Codex ships first; no story is optional.

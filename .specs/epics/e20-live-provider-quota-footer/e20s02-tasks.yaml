@@ -1,0 +1,44 @@
+story_id: e20s02
+title: Persistent opt-in current-provider quota footer
+status: planned
+bcps: 2
+delta: ADDED
+spec: e20s02-quota-footer.md
+tasks:
+  - id: 1
+    description: >-
+      Add contracts for default-off persistence, toggle command, footer render
+      of 5h and 7d for the current provider, refresh/backoff, and preservation
+      of footerData extension statuses.
+    verify: node --test extensions/usage/
+    status: planned
+    risk: P1
+    allure:
+      severity: high
+      categories:
+        - Provider quota footer
+        - footer toggle
+        - persistence
+  - id: 2
+    description: >-
+      Implement setFooter-based current-provider quota bar with persisted
+      preference and shared checker consumption from e20s01.
+    verify: node --test extensions/usage/
+    status: planned
+    risk: P1
+    allure:
+      severity: high
+      categories:
+        - Provider quota footer
+        - setFooter
+        - current provider
+  - id: 3
+    description: Run package typecheck/tests after footer integration.
+    verify: npm run check
+    status: planned
+    risk: P1
+    allure:
+      severity: high
+      categories:
+        - Provider quota footer
+        - regression

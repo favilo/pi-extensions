@@ -1,0 +1,45 @@
+story_id: e20s01
+title: Real Codex and OpenAI OAuth usage adapter
+status: planned
+bcps: 2
+delta: ADDED
+spec: e20s01-codex-openai-usage-adapter.md
+tasks:
+  - id: 1
+    description: >-
+      Add shared quota window/result contracts and injectable-fetch tests for
+      Codex wham/usage parsing (5h/7d), chatgpt_account_id gating, and safe
+      failure kinds.
+    verify: node --test extensions/usage/
+    status: planned
+    risk: P1
+    allure:
+      severity: high
+      categories:
+        - Provider quota footer
+        - Codex usage
+        - contracts
+  - id: 2
+    description: >-
+      Implement credential resolution (account-switcher piAuth then auth.json)
+      and replace the broken OpenAI/Codex OAuth /usage path with the wham/usage
+      checker.
+    verify: node --test extensions/usage/
+    status: planned
+    risk: P1
+    allure:
+      severity: high
+      categories:
+        - Provider quota footer
+        - credential resolution
+        - Codex usage
+  - id: 3
+    description: Run package typecheck/tests for the usage extension changes.
+    verify: npm run check
+    status: planned
+    risk: P1
+    allure:
+      severity: high
+      categories:
+        - Provider quota footer
+        - regression
