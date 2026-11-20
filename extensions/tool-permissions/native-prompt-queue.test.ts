@@ -45,6 +45,11 @@ test(
       const presented = new Promise(resolve => { opened = resolve; });
       native.decidePrompt(request, () => { opened(); return new Promise(resolve => { settle = resolve; }); });
       await presented;
+      delete require.cache[require.resolve(loader)];
+      const parallel = require(loader);
+      const independent = await parallel.decidePrompt(request, async () => ({ decision: 'deny' }));
+      assert.equal(independent.decision, 'deny');
+      await parallel[Symbol.for('napi.rs.wasi.dispose')]();
       await native[Symbol.for('napi.rs.wasi.dispose')]();
       delete require.cache[require.resolve(loader)];
       native = require(loader);
@@ -530,8 +535,19 @@ test(
       request("queued-cancel-second"),
     );
     controller.abort();
+    const cancelled = await Promise.race([
+      second,
+      new Promise<"still-pending">((resolve) =>
+        setTimeout(() => resolve("still-pending"), 100),
+      ),
+    ]);
     firstConfirmation.resolve(false);
     assert.equal(await first, "deny");
+    assert.notEqual(
+      cancelled,
+      "still-pending",
+      "queued cancellation must settle before the active prompt",
+    );
     assert.notEqual(await second, "allow");
     assert.equal(secondOpened, false);
   },
