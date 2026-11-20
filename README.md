@@ -39,6 +39,10 @@ pi install git:github.com/favilo/pi-extensions
 
 For active development, install the local checkout of the same fork instead. The fork must remain the configured package; do not substitute a stale package-manager cache for it.
 
+### Known issue: extension-provided child models
+
+A subagent that selects a provider registered by a parent extension can fail during startup because its isolated runtime does not yet receive that provider's model catalog. Built-in providers are unaffected. Track progress and the proposed fix in [BUG-2026-11-20T101309](.specs/bugs/BUG-2026-11-20T101309-child-model-unavailable.md).
+
 ## Extensions
 
 | Extension | Purpose |

@@ -1,11 +1,12 @@
-active_flow: fix_bug
+active_flow: build_epic
 active_epic_id: e19
 active_story_id: e19s02
 active_story: Use typed async prompt orchestration
 active_bug_id: BUG-2026-11-20T101309
 bug_cycle:
   current_step: 1
-  completed_steps: []
+  completed_steps:
+    - investigate-bug
 vcs:
   kind: jj
   workspace: e18s04-prompt-queue
@@ -99,9 +100,10 @@ planning:
     - Do not modify the e06 repair flow or child-private bridge catalog.
 handoff:
   last_step_completed: >-
-    e19s02 paused after async presenter dispatch and full check passed. Multiline
-    edit/write validation display fixed in 940c1847. User reported subagent model
-    selection failure; bug recorded for investigation next session.
+    BUG-2026-11-20T101309 investigation completed: an isolated child runtime lacks
+    extension-provided provider catalogs before account-specific authentication is
+    installed. The bug file and README known-issue link are updated. Resume e19s02,
+    which was paused after async presenter dispatch and full check passed.
   open_decisions:
   - Determine how session cancellation and shutdown revoke native queued and active prompts without late authorization.
   - Verify environment cleanup, identity reuse, and lifecycle behavior against the real WASM host before accepting the story.
@@ -121,7 +123,7 @@ handoff:
   - extensions/tool-permissions/native/Cargo.toml
   - extensions/tool-permissions/native/package.json
   - node_modules/@napi-rs/cli/src/utils/config.ts
-  next_skill: investigate-bug
+  next_skill: develop-tdd
   context: 'User accepted e19s01 and approved the following direction for e19s02,
     but requested implementation start next session. Use Rust async/await with napi::Promise<PromptQueueResolution>
     and a single FIFO queue. Investigate napi-async-runtime 0.2.10 (Tokio-free), preferably
@@ -167,6 +169,8 @@ handoff:
     Keep working directory at project root for Bigpowers scripts and invoke them only
     via $BIGPOWERS_ROOT/scripts absolute path.'
   blocker: >-
+    The account-switcher subagent model issue is investigated and tracked as
+    BUG-2026-11-20T101309; its fix is separate follow-up work. Resume e19s02.
     User approved aligning the native package's Node compatibility with the new
     @napi-rs/async-runtime 0.2.0 dependency: ^20.19.0 || ^22.13.0 || >=23.5.0.
     The updated Bigpowers RED isolation checker passed for daeca6da using an

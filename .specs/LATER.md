@@ -67,3 +67,27 @@ follow-up. Make the target and message visible for approval, and report whether
 the message was accepted or the session was unavailable. Preserve session
 isolation and avoid writing directly to another session's transcript.
 
+## Parallel subagents with a navigable child-agent UI
+
+Remove the single-active-child constraint so independent subagents can run in
+parallel. Replace the current child display with a durable pane/tab UI: one tab
+per child, keyboard navigation, live status/output, and a clear title-bar badge
+when a child is waiting for permission.
+
+Permission prompts should appear in the waiting child's tab/pane so the user
+has direct execution context. The parent must still serialize or otherwise
+safely coordinate approval decisions, route each result to the correct child,
+and prevent ambiguous prompts. Define concurrency semantics for simultaneous
+file edits, cancellation, completion notifications, background lifecycle
+cleanup, and result export before implementation.
+
+This is a major UX and concurrency redesign, not a simple limit increase.
+Preserve per-child runtime isolation and the requirement that every child tool
+action receives separate approval.
+
+## Compress the permission prompt UI
+
+The permission prompt is too verbose and uses too much vertical space.
+Compress the layout and drop redundant fields so more of the decision and
+request stay visible without scrolling.
+
