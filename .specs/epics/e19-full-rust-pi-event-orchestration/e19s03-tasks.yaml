@@ -17,7 +17,7 @@ tasks:
         - Registration
         - Security Review
   - id: 2
-    description: Replace bridge-forwarded registration callbacks with Rust-created adapters that dispatch to typed Rust handler traits.
+    description: Implement a separate Rust registration harness with adapters that dispatch to typed Rust handlers without a TypeScript bridge.
     verify: npm test -- extensions/tool-permissions/native-registration.test.ts
     risk: P0
     security: high
@@ -29,7 +29,7 @@ tasks:
         - Callback safety
         - Security Review
   - id: 3
-    description: Remove registration-time TypeScript bridge requirements while retaining the Pi API handoff to Rust.
+    description: Verify the production bridge and existing permission behavior remain intact during this story.
     verify: npm run check
     risk: P0
     security: high
