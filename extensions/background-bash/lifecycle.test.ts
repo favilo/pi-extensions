@@ -203,6 +203,7 @@ test("cancellation terminates the entire process tree", async (t) => {
     controller.cancel(launched.id);
     assert.equal(controller.status(launched.id)?.status, "cancelled");
 
+    // This timing-sensitive assertion has failed intermittently; investigate if it recurs.
     await new Promise((resolve) => setTimeout(resolve, 400));
     assert.equal(
       existsSync(marker),
