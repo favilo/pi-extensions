@@ -1,6 +1,6 @@
 story_id: e19s02
 title: Use typed async prompt orchestration
-status: failing
+status: passing
 bcps: 3
 spec: e19s02-miri-prompt-queue.md
 tasks:
@@ -20,7 +20,7 @@ tasks:
     verify: npm run build:native && npx tsx --test extensions/tool-permissions/native-prompt-queue.test.ts
     risk: P0
     security: high
-    status: failing
+    status: passing
     allure:
       severity: critical
       categories:
@@ -32,7 +32,7 @@ tasks:
     verify: npm run build:native && npx tsx --test extensions/tool-permissions/native-prompt-queue.test.ts
     risk: P0
     security: high
-    status: failing
+    status: passing
     allure:
       severity: critical
       categories:
@@ -44,7 +44,7 @@ tasks:
     verify: npm run check
     risk: P0
     security: high
-    status: failing
+    status: passing
     allure:
       severity: critical
       categories:

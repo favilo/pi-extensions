@@ -1,7 +1,8 @@
 active_flow: build_epic
 active_epic_id: e19
-active_story_id: e19s02
-active_story: Use typed async prompt orchestration
+active_story_id: e19s03
+active_story: e19s03
+active_story_title: Register Pi callbacks directly from Rust
 active_bug_id: BUG-2026-11-20T101309
 bug_cycle:
   current_step: 1
@@ -24,9 +25,7 @@ planning:
       time_criticality: 0
       risk_reduction: 0
       job_size: 1
-      rationale: Exploratory backlog epic. Pilot a hybrid Rust/WASM migration in the
-        pure-compute portions of tool-permissions, starting with a supported package/runtime
-        boundary and validating whether pi-oxidized is viable.
+      rationale: Exploratory backlog epic. Pilot a hybrid Rust/WASM migration in the pure-compute portions of tool-permissions, starting with a supported package/runtime boundary and validating whether pi-oxidized is viable.
   e17:
     status: completed
     story_id: e17s02
@@ -37,8 +36,7 @@ planning:
       time_criticality: 7
       risk_reduction: 6
       job_size: 3
-      rationale: Environment-gated YOLO mode (PI_YOLO_MODE=1 / PI_PERMISSION_YOLO=1),
-        session startup notification, and audit logging complete across e17s01-s02.
+      rationale: Environment-gated YOLO mode (PI_YOLO_MODE=1 / PI_PERMISSION_YOLO=1), session startup notification, and audit logging complete across e17s01-s02.
   e07:
     status: completed
     story_id: e07s05
@@ -49,9 +47,7 @@ planning:
       time_criticality: 8
       risk_reduction: 8
       job_size: 4
-      rationale: Subcommand parsing, decision boundary, per-subcommand auditing, interactive
-        subcommand selection mode, and recursive command substitution parsing complete
-        across e07s01-s05.
+      rationale: Subcommand parsing, decision boundary, per-subcommand auditing, interactive subcommand selection mode, and recursive command substitution parsing complete across e07s01-s05.
   e11:
     status: completed
     story_id: e11s04
@@ -95,122 +91,46 @@ planning:
       time_criticality: 10
       risk_reduction: 7
       job_size: 5
-      rationale: 'User priority: smaller models are unusable without a bounded initial
-        tool and skill context.'
+      rationale: 'User priority: smaller models are unusable without a bounded initial tool and skill context.'
     constraints:
-    - Do not modify the e06 repair flow or child-private bridge catalog.
+      - Do not modify the e06 repair flow or child-private bridge catalog.
 handoff:
-  last_step_completed: >-
-    PR #21 merged into main. A fresh e19s02 Jujutsu change and
-    favilo/e19s02-async-prompt-lifecycle bookmark now start from merged main.
-    The Bigpowers YAML and portable-path CI failures were fixed and merged.
-  open_decisions:
-  - Determine how session cancellation and shutdown revoke native queued and active prompts without late authorization.
-  - Verify environment cleanup, identity reuse, and lifecycle behavior against the real WASM host before accepting the story.
+  last_step_completed: 'e19s02 verification accepted; traceability waived by user and NFR accepted within existing liveness bounds.'
+  open_decisions: []
   required_reading:
-  - .specs/bugs/BUG-2026-11-20T101309-child-model-unavailable.md
-  - extensions/subagent/account-runtime.ts
-  - extensions/subagent/account-runtime.test.ts
-  - $HOME/git/agents/pi-account-switcher/src/runtime/child-runtime-api.ts
-  - .specs/product/SCOPE_LATEST.yaml
-  - .specs/IMPACT-e19-e19s02.md
-  - .specs/epics/e19-full-rust-pi-event-orchestration/epic.yaml
-  - .specs/epics/e19-full-rust-pi-event-orchestration/e19s02-miri-prompt-queue.md
-  - .specs/epics/e19-full-rust-pi-event-orchestration/e19s02-tasks.yaml
-  - extensions/tool-permissions/native/crates/tool-permissions-native/src/prompt_queue.rs
-  - extensions/tool-permissions/native/crates/tool-permissions-native/src/lib.rs
-  - extensions/tool-permissions/native-prompt-queue.test.ts
-  - extensions/tool-permissions/native/Cargo.toml
-  - extensions/tool-permissions/native/package.json
-  - node_modules/@napi-rs/cli/src/utils/config.ts
+    - .specs/bugs/BUG-2026-11-20T101309-child-model-unavailable.md
+    - extensions/subagent/account-runtime.ts
+    - extensions/subagent/account-runtime.test.ts
+    - $HOME/git/agents/pi-account-switcher/src/runtime/child-runtime-api.ts
+    - .specs/product/SCOPE_LATEST.yaml
+    - .specs/IMPACT-e19-e19s02.md
+    - .specs/epics/e19-full-rust-pi-event-orchestration/epic.yaml
+    - .specs/epics/e19-full-rust-pi-event-orchestration/e19s02-miri-prompt-queue.md
+    - .specs/epics/e19-full-rust-pi-event-orchestration/e19s02-tasks.yaml
+    - extensions/tool-permissions/native/crates/tool-permissions-native/src/prompt_queue.rs
+    - extensions/tool-permissions/native/crates/tool-permissions-native/src/lib.rs
+    - extensions/tool-permissions/native-prompt-queue.test.ts
+    - extensions/tool-permissions/native/Cargo.toml
+    - extensions/tool-permissions/native/package.json
+    - node_modules/@napi-rs/cli/src/utils/config.ts
   next_skill: develop-tdd
-  context: 'User accepted e19s01 and approved the following direction for e19s02,
-    but requested implementation start next session. Use Rust async/await with napi::Promise<PromptQueueResolution>
-    and a single FIFO queue. Investigate napi-async-runtime 0.2.10 (Tokio-free), preferably
-    CurrentThread, with napi''s async-runtime feature and generated WASI loader host
-    bootstrap (napi.wasm.asyncRuntime: true and @napi-rs/async-runtime). Register
-    the runtime through module_init. Declare Rust dependencies under workspace.dependencies
-    and member dependencies with workspace = true. Confirm compatible napi-derive
-    and npm package versions before changing dependencies.
-
-
-    Use a ThreadsafeFunction with call_async_catch to invoke the presenter on its
-    owning JavaScript thread; await the callback invocation and then the returned
-    typed Promise. Do not retain Env or borrowed JavaScript handles across suspension.
-    Do not block_on the Pi JavaScript thread. Preserve single-queue FIFO, identity
-    binding, cancellation, shutdown, and fail-closed behavior. Test synchronous throws,
-    rejected and malformed results, cancellation, teardown, and the real WASM loader.
-    Keep runtime bootstrap separate from production TypeScript permission callback
-    glue. TypeScript currently calls decidePrompt through native-prompt-queue.ts;
-    production migration is later e19 work.
-
-
-    Current committed state: presenter FunctionRef transmute was removed; a typed
-    PromiseRaw<''static, ...> signature marker remains and is narrowed to invocation
-    lifetime. Raw deferred handles and unsafe impl Send were replaced with napi::JsDeferred;
-    the queue remains process-global and uses an environment cleanup hook. Generated
-    TypeScript declares Promise<PromptQueueResponse>. Workspace Clippy all and pedantic
-    are warnings; undocumented_unsafe_blocks is denied and npm run check runs Clippy.
-    e19s02 remains in progress, not complete. Miri passed Rust-owned queue tests only;
-    it does not validate N-API or JavaScript environment lifetimes. The story and
-    task ledger reflect the user''s updated direction; do not claim Miri proves host-lifetime
-    safety.
-
-
-    Prior art: local napi 3.16.2 promise.rs and threadsafe_function.rs; napi-async-runtime
-    0.2.10 src/lib.rs, src/adapter.rs and src/js_callback.rs in the Cargo registry;
-    https://napi.rs/docs/concepts/async-runtime and https://docs.rs/napi-async-runtime/0.2.10/napi_async_runtime/.
-    CurrentThread on WASM needs loader task and timer hosts; the runtime crate does
-    not install itself. The user''s desired approach does not require Tokio.
-
-
-    Follow repository TDD: behavioral RED and GREEN in separate jj changes; run tests
-    and jj commit in separate Bash calls. No raw git commands. No push unless asked.
-    Keep working directory at project root for Bigpowers scripts and invoke them only
-    via $BIGPOWERS_ROOT/scripts absolute path.'
-  blocker: >-
-    The account-switcher subagent model issue is investigated and tracked as
-    BUG-2026-11-20T101309; its fix is separate follow-up work. Resume e19s02.
-    User approved aligning the native package's Node compatibility with the new
-    @napi-rs/async-runtime 0.2.0 dependency: ^20.19.0 || ^22.13.0 || >=23.5.0.
-    The updated Bigpowers RED isolation checker passed for daeca6da using an
-    isolated jj workspace and the project's installed dependencies. npm audit
-    reports three pre-existing high findings in brace-expansion,
-    undici, and zod; none are dependencies of the new host package. cargo audit
-    found no Rust dependency vulnerabilities.
-  async_runtime_progress: >-
-    The plan consistency checker now passes after adding missing spec links to six
-    task ledgers. The behavioral RED commit daeca6da fails against the earlier stub
-    with an assertion that the Rust tracer must return a Promise. The committed
-    GREEN bootstraps napi-async-runtime 0.2.10 with the generated WASI loader and
-    @napi-rs/async-runtime 0.2.0. The focused eight-test suite, full npm run check
-    (374 preflight and 34 Rust tests), and cargo audit pass. Queue migration and
-    lifecycle tests remain; task 1 is passing. No push was performed.
-  current_async_draft: >-
-    Merged main includes RED a5a20081 and GREEN 6f8108fa: a mutex-owning
-    environment registry, unique prompt IDs, and typed ThreadsafeFunction dispatch.
-    npm run check passed before merge (377 TypeScript tests and 35 Rust tests).
-    The temporary lifecycle probe is not a regression test. Resume with behavioral
-    RED/GREEN lifecycle coverage for cancellation, shutdown, rejected or malformed
-    resolutions, late settlements, cleanup ordering, and cross-environment isolation.
-    Task 2 remains failing until identity and security contracts are proven; tasks
-    3 and 4 also remain failing. Then run verify-work and security-review.
+  context: 'Resume e19s03 from its epic capsule; read the story and task ledger and confirm the plan before TDD. No push performed.'
+  blocker: ''
+  implementation_update: 'e19s02 accepted: tests and independent security re-review passed; NFR accepted for existing liveness bounds, traceability waived by user. See .specs/verifications/e19s02-verify.yaml.'
   deferred_work:
-  - Consolidate safeStringify and JSON formatting helpers into a shared utility module
-  - Persist completed and active child sessions for later external analysis
-  - Add interactive child steering after the read-only transcript slice
-  - Build e03 directory-local tool permissions after the higher-WSJF e04 fix
-  - Add real Pi process integration tests after unit contracts are established
-  - Apply yolo mode after the WASM path decision without bypassing an .aiignore deny
-    or a path-trust diagnostic
+    - Consolidate safeStringify and JSON formatting helpers into a shared utility module
+    - Persist completed and active child sessions for later external analysis
+    - Add interactive child steering after the read-only transcript slice
+    - Build e03 directory-local tool permissions after the higher-WSJF e04 fix
+    - Add real Pi process integration tests after unit contracts are established
+    - Apply yolo mode after the WASM path decision without bypassing an .aiignore deny or a path-trust diagnostic
   verified_at: '2026-11-18T19:54:49Z'
 release:
   pr: https://github.com/favilo/pi-extensions/pull/14
   merged_commit: 841d91a0
   merged_at: '2026-08-22T03:40:00Z'
   ci_verified: true
-  ci_note: GitHub Actions workflows passing (actionlint, python, quality, secrets,
-    shellcheck)
+  ci_note: GitHub Actions workflows passing (actionlint, python, quality, secrets, shellcheck)
 epic_cycle:
   step: 1
   current_step: 1
@@ -232,15 +152,15 @@ metrics:
       calls: 5
       total_seconds: 5191.0
       avg_seconds: 1038.2
-      _start: '2026-09-02T17:43:06Z'
+      _start: '2026-11-20T20:52:26Z'
     audit-code:
       calls: 3
       total_seconds: 3246.0
       avg_seconds: 1082.0
     develop-tdd:
-      calls: 10
-      total_seconds: 664248.0
-      avg_seconds: 66424.8
+      calls: 11
+      total_seconds: 664529.0
+      avg_seconds: 60411.72727272727
     plan-work:
       calls: 3
       total_seconds: 1580.0
