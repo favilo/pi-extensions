@@ -10,8 +10,9 @@ bug_cycle:
 vcs:
   kind: jj
   workspace: e18s04-prompt-queue
-  last_completed_change: ylsmvrqy
-  parent_bookmark: main
+  last_completed_change: b6512463
+  parent_bookmark: favilo/e19s02-async-prompt-lifecycle
+  workspace_change: yppotwnk
 planning:
   e16:
     status: completed
@@ -100,10 +101,9 @@ planning:
     - Do not modify the e06 repair flow or child-private bridge catalog.
 handoff:
   last_step_completed: >-
-    BUG-2026-11-20T101309 investigation completed: an isolated child runtime lacks
-    extension-provided provider catalogs before account-specific authentication is
-    installed. The bug file and README known-issue link are updated. Resume e19s02,
-    which was paused after async presenter dispatch and full check passed.
+    PR #21 merged into main. A fresh e19s02 Jujutsu change and
+    favilo/e19s02-async-prompt-lifecycle bookmark now start from merged main.
+    The Bigpowers YAML and portable-path CI failures were fixed and merged.
   open_decisions:
   - Determine how session cancellation and shutdown revoke native queued and active prompts without late authorization.
   - Verify environment cleanup, identity reuse, and lifecycle behavior against the real WASM host before accepting the story.
@@ -187,24 +187,14 @@ handoff:
     (374 preflight and 34 Rust tests), and cargo audit pass. Queue migration and
     lifecycle tests remain; task 1 is passing. No push was performed.
   current_async_draft: >-
-    RED a5a20081 passed the updated jj-aware isolation checker. Committed change
-    6f8108fa uses a mutex-owning environment registry, unique prompt IDs, and typed
-    ThreadsafeFunction dispatch. Full npm run check now passes (375 TypeScript
-    tests and 35 Rust tests) after replacing synchronous presenter assumptions in
-    existing tests with explicit readiness signals. A temporary
-    /tmp/pi-wasi-prompt-lifecycle.cjs probe observed the same
-    numeric env address across independent WASM instances and tested disposal with
-    a pending prompt and late allow; same-registry reuse was simulated in Rust.
-    The probe is not yet a committed regression test, and the registry test was
-    added alongside implementation rather than independently RED. Shutdown,
-    cancellation, malformed resolutions, cleanup ordering, cross-environment
-    isolation, and a full security review remain before claiming the story done.
-    Resume e19s02 after investigating the child-model bug. Task 2 remains failing until those identity and security contracts are verified;
-    tasks 3 and 4 also remain failing. Next use develop-tdd for the lifecycle cases,
-    then run verify-work and security review. The separate path wording fix is
-    ce5d4810, with RED 1b230149. Its broader original report remains unconfirmed;
-    registry BUG-2026-11-19T165747 stays open pending real reproduction and edit/write
-    parity investigation. No push or PR was made.
+    Merged main includes RED a5a20081 and GREEN 6f8108fa: a mutex-owning
+    environment registry, unique prompt IDs, and typed ThreadsafeFunction dispatch.
+    npm run check passed before merge (377 TypeScript tests and 35 Rust tests).
+    The temporary lifecycle probe is not a regression test. Resume with behavioral
+    RED/GREEN lifecycle coverage for cancellation, shutdown, rejected or malformed
+    resolutions, late settlements, cleanup ordering, and cross-environment isolation.
+    Task 2 remains failing until identity and security contracts are proven; tasks
+    3 and 4 also remain failing. Then run verify-work and security-review.
   deferred_work:
   - Consolidate safeStringify and JSON formatting helpers into a shared utility module
   - Persist completed and active child sessions for later external analysis
