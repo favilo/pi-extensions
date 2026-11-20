@@ -952,10 +952,25 @@ async function presentScrollablePermission(
 ): Promise<PermissionResult> {
   if (ctx.mode !== "tui" || !ctx.ui.custom) {
     const bodyWithHeader = stickyHeader ? `${stickyHeader}\n\n${body}` : body;
-    const allowed = await ctx.ui.confirm(title, bodyWithHeader, { signal });
-    return allowed
-      ? { allowed: true, decision: "allow_once" }
-      : { allowed: false, decision: "deny" };
+    const confirmation = ctx.ui.confirm(title, bodyWithHeader, { signal });
+    let onAbort: (() => void) | undefined;
+    try {
+      const cancelled = new Promise<PermissionResult>((resolve) => {
+        onAbort = () => resolve({ allowed: false, decision: "cancel" });
+        signal.addEventListener("abort", onAbort, { once: true });
+        if (signal.aborted) onAbort();
+      });
+      return await Promise.race([
+        confirmation.then((allowed): PermissionResult =>
+          allowed
+            ? { allowed: true, decision: "allow_once" }
+            : { allowed: false, decision: "deny" },
+        ),
+        cancelled,
+      ]);
+    } finally {
+      if (onAbort) signal.removeEventListener("abort", onAbort);
+    }
   }
 
   const rawLines = body.split("\n");
