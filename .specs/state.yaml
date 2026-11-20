@@ -111,7 +111,7 @@ handoff:
   - .specs/bugs/BUG-2026-11-20T101309-child-model-unavailable.md
   - extensions/subagent/account-runtime.ts
   - extensions/subagent/account-runtime.test.ts
-  - /Users/kevin.oberlies/git/agents/pi-account-switcher/src/runtime/child-runtime-api.ts
+  - $HOME/git/agents/pi-account-switcher/src/runtime/child-runtime-api.ts
   - .specs/product/SCOPE_LATEST.yaml
   - .specs/IMPACT-e19-e19s02.md
   - .specs/epics/e19-full-rust-pi-event-orchestration/epic.yaml
