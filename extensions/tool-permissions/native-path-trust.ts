@@ -111,7 +111,7 @@ export function adoptPathTrust(request: PathTrustRequest): AdoptedPathTrust {
   } catch (error) {
     return {
       status: "invalid",
-      diagnostic: `Native path trust failed: ${error instanceof Error ? error.message : String(error)}`,
+      diagnostic: error instanceof Error ? error.message : String(error),
     };
   }
 }
