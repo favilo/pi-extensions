@@ -16,7 +16,7 @@ pub struct RegistrationBridge<'env> {
 }
 
 impl<'env> RegistrationBridge<'env> {
-    pub fn new(env: &'env Env, pi: Object<'env>, bridge: Option<Object<'env>>) -> Result<Self> {
+    pub fn new(env: &'env Env, pi: pi_api::Pi, bridge: Option<Object<'env>>) -> Result<Self> {
         Ok(Self {
             bridge: Bridge::new(env, pi, bridge)?,
             registrations: Vec::new(),
@@ -89,6 +89,7 @@ impl<'env> RegistrationBridge<'env> {
             },
         )?;
         self.bridge.pi().register_command(
+            self.bridge.env(),
             "permissions",
             "Edit user or local tool permissions",
             handler,
@@ -111,9 +112,11 @@ impl<'env> RegistrationBridge<'env> {
                 renderer.call(FnArgs::from((entry, options, theme)))
             },
         )?;
-        self.bridge
-            .pi()
-            .register_entry_renderer("permission-preview", handler)?;
+        self.bridge.pi().register_entry_renderer(
+            self.bridge.env(),
+            "permission-preview",
+            handler,
+        )?;
         self.registrations
             .push("entry_renderer:permission-preview".to_owned());
         Ok(())
@@ -158,7 +161,7 @@ fn notify_session_start(session_context: &Object) -> Result<()> {
 pub fn register_callbacks(
     env: &Env,
     request: NativeRegistrationRequest,
-    pi: Object,
+    pi: pi_api::Pi,
     bridge: Option<Object>,
 ) -> Result<NativeRegistrationResponse> {
     if request.version != CONTRACT_VERSION || request.operation != "register_callbacks" {
@@ -167,6 +170,8 @@ pub fn register_callbacks(
     validate_nonce(&request.nonce)?;
 
     let mut bridge = RegistrationBridge::new(env, pi, bridge)?;
+    pi_api::ScopedPi::new(env, bridge.bridge.pi())?
+        .register_callback(crate::sample_callback::SampleCommand)?;
     bridge.register_session_start()?;
     bridge.register_tool_call()?;
     bridge.register_tool_result()?;

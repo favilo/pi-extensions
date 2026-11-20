@@ -1,5 +1,4 @@
 mod audit;
-mod sample_callback;
 mod contract;
 mod execution;
 mod parser;
@@ -8,6 +7,7 @@ mod policy;
 mod prompt_queue;
 mod registration;
 mod rule_save;
+mod sample_callback;
 
 pub use contract::{
     AuditWriteRequest, AuditWriteResponse, EvaluateRequest, EvaluateResponse, NativeOperation,
@@ -77,26 +77,24 @@ pub fn parse_policy(request: PolicyRequest) -> Result<PolicyResponse> {
 pub fn register_tool_permissions_callbacks(
     env: Env,
     request: NativeRegistrationRequest,
-    pi: napi::bindgen_prelude::Object,
+    pi: pi_api::Pi,
     bridge: Option<napi::bindgen_prelude::Object>,
 ) -> Result<NativeRegistrationResponse> {
     registration::register_callbacks(&env, request, pi, bridge)
 }
 
 #[napi]
-pub fn register_direct_callbacks(env: Env, pi: napi::bindgen_prelude::Object) -> Result<bool> {
-    let api = pi_api::Pi::new(&env, pi)?;
-    sample_callback::register_with_pi(&env, &api)?;
-    let handler = env.create_function_from_closure("directPermissionsCommand", |ctx| {
-        ctx.get::<napi::bindgen_prelude::Unknown>(0)
-    })?;
-    api.register_command("registration-sample", "Direct registration sample", handler)?;
+pub fn register_direct_callbacks(env: Env, pi: pi_api::Pi) -> Result<bool> {
+    let scoped = pi_api::ScopedPi::new(&env, &pi)?;
+    scoped.register_callback(sample_callback::Tracer::default())?;
+    scoped.register_callback(sample_callback::SampleCommand)?;
     Ok(true)
 }
 
 #[napi]
-pub fn register_callback_tracer(env: Env, pi: napi::bindgen_prelude::Object) -> Result<bool> {
-    sample_callback::register(&env, pi)
+pub fn register_callback_tracer(env: Env, pi: pi_api::Pi) -> Result<bool> {
+    pi_api::ScopedPi::new(&env, &pi)?.register_callback(sample_callback::Tracer::default())?;
+    Ok(true)
 }
 
 #[napi]

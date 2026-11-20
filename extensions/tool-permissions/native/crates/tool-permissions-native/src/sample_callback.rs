@@ -1,14 +1,14 @@
 use napi::bindgen_prelude::{JsObjectValue, Object, PromiseRaw};
-use napi::{Env, Error, Result};
-use pi_api::{OnCallback, Pi, ScopedCallbacks, SessionCallbacks, SessionScoped};
+use napi::{Error, JsValue, Result};
+use parking_lot::Mutex;
+use pi_api::{Callback, OnCallback, ScopedPi, Ui};
+use std::sync::Arc;
 use thiserror::Error as ThisError;
 
 #[derive(Debug, ThisError)]
 enum TracerError {
     #[error("tracer event has an invalid type")]
     InvalidEvent,
-    #[error("callback tracer state is unavailable")]
-    Unavailable,
 }
 
 struct TracerEvent {
@@ -25,7 +25,7 @@ impl TracerEvent {
 }
 
 #[derive(Default)]
-struct Tracer {
+pub struct Tracer {
     dispatch_count: u32,
 }
 
@@ -45,33 +45,45 @@ pub struct TracerResponse {
     pub dispatch_count: u32,
 }
 
-impl ScopedCallbacks for Tracer {
-    fn register_scoped(scope: &SessionScoped<Self>, env: &Env, pi: &Pi) -> Result<()> {
-        let callback_state = scope.clone();
-        let handler = env.create_function_from_closure("toolPermissionsTracer", move |ctx| {
-            let event: Object = ctx.get(0)?;
-            let event = TracerEvent::parse(
-                event.get_named_property("type")?,
-                event.get_named_property("name")?,
-            )
-            .map_err(|error| Error::from_reason(error.to_string()))?;
-            let callback_state = callback_state.clone();
-            PromiseRaw::resolve(ctx.env, ())?.then(move |_| {
-                callback_state
-                    .with(|state| state.dispatch(event))
-                    .map_err(|_| Error::from_reason(TracerError::Unavailable.to_string()))
-            })
-        })?;
+impl Callback for Tracer {
+    fn register(self, pi: &ScopedPi<'_>) -> Result<()> {
+        let state = Arc::new(Mutex::new(self));
+        let dispatch = pi.guarded_callback(move |event| state.lock().dispatch(event));
+        let handler =
+            pi.env()
+                .create_function_from_closure("toolPermissionsTracer", move |ctx| {
+                    let event: Object = ctx.get(0)?;
+                    let event = TracerEvent::parse(
+                        event.get_named_property("type")?,
+                        event.get_named_property("name")?,
+                    )
+                    .map_err(|error| Error::from_reason(error.to_string()))?;
+                    let dispatch = dispatch.clone();
+                    Ok(PromiseRaw::resolve(ctx.env, ())?
+                        .then(move |_| dispatch(event))?
+                        .to_unknown())
+                })?;
         pi.on(OnCallback::SessionInfoChanged, handler)
     }
 }
 
-pub fn register(env: &Env, pi: Object) -> Result<bool> {
-    let pi = Pi::new(env, pi)?;
-    register_with_pi(env, &pi)?;
-    Ok(true)
-}
+pub struct SampleCommand;
 
-pub fn register_with_pi(env: &Env, pi: &Pi) -> Result<()> {
-    SessionScoped::new(Tracer::default()).register_callbacks(env, pi)
+impl Callback for SampleCommand {
+    fn register(self, pi: &ScopedPi<'_>) -> Result<()> {
+        let handler = pi
+            .env()
+            .create_function_from_closure("registrationSample", |ctx| {
+                let context: Object = ctx.get(1)?;
+                if let Some(ui) = Ui::from_session(&context)? {
+                    ui.notify("Rust sample command works.", "info")?;
+                }
+                ctx.get::<napi::bindgen_prelude::Unknown>(0)
+            })?;
+        pi.register_command(
+            "registration-sample",
+            "Test Rust command registration",
+            handler,
+        )
+    }
 }

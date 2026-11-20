@@ -11,80 +11,103 @@ mod session_scope;
 pub use bridge::{Bridge, CallbackPresence};
 pub use on_callback::OnCallback;
 pub use path_host::{PathHost, RealpathCallback};
-pub use session_scope::{ScopedCallbacks, SessionCallbacks, SessionScopeError, SessionScoped};
+pub use session_scope::{Callback, ScopedPi};
 
 use napi::bindgen_prelude::{
-    FnArgs, FromNapiValue, Function, JsObjectValue, JsValue, Object, Unknown,
+    FnArgs, FromNapiValue, Function, FunctionRef, JsObjectValue, JsValue, Object, TypeName,
+    Unknown, ValidateNapiValue,
 };
 use napi::{Env, Error, Result};
 
-type OnFunction<'scope> = Function<'scope, FnArgs<(String, Unknown<'scope>)>, ()>;
-type RegisterCommandFunction<'scope> = Function<'scope, FnArgs<(String, Object<'scope>)>, ()>;
-type RegisterEntryRendererFunction<'scope> =
-    Function<'scope, FnArgs<(String, Function<'scope, (), Unknown<'static>>)>, ()>;
+type PiFunction = FunctionRef<FnArgs<(String, Unknown<'static>)>, ()>;
 
-/// The `pi` object passed to an extension entrypoint.
-pub struct Pi<'scope> {
-    env: &'scope Env,
-    on: OnFunction<'scope>,
-    register_command: RegisterCommandFunction<'scope>,
-    register_entry_renderer: RegisterEntryRendererFunction<'scope>,
+/// Bound Pi methods, invoked only with a live environment on its JS thread.
+pub struct Pi {
+    on: PiFunction,
+    register_command: PiFunction,
+    register_entry_renderer: PiFunction,
 }
 
-impl<'scope> Pi<'scope> {
-    /// Returns the wrapper when `object` exposes the Pi methods this crate calls.
-    ///
-    /// `on`, `registerCommand`, and `registerEntryRenderer` are stored here.
-    /// The check does not call them.
-    pub fn new(env: &'scope Env, object: Object<'scope>) -> Result<Self> {
+impl TypeName for Pi {
+    fn type_name() -> &'static str {
+        "Pi"
+    }
+    fn value_type() -> napi::ValueType {
+        napi::ValueType::Object
+    }
+}
+
+impl ValidateNapiValue for Pi {}
+
+impl FromNapiValue for Pi {
+    unsafe fn from_napi_value(
+        env: napi::sys::napi_env,
+        value: napi::sys::napi_value,
+    ) -> Result<Self> {
+        // SAFETY: N-API supplies the live environment and value for this synchronous invocation.
+        let object = unsafe { Object::from_napi_value(env, value)? };
+        let bound = |name: &str| -> Result<PiFunction> {
+            let method: Function<FnArgs<(String, Unknown<'static>)>, ()> = function(&object, name)?;
+            method.bind(object)?.create_ref()
+        };
         Ok(Self {
-            env,
-            on: function(&object, "on")?,
-            register_command: function(&object, "registerCommand")?,
-            register_entry_renderer: function(&object, "registerEntryRenderer")?,
+            on: bound("on")?,
+            register_command: bound("registerCommand")?,
+            register_entry_renderer: bound("registerEntryRenderer")?,
         })
     }
+}
 
-    pub fn on<Return>(&self, event: OnCallback, handler: Function<'scope, (), Return>) -> Result<()>
+impl Pi {
+    pub fn on<'env, Return>(
+        &self,
+        env: &'env Env,
+        event: OnCallback,
+        handler: Function<'env, (), Return>,
+    ) -> Result<()>
     where
         Return: FromNapiValue,
     {
-        self.on.call(FnArgs::from((
+        self.on.borrow_back(env)?.call(FnArgs::from((
             event.as_str().to_owned(),
             handler.to_unknown(),
         )))?;
         Ok(())
     }
 
-    pub fn register_command(
+    pub fn register_command<'env>(
         &self,
+        env: &'env Env,
         name: &str,
         description: &str,
-        handler: Function<'scope, (), Unknown<'static>>,
+        handler: Function<'env, (), Unknown<'static>>,
     ) -> Result<()> {
-        let mut options = Object::new(self.env)?;
+        let mut options = Object::new(env)?;
         options.set_named_property("description", description)?;
         options.set_named_property("handler", handler)?;
         self.register_command
-            .call(FnArgs::from((name.to_owned(), options)))?;
+            .borrow_back(env)?
+            .call(FnArgs::from((name.to_owned(), options.to_unknown())))?;
         Ok(())
     }
 
-    pub fn register_entry_renderer(
+    pub fn register_entry_renderer<'env>(
         &self,
+        env: &'env Env,
         name: &str,
-        renderer: Function<'scope, (), Unknown<'static>>,
+        renderer: Function<'env, (), Unknown<'static>>,
     ) -> Result<()> {
         self.register_entry_renderer
-            .call(FnArgs::from((name.to_owned(), renderer)))?;
+            .borrow_back(env)?
+            .call(FnArgs::from((name.to_owned(), renderer.to_unknown())))?;
         Ok(())
     }
 }
 
-fn function<'scope, Args, Return>(
-    object: &Object<'scope>,
+fn function<'env, Args, Return>(
+    object: &Object<'env>,
     name: &str,
-) -> Result<Function<'scope, Args, Return>>
+) -> Result<Function<'env, Args, Return>>
 where
     Args: napi::bindgen_prelude::JsValuesTupleIntoVec,
     Return: FromNapiValue,
@@ -97,13 +120,13 @@ where
 }
 
 /// The `ui` object on a session context.
-pub struct Ui<'scope> {
-    object: Object<'scope>,
+pub struct Ui<'env> {
+    object: Object<'env>,
 }
 
-impl<'scope> Ui<'scope> {
+impl<'env> Ui<'env> {
     /// Returns the session UI when `hasUI` is set and the `ui` object is present.
-    pub fn from_session(session_context: &Object<'scope>) -> Result<Option<Self>> {
+    pub fn from_session(session_context: &Object<'env>) -> Result<Option<Self>> {
         if !session_context
             .get_named_property::<bool>("hasUI")
             .unwrap_or(false)

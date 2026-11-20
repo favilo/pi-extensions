@@ -38,7 +38,7 @@ Pi's callback, command, and renderer registration interfaces remain callable fro
 Typed Rust handler traits and owned orchestrator state replace a dynamically named TypeScript bridge object.
 
 ## 12. Interfaces
-A Rust direct-registration coordinator constructs adapters for event, command, and renderer interfaces. The existing production `RegistrationBridge` remains until its handlers migrate.
+A single Rust-only `ScopedPi` owns a shared revocable session lifetime. `ScopedPi::register_callback()` passes a reference to itself into each `Callback::register`; its `on` and `register_command` methods guard handler invocation. All callbacks shut down together. Async continuations must re-check session state after suspension. Callback implementations do not manage shutdown. The Pi wrapper accepts the host object through `FromNapiValue` when safe, preserving method receivers and N-API lifetimes. The existing production `RegistrationBridge` remains until its handlers migrate.
 
 **Reason for Depth:** A registration coordinator isolates Pi API wiring from typed event-handler implementations.
 
