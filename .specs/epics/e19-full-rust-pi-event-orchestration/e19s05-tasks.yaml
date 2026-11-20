@@ -1,0 +1,42 @@
+story_id: e19s05
+title: Move interactive permission surfaces into Rust
+status: failing
+bcps: 8
+spec: e19s05-rust-interactive-permission-surfaces.md
+tasks:
+  - id: 1
+    description: Add parity contracts for prompt serialization, steering, command behavior, and permission-preview rendering through Rust-owned callbacks.
+    verify: npm test -- extensions/tool-permissions
+    risk: P0
+    security: high
+    status: failing
+    allure:
+      severity: critical
+      categories:
+        - Permission parity
+        - Interactive UI
+        - Security Review
+  - id: 2
+    description: Implement typed Rust prompt, steering, command, and renderer orchestration with Pi host capability adapters.
+    verify: npm test -- extensions/tool-permissions
+    risk: P0
+    security: high
+    status: failing
+    allure:
+      severity: critical
+      categories:
+        - Interactive UI
+        - Native integration
+        - Security Review
+  - id: 3
+    description: Remove migrated interactive permission implementations and callback helpers from TypeScript without changing the visible interaction contract.
+    verify: npm run check
+    risk: P0
+    security: high
+    status: failing
+    allure:
+      severity: critical
+      categories:
+        - Typecheck
+        - Interactive UI
+        - Security Review

@@ -1,8 +1,10 @@
-use std::collections::VecDeque;
-use std::sync::{LazyLock, Mutex};
+use std::collections::{HashMap, VecDeque};
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{Arc, LazyLock, Mutex};
 
-use napi::bindgen_prelude::{Function, FunctionRef, PromiseRaw, ToNapiValue, Unknown};
-use napi::{Env, Error, Result as NapiResult, Status};
+use napi::bindgen_prelude::{Function, Object, Promise};
+use napi::threadsafe_function::ThreadsafeFunction;
+use napi::{Env, Error, JsDeferred, Result as NapiResult, Status};
 use thiserror::Error;
 
 use crate::CONTRACT_VERSION;
@@ -21,6 +23,8 @@ pub enum PromptQueueError {
     ToolCallId,
     #[error("prompt queue cannot cross N-API environments")]
     Environment,
+    #[error("prompt queue identity space exhausted")]
+    IdentityExhausted,
 }
 
 pub fn validate(request: &PromptQueueRequest) -> std::result::Result<(), PromptQueueError> {
@@ -51,25 +55,98 @@ pub fn complete(
     })
 }
 
-struct DeferredPrompt {
-    env: napi::sys::napi_env,
-    deferred: napi::sys::napi_deferred,
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct EnvironmentId(u64);
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct PromptId(u64);
+
+static NEXT_ENVIRONMENT_ID: AtomicU64 = AtomicU64::new(1);
+static NEXT_PROMPT_ID: AtomicU64 = AtomicU64::new(1);
+static ENVIRONMENTS: LazyLock<EnvironmentRegistry> = LazyLock::new(EnvironmentRegistry::default);
+
+#[derive(Default)]
+struct EnvironmentRegistry {
+    live: Mutex<HashMap<usize, EnvironmentId>>,
 }
 
-// Deferred handles are created and settled only on their owning JavaScript thread.
-unsafe impl Send for DeferredPrompt {}
+impl EnvironmentRegistry {
+    fn get_or_register(
+        &self,
+        key: usize,
+        register_hook: impl FnOnce(EnvironmentId) -> NapiResult<()>,
+    ) -> NapiResult<EnvironmentId> {
+        let mut live = self
+            .live
+            .lock()
+            .map_err(|_| Error::from_reason("environment registry unavailable"))?;
+        if let Some(id) = live.get(&key) {
+            return Ok(*id);
+        }
+        let id = EnvironmentId(
+            next_identity(&NEXT_ENVIRONMENT_ID)
+                .map_err(|error| Error::from_reason(error.to_string()))?,
+        );
+        register_hook(id)?;
+        live.insert(key, id);
+        Ok(id)
+    }
+
+    fn remove(&self, key: usize, id: EnvironmentId) {
+        if let Ok(mut live) = self.live.lock() {
+            if live.get(&key) == Some(&id) {
+                live.remove(&key);
+            }
+        }
+    }
+}
+
+fn next_identity(counter: &AtomicU64) -> Result<u64, PromptQueueError> {
+    counter
+        .try_update(Ordering::Relaxed, Ordering::Relaxed, |value| {
+            value.checked_add(1)
+        })
+        .map_err(|_| PromptQueueError::IdentityExhausted)
+}
+
+fn environment_id(env: &Env) -> NapiResult<EnvironmentId> {
+    let key = env.raw() as usize;
+    ENVIRONMENTS.get_or_register(key, |id| {
+        env.add_env_cleanup_hook((key, id), cleanup_environment)?;
+        Ok(())
+    })
+}
+
+type PromptResolver = Box<dyn FnOnce(Env) -> NapiResult<PromptQueueResponse> + Send>;
+type DeferredPrompt = JsDeferred<PromptQueueResponse, PromptResolver>;
+
+type PresenterRef =
+    ThreadsafeFunction<String, Promise<PromptQueueResolution>, String, Status, false, true>;
 
 struct QueuedPrompt {
     request: PromptQueueRequest,
-    present: FunctionRef<String, PromiseRaw<'static, PromptQueueResolution>>,
+    present: Arc<PresenterRef>,
     deferred: DeferredPrompt,
+    environment: EnvironmentId,
+    id: PromptId,
 }
 
-#[cfg(test)]
-#[derive(Default)]
-struct PromptQueue {
-    active: Option<ToolCallId>,
-    pending: VecDeque<ToolCallId>,
+struct PromptQueue<T> {
+    environment: Option<EnvironmentId>,
+    active: Option<T>,
+    pending: VecDeque<T>,
+    opening: bool,
+}
+
+impl<T> Default for PromptQueue<T> {
+    fn default() -> Self {
+        Self {
+            environment: None,
+            active: None,
+            pending: VecDeque::new(),
+            opening: false,
+        }
+    }
 }
 
 #[derive(Debug, Eq, PartialEq)]
@@ -78,40 +155,11 @@ enum QueuePosition {
     Waiting,
 }
 
-#[cfg(test)]
-impl PromptQueue {
-    fn submit(&mut self, tool_call_id: ToolCallId) -> QueuePosition {
-        if self.active.is_none() {
-            self.active = Some(tool_call_id);
-            QueuePosition::Active
-        } else {
-            self.pending.push_back(tool_call_id);
-            QueuePosition::Waiting
-        }
-    }
-
-    fn complete(&mut self, tool_call_id: &ToolCallId) -> Option<ToolCallId> {
-        if self.active.as_ref() != Some(tool_call_id) {
-            return None;
-        }
-        self.active = self.pending.pop_front();
-        self.active.clone()
-    }
-}
-
-#[derive(Default)]
-struct NativePromptQueue {
-    environment: Option<usize>,
-    active: Option<QueuedPrompt>,
-    pending: VecDeque<QueuedPrompt>,
-    opening: bool,
-}
-
-impl NativePromptQueue {
+impl<T> PromptQueue<T> {
     fn submit(
         &mut self,
-        environment: usize,
-        prompt: QueuedPrompt,
+        environment: EnvironmentId,
+        prompt: T,
     ) -> std::result::Result<QueuePosition, PromptQueueError> {
         match self.environment {
             Some(current) if current != environment => return Err(PromptQueueError::Environment),
@@ -127,7 +175,7 @@ impl NativePromptQueue {
         }
     }
 
-    fn take_active_for_opening(&mut self) -> Option<QueuedPrompt> {
+    fn take_active_for_opening(&mut self) -> Option<T> {
         if self.opening || self.active.is_none() {
             return None;
         }
@@ -135,13 +183,17 @@ impl NativePromptQueue {
         self.active.take()
     }
 
-    fn restore_active(&mut self, prompt: QueuedPrompt) {
+    fn restore_active(&mut self, environment: EnvironmentId, prompt: T) -> Option<T> {
+        if !self.opening || self.environment != Some(environment) {
+            return Some(prompt);
+        }
         self.active = Some(prompt);
         self.opening = false;
+        None
     }
 
-    fn finish_active(&mut self, tool_call_id: &str) -> Option<QueuedPrompt> {
-        if self.active.as_ref()?.request.tool_call_id != tool_call_id {
+    fn finish_active(&mut self, matches: impl FnOnce(&T) -> bool) -> Option<T> {
+        if !matches(self.active.as_ref()?) {
             return None;
         }
         let completed = self.active.take();
@@ -151,66 +203,66 @@ impl NativePromptQueue {
         }
         completed
     }
+
+    fn close(&mut self) -> Vec<T> {
+        let mut released = Vec::with_capacity(self.pending.len() + 1);
+        released.extend(self.active.take());
+        released.extend(self.pending.drain(..));
+        self.opening = false;
+        self.environment = None;
+        released
+    }
 }
 
-static NATIVE_PROMPT_QUEUE: LazyLock<Mutex<NativePromptQueue>> =
-    LazyLock::new(|| Mutex::new(NativePromptQueue::default()));
+static NATIVE_PROMPT_QUEUE: LazyLock<Mutex<PromptQueue<QueuedPrompt>>> =
+    LazyLock::new(|| Mutex::new(PromptQueue::default()));
 
 pub fn decide<'env>(
-    env: Env,
+    env: &'env Env,
     request: PromptQueueRequest,
-    present: Function<'env, String, PromiseRaw<'env, PromptQueueResolution>>,
-) -> NapiResult<PromiseRaw<'env, PromptQueueResponse>> {
+    present: Function<'env, String, Promise<PromptQueueResolution>>,
+) -> NapiResult<Object<'env>> {
     validate(&request).map_err(|error| Error::from_reason(error.to_string()))?;
-    let (deferred, promise) = create_deferred(env)?;
+    let environment = environment_id(env)?;
+    let id = PromptId(
+        next_identity(&NEXT_PROMPT_ID).map_err(|error| Error::from_reason(error.to_string()))?,
+    );
+    let (deferred, promise) = env.create_deferred::<PromptQueueResponse, PromptResolver>()?;
     let queued = QueuedPrompt {
         request,
-        present: persistent_present(present)?,
+        present: Arc::new(persistent_present(present)?),
         deferred,
+        environment,
+        id,
     };
     let should_open = NATIVE_PROMPT_QUEUE
         .lock()
         .expect("native prompt queue lock poisoned")
-        .submit(env.raw() as usize, queued)
+        .submit(environment, queued)
         .map_err(|error| Error::from_reason(error.to_string()))?
         == QueuePosition::Active;
     if should_open {
-        open_next(&env)?;
+        open_next(env)?;
     }
     Ok(promise)
 }
 
-fn persistent_present<'env>(
-    present: Function<'env, String, PromiseRaw<'env, PromptQueueResolution>>,
-) -> NapiResult<FunctionRef<String, PromiseRaw<'static, PromptQueueResolution>>> {
-    let reference = present.create_ref()?;
-    // SAFETY: `FunctionRef` owns a `napi_ref`; napi-rs explicitly provides it
-    // to outlive a `Function` call scope. `PromiseRaw` carries its scope only
-    // in `&'env PhantomData<T>`, so this changes no pointer or owned value.
-    // The erased value is private: `open_next` borrows it back only with the
-    // exact `Env` captured in `DeferredPrompt`, immediately attaches `then`
-    // and `catch`, and never stores or returns that `PromiseRaw`. `submit`
-    // rejects a different N-API environment while work is queued, and
-    // `open_next` checks the captured environment before the borrow.
-    Ok(unsafe { std::mem::transmute(reference) })
+fn cleanup_environment((key, environment): (usize, EnvironmentId)) {
+    ENVIRONMENTS.remove(key, environment);
+    let released = match NATIVE_PROMPT_QUEUE.lock() {
+        Ok(mut queue) if queue.environment == Some(environment) => queue.close(),
+        _ => Vec::new(),
+    };
+    drop(released);
 }
 
-fn create_deferred<'env>(
-    env: Env,
-) -> NapiResult<(DeferredPrompt, PromiseRaw<'env, PromptQueueResponse>)> {
-    let mut deferred = std::ptr::null_mut();
-    let mut promise = std::ptr::null_mut();
-    let status = unsafe { napi::sys::napi_create_promise(env.raw(), &mut deferred, &mut promise) };
-    if status != napi::sys::Status::napi_ok {
-        return Err(Error::from_status(Status::from(status as i32)));
-    }
-    Ok((
-        DeferredPrompt {
-            env: env.raw(),
-            deferred,
-        },
-        PromiseRaw::new(env.raw(), promise),
-    ))
+fn persistent_present(
+    present: Function<'_, String, Promise<PromptQueueResolution>>,
+) -> NapiResult<PresenterRef> {
+    present
+        .build_threadsafe_function::<String>()
+        .weak::<true>()
+        .build()
 }
 
 fn open_next(env: &Env) -> NapiResult<()> {
@@ -222,59 +274,64 @@ fn open_next(env: &Env) -> NapiResult<()> {
         return Ok(());
     };
     let tool_call_id = active.request.tool_call_id.clone();
-    if active.deferred.env != env.raw() {
+    if active.environment != environment_id(env)? {
         NATIVE_PROMPT_QUEUE
             .lock()
             .expect("native prompt queue lock poisoned")
-            .restore_active(active);
+            .restore_active(active.environment, active);
         return Err(Error::from_reason(
             "native prompt queue environment mismatch",
         ));
     }
-    let presentation = active.present.borrow_back(env)?.call(tool_call_id.clone());
-    NATIVE_PROMPT_QUEUE
+    let presenter = active.present.clone();
+    let environment = active.environment;
+    let id = active.id;
+    let abandoned = NATIVE_PROMPT_QUEUE
         .lock()
         .expect("native prompt queue lock poisoned")
-        .restore_active(active);
-
-    match presentation {
-        Ok(presentation) => {
-            let successful_tool_call_id = tool_call_id.clone();
-            let settled = presentation.then(move |context| {
-                settle_active(&context.env, &successful_tool_call_id, Ok(context.value))?;
-                Ok(())
-            })?;
-            settled.catch(
-                move |context: napi::bindgen_prelude::CallbackContext<Unknown>| {
-                    settle_active(&context.env, &tool_call_id, Err(()))?;
-                    Ok(())
-                },
-            )?;
-            Ok(())
-        }
-        Err(_) => settle_active(env, &tool_call_id, Err(())),
+        .restore_active(environment, active);
+    if abandoned.is_some() {
+        return Err(Error::from_reason(
+            "prompt queue environment closed while opening",
+        ));
     }
+
+    let future = async move {
+        let resolution = match presenter.call_async_catch(tool_call_id).await {
+            Ok(promise) => promise.await.map_err(|_| ()),
+            Err(_) => Err(()),
+        };
+        settle_active(environment, id, resolution);
+    };
+    if napi_async_runtime::try_spawn_detached(future).is_err() {
+        settle_active(environment, id, Err(()));
+    }
+    Ok(())
 }
 
 fn settle_active(
-    env: &Env,
-    tool_call_id: &str,
+    environment: EnvironmentId,
+    id: PromptId,
     resolution: std::result::Result<PromptQueueResolution, ()>,
-) -> NapiResult<()> {
+) {
     let Some(completed) = NATIVE_PROMPT_QUEUE
         .lock()
         .expect("native prompt queue lock poisoned")
-        .finish_active(tool_call_id)
+        .finish_active(|prompt| prompt.environment == environment && prompt.id == id)
     else {
-        return Ok(());
+        return;
     };
     let response = match resolution {
         Ok(resolution) => complete(completed.request.clone(), resolution)
             .unwrap_or_else(|_| failed_response(&completed.request)),
         Err(()) => failed_response(&completed.request),
     };
-    resolve(&completed.deferred, response)?;
-    open_next(env)
+    completed.deferred.resolve(Box::new(move |env| {
+        if environment_id(&env)? == environment {
+            open_next(&env)?;
+        }
+        Ok(response)
+    }));
 }
 
 fn failed_response(request: &PromptQueueRequest) -> PromptQueueResponse {
@@ -287,16 +344,6 @@ fn failed_response(request: &PromptQueueRequest) -> PromptQueueResponse {
         decision: PromptQueueDecision::Deny,
         steering: None,
     }
-}
-
-fn resolve(deferred: &DeferredPrompt, response: PromptQueueResponse) -> NapiResult<()> {
-    let value = unsafe { PromptQueueResponse::to_napi_value(deferred.env, response) }?;
-    let status =
-        unsafe { napi::sys::napi_resolve_deferred(deferred.env, deferred.deferred, value) };
-    if status != napi::sys::Status::napi_ok {
-        return Err(Error::from_status(Status::from(status as i32)));
-    }
-    Ok(())
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -321,16 +368,107 @@ mod tests {
     use crate::contract::{PromptQueueDecision, PromptQueueRequest, PromptQueueResolution};
 
     #[test]
+    fn reused_environment_address_gets_a_new_identity_and_ignores_old_cleanup() {
+        let registry = super::EnvironmentRegistry::default();
+        let first = registry.get_or_register(42, |_| Ok(())).unwrap();
+        assert_eq!(
+            registry
+                .get_or_register(42, |_| panic!("already registered"))
+                .unwrap(),
+            first
+        );
+        registry.remove(42, first);
+        let second = registry.get_or_register(42, |_| Ok(())).unwrap();
+        assert_ne!(first, second);
+        registry.remove(42, first);
+        assert_eq!(
+            registry
+                .get_or_register(42, |_| panic!("new environment must remain live"))
+                .unwrap(),
+            second
+        );
+    }
+
+    #[test]
     fn releases_the_next_fifo_prompt_when_the_active_prompt_settles() {
         let mut queue = super::PromptQueue::default();
         let first = super::ToolCallId::parse("call-first").unwrap();
         let second = super::ToolCallId::parse("call-second").unwrap();
 
-        assert_eq!(queue.submit(first), super::QueuePosition::Active);
-        assert_eq!(queue.submit(second), super::QueuePosition::Waiting);
         assert_eq!(
-            queue.complete(&super::ToolCallId::parse("call-first").unwrap()),
+            queue.submit(super::EnvironmentId(1), first).unwrap(),
+            super::QueuePosition::Active
+        );
+        assert_eq!(
+            queue.submit(super::EnvironmentId(1), second).unwrap(),
+            super::QueuePosition::Waiting
+        );
+        assert_eq!(
+            queue.finish_active(|id| id == &super::ToolCallId::parse("call-first").unwrap()),
+            Some(super::ToolCallId::parse("call-first").unwrap())
+        );
+        assert_eq!(
+            queue.active,
             Some(super::ToolCallId::parse("call-second").unwrap())
+        );
+    }
+
+    #[test]
+    fn prompt_queue_rejects_presenter_restoration_after_environment_shutdown() {
+        let mut queue = super::PromptQueue::default();
+        assert_eq!(
+            queue.submit(super::EnvironmentId(1), "old").unwrap(),
+            super::QueuePosition::Active
+        );
+        let opening = queue.take_active_for_opening().unwrap();
+        drop(queue.close());
+        assert_eq!(
+            queue.restore_active(super::EnvironmentId(1), opening),
+            Some("old")
+        );
+        assert_eq!(
+            queue.submit(super::EnvironmentId(2), "new").unwrap(),
+            super::QueuePosition::Active
+        );
+    }
+
+    #[test]
+    fn prompt_queue_releases_owned_presenters_on_environment_shutdown() {
+        use std::cell::Cell;
+        use std::rc::Rc;
+
+        struct Presenter(Rc<Cell<usize>>);
+        impl Drop for Presenter {
+            fn drop(&mut self) {
+                self.0.set(self.0.get() + 1);
+            }
+        }
+
+        let released = Rc::new(Cell::new(0));
+        let mut queue = super::PromptQueue::default();
+        assert_eq!(
+            queue
+                .submit(super::EnvironmentId(1), Presenter(Rc::clone(&released)))
+                .unwrap(),
+            super::QueuePosition::Active
+        );
+        assert_eq!(
+            queue
+                .submit(super::EnvironmentId(1), Presenter(Rc::clone(&released)))
+                .unwrap(),
+            super::QueuePosition::Waiting
+        );
+        drop(queue.close());
+        assert_eq!(released.get(), 2);
+    }
+
+    #[test]
+    fn presenter_reference_does_not_erase_a_promise_lifetime() {
+        let source = include_str!("prompt_queue.rs");
+        let implementation = source.split("#[cfg(test)]\nmod tests").next().unwrap();
+        assert!(
+            !implementation.contains("std::mem::transmute(reference)"),
+            "the presenter reference must not forge a static promise lifetime"
         );
     }
 

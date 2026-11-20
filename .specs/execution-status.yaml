@@ -1,4 +1,10 @@
 stories:
+  e19s01:
+    status: done
+    completed_at: '2026-11-19T21:43:54Z'
+  e19s02:
+    status: in_progress
+    started_at: '2026-11-19T21:43:54Z'
   e06s05:
     status: todo
     started_at: '2026-08-11T17:40:59-07:00'
@@ -58,5 +64,12 @@ development_status:
   e18s03: passing
   e18s04: passing
   e18s05: passing
-  e18s06: todo
-  e18s07: todo
+  e18s06: cancelled
+  e18s07: cancelled
+  e19s01: passing
+  e19s02: todo
+  e19s03: todo
+  e19s04: todo
+  e19s05: todo
+  e19s06: todo
+  e19s07: todo

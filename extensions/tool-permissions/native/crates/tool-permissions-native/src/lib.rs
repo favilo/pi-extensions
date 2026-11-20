@@ -1,4 +1,5 @@
 mod audit;
+mod callback_tracer;
 mod contract;
 mod execution;
 mod parser;
@@ -18,12 +19,18 @@ pub use contract::{
     RuleSaveRequest, RuleSaveResponse, ToolExecutionDecision, ToolExecutionRequest,
     ToolExecutionResponse,
 };
-use napi::bindgen_prelude::{FnArgs, Function, PromiseRaw};
+use napi::bindgen_prelude::{FnArgs, Function, Promise, PromiseRaw};
 use napi::{Env, Error, Result};
 use napi_derive::napi;
 use pi_api::RealpathCallback;
 
 pub(crate) const CONTRACT_VERSION: i64 = 1;
+
+#[napi_derive::module_init]
+fn initialize_async_runtime() {
+    napi_async_runtime::install(napi_async_runtime::RuntimeOptions::default())
+        .expect("failed to install the async runtime");
+}
 
 fn validate_nonce(nonce: &str) -> Result<()> {
     if nonce.is_empty() || nonce.len() > 256 {
@@ -74,6 +81,11 @@ pub fn register_tool_permissions_callbacks(
     bridge: Option<napi::bindgen_prelude::Object>,
 ) -> Result<NativeRegistrationResponse> {
     registration::register_callbacks(&env, request, pi, bridge)
+}
+
+#[napi]
+pub fn register_callback_tracer(env: Env, pi: napi::bindgen_prelude::Object) -> Result<bool> {
+    callback_tracer::register(&env, pi)
 }
 
 #[napi]
@@ -136,13 +148,22 @@ pub fn save_rule(request: RuleSaveRequest) -> Result<RuleSaveResponse> {
     rule_save::save(request).map_err(|error| Error::from_reason(error.to_string()))
 }
 
-#[napi]
+#[napi(ts_return_type = "Promise<PromptQueueResponse>")]
 pub fn decide_prompt<'env>(
-    env: Env,
+    env: &'env Env,
     request: PromptQueueRequest,
-    present: Function<'env, String, PromiseRaw<'env, PromptQueueResolution>>,
-) -> Result<PromiseRaw<'env, PromptQueueResponse>> {
+    present: Function<'env, String, Promise<PromptQueueResolution>>,
+) -> Result<napi::bindgen_prelude::Object<'env>> {
     prompt_queue::decide(env, request, present)
+}
+
+/// Await a JavaScript promise through the configured runtime.
+///
+/// # Errors
+/// Returns an error if the JavaScript promise rejects.
+#[napi]
+pub async fn trace_async_promise(promise: Promise<String>) -> Result<String> {
+    promise.await
 }
 
 #[napi]

@@ -82,6 +82,18 @@ test("a failed edit renders its reason, never success text", () => {
   assert.doesNotMatch(rendered, /No diff supplied/);
 });
 
+test("edit and write validation failures show the missing-field detail", () => {
+  const message = 'Validation failed for tool "edit":\n  edits: required property is missing';
+  for (const name of ["edit", "write"]) {
+    const rendered = renderEdit(
+      captureTool(name),
+      { content: [{ type: "text", text: message }] },
+      true,
+    );
+    assert.match(rendered, /edits: required property is missing/, name);
+  }
+});
+
 test("a blocked edit renders the block reason, never success text", () => {
   const renderer = captureEditRenderer();
   const rendered = renderEdit(

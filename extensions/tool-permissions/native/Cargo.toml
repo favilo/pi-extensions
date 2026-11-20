@@ -6,10 +6,16 @@ resolver = "2"
 edition = "2024"
 publish = false
 
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
+undocumented_unsafe_blocks = "deny"
+
 [workspace.dependencies]
 pi-api = { path = "crates/pi-api" }
-napi = { version = "3.16.2", features = ["napi8"] }
-napi-derive = "3.6.3"
+napi = { version = "3.16.2", features = ["napi8", "async-runtime"] }
+napi-derive = "3.7.1"
+napi-async-runtime = "0.2.10"
 napi-build = "2.6.0"
 bash-ast = "0.8.22"
 toml = "1.1.5"

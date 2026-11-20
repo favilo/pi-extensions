@@ -5,5 +5,9 @@ edition.workspace = true
 publish.workspace = true
 description = "Typed helpers for the Pi JavaScript extension object"
 
+[lints]
+workspace = true
+
 [dependencies]
 napi.workspace = true
+thiserror.workspace = true

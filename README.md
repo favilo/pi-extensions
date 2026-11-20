@@ -39,6 +39,10 @@ pi install git:github.com/favilo/pi-extensions
 
 For active development, install the local checkout of the same fork instead. The fork must remain the configured package; do not substitute a stale package-manager cache for it.
 
+### Known issue: extension-provided child models
+
+A subagent that selects a provider registered by a parent extension can fail during startup because its isolated runtime does not yet receive that provider's model catalog. Built-in providers are unaffected. Track progress and the proposed fix in [BUG-2026-11-20T101309](.specs/bugs/BUG-2026-11-20T101309-child-model-unavailable.md).
+
 ## Extensions
 
 | Extension | Purpose |
@@ -68,7 +72,7 @@ Run `/permissions` or `/permissions user` in Pi to edit the user rules. Run `/pe
 
 ### Native runtime
 
-The `tool-permissions` bundled native Rust core is enabled by default when its packaged WebAssembly artifact is compatible with the current Node runtime. The extension loads the `wasm32-wasip1-threads` module and does not load a platform `.node` library. Pi shows a startup diagnostic when the native probe is active, or a warning when the bundled native package cannot load and TypeScript fallback is used. To force the TypeScript implementation for diagnosis, start Pi with `PI_TOOL_PERMISSIONS_NATIVE_DISABLE=1`.
+The `tool-permissions` bundled native Rust core is required. The extension loads the `wasm32-wasip1-threads` module and does not load a platform `.node` library. There is no TypeScript permission fallback: if the WASM artifact is missing, invalid, or disabled (`PI_TOOL_PERMISSIONS_NATIVE_DISABLE=1`), Pi exits with a fatal error that includes rebuild instructions.
 
 For local development, rebuild the bundled WebAssembly artifact after Rust changes. The build compiles tree-sitter with the wasi-sdk `wasm32-wasip1-threads` compiler and needs [wasi-sdk](https://github.com/WebAssembly/wasi-sdk/releases) at `WASI_SDK_PATH` or `~/.local/wasi-sdk`. Output goes to `extensions/tool-permissions/native/generated/`, which is ignored.
 
@@ -83,7 +87,7 @@ Before publishing or testing packaged installs, confirm the native package inclu
 npm pack --dry-run ./extensions/tool-permissions/native
 ```
 
-The native package remains a pure computation boundary. Prompt rendering, policy editing and persistence, project trust checks, audit writes, and tool execution stay in the TypeScript host and fall back safely if native loading or output validation fails.
+The native package owns permission decisions at runtime. Host callbacks still render prompts and execute tools through Pi APIs after WASM authorizes them.
 
 ### Multiline steering & Vim keybindings
 

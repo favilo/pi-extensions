@@ -77,7 +77,11 @@ test("returns a structured unavailable-UI denial without executing", async () =>
 test("attributes the visible prompt while marking only the requesting child as waiting", async () => {
   const statuses: string[] = [];
   const notifications: string[] = [];
-  let resolvePrompt: ((value: boolean) => void) | undefined;
+  let resolvePrompt!: (value: boolean) => void;
+  let notifyPromptOpened!: () => void;
+  const promptOpened = new Promise<void>((resolve) => {
+    notifyPromptOpened = resolve;
+  });
   const prompt = createParentPermissionPrompt(
     { sendUserMessage() {} },
     "amber-otter",
@@ -90,6 +94,7 @@ test("attributes the visible prompt while marking only the requesting child as w
         confirm: () =>
           new Promise<boolean>((resolve) => {
             resolvePrompt = resolve;
+            notifyPromptOpened();
           }),
         notify: (message) => notifications.push(message),
       },
@@ -107,19 +112,23 @@ test("attributes the visible prompt while marking only the requesting child as w
   assert.deepEqual(notifications, [
     "Subagent amber-otter → read: permission required",
   ]);
-  resolvePrompt?.(false);
+  await promptOpened;
+  resolvePrompt(false);
   await pending;
   assert.deepEqual(statuses, ["waiting-for-permission", "running"]);
 });
 
-function openWritePrompt(): {
+async function openWritePrompt(): Promise<{
   pending: Promise<"allow" | "deny" | "cancel">;
   prompt: {
     handleInput(data: string): void;
     render(width: number): string[];
   };
-} {
-  let promptComponent: unknown;
+}> {
+  let notifyPromptOpened!: (component: unknown) => void;
+  const promptOpened = new Promise<unknown>((resolve) => {
+    notifyPromptOpened = resolve;
+  });
   const context = {
     cwd: "/workspace/project",
     hasUI: true,
@@ -140,7 +149,7 @@ function openWritePrompt(): {
         ) => unknown,
       ): Promise<T> {
         return new Promise<T>((resolve) => {
-          promptComponent = factory(
+          const component = factory(
             { requestRender() {}, stop() {}, start() {} },
             {
               fg: (_color: string, text: string) => text,
@@ -149,6 +158,7 @@ function openWritePrompt(): {
             {},
             resolve,
           );
+          notifyPromptOpened(component);
         });
       },
     },
@@ -163,12 +173,13 @@ function openWritePrompt(): {
       cwd: context.cwd,
     },
   );
+  const promptComponent = await promptOpened;
   assert.ok(isInputComponent(promptComponent));
   return { pending, prompt: promptComponent };
 }
 
 test("Escape does not cancel an available main UI permission prompt", async () => {
-  const { pending, prompt } = openWritePrompt();
+  const { pending, prompt } = await openWritePrompt();
   prompt.handleInput("\x1b");
   prompt.handleInput("\x1b");
 
@@ -188,7 +199,7 @@ test("Vim insert steering does not say that Escape returns", async () => {
   const previousVim = process.env.PI_VIM_MODE;
   process.env.PI_VIM_MODE = "1";
   try {
-    const { pending, prompt } = openWritePrompt();
+    const { pending, prompt } = await openWritePrompt();
     prompt.handleInput("\t");
     const hint = prompt.render(80).join("\n");
     assert.match(hint, /Esc normal mode/);

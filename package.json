@@ -12,7 +12,8 @@
     "pi-package"
   ],
   "scripts": {
-    "check": "npm run typecheck && npm run test:native && npm run test:preflight && npm run check:test-guard",
+    "check": "npm run typecheck && npm run lint:rust && npm run test:native && npm run test:preflight && npm run check:test-guard",
+    "lint:rust": "cargo clippy --manifest-path extensions/tool-permissions/native/Cargo.toml --workspace --all-targets",
     "check:test-guard": "bash .github/scripts/check-test-guard.sh",
     "check:ci": "npm run check && npm run check:plans && npm run check:portability",
     "check:plans": "bash .github/scripts/check-active-plans.sh",
@@ -48,6 +49,7 @@
     "@decimalturn/toml-patch": "^2.1.0",
     "@emnapi/core": "2.0.0-beta.3",
     "@emnapi/runtime": "2.0.0-beta.3",
+    "@napi-rs/async-runtime": "0.2.0",
     "@napi-rs/wasm-runtime": "^1.2.7",
     "emnapi": "2.0.0-beta.3",
     "ignore": "^7.0.6",

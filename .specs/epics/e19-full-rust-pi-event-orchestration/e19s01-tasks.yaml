@@ -1,0 +1,41 @@
+story_id: e19s01
+title: Prove safe Rust Pi callback lifetime and dispatch
+status: passing
+bcps: 5
+spec: e19s01-safe-rust-callback-lifetime.md
+tasks:
+  - id: 1
+    description: Add a native integration contract that initializes Rust registration, invokes a Rust-created Pi callback after initialization returns, and observes typed Rust dispatch.
+    verify: npm test -- extensions/tool-permissions/native-registration.test.ts
+    risk: P0
+    security: high
+    status: passing
+    allure:
+      severity: critical
+      categories:
+        - Native integration
+        - Callback safety
+        - Security Review
+  - id: 2
+    description: Implement safe Rust-owned callback state and adapters that capture only owned state and receive JavaScript values through callback invocation context.
+    verify: npm test -- extensions/tool-permissions/native-registration.test.ts
+    risk: P0
+    security: high
+    status: passing
+    allure:
+      severity: critical
+      categories:
+        - Native integration
+        - Callback safety
+        - Security Review
+  - id: 3
+    description: Prove shutdown releases callback-owned state and no adapter retains borrowed JavaScript values across an asynchronous boundary.
+    verify: npm test -- extensions/tool-permissions/native-registration.test.ts
+    risk: P0
+    security: high
+    status: passing
+    allure:
+      severity: critical
+      categories:
+        - Lifetime safety
+        - Security Review

@@ -8,7 +8,8 @@
   "files": ["generated/"],
   "napi": {
     "binaryName": "index",
-    "targets": ["wasm32-wasip1-threads"]
+    "targets": ["wasm32-wasip1-threads"],
+    "wasm": { "asyncRuntime": true }
   },
-  "engines": { "node": ">=20" }
+  "engines": { "node": "^20.19.0 || ^22.13.0 || >=23.5.0" }
 }

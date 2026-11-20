@@ -91,4 +91,10 @@ Startup diagnostics name the WASM artifact. Failure diagnostics name the load er
 4. Run the native build and full checks. No new security findings in affected paths. → verify: `npm run build:native && npm run check`
 
 ## 20. Definition of done
-The extension has one permission engine. The TypeScript file only loads WASM. A missing or invalid module cannot authorize a tool call.
+The extension has one permission engine. A missing or invalid module cannot authorize a tool call.
+
+> **Scope correction (2026-11-18):** The planned loader-only `index.ts` requires Rust to own
+> complete Pi-event orchestration. The current Rust registrar still forwards session start, tool
+> call, tool result, session shutdown, command, and renderer callbacks to TypeScript. Task 3 is
+> deferred to a new full-Rust orchestration epic; this story delivers the fail-closed removal of
+> the TypeScript fallback only.

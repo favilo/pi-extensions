@@ -16,10 +16,52 @@ import {
   NATIVE_PATH_TRUST_NONCE,
 } from "./native-contract.ts";
 import toolPermissionPolicy, { createToolPermissionBoundary } from "./index.ts";
-import { evaluatePathTrust } from "./native-path-trust.ts";
+import { adoptPathTrust, evaluatePathTrust } from "./native-path-trust.ts";
 import { setNativePackagePathForTests } from "./native-package.ts";
+import {
+  NATIVE_REGISTRATION_STUB,
+  withCapturedProcessExit,
+} from "./native-host-test-support.ts";
 import { executeToolRequest, type ToolRequest } from "./permission-boundary.ts";
 import { resolveScopedPermissionDecision } from "./scope.ts";
+
+function writePathTrustNativePackage(
+  packagePath: string,
+  evaluateLines: string[],
+): void {
+  writeFileSync(
+    packagePath,
+    [NATIVE_REGISTRATION_STUB, ...evaluateLines].join("\n"),
+  );
+}
+
+test("path failures preserve the underlying error without internal terminology", () => {
+  const packageDir = mkdtempSync(join(tmpdir(), "pi-path-error-"));
+  const packagePath = join(packageDir, "index.cjs");
+  writeFileSync(
+    packagePath,
+    "exports.evaluatePathTrust = () => { throw new Error('permission denied'); };\n",
+  );
+  const restore = setNativePackagePathForTests(packagePath);
+  try {
+    assert.deepEqual(
+      adoptPathTrust({
+        version: NATIVE_CONTRACT_VERSION,
+        operation: "path_trust",
+        nonce: NATIVE_PATH_TRUST_NONCE,
+        tool: "edit",
+        requestedPath: "notes.txt",
+        cwd: "/workspace",
+        trustPath: null,
+        trustDecision: false,
+      }),
+      { status: "invalid", diagnostic: "permission denied" },
+    );
+  } finally {
+    restore();
+    rmSync(packageDir, { recursive: true, force: true });
+  }
+});
 
 test("canonical path and working directory match the current host for an existing read", () => {
   const root = mkdtempSync(join(tmpdir(), "pi-path-trust-"));
@@ -341,22 +383,19 @@ test("a registered read blocks when WASM denies a path the host would allow", as
   writeFileSync(join(cwd, "notes.txt"), "hello");
   const packageDir = mkdtempSync(join(tmpdir(), "pi-path-trust-native-"));
   const packagePath = join(packageDir, "index.cjs");
-  writeFileSync(
-    packagePath,
-    [
-      "exports.evaluatePathTrust = (request, realpath) => ({",
-      "  version: 1,",
-      "  operation: 'path_trust',",
-      "  ok: true,",
-      "  nonce: request.nonce,",
-      "  path: realpath(request.cwd + '/' + request.requestedPath),",
-      "  cwd: realpath(request.cwd),",
-      "  trustEligible: true,",
-      "  aiignoreMatch: false,",
-      "  decision: 'deny',",
-      "});",
-    ].join("\n"),
-  );
+  writePathTrustNativePackage(packagePath, [
+    "exports.evaluatePathTrust = (request, realpath) => ({",
+    "  version: 1,",
+    "  operation: 'path_trust',",
+    "  ok: true,",
+    "  nonce: request.nonce,",
+    "  path: realpath(request.cwd + '/' + request.requestedPath),",
+    "  cwd: realpath(request.cwd),",
+    "  trustEligible: true,",
+    "  aiignoreMatch: false,",
+    "  decision: 'deny',",
+    "});",
+  ]);
   const restore = setNativePackagePathForTests(packagePath);
   const previousAgentDir = process.env.PI_CODING_AGENT_DIR;
   process.env.PI_CODING_AGENT_DIR = agentDir;
@@ -374,6 +413,7 @@ test("a registered read blocks when WASM denies a path the host would allow", as
   try {
     toolPermissionPolicy({
       registerCommand() {},
+      registerEntryRenderer() {},
       on(
         event: string,
         handler: (
@@ -416,22 +456,19 @@ test("a registered write uses a WASM deny instead of the no-UI ask", async () =>
   writeFileSync(join(cwd, "notes.txt"), "hello");
   const packageDir = mkdtempSync(join(tmpdir(), "pi-path-trust-write-native-"));
   const packagePath = join(packageDir, "index.cjs");
-  writeFileSync(
-    packagePath,
-    [
-      "exports.evaluatePathTrust = (request, realpath) => ({",
-      "  version: 1,",
-      "  operation: 'path_trust',",
-      "  ok: true,",
-      "  nonce: request.nonce,",
-      "  path: realpath(request.cwd + '/' + request.requestedPath),",
-      "  cwd: realpath(request.cwd),",
-      "  trustEligible: false,",
-      "  aiignoreMatch: false,",
-      "  decision: 'deny',",
-      "});",
-    ].join("\n"),
-  );
+  writePathTrustNativePackage(packagePath, [
+    "exports.evaluatePathTrust = (request, realpath) => ({",
+    "  version: 1,",
+    "  operation: 'path_trust',",
+    "  ok: true,",
+    "  nonce: request.nonce,",
+    "  path: realpath(request.cwd + '/' + request.requestedPath),",
+    "  cwd: realpath(request.cwd),",
+    "  trustEligible: false,",
+    "  aiignoreMatch: false,",
+    "  decision: 'deny',",
+    "});",
+  ]);
   const restore = setNativePackagePathForTests(packagePath);
   const previousAgentDir = process.env.PI_CODING_AGENT_DIR;
   process.env.PI_CODING_AGENT_DIR = agentDir;
@@ -449,6 +486,7 @@ test("a registered write uses a WASM deny instead of the no-UI ask", async () =>
   try {
     toolPermissionPolicy({
       registerCommand() {},
+      registerEntryRenderer() {},
       on(
         event: string,
         handler: (
@@ -496,22 +534,19 @@ test("a registered write blocks when WASM denies the path for .aiignore", async 
     join(tmpdir(), "pi-path-trust-write-aiignore-native-"),
   );
   const packagePath = join(packageDir, "index.cjs");
-  writeFileSync(
-    packagePath,
-    [
-      "exports.evaluatePathTrust = (request, realpath) => ({",
-      "  version: 1,",
-      "  operation: 'path_trust',",
-      "  ok: true,",
-      "  nonce: request.nonce,",
-      "  path: realpath(request.cwd + '/' + request.requestedPath),",
-      "  cwd: realpath(request.cwd),",
-      "  trustEligible: false,",
-      "  aiignoreMatch: true,",
-      "  decision: 'deny',",
-      "});",
-    ].join("\n"),
-  );
+  writePathTrustNativePackage(packagePath, [
+    "exports.evaluatePathTrust = (request, realpath) => ({",
+    "  version: 1,",
+    "  operation: 'path_trust',",
+    "  ok: true,",
+    "  nonce: request.nonce,",
+    "  path: realpath(request.cwd + '/' + request.requestedPath),",
+    "  cwd: realpath(request.cwd),",
+    "  trustEligible: false,",
+    "  aiignoreMatch: true,",
+    "  decision: 'deny',",
+    "});",
+  ]);
   const restore = setNativePackagePathForTests(packagePath);
   const previousAgentDir = process.env.PI_CODING_AGENT_DIR;
   process.env.PI_CODING_AGENT_DIR = agentDir;
@@ -529,6 +564,7 @@ test("a registered write blocks when WASM denies the path for .aiignore", async 
   try {
     toolPermissionPolicy({
       registerCommand() {},
+      registerEntryRenderer() {},
       on(
         event: string,
         handler: (
@@ -577,23 +613,20 @@ test("a registered read blocks without a UI when WASM asks about a broken .aiign
   );
   const packagePath = join(packageDir, "index.cjs");
   const diagnostic = `${cwd}/.aiignore line 1 is invalid`;
-  writeFileSync(
-    packagePath,
-    [
-      "exports.evaluatePathTrust = (request, realpath) => ({",
-      "  version: 1,",
-      "  operation: 'path_trust',",
-      "  ok: true,",
-      "  nonce: request.nonce,",
-      "  path: realpath(request.cwd + '/' + request.requestedPath),",
-      "  cwd: realpath(request.cwd),",
-      "  trustEligible: false,",
-      "  aiignoreMatch: false,",
-      "  decision: 'ask',",
-      `  diagnostic: ${JSON.stringify(diagnostic)},`,
-      "});",
-    ].join("\n"),
-  );
+  writePathTrustNativePackage(packagePath, [
+    "exports.evaluatePathTrust = (request, realpath) => ({",
+    "  version: 1,",
+    "  operation: 'path_trust',",
+    "  ok: true,",
+    "  nonce: request.nonce,",
+    "  path: realpath(request.cwd + '/' + request.requestedPath),",
+    "  cwd: realpath(request.cwd),",
+    "  trustEligible: false,",
+    "  aiignoreMatch: false,",
+    "  decision: 'ask',",
+    `  diagnostic: ${JSON.stringify(diagnostic)},`,
+    "});",
+  ]);
   const restore = setNativePackagePathForTests(packagePath);
   const previousAgentDir = process.env.PI_CODING_AGENT_DIR;
   process.env.PI_CODING_AGENT_DIR = agentDir;
@@ -611,6 +644,7 @@ test("a registered read blocks without a UI when WASM asks about a broken .aiign
   try {
     toolPermissionPolicy({
       registerCommand() {},
+      registerEntryRenderer() {},
       on(
         event: string,
         handler: (
@@ -659,23 +693,20 @@ test("a UI prompt shows a broken .aiignore diagnostic and can allow the call onc
   );
   const packagePath = join(packageDir, "index.cjs");
   const diagnostic = `${cwd}/.aiignore line 1 is invalid`;
-  writeFileSync(
-    packagePath,
-    [
-      "exports.evaluatePathTrust = (request, realpath) => ({",
-      "  version: 1,",
-      "  operation: 'path_trust',",
-      "  ok: true,",
-      "  nonce: request.nonce,",
-      "  path: realpath(request.cwd + '/' + request.requestedPath),",
-      "  cwd: realpath(request.cwd),",
-      "  trustEligible: false,",
-      "  aiignoreMatch: false,",
-      "  decision: 'ask',",
-      `  diagnostic: ${JSON.stringify(diagnostic)},`,
-      "});",
-    ].join("\n"),
-  );
+  writePathTrustNativePackage(packagePath, [
+    "exports.evaluatePathTrust = (request, realpath) => ({",
+    "  version: 1,",
+    "  operation: 'path_trust',",
+    "  ok: true,",
+    "  nonce: request.nonce,",
+    "  path: realpath(request.cwd + '/' + request.requestedPath),",
+    "  cwd: realpath(request.cwd),",
+    "  trustEligible: false,",
+    "  aiignoreMatch: false,",
+    "  decision: 'ask',",
+    `  diagnostic: ${JSON.stringify(diagnostic)},`,
+    "});",
+  ]);
   const restore = setNativePackagePathForTests(packagePath);
   const previousAgentDir = process.env.PI_CODING_AGENT_DIR;
   process.env.PI_CODING_AGENT_DIR = agentDir;
@@ -703,6 +734,7 @@ test("a UI prompt shows a broken .aiignore diagnostic and can allow the call onc
   try {
     toolPermissionPolicy({
       registerCommand() {},
+      registerEntryRenderer() {},
       on(
         event: string,
         handler: (
@@ -774,22 +806,19 @@ test("a registered read keeps a WASM allow when TypeScript .aiignore would deny"
     join(tmpdir(), "pi-path-trust-read-aiignore-native-"),
   );
   const packagePath = join(packageDir, "index.cjs");
-  writeFileSync(
-    packagePath,
-    [
-      "exports.evaluatePathTrust = (request, realpath) => ({",
-      "  version: 1,",
-      "  operation: 'path_trust',",
-      "  ok: true,",
-      "  nonce: request.nonce,",
-      "  path: realpath(request.cwd + '/' + request.requestedPath),",
-      "  cwd: realpath(request.cwd),",
-      "  trustEligible: false,",
-      "  aiignoreMatch: false,",
-      "  decision: 'allow',",
-      "});",
-    ].join("\n"),
-  );
+  writePathTrustNativePackage(packagePath, [
+    "exports.evaluatePathTrust = (request, realpath) => ({",
+    "  version: 1,",
+    "  operation: 'path_trust',",
+    "  ok: true,",
+    "  nonce: request.nonce,",
+    "  path: realpath(request.cwd + '/' + request.requestedPath),",
+    "  cwd: realpath(request.cwd),",
+    "  trustEligible: false,",
+    "  aiignoreMatch: false,",
+    "  decision: 'allow',",
+    "});",
+  ]);
   const restore = setNativePackagePathForTests(packagePath);
   const previousAgentDir = process.env.PI_CODING_AGENT_DIR;
   process.env.PI_CODING_AGENT_DIR = agentDir;
@@ -807,6 +836,7 @@ test("a registered read keeps a WASM allow when TypeScript .aiignore would deny"
   try {
     toolPermissionPolicy({
       registerCommand() {},
+      registerEntryRenderer() {},
       on(
         event: string,
         handler: (
@@ -841,66 +871,30 @@ test("a registered read keeps a WASM allow when TypeScript .aiignore would deny"
   }
 });
 
-test("a disabled native package still denies a registered read matched by .aiignore", async () => {
+test("a disabled native package fails at load instead of using TypeScript .aiignore", () => {
   const previous = process.env.PI_TOOL_PERMISSIONS_NATIVE_DISABLE;
   process.env.PI_TOOL_PERMISSIONS_NATIVE_DISABLE = "1";
-  const root = mkdtempSync(join(tmpdir(), "pi-path-trust-fallback-aiignore-"));
-  const cwd = join(root, "project");
-  const agentDir = mkdtempSync(
-    join(tmpdir(), "pi-path-trust-fallback-aiignore-agent-"),
-  );
-  mkdirSync(cwd);
-  writeFileSync(join(cwd, ".aiignore"), "secret.txt\n");
-  writeFileSync(join(cwd, "secret.txt"), "nope");
-  const previousAgentDir = process.env.PI_CODING_AGENT_DIR;
-  process.env.PI_CODING_AGENT_DIR = agentDir;
-  const handlers = new Map<
-    string,
-    (
-      event: {
-        toolName: string;
-        toolCallId: string;
-        input: { path: string };
-      },
-      ctx: { cwd: string; hasUI: boolean; ui: { notify: () => void } },
-    ) => Promise<{ block?: boolean; reason?: string } | undefined>
-  >();
+  const handlers: string[] = [];
+  const previousError = console.error;
+  console.error = () => {};
   try {
-    toolPermissionPolicy({
-      registerCommand() {},
-      on(
-        event: string,
-        handler: (
-          event: {
-            toolName: string;
-            toolCallId: string;
-            input: { path: string };
-          },
-          ctx: { cwd: string; hasUI: boolean; ui: { notify: () => void } },
-        ) => Promise<{ block?: boolean; reason?: string } | undefined>,
-      ) {
-        if (event === "tool_call") handlers.set(event, handler);
-      },
-      getAllTools: () => [],
-    } as never);
-    const result = await handlers.get("tool_call")?.(
-      {
-        toolName: "read",
-        toolCallId: "ts-aiignore-read",
-        input: { path: "secret.txt" },
-      },
-      { cwd, hasUI: false, ui: { notify() {} } },
+    const { exitCode } = withCapturedProcessExit(() =>
+      toolPermissionPolicy({
+        registerCommand() {},
+        registerEntryRenderer() {},
+        on(event: string) {
+          handlers.push(event);
+        },
+        getAllTools: () => [],
+      } as never),
     );
-    assert.equal(result?.block, true);
-    assert.match(result?.reason ?? "", /\.aiignore/);
+    assert.equal(exitCode, 1);
+    assert.equal(handlers.includes("tool_call"), false);
   } finally {
+    console.error = previousError;
     if (previous === undefined)
       delete process.env.PI_TOOL_PERMISSIONS_NATIVE_DISABLE;
     else process.env.PI_TOOL_PERMISSIONS_NATIVE_DISABLE = previous;
-    if (previousAgentDir === undefined) delete process.env.PI_CODING_AGENT_DIR;
-    else process.env.PI_CODING_AGENT_DIR = previousAgentDir;
-    rmSync(root, { recursive: true, force: true });
-    rmSync(agentDir, { recursive: true, force: true });
   }
 });
 
@@ -917,22 +911,19 @@ test("a registered read allows an outside path when WASM allows it", async () =>
     join(tmpdir(), "pi-path-trust-outside-read-native-"),
   );
   const packagePath = join(packageDir, "index.cjs");
-  writeFileSync(
-    packagePath,
-    [
-      "exports.evaluatePathTrust = (request, realpath) => ({",
-      "  version: 1,",
-      "  operation: 'path_trust',",
-      "  ok: true,",
-      "  nonce: request.nonce,",
-      "  path: realpath(request.requestedPath),",
-      "  cwd: realpath(request.cwd),",
-      "  trustEligible: true,",
-      "  aiignoreMatch: false,",
-      "  decision: 'allow',",
-      "});",
-    ].join("\n"),
-  );
+  writePathTrustNativePackage(packagePath, [
+    "exports.evaluatePathTrust = (request, realpath) => ({",
+    "  version: 1,",
+    "  operation: 'path_trust',",
+    "  ok: true,",
+    "  nonce: request.nonce,",
+    "  path: realpath(request.requestedPath),",
+    "  cwd: realpath(request.cwd),",
+    "  trustEligible: true,",
+    "  aiignoreMatch: false,",
+    "  decision: 'allow',",
+    "});",
+  ]);
   const restore = setNativePackagePathForTests(packagePath);
   const previousAgentDir = process.env.PI_CODING_AGENT_DIR;
   process.env.PI_CODING_AGENT_DIR = agentDir;
@@ -950,6 +941,7 @@ test("a registered read allows an outside path when WASM allows it", async () =>
   try {
     toolPermissionPolicy({
       registerCommand() {},
+      registerEntryRenderer() {},
       on(
         event: string,
         handler: (

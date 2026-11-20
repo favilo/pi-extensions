@@ -1,0 +1,42 @@
+story_id: e19s06
+title: Reduce TypeScript to the WASM loader and one-time handoff
+status: failing
+bcps: 5
+spec: e19s06-loader-only-typescript-entrypoint.md
+tasks:
+  - id: 1
+    description: Add a contract asserting that index.ts contains only native module loading and the single Rust initialization handoff.
+    verify: npm test -- extensions/tool-permissions
+    risk: P0
+    security: high
+    status: failing
+    allure:
+      severity: critical
+      categories:
+        - Entrypoint
+        - Fail closed
+        - Security Review
+  - id: 2
+    description: Remove all remaining TypeScript callback registration, permission bridge, permission behavior, and fallback paths.
+    verify: npm run check
+    risk: P0
+    security: high
+    status: failing
+    allure:
+      severity: critical
+      categories:
+        - Entrypoint
+        - Typecheck
+        - Security Review
+  - id: 3
+    description: Verify that an unavailable or invalid WASM artifact fails closed and cannot authorize a tool call.
+    verify: npm test -- extensions/tool-permissions
+    risk: P0
+    security: high
+    status: failing
+    allure:
+      severity: critical
+      categories:
+        - Fail closed
+        - Permission parity
+        - Security Review

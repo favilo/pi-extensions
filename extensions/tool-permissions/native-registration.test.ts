@@ -5,6 +5,11 @@ import assert from "node:assert/strict";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import {
+  createAgentSession,
+  DefaultResourceLoader,
+  SessionManager,
+} from "@earendil-works/pi-coding-agent";
 import { NATIVE_CONTRACT_VERSION } from "./native-contract.ts";
 import { setNativePackagePathForTests } from "./native-package.ts";
 import {
@@ -240,6 +245,293 @@ test("bundled Rust registration calls pi.on and registerCommand for delegated ca
   assert.deepEqual(handledCommands, [{ args: "local", ctx: commandContext }]);
 });
 
+test("Rust callback dispatches after tracer initialization returns", async () => {
+  const native = createRequire(import.meta.url)(
+    "./native/generated/index.js",
+  ) as {
+    registerCallbackTracer: (pi: unknown) => boolean;
+  };
+  const handlers = new Map<string, (event: unknown, ctx: unknown) => unknown>();
+  const registered = native.registerCallbackTracer({
+    on(eventName: string, handler: (event: unknown, ctx: unknown) => unknown) {
+      handlers.set(eventName, handler);
+    },
+    registerCommand() {},
+    registerEntryRenderer() {},
+  });
+
+  assert.equal(registered, true);
+  const handler = handlers.get("session_info_changed");
+  assert.ok(handler);
+  await Promise.resolve();
+  assert.deepEqual(
+    await handler(
+      { type: "session_info_changed", name: "after initialization" },
+      {},
+    ),
+    { name: "after initialization", dispatchCount: 1 },
+  );
+});
+
+test("Rust tracer rejects malformed events without dispatching", async () => {
+  const native = createRequire(import.meta.url)(
+    "./native/generated/index.js",
+  ) as {
+    registerCallbackTracer: (pi: unknown) => boolean;
+  };
+  const handlers = new Map<string, (event: unknown, ctx: unknown) => unknown>();
+  native.registerCallbackTracer({
+    on(eventName: string, handler: (event: unknown, ctx: unknown) => unknown) {
+      handlers.set(eventName, handler);
+    },
+    registerCommand() {},
+    registerEntryRenderer() {},
+  });
+  const handler = handlers.get("session_info_changed");
+  assert.ok(handler);
+  assert.throws(() => handler({ type: "invalid", name: "ignored" }, {}));
+  assert.deepEqual(
+    await handler({ type: "session_info_changed", name: "valid" }, {}),
+    { name: "valid", dispatchCount: 1 },
+  );
+});
+
+test("session-scoped tracer installs shutdown before its event callbacks", () => {
+  const native = createRequire(import.meta.url)(
+    "./native/generated/index.js",
+  ) as { registerCallbackTracer: (pi: unknown) => boolean };
+  const registrations: string[] = [];
+  native.registerCallbackTracer({
+    on(eventName: string) {
+      registrations.push(eventName);
+    },
+    registerCommand() {},
+    registerEntryRenderer() {},
+  });
+  assert.deepEqual(registrations, ["session_shutdown", "session_info_changed"]);
+});
+
+test("Rust tracer releases session state at shutdown and rejects stale callbacks", async () => {
+  const native = createRequire(import.meta.url)(
+    "./native/generated/index.js",
+  ) as {
+    registerCallbackTracer: (pi: unknown) => boolean;
+  };
+  const handlers = new Map<string, (event: unknown, ctx: unknown) => unknown>();
+  native.registerCallbackTracer({
+    on(eventName: string, handler: (event: unknown, ctx: unknown) => unknown) {
+      handlers.set(eventName, handler);
+    },
+    registerCommand() {},
+    registerEntryRenderer() {},
+  });
+  const handler = handlers.get("session_info_changed");
+  const shutdown = handlers.get("session_shutdown");
+  assert.ok(handler);
+  assert.ok(shutdown);
+  assert.deepEqual(
+    await handler(
+      { type: "session_info_changed", name: "before shutdown" },
+      {},
+    ),
+    { name: "before shutdown", dispatchCount: 1 },
+  );
+  assert.equal(await shutdown({}, {}), true);
+  await assert.rejects(
+    Promise.resolve(
+      handler({ type: "session_info_changed", name: "after shutdown" }, {}),
+    ),
+  );
+  assert.equal(await shutdown({}, {}), false);
+});
+
+test("shutdown during initialization prevents a live scoped registration", () => {
+  const native = createRequire(import.meta.url)(
+    "./native/generated/index.js",
+  ) as { registerCallbackTracer: (pi: unknown) => boolean };
+  const registrations: string[] = [];
+  assert.throws(() =>
+    native.registerCallbackTracer({
+      on(eventName: string, handler: (event: unknown, ctx: unknown) => unknown) {
+        registrations.push(eventName);
+        if (eventName === "session_shutdown") handler({}, {});
+      },
+      registerCommand() {},
+      registerEntryRenderer() {},
+    }),
+  );
+  assert.deepEqual(registrations, ["session_shutdown"]);
+});
+
+test("failed tracer initialization leaves no live callback state", () => {
+  const native = createRequire(import.meta.url)(
+    "./native/generated/index.js",
+  ) as {
+    registerCallbackTracer: (pi: unknown) => boolean;
+  };
+  let shutdown: ((event: unknown, ctx: unknown) => unknown) | undefined;
+  assert.throws(() =>
+    native.registerCallbackTracer({
+      on(
+        eventName: string,
+        handler: (event: unknown, ctx: unknown) => unknown,
+      ) {
+        if (eventName === "session_shutdown") shutdown = handler;
+        else throw new Error("registration failed");
+      },
+      registerCommand() {},
+      registerEntryRenderer() {},
+    }),
+  );
+  assert.ok(shutdown);
+  assert.equal(shutdown({}, {}), false);
+});
+
+test("Rust tracer owns asynchronous dispatch after callback return", async () => {
+  const native = createRequire(import.meta.url)(
+    "./native/generated/index.js",
+  ) as {
+    registerCallbackTracer: (pi: unknown) => boolean;
+  };
+  const handlers = new Map<string, (event: unknown, ctx: unknown) => unknown>();
+  native.registerCallbackTracer({
+    on(eventName: string, handler: (event: unknown, ctx: unknown) => unknown) {
+      handlers.set(eventName, handler);
+    },
+    registerCommand() {},
+    registerEntryRenderer() {},
+  });
+  const handler = handlers.get("session_info_changed");
+  assert.ok(handler);
+  const pending = handler(
+    { type: "session_info_changed", name: "asynchronous" },
+    {},
+  );
+  assert.ok(pending instanceof Promise);
+  assert.deepEqual(await pending, {
+    name: "asynchronous",
+    dispatchCount: 1,
+  });
+});
+
+test("shutdown cancels Rust tracer work before its asynchronous dispatch", async () => {
+  const native = createRequire(import.meta.url)(
+    "./native/generated/index.js",
+  ) as {
+    registerCallbackTracer: (pi: unknown) => boolean;
+  };
+  const handlers = new Map<string, (event: unknown, ctx: unknown) => unknown>();
+  native.registerCallbackTracer({
+    on(eventName: string, handler: (event: unknown, ctx: unknown) => unknown) {
+      handlers.set(eventName, handler);
+    },
+    registerCommand() {},
+    registerEntryRenderer() {},
+  });
+  const handler = handlers.get("session_info_changed");
+  const shutdown = handlers.get("session_shutdown");
+  assert.ok(handler);
+  assert.ok(shutdown);
+  const pending = Promise.resolve(
+    handler({ type: "session_info_changed", name: "pending" }, {}),
+  );
+  assert.equal(shutdown({}, {}), true);
+  await assert.rejects(pending, /callback tracer state is unavailable/);
+});
+
+test("Rust tracer accepts the Pi session info changed event shape", async () => {
+  const native = createRequire(import.meta.url)(
+    "./native/generated/index.js",
+  ) as {
+    registerCallbackTracer: (pi: unknown) => boolean;
+  };
+  const handlers = new Map<string, (event: unknown, ctx: unknown) => unknown>();
+  native.registerCallbackTracer({
+    on(eventName: string, handler: (event: unknown, ctx: unknown) => unknown) {
+      handlers.set(eventName, handler);
+    },
+    registerCommand() {},
+    registerEntryRenderer() {},
+  });
+  const handler = handlers.get("session_info_changed");
+  assert.ok(handler);
+  assert.deepEqual(
+    await handler({ type: "session_info_changed", name: "session" }, {}),
+    { name: "session", dispatchCount: 1 },
+  );
+  assert.deepEqual(
+    await handler({ type: "session_info_changed", name: undefined }, {}),
+    { dispatchCount: 2 },
+  );
+});
+
+test("real Pi extension runner invokes and shuts down Rust tracer", async () => {
+  const native = createRequire(import.meta.url)(
+    "./native/generated/index.js",
+  ) as {
+    registerCallbackTracer: (pi: unknown) => boolean;
+  };
+  const directory = mkdtempSync(join(tmpdir(), "pi-tracer-runner-"));
+  const loader = new DefaultResourceLoader({
+    cwd: directory,
+    agentDir: directory,
+    noExtensions: true,
+    noSkills: true,
+    noPromptTemplates: true,
+    noThemes: true,
+    noContextFiles: true,
+    extensionFactories: [
+      (pi) => {
+        assert.equal(native.registerCallbackTracer(pi), true);
+      },
+    ],
+  });
+  await loader.reload();
+  const { session } = await createAgentSession({
+    cwd: directory,
+    noTools: "all",
+    resourceLoader: loader,
+    sessionManager: SessionManager.inMemory(directory),
+  });
+  try {
+    const extension = loader
+      .getExtensions()
+      .extensions.find((entry) => entry.handlers.has("session_info_changed"));
+    assert.ok(extension);
+    const tracer = extension.handlers.get("session_info_changed")?.[0];
+    assert.ok(tracer);
+    const errors: string[] = [];
+    session.extensionRunner.onError((error) => errors.push(error.error));
+    await session.extensionRunner.emit({
+      type: "session_info_changed",
+      name: "runner event",
+    });
+    assert.deepEqual(errors, []);
+    assert.deepEqual(
+      await tracer(
+        { type: "session_info_changed", name: "probe" },
+        {} as never,
+      ),
+      {
+        name: "probe",
+        dispatchCount: 2,
+      },
+    );
+    await session.extensionRunner.emit({
+      type: "session_shutdown",
+      reason: "quit",
+    });
+    await assert.rejects(
+      Promise.resolve(
+        tracer({ type: "session_info_changed", name: "stale" }, {} as never),
+      ),
+    );
+  } finally {
+    session.dispose();
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
 test("native registration falls back without installing duplicate callbacks", () => {
   const handlers: Array<string> = [];
   withNativeRegistrationModule(compatibleProbe, () => {
@@ -248,12 +540,12 @@ test("native registration falls back without installing duplicate callbacks", ()
         handlers.push(eventName);
       },
     } as never);
-    assert.equal(result.mode, "typescript");
+    assert.equal(result.mode, "unavailable");
   });
   assert.deepEqual(handlers, []);
 });
 
-test("hasNativeRegistration identifies registered capabilities when native, false when typescript fallback", () => {
+test("hasNativeRegistration identifies registered capabilities when native, false when unavailable", () => {
   assert.equal(
     hasNativeRegistration(
       { mode: "native", registrations: ["session_start", "tool_call"] },
@@ -270,7 +562,7 @@ test("hasNativeRegistration identifies registered capabilities when native, fals
   );
   assert.equal(
     hasNativeRegistration(
-      { mode: "typescript", reason: "disabled" },
+      { mode: "unavailable", reason: "disabled" },
       "session_start",
     ),
     false,

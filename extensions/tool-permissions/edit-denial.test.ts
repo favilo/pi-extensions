@@ -48,6 +48,7 @@ async function denialHarness(): Promise<Harness> {
   );
   toolPermissionPolicy({
     registerCommand() {},
+    registerEntryRenderer() {},
     on(event: string, handler: ToolCallHandler) {
       if (event === "tool_call") handlers.set(event, handler);
     },
