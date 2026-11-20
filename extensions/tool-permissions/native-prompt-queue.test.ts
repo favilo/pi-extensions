@@ -206,6 +206,84 @@ test(
 );
 
 test(
+  "a malformed presenter result denies and releases the next prompt",
+  { timeout: 5000 },
+  async () => {
+    const native = requireNativePackage(bundledNativePackagePath()) as {
+      decidePrompt(
+        request: {
+          version: number;
+          operation: string;
+          nonce: string;
+          toolCallId: string;
+        },
+        present: (id: string) => Promise<unknown>,
+      ): Promise<{ ok: boolean; decision: string; toolCallId: string }>;
+    };
+    const request = (toolCallId: string) => ({
+      version: NATIVE_CONTRACT_VERSION,
+      operation: "prompt_queue",
+      nonce: NATIVE_PROMPT_QUEUE_NONCE,
+      toolCallId,
+    });
+    const first = native.decidePrompt(request("malformed-first"), async () => ({
+      decision: "unexpected",
+    }));
+    const second = native.decidePrompt(request("malformed-next"), async () => ({
+      decision: PromptQueueDecision.Allow,
+    }));
+    assert.deepEqual(await first, {
+      version: NATIVE_CONTRACT_VERSION,
+      operation: "prompt_queue",
+      ok: false,
+      nonce: NATIVE_PROMPT_QUEUE_NONCE,
+      toolCallId: "malformed-first",
+      decision: PromptQueueDecision.Deny,
+    });
+    assert.equal((await second).decision, PromptQueueDecision.Allow);
+  },
+);
+
+test(
+  "a synchronous presenter throw denies and releases the next prompt",
+  { timeout: 5000 },
+  async () => {
+    const native = requireNativePackage(bundledNativePackagePath()) as {
+      decidePrompt(
+        request: {
+          version: number;
+          operation: string;
+          nonce: string;
+          toolCallId: string;
+        },
+        present: (id: string) => Promise<{ decision: PromptQueueDecision }>,
+      ): Promise<{ ok: boolean; decision: string; toolCallId: string }>;
+    };
+    const request = (toolCallId: string) => ({
+      version: NATIVE_CONTRACT_VERSION,
+      operation: "prompt_queue",
+      nonce: NATIVE_PROMPT_QUEUE_NONCE,
+      toolCallId,
+    });
+    const first = native.decidePrompt(request("throw-first"), () => {
+      throw new Error("presenter failed");
+    });
+    const second = native.decidePrompt(request("throw-next"), async () => ({
+      decision: PromptQueueDecision.Allow,
+    }));
+    assert.deepEqual(await first, {
+      version: NATIVE_CONTRACT_VERSION,
+      operation: "prompt_queue",
+      ok: false,
+      nonce: NATIVE_PROMPT_QUEUE_NONCE,
+      toolCallId: "throw-first",
+      decision: PromptQueueDecision.Deny,
+    });
+    assert.equal((await second).decision, PromptQueueDecision.Allow);
+  },
+);
+
+test(
   "the native boundary queues a later prompt until the active UI settles",
   { timeout: 5000 },
   async () => {
@@ -315,6 +393,43 @@ test("steering stays bound to the prompt that submitted it", async () => {
     steering: "use the project policy instead",
   });
 });
+
+test(
+  "an aborted permission request cannot allow after a late UI confirmation",
+  { timeout: 5000 },
+  async () => {
+    const controller = new AbortController();
+    const confirmation = deferred<boolean>();
+    const opened = deferred<void>();
+    const pending = promptToolPermissionRequest(
+      { sendUserMessage() {} },
+      {
+        cwd: "/workspace/project",
+        hasUI: true,
+        mode: "rpc",
+        sessionId: "late-confirmation",
+        signal: controller.signal,
+        ui: {
+          confirm: async () => {
+            opened.resolve();
+            return confirmation.promise;
+          },
+        },
+      },
+      {
+        actor: { kind: "main" },
+        toolName: "read",
+        input: { path: "notes.md" },
+        cwd: "/workspace/project",
+        toolCallId: "late-confirmation-call",
+      },
+    );
+    await opened.promise;
+    controller.abort();
+    confirmation.resolve(true);
+    assert.notEqual(await pending, "allow");
+  },
+);
 
 test("promptToolPermissionRequest holds the native queue until the visible prompt settles", async () => {
   const components: VisiblePrompt[] = [];
