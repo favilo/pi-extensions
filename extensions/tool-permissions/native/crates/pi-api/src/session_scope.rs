@@ -211,8 +211,11 @@ mod tests {
     }
 
     #[test]
-    fn shutdown_cleanup_runs_before_scope_is_revoked() {
-        use std::sync::{Arc, atomic::{AtomicBool, Ordering}};
+    fn shutdown_denies_new_work_during_cleanup() {
+        use std::sync::{
+            Arc,
+            atomic::{AtomicBool, Ordering},
+        };
 
         let token = SessionToken::default();
         let active_during_cleanup = Arc::new(AtomicBool::new(false));
@@ -223,7 +226,16 @@ mod tests {
         }));
 
         assert!(token.close());
-        assert!(active_during_cleanup.load(Ordering::SeqCst));
+        assert!(!active_during_cleanup.load(Ordering::SeqCst));
+        assert!(token.ensure_active().is_err());
+    }
+
+    #[test]
+    fn shutdown_closes_scope_when_cleanup_panics() {
+        let token = SessionToken::default();
+        token.0.lock().cleanup.push(Box::new(|| panic!("cleanup failed")));
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| token.close()));
+        assert!(result.is_err());
         assert!(token.ensure_active().is_err());
     }
 
