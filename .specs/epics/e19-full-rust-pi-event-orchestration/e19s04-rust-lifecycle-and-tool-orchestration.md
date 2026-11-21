@@ -1,4 +1,6 @@
-# Story e19s04: Move lifecycle and tool authorization orchestration into Rust
+# Story e19s04: Move tool authorization and result orchestration into Rust
+
+> **Replanned scope:** This story owns tool authorization and result handling. Lifecycle startup and final shutdown cleanup are transferred to e19s08, after state owners in e19s04 and e19s05 migrate. References to lifecycle completion below describe the original combined scope and are superseded by this note. Temporary lifecycle callbacks remain until e19s08. Coordinate shared state with e19s05; the stories may interleave.
 
 ## 1. Business narrative
 Tool authorization must have one Rust owner from session start through tool result and shutdown.
