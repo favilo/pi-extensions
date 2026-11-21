@@ -30,7 +30,8 @@ struct SessionToken(Arc<Mutex<SessionState>>);
 
 impl SessionToken {
     fn ensure_active(&self) -> Result<()> {
-        if self.0.lock().closed {
+        let state = self.0.lock();
+        if state.closed || state.closing {
             Err(napi::Error::from_reason(
                 SessionError::Unavailable.to_string(),
             ))
