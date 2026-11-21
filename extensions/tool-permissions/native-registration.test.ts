@@ -102,7 +102,10 @@ test("bundled Rust registration calls pi.on and registerCommand for delegated ca
     return;
   }
   assert.ok(register);
-  const handlers = new Map<string, (event: unknown, ctx: any) => unknown>();
+  const handlers = new Map<
+    string,
+    Array<(event: unknown, ctx: any) => unknown>
+  >();
   const commands = new Map<
     string,
     { description?: string; handler: (args: string, ctx: unknown) => unknown }
@@ -124,7 +127,7 @@ test("bundled Rust registration calls pi.on and registerCommand for delegated ca
     },
     {
       on(eventName: string, handler: (event: unknown, ctx: any) => unknown) {
-        handlers.set(eventName, handler);
+        handlers.set(eventName, [...(handlers.get(eventName) ?? []), handler]);
       },
       registerCommand(
         name: string,
@@ -210,7 +213,10 @@ test("bundled Rust registration calls pi.on and registerCommand for delegated ca
         notices.push({ message, level }),
     },
   };
-  await handlers.get("session_start")?.(sessionStartEvent, sessionStartContext);
+  await handlers.get("session_start")?.[0](
+    sessionStartEvent,
+    sessionStartContext,
+  );
   assert.deepEqual(notices, [
     { message: "Rust native registration active.", level: "info" },
   ]);
@@ -224,7 +230,7 @@ test("bundled Rust registration calls pi.on and registerCommand for delegated ca
   };
   const toolCallContext = { cwd: "/tmp", hasUI: false, ui: {} };
   assert.deepEqual(
-    await handlers.get("tool_call")?.(toolCallEvent, toolCallContext),
+    await handlers.get("tool_call")?.[0](toolCallEvent, toolCallContext),
     { block: true, reason: "delegated" },
   );
   assert.deepEqual(handledToolCalls, [
@@ -233,7 +239,7 @@ test("bundled Rust registration calls pi.on and registerCommand for delegated ca
   const toolResultEvent = { toolCallId: "native-tool-call", content: [] };
   const toolResultContext = { cwd: "/tmp" };
   assert.deepEqual(
-    await handlers.get("tool_result")?.(toolResultEvent, toolResultContext),
+    await handlers.get("tool_result")?.[0](toolResultEvent, toolResultContext),
     { content: [{ type: "text", text: "delegated" }] },
   );
   assert.deepEqual(handledToolResults, [
@@ -241,7 +247,9 @@ test("bundled Rust registration calls pi.on and registerCommand for delegated ca
   ]);
   const shutdownEvent = {};
   const shutdownContext = { sessionId: "native-session" };
-  await handlers.get("session_shutdown")?.(shutdownEvent, shutdownContext);
+  const shutdownHandlers = handlers.get("session_shutdown") ?? [];
+  assert.equal(shutdownHandlers.length, 2);
+  await shutdownHandlers[1](shutdownEvent, shutdownContext);
   assert.deepEqual(handledSessionShutdowns, [
     { event: shutdownEvent, ctx: shutdownContext },
   ]);
@@ -250,7 +258,7 @@ test("bundled Rust registration calls pi.on and registerCommand for delegated ca
   assert.deepEqual(handledCommands, [{ args: "local", ctx: commandContext }]);
 });
 
-test("Rust installs distinct scoped and product shutdown handlers while tool calls remain bridge-delegated", () => {
+test("Rust preserves product lifecycle callbacks while tool calls remain bridge-delegated", async () => {
   const native = createRequire(import.meta.url)(
     "./native/generated/index.js",
   ) as {
@@ -265,6 +273,7 @@ test("Rust installs distinct scoped and product shutdown handlers while tool cal
     handler: (event: unknown, ctx: unknown) => unknown;
   }> = [];
   const toolCalls: Array<{ event: unknown; ctx: unknown }> = [];
+  const shutdowns: Array<{ event: unknown; ctx: unknown }> = [];
 
   const response = native.registerToolPermissionsCallbacks(
     {
@@ -280,15 +289,9 @@ test("Rust installs distinct scoped and product shutdown handlers while tool cal
       registerEntryRenderer() {},
     },
     {
-      get handleSessionStart() {
-        throw new Error(
-          "session_start must register through ScopedPi, not the bridge",
-        );
-      },
-      get handleSessionShutdown() {
-        throw new Error(
-          "session_shutdown must register through ScopedPi, not the bridge",
-        );
+      handleSessionStart() {},
+      handleSessionShutdown(event: unknown, ctx: unknown) {
+        shutdowns.push({ event, ctx });
       },
       handleToolCall(event: unknown, ctx: unknown) {
         toolCalls.push({ event, ctx });
@@ -304,14 +307,16 @@ test("Rust installs distinct scoped and product shutdown handlers while tool cal
   ]);
   assert.deepEqual(
     registrations.map(({ name }) => name),
-    ["session_shutdown", "session_start", "tool_call", "session_shutdown"],
-    "ScopedPi must install its shutdown guard first; product lifecycle cleanup is a distinct later registration",
+    ["session_shutdown", "session_start", "tool_call"],
+    "one scoped shutdown guard owns product cleanup",
   );
   const scopedShutdown = registrations[0];
   const toolCallHandler = registrations[2];
-  const productShutdown = registrations[3];
-  assert.equal(scopedShutdown.handler({}, {}), true);
-  assert.equal(productShutdown.handler({}, {}), undefined);
+  const shutdownEvent = {};
+  const shutdownContext = { sessionId: "test" };
+  await scopedShutdown.handler(shutdownEvent, shutdownContext);
+  await scopedShutdown.handler(shutdownEvent, shutdownContext);
+  assert.deepEqual(shutdowns, [{ event: shutdownEvent, ctx: shutdownContext }]);
   const toolCall = { toolName: "read", toolCallId: "lifecycle-slice" };
   const context = { cwd: "/tmp", hasUI: false };
   assert.deepEqual(toolCallHandler.handler(toolCall, context), {
