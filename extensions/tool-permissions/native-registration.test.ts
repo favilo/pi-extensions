@@ -180,6 +180,11 @@ test("bundled Rust registration calls pi.on and registerCommand for delegated ca
     "command:permissions",
     "entry_renderer:permission-preview",
   ]);
+  assert.deepEqual(
+    [...handlers.keys()],
+    ["session_shutdown", "session_start", "tool_call", "tool_result"],
+    "Rust installs its session lifetime guard before Rust-owned lifecycle callbacks; tool callbacks remain bridge-delegated",
+  );
   assert.equal(
     commands.get("permissions")?.description,
     "Edit user or local tool permissions",
@@ -243,6 +248,72 @@ test("bundled Rust registration calls pi.on and registerCommand for delegated ca
   const commandContext = { cwd: "/tmp" };
   await commands.get("permissions")?.handler("local", commandContext);
   assert.deepEqual(handledCommands, [{ args: "local", ctx: commandContext }]);
+});
+
+test("Rust installs distinct scoped and product shutdown handlers while tool calls remain bridge-delegated", () => {
+  const native = createRequire(import.meta.url)(
+    "./native/generated/index.js",
+  ) as {
+    registerToolPermissionsCallbacks(
+      request: unknown,
+      pi: unknown,
+      bridge: unknown,
+    ): { registrations: string[] };
+  };
+  const registrations: Array<{
+    name: string;
+    handler: (event: unknown, ctx: unknown) => unknown;
+  }> = [];
+  const toolCalls: Array<{ event: unknown; ctx: unknown }> = [];
+
+  const response = native.registerToolPermissionsCallbacks(
+    {
+      version: NATIVE_CONTRACT_VERSION,
+      operation: "register_callbacks",
+      nonce: "distinct-lifecycle-shutdowns",
+    },
+    {
+      on(name: string, handler: (event: unknown, ctx: unknown) => unknown) {
+        registrations.push({ name, handler });
+      },
+      registerCommand() {},
+      registerEntryRenderer() {},
+    },
+    {
+      on(eventName: string) {
+        if (eventName === "session_start" || eventName === "session_shutdown") {
+          throw new Error(
+            "lifecycle callbacks must register through Pi, not the bridge",
+          );
+        }
+      },
+      handleToolCall(event: unknown, ctx: unknown) {
+        toolCalls.push({ event, ctx });
+        return { block: true, reason: "tool bridge remains delegated" };
+      },
+    },
+  );
+
+  assert.deepEqual(response.registrations, [
+    "session_start",
+    "session_shutdown",
+    "tool_call",
+  ]);
+  assert.deepEqual(
+    registrations.map(({ name }) => name),
+    ["session_shutdown", "session_start", "session_shutdown", "tool_call"],
+    "the first shutdown handler belongs to ScopedPi; the second is product lifecycle cleanup",
+  );
+  const [scopedShutdown, , productShutdown, toolCallHandler] = registrations;
+  assert.equal(scopedShutdown.handler({}, {}), true);
+  assert.equal(productShutdown.handler({}, {}), undefined);
+  const toolCall = { toolName: "read", toolCallId: "lifecycle-slice" };
+  const context = { cwd: "/tmp", hasUI: false };
+  assert.deepEqual(toolCallHandler.handler(toolCall, context), {
+    block: true,
+    reason: "tool bridge remains delegated",
+  });
+  assert.deepEqual(toolCalls, [{ event: toolCall, ctx: context }]);
 });
 
 test("production registration exposes a sample command that notifies the user", async () => {
