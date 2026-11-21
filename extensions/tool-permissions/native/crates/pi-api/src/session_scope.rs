@@ -20,6 +20,7 @@ enum SessionError {
 
 #[derive(Default)]
 struct SessionState {
+    closing: bool,
     closed: bool,
     cleanup: Vec<Box<dyn FnOnce() + Send>>,
 }
@@ -41,15 +42,18 @@ impl SessionToken {
     fn close(&self) -> bool {
         let cleanup = {
             let mut state = self.0.lock();
-            if state.closed {
+            if state.closed || state.closing {
                 return false;
             }
-            state.closed = true;
+            state.closing = true;
             std::mem::take(&mut state.cleanup)
         };
         for release in cleanup {
             release();
         }
+        let mut state = self.0.lock();
+        state.closed = true;
+        state.closing = false;
         true
     }
 
@@ -61,7 +65,7 @@ impl SessionToken {
         let cleanup = stored.clone();
         {
             let mut state = self.0.lock();
-            if state.closed {
+            if state.closed || state.closing {
                 cleanup.lock().take();
             } else {
                 state.cleanup.push(Box::new(move || {
