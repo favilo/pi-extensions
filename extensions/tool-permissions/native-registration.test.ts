@@ -327,7 +327,7 @@ test("Rust preserves product lifecycle callbacks while tool calls remain bridge-
   await pendingCleanup;
   const toolCall = { toolName: "read", toolCallId: "lifecycle-slice" };
   const context = { cwd: "/tmp", hasUI: false };
-  assert.deepEqual(toolCallHandler.handler(toolCall, context), {
+  assert.deepEqual(await toolCallHandler.handler(toolCall, context), {
     block: true,
     reason: "Permission session is closed.",
   });

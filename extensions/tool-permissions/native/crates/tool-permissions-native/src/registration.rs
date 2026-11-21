@@ -1,7 +1,7 @@
 use crate::contract::{NativeOperation, NativeRegistrationRequest, NativeRegistrationResponse};
 use crate::{CONTRACT_VERSION, validate_nonce};
 use napi::bindgen_prelude::{
-    Either, FnArgs, Function, FunctionRef, JsObjectValue, Object, Unknown,
+    Either, FnArgs, Function, FunctionRef, JsObjectValue, Object, PromiseRaw, Unknown,
 };
 use napi::{Env, Error, Result};
 use pi_api::{Bridge, CallbackPresence, OnCallback, ScopedPi};
@@ -29,7 +29,10 @@ impl<'env> RegistrationBridge<'env> {
         self.registrations
     }
 
-    pub fn register_tool_call(&mut self, is_active: impl Fn() -> bool + 'static) -> Result<()> {
+    pub fn register_tool_call(
+        &mut self,
+        is_active: impl Fn() -> bool + Clone + 'static,
+    ) -> Result<()> {
         let source = self
             .bridge
             .source()
@@ -43,14 +46,25 @@ impl<'env> RegistrationBridge<'env> {
                         let mut denied = Object::new(ctx.env)?;
                         denied.set_named_property("block", true)?;
                         denied.set_named_property("reason", "Permission session is closed.")?;
-                        return Ok(Either::A(denied));
+                        return PromiseRaw::resolve(ctx.env, Either::<Object, Unknown>::A(denied));
                     }
                     let event: Unknown = ctx.get(0)?;
                     let context: Unknown = ctx.get(1)?;
-                    callback
+                    let result = callback
                         .borrow_back(ctx.env)?
-                        .call(FnArgs::from((event, context)))
-                        .map(Either::B)
+                        .call(FnArgs::from((event, context)))?;
+                    let active = is_active.clone();
+                    let promise = PromiseRaw::resolve(ctx.env, result)?.then(move |settled| {
+                        if active() {
+                            Ok(Either::B(settled.value))
+                        } else {
+                            let mut denied = Object::new(&settled.env)?;
+                            denied.set_named_property("block", true)?;
+                            denied.set_named_property("reason", "Permission session is closed.")?;
+                            Ok(Either::A(denied))
+                        }
+                    })?;
+                    Ok(promise)
                 })?;
         self.bridge
             .pi()
