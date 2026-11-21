@@ -28,6 +28,17 @@ impl SessionToken {
     fn close(&self) -> bool {
         !self.0.swap(true, Ordering::AcqRel)
     }
+
+    fn guarded_callback<A: 'static, R: 'static>(
+        &self,
+        action: impl Fn(A) -> R + Clone + 'static,
+    ) -> impl Fn(A) -> Result<R> + Clone + 'static {
+        let token = self.clone();
+        move |arg| {
+            token.ensure_active()?;
+            Ok(action(arg))
+        }
+    }
 }
 
 /// Rust-only registration facade; all its callbacks share one shutdown lifetime.
@@ -66,11 +77,7 @@ impl<'a> ScopedPi<'a> {
         &self,
         action: impl Fn(A) -> R + Clone + 'static,
     ) -> impl Fn(A) -> Result<R> + Clone + 'static {
-        let token = self.token.clone();
-        move |arg| {
-            token.ensure_active()?;
-            Ok(action(arg))
-        }
+        self.token.guarded_callback(action)
     }
 
     pub fn on(
