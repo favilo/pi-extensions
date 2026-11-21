@@ -133,6 +133,29 @@ mod tests {
     use super::SessionToken;
 
     #[test]
+    fn shutdown_releases_callback_state_while_handler_is_retained() {
+        use std::sync::{Arc, atomic::{AtomicUsize, Ordering}};
+
+        struct State(Arc<AtomicUsize>);
+        impl Drop for State {
+            fn drop(&mut self) { self.0.fetch_add(1, Ordering::SeqCst); }
+        }
+
+        let drops = Arc::new(AtomicUsize::new(0));
+        let state = Arc::new(State(drops.clone()));
+        let token = SessionToken::default();
+        let handler = token.guarded_callback({
+            let state = state.clone();
+            move |()| { let _ = &state; }
+        });
+        drop(state);
+        assert_eq!(drops.load(Ordering::SeqCst), 0);
+        token.close();
+        assert_eq!(drops.load(Ordering::SeqCst), 1, "shutdown must release callback state");
+        assert!(handler(()).is_err());
+    }
+
+    #[test]
     fn shutdown_revokes_all_token_clones_once() {
         let token = SessionToken::default();
         let clone = token.clone();
