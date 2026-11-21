@@ -1,8 +1,10 @@
 use crate::contract::{NativeOperation, NativeRegistrationRequest, NativeRegistrationResponse};
 use crate::{CONTRACT_VERSION, validate_nonce};
-use napi::bindgen_prelude::{FnArgs, Function, FunctionRef, JsObjectValue, Object, Unknown};
+use napi::bindgen_prelude::{
+    Either, FnArgs, Function, FunctionRef, JsObjectValue, Object, Unknown,
+};
 use napi::{Env, Error, Result};
-use pi_api::{Bridge, CallbackPresence, OnCallback, Ui};
+use pi_api::{Bridge, CallbackPresence, OnCallback, ScopedPi};
 
 type NativeRenderer =
     FunctionRef<FnArgs<(Unknown<'static>, Unknown<'static>, Unknown<'static>)>, Unknown<'static>>;
@@ -27,28 +29,33 @@ impl<'env> RegistrationBridge<'env> {
         self.registrations
     }
 
-    pub fn register_session_start(&mut self) -> Result<()> {
-        self.record(
-            self.bridge.forward_on(
-                OnCallback::SessionStart,
-                "handleSessionStart",
-                CallbackPresence::Always,
-                Some(notify_session_start),
-            )?,
-            "session_start",
-        )
-    }
-
-    pub fn register_tool_call(&mut self) -> Result<()> {
-        self.record(
-            self.bridge.forward_on(
-                OnCallback::ToolCall,
-                "handleToolCall",
-                CallbackPresence::Required,
-                None,
-            )?,
-            "tool_call",
-        )
+    pub fn register_tool_call(&mut self, is_active: impl Fn() -> bool + 'static) -> Result<()> {
+        let source = self
+            .bridge
+            .source()
+            .ok_or_else(|| Error::from_reason("handleToolCall bridge is unavailable"))?;
+        let callback = source.get_named_property::<Function<FnArgs<(Unknown<'static>, Unknown<'static>)>, Unknown<'static>>>("handleToolCall")?.create_ref()?;
+        let handler =
+            self.bridge
+                .env()
+                .create_function_from_closure("toolPermissionsCall", move |ctx| {
+                    if !is_active() {
+                        let mut denied = Object::new(ctx.env)?;
+                        denied.set_named_property("block", true)?;
+                        denied.set_named_property("reason", "Permission session is closed.")?;
+                        return Ok(Either::A(denied));
+                    }
+                    let event: Unknown = ctx.get(0)?;
+                    let context: Unknown = ctx.get(1)?;
+                    callback
+                        .borrow_back(ctx.env)?
+                        .call(FnArgs::from((event, context)))
+                        .map(Either::B)
+                })?;
+        self.bridge
+            .pi()
+            .on(self.bridge.env(), OnCallback::ToolCall, handler)?;
+        self.record(true, "tool_call")
     }
 
     pub fn register_tool_result(&mut self) -> Result<()> {
@@ -60,18 +67,6 @@ impl<'env> RegistrationBridge<'env> {
                 None,
             )?,
             "tool_result",
-        )
-    }
-
-    pub fn register_session_shutdown(&mut self) -> Result<()> {
-        self.record(
-            self.bridge.forward_on(
-                OnCallback::SessionShutdown,
-                "handleSessionShutdown",
-                CallbackPresence::Always,
-                None,
-            )?,
-            "session_shutdown",
         )
     }
 
@@ -151,13 +146,6 @@ impl<'env> RegistrationBridge<'env> {
     }
 }
 
-fn notify_session_start(session_context: &Object) -> Result<()> {
-    let Some(ui) = Ui::from_session(session_context)? else {
-        return Ok(());
-    };
-    ui.notify("Rust native registration active.", "info")
-}
-
 pub fn register_callbacks(
     env: &Env,
     request: NativeRegistrationRequest,
@@ -170,12 +158,32 @@ pub fn register_callbacks(
     validate_nonce(&request.nonce)?;
 
     let mut bridge = RegistrationBridge::new(env, pi, bridge)?;
-    pi_api::ScopedPi::new(env, bridge.bridge.pi())?
-        .register_callback(crate::sample_callback::SampleCommand)?;
-    bridge.register_session_start()?;
-    bridge.register_tool_call()?;
+    let scoped_pi = ScopedPi::new(env, bridge.bridge.pi())?;
+    scoped_pi.register_callback(crate::sample_callback::SampleCommand)?;
+    let is_active = scoped_pi.is_active_check();
+    // TODO: Replace this temporary TypeScript shutdown capability with Rust-owned cleanup.
+    let shutdown_registered = if let Some(source) = bridge.bridge.source() {
+        if let Ok(handler) = source.get_named_property::<Function<FnArgs<(Unknown<'static>, Unknown<'static>)>, Unknown<'static>>>("handleSessionShutdown") {
+            scoped_pi.on_shutdown(&handler)?;
+            true
+        } else { false }
+    } else {
+        false
+    };
+    // TODO: Move startup and shutdown behavior into Rust, then remove these
+    // temporary TypeScript lifecycle capabilities.
+    bridge.record(
+        bridge.bridge.forward_on(
+            OnCallback::SessionStart,
+            "handleSessionStart",
+            CallbackPresence::Always,
+            Some(crate::lifecycle_callbacks::notify_session_start),
+        )?,
+        "session_start",
+    )?;
+    bridge.register_tool_call(is_active)?;
     bridge.register_tool_result()?;
-    bridge.register_session_shutdown()?;
+    bridge.record(shutdown_registered, "session_shutdown")?;
     bridge.register_command()?;
     bridge.register_entry_renderer()?;
 

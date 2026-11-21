@@ -1,6 +1,7 @@
 mod audit;
 mod contract;
 mod execution;
+mod lifecycle_callbacks;
 mod parser;
 mod path_trust;
 mod policy;

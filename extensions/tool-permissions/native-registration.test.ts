@@ -248,8 +248,8 @@ test("bundled Rust registration calls pi.on and registerCommand for delegated ca
   const shutdownEvent = {};
   const shutdownContext = { sessionId: "native-session" };
   const shutdownHandlers = handlers.get("session_shutdown") ?? [];
-  assert.equal(shutdownHandlers.length, 2);
-  await shutdownHandlers[1](shutdownEvent, shutdownContext);
+  assert.equal(shutdownHandlers.length, 1);
+  await shutdownHandlers[0](shutdownEvent, shutdownContext);
   assert.deepEqual(handledSessionShutdowns, [
     { event: shutdownEvent, ctx: shutdownContext },
   ]);
@@ -274,6 +274,10 @@ test("Rust preserves product lifecycle callbacks while tool calls remain bridge-
   }> = [];
   const toolCalls: Array<{ event: unknown; ctx: unknown }> = [];
   const shutdowns: Array<{ event: unknown; ctx: unknown }> = [];
+  let finishShutdown!: () => void;
+  const cleanupFinished = new Promise<void>((resolve) => {
+    finishShutdown = resolve;
+  });
 
   const response = native.registerToolPermissionsCallbacks(
     {
@@ -292,6 +296,7 @@ test("Rust preserves product lifecycle callbacks while tool calls remain bridge-
       handleSessionStart() {},
       handleSessionShutdown(event: unknown, ctx: unknown) {
         shutdowns.push({ event, ctx });
+        return cleanupFinished;
       },
       handleToolCall(event: unknown, ctx: unknown) {
         toolCalls.push({ event, ctx });
@@ -314,16 +319,19 @@ test("Rust preserves product lifecycle callbacks while tool calls remain bridge-
   const toolCallHandler = registrations[2];
   const shutdownEvent = {};
   const shutdownContext = { sessionId: "test" };
-  await scopedShutdown.handler(shutdownEvent, shutdownContext);
+  const pendingCleanup = scopedShutdown.handler(shutdownEvent, shutdownContext);
+  assert.ok(pendingCleanup instanceof Promise);
   await scopedShutdown.handler(shutdownEvent, shutdownContext);
   assert.deepEqual(shutdowns, [{ event: shutdownEvent, ctx: shutdownContext }]);
+  finishShutdown();
+  await pendingCleanup;
   const toolCall = { toolName: "read", toolCallId: "lifecycle-slice" };
   const context = { cwd: "/tmp", hasUI: false };
   assert.deepEqual(toolCallHandler.handler(toolCall, context), {
     block: true,
-    reason: "tool bridge remains delegated",
+    reason: "Permission session is closed.",
   });
-  assert.deepEqual(toolCalls, [{ event: toolCall, ctx: context }]);
+  assert.deepEqual(toolCalls, []);
 });
 
 test("production registration exposes a sample command that notifies the user", async () => {

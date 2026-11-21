@@ -1,8 +1,8 @@
-use std::sync::Arc;
+use std::{cell::RefCell, rc::Rc, sync::Arc};
 
 use parking_lot::Mutex;
 
-use napi::bindgen_prelude::{FnArgs, Function, PromiseRaw, Unknown};
+use napi::bindgen_prelude::{Either, FnArgs, Function, FunctionRef, PromiseRaw, Unknown};
 use napi::{Env, JsValue, Result};
 
 use crate::{OnCallback, Pi};
@@ -86,23 +86,56 @@ impl SessionToken {
     }
 }
 
+type ShutdownCallback = FunctionRef<FnArgs<(Unknown<'static>, Unknown<'static>)>, Unknown<'static>>;
+type ShutdownSlot = Rc<RefCell<Option<ShutdownCallback>>>;
+
 /// Rust-only registration facade; all its callbacks share one shutdown lifetime.
 pub struct ScopedPi<'a> {
     env: &'a Env,
     pi: &'a Pi,
     token: SessionToken,
+    shutdown: ShutdownSlot,
 }
 
 impl<'a> ScopedPi<'a> {
     pub fn new(env: &'a Env, pi: &'a Pi) -> Result<Self> {
         let token = SessionToken::default();
         let shutdown_token = token.clone();
-        let handler = env.create_function_from_closure("piSessionShutdown", move |_| {
-            Ok(shutdown_token.close())
+        let shutdown: ShutdownSlot = Rc::default();
+        let cleanup = shutdown.clone();
+        let handler = env.create_function_from_closure("piSessionShutdown", move |ctx| {
+            let closed = shutdown_token.close();
+            if closed && let Some(callback) = cleanup.borrow_mut().take() {
+                let event: Unknown = ctx.get(0)?;
+                let context: Unknown = ctx.get(1)?;
+                return callback
+                    .borrow_back(ctx.env)?
+                    .call(FnArgs::from((event, context)))
+                    .map(Either::B);
+            }
+            Ok(Either::A(closed))
         })?;
         pi.on(env, OnCallback::SessionShutdown, handler)?;
         token.ensure_active()?;
-        Ok(Self { env, pi, token })
+        Ok(Self {
+            env,
+            pi,
+            token,
+            shutdown,
+        })
+    }
+
+    /// Register temporary host cleanup to run once when the scope closes.
+    ///
+    /// # Errors
+    /// Returns an error if the scope is closed or the handler cannot be retained.
+    pub fn on_shutdown(
+        &self,
+        handler: &Function<'a, FnArgs<(Unknown<'static>, Unknown<'static>)>, Unknown<'static>>,
+    ) -> Result<()> {
+        self.token.ensure_active()?;
+        *self.shutdown.borrow_mut() = Some(handler.create_ref()?);
+        Ok(())
     }
 
     pub fn register_callback<T: Callback>(&self, callback: T) -> Result<()> {
@@ -112,6 +145,12 @@ impl<'a> ScopedPi<'a> {
             return Err(error);
         }
         self.token.ensure_active()
+    }
+
+    /// Return a check tied to the session lifetime for host-bound authorization.
+    pub fn is_active_check(&self) -> impl Fn() -> bool + Clone + 'static {
+        let token = self.token.clone();
+        move || token.ensure_active().is_ok()
     }
 
     pub fn env(&self) -> &'a Env {
@@ -234,7 +273,11 @@ mod tests {
     #[test]
     fn shutdown_closes_scope_when_cleanup_panics() {
         let token = SessionToken::default();
-        token.0.lock().cleanup.push(Box::new(|| panic!("cleanup failed")));
+        token
+            .0
+            .lock()
+            .cleanup
+            .push(Box::new(|| panic!("cleanup failed")));
         let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| token.close()));
         assert!(result.is_err());
         assert!(token.ensure_active().is_err());

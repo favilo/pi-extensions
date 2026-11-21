@@ -6,10 +6,17 @@ import { NATIVE_CONTRACT_VERSION } from "./native-contract.ts";
 
 test("a tool call after session shutdown is not authorized by the delegated handler", async () => {
   const native = createRequire(import.meta.url)("./native/generated/index.js");
-  const handlers = new Map<string, (event: unknown, context: unknown) => unknown>();
+  const handlers = new Map<
+    string,
+    (event: unknown, context: unknown) => unknown
+  >();
   let calls = 0;
   native.registerToolPermissionsCallbacks(
-    { version: NATIVE_CONTRACT_VERSION, operation: "register_callbacks", nonce: "shutdown-authorization" },
+    {
+      version: NATIVE_CONTRACT_VERSION,
+      operation: "register_callbacks",
+      nonce: "shutdown-authorization",
+    },
     {
       on(name: string, handler: (event: unknown, context: unknown) => unknown) {
         handlers.set(name, handler);
@@ -25,7 +32,10 @@ test("a tool call after session shutdown is not authorized by the delegated hand
     },
   );
   await handlers.get("session_shutdown")!({}, {});
-  const result = await handlers.get("tool_call")!({ toolName: "read", toolCallId: "late", input: {} }, {});
+  const result = await handlers.get("tool_call")!(
+    { toolName: "read", toolCallId: "late", input: {} },
+    {},
+  );
   assert.equal(calls, 0);
   assert.equal((result as { block: boolean }).block, true);
 });
