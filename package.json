@@ -19,7 +19,7 @@
     "check:plans": "bash .github/scripts/check-active-plans.sh",
     "check:portability": "python3 .github/scripts/check-portable-paths.py",
     "prepare": "npm run build:native",
-    "build:native": "WASI_SDK_PATH=\"${WASI_SDK_PATH:-$HOME/.local/wasi-sdk}\" napi build --cwd extensions/tool-permissions/native --package tool-permissions-native --release --platform --target wasm32-wasip1-threads --output-dir generated && node scripts/patch-wasi-init-tp.mjs && rm -f extensions/tool-permissions/native/generated/*.node",
+    "build:native": "bash scripts/build-native.sh",
     "build:clean": "rm -rf extensions/tool-permissions/native/generated extensions/tool-permissions/native/target",
     "fmt": "npm run fmt:rust && npm run fmt:ts",
     "fmt:rust": "cargo fmt --all --manifest-path extensions/tool-permissions/native/Cargo.toml",
