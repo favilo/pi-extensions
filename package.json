@@ -26,7 +26,7 @@
     "fmt:ts": "prettier --write \"extensions/**/*.ts\" \"examples/**/*.ts\"",
     "test": "npm run test:native && tsx --test extensions/*/*.test.ts examples/*/*.test.ts",
     "test:native": "cargo test --manifest-path extensions/tool-permissions/native/Cargo.toml",
-    "test:preflight": "tsx --test extensions/*/*.test.ts",
+    "test:preflight": "tsx --test extensions/*/*.test.ts scripts/build-native.test.ts",
     "typecheck": "tsc --noEmit"
   },
   "pi": {
