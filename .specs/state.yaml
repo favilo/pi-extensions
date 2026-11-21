@@ -1,8 +1,8 @@
 active_flow: build_epic
 active_epic_id: e19
-active_story_id: e19s03
-active_story: e19s03
-active_story_title: Register Pi callbacks directly from Rust
+active_story_id: e19s04
+active_story: e19s04
+active_story_title: Move lifecycle and tool authorization orchestration into Rust
 active_bug_id: BUG-2026-11-20T101309
 bug_cycle:
   current_step: 1
@@ -95,7 +95,7 @@ planning:
     constraints:
       - Do not modify the e06 repair flow or child-private bridge catalog.
 handoff:
-  last_step_completed: 'e19s02 verification accepted; traceability waived by user and NFR accepted within existing liveness bounds.'
+  last_step_completed: 'e19s03 superseded by user decision; user confirmed registration-sample works in fresh Pi. Original renderer coverage waived, not passed.'
   open_decisions: []
   required_reading:
     - .specs/bugs/BUG-2026-11-20T101309-child-model-unavailable.md
@@ -113,8 +113,8 @@ handoff:
     - extensions/tool-permissions/native/Cargo.toml
     - extensions/tool-permissions/native/package.json
     - node_modules/@napi-rs/cli/src/utils/config.ts
-  next_skill: develop-tdd
-  context: 'Resume e19s03 from its epic capsule; read the story and task ledger and confirm the plan before TDD. No push performed.'
+  next_skill: assess-impact
+  context: 'Start e19s04: review the story and map production authorization dependencies and coverage before a behavior-first TDD slice. Production bridge remains until migrated.'
   blocker: ''
   implementation_update: 'e19s02 accepted: tests and independent security re-review passed; NFR accepted for existing liveness bounds, traceability waived by user. See .specs/verifications/e19s02-verify.yaml.'
   deferred_work:

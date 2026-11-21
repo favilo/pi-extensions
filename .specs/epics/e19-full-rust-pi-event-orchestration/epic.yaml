@@ -15,14 +15,14 @@ stories:
   - id: e19s02
     title: Use typed async prompt orchestration
     bcps: 3
-    status: todo
+    status: passing
     delta: ADDED
     spec: e19s02-miri-prompt-queue.md
     tasks: e19s02-tasks.yaml
   - id: e19s03
     title: Register Pi callbacks directly from Rust
     bcps: 5
-    status: todo
+    status: cancelled
     delta: MODIFIED
     spec: e19s03-rust-direct-pi-registration.md
     tasks: e19s03-tasks.yaml
