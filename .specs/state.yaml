@@ -95,26 +95,17 @@ planning:
     constraints:
       - Do not modify the e06 repair flow or child-private bridge catalog.
 handoff:
-  last_step_completed: 'e19s03 superseded by user decision; user confirmed registration-sample works in fresh Pi. Original renderer coverage waived, not passed.'
+  last_step_completed: 'e19s03 superseded by user decision; registration-sample confirmed live. e19s04 impact review completed.'
   open_decisions: []
   required_reading:
-    - .specs/bugs/BUG-2026-11-20T101309-child-model-unavailable.md
-    - extensions/subagent/account-runtime.ts
-    - extensions/subagent/account-runtime.test.ts
-    - $HOME/git/agents/pi-account-switcher/src/runtime/child-runtime-api.ts
-    - .specs/product/SCOPE_LATEST.yaml
-    - .specs/IMPACT-e19-e19s02.md
-    - .specs/epics/e19-full-rust-pi-event-orchestration/epic.yaml
-    - .specs/epics/e19-full-rust-pi-event-orchestration/e19s02-miri-prompt-queue.md
-    - .specs/epics/e19-full-rust-pi-event-orchestration/e19s02-tasks.yaml
-    - extensions/tool-permissions/native/crates/tool-permissions-native/src/prompt_queue.rs
-    - extensions/tool-permissions/native/crates/tool-permissions-native/src/lib.rs
-    - extensions/tool-permissions/native-prompt-queue.test.ts
-    - extensions/tool-permissions/native/Cargo.toml
-    - extensions/tool-permissions/native/package.json
-    - node_modules/@napi-rs/cli/src/utils/config.ts
-  next_skill: assess-impact
-  context: 'Start e19s04: review the story and map production authorization dependencies and coverage before a behavior-first TDD slice. Production bridge remains until migrated.'
+    - .specs/IMPACT-e19s04.md
+    - .specs/epics/e19-full-rust-pi-event-orchestration/e19s04-rust-lifecycle-and-tool-orchestration.md
+    - .specs/epics/e19-full-rust-pi-event-orchestration/e19s04-tasks.yaml
+    - extensions/tool-permissions/index.ts
+    - extensions/tool-permissions/native/crates/tool-permissions-native/src/registration.rs
+    - extensions/tool-permissions/native/crates/pi-api/src/session_scope.rs
+  next_skill: develop-tdd
+  context: 'Resume e19s04 with behavior-first TDD. The production TypeScript bridge must remain until each Rust replacement has authorization parity. The user waived story tracing. No push performed.'
   blocker: ''
   implementation_update: 'e19s02 accepted: tests and independent security re-review passed; NFR accepted for existing liveness bounds, traceability waived by user. See .specs/verifications/e19s02-verify.yaml.'
   deferred_work:
