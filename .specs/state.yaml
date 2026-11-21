@@ -2,7 +2,7 @@ active_flow: build_epic
 active_epic_id: e19
 active_story_id: e19s04
 active_story: e19s04
-active_story_title: Move lifecycle and tool authorization orchestration into Rust
+active_story_title: Move tool authorization and result orchestration into Rust
 active_bug_id: BUG-2026-11-20T101309
 bug_cycle:
   current_step: 1
@@ -101,9 +101,9 @@ planning:
     constraints:
     - Do not modify the e06 repair flow or child-private bridge catalog.
 handoff:
-  last_step_completed: e19s03 superseded by user decision; registration-sample confirmed
-    live. e19s04 impact review completed.
-  open_decisions: []
+  last_step_completed: 'e19s04 partial TDD: scoped cleanup ordering test and implementation committed; production TypeScript lifecycle behavior restored temporarily.'
+  open_decisions:
+  - 'Design scoped shutdown cleanup so it executes once before revocation, still closes on cleanup failure, and cannot authorize work during shutdown.'
   required_reading:
   - .specs/IMPACT-e19s04.md
   - .specs/epics/e19-full-rust-pi-event-orchestration/e19s04-rust-lifecycle-and-tool-orchestration.md
@@ -111,10 +111,50 @@ handoff:
   - extensions/tool-permissions/index.ts
   - extensions/tool-permissions/native/crates/tool-permissions-native/src/registration.rs
   - extensions/tool-permissions/native/crates/pi-api/src/session_scope.rs
+  - extensions/tool-permissions/native/crates/tool-permissions-native/src/lifecycle_callbacks.rs
+  - extensions/tool-permissions/native-registration.test.ts
+  - extensions/tool-permissions/native-prompt-queue.test.ts
   next_skill: develop-tdd
-  context: Resume e19s04 with behavior-first TDD. The production TypeScript bridge
-    must remain until each Rust replacement has authorization parity. The user waived
-    story tracing. No push performed.
+  latest_progress: >-
+    Replanned e19s04/e19s05 state ownership before e19s08 lifecycle cleanup.
+    Scoped shutdown guard and late authorization checks were implemented; Rust
+    tool-result registration now has a no-bridge slice in progress. Authorization
+    and steering result behavior still delegate to TypeScript. Story traceability
+    is waived; no push performed.
+  replanning_update: >-
+    e19s04 now covers authorization and result ownership and may interleave with
+    e19s05 interactive state migration. New e19s08 owns final lifecycle cleanup
+    after both; e19s06 bridge removal follows e19s08. Existing scoped shutdown
+    forwarding is temporary and must not be counted as lifecycle parity.
+  context: >-
+    Resume e19s04; user approved lifecycle registration through ScopedPi while tool
+    call and result handlers remain on RegistrationBridge. Keep TypeScript startup
+    notices, audit and prompt cleanup until Rust replacements have parity; temporary
+    capabilities need a TODO for removal. ScopedPi currently registers a shutdown
+    guard before its guarded event handlers, so a separate scoped shutdown event is
+    revoked before invocation. Design one guard with registered product cleanup,
+    including failure-safe closure and denial of late confirmations. Do not remove
+    RegistrationBridge. Story tracing is waived. No push performed.
+  session_handoff: >-
+    Working copy tmxkunrl contains unfinished uncommitted lifecycle changes; inspect
+    jj status and diff before edits. Commits 0f628fae and a31ebfa8 contain earlier
+    lifecycle tests, some assumptions now superseded by the single-guard design;
+    a31ebfa8 also includes earlier implementation changes, so do not assume it is
+    strictly test-only. 088d1b8e is RED cleanup-order test; 89f76a17 is GREEN.
+    Review 89f76a17 for safety: it leaves ensure_active true during cleanup, may
+    permit callback dispatch during shutdown, and does not guarantee closure if
+    cleanup panics. The new LifecycleCallbacks module is an unused scaffold; its
+    shutdown does nothing. Production lifecycle forwarding was restored in the
+    working copy and must not be removed until replacement behavior is tested.
+    npm run fmt also changed documentation.test.ts; inspect that incidental diff.
+    Native build succeeded with unused scaffold warning. Focused index and prompt
+    queue tests passed 35/35 after restoration. Earlier npm run check failed on
+    debug notification, late confirmation, and registration test; those results
+    predate restoration and the full suite has not been rerun. Registration tests
+    currently contain stale assumptions and must not be described as passing.
+    Next: reconcile lifecycle tests with approved single-guard design, preserve
+    actual production cleanup, use behavioral RED/GREEN in separate jj changes,
+    then run story verify and full check.
   blocker: ''
   implementation_update: 'e19s02 accepted: tests and independent security re-review
     passed; NFR accepted for existing liveness bounds, traceability waived by user.
