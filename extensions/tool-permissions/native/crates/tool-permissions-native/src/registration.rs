@@ -77,7 +77,7 @@ impl<'env> RegistrationBridge<'env> {
             self.bridge.forward_on(
                 OnCallback::ToolResult,
                 "handleToolResult",
-                CallbackPresence::IfPresent,
+                CallbackPresence::Always,
                 None,
             )?,
             "tool_result",

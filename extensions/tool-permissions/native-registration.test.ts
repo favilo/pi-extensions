@@ -308,11 +308,12 @@ test("Rust preserves product lifecycle callbacks while tool calls remain bridge-
   assert.deepEqual(response.registrations, [
     "session_start",
     "tool_call",
+    "tool_result",
     "session_shutdown",
   ]);
   assert.deepEqual(
     registrations.map(({ name }) => name),
-    ["session_shutdown", "session_start", "tool_call"],
+    ["session_shutdown", "session_start", "tool_call", "tool_result"],
     "one scoped shutdown guard owns product cleanup",
   );
   const scopedShutdown = registrations[0];
