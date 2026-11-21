@@ -207,6 +207,23 @@ mod tests {
     }
 
     #[test]
+    fn shutdown_cleanup_runs_before_scope_is_revoked() {
+        use std::sync::{Arc, atomic::{AtomicBool, Ordering}};
+
+        let token = SessionToken::default();
+        let active_during_cleanup = Arc::new(AtomicBool::new(false));
+        let observed = active_during_cleanup.clone();
+        let cleanup_token = token.clone();
+        token.0.lock().cleanup.push(Box::new(move || {
+            observed.store(cleanup_token.ensure_active().is_ok(), Ordering::SeqCst);
+        }));
+
+        assert!(token.close());
+        assert!(active_during_cleanup.load(Ordering::SeqCst));
+        assert!(token.ensure_active().is_err());
+    }
+
+    #[test]
     fn shutdown_revokes_all_token_clones_once() {
         let token = SessionToken::default();
         let clone = token.clone();
