@@ -68,7 +68,7 @@ impl<'env> RegistrationBridge<'env> {
             self.bridge.forward_on(
                 OnCallback::SessionShutdown,
                 "handleSessionShutdown",
-                CallbackPresence::IfPresent,
+                CallbackPresence::Always,
                 None,
             )?,
             "session_shutdown",

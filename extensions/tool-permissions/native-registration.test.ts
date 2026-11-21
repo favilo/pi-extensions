@@ -280,12 +280,15 @@ test("Rust installs distinct scoped and product shutdown handlers while tool cal
       registerEntryRenderer() {},
     },
     {
-      on(eventName: string) {
-        if (eventName === "session_start" || eventName === "session_shutdown") {
-          throw new Error(
-            "lifecycle callbacks must register through Pi, not the bridge",
-          );
-        }
+      get handleSessionStart() {
+        throw new Error(
+          "session_start must register through ScopedPi, not the bridge",
+        );
+      },
+      get handleSessionShutdown() {
+        throw new Error(
+          "session_shutdown must register through ScopedPi, not the bridge",
+        );
       },
       handleToolCall(event: unknown, ctx: unknown) {
         toolCalls.push({ event, ctx });
@@ -296,15 +299,17 @@ test("Rust installs distinct scoped and product shutdown handlers while tool cal
 
   assert.deepEqual(response.registrations, [
     "session_start",
-    "session_shutdown",
     "tool_call",
+    "session_shutdown",
   ]);
   assert.deepEqual(
     registrations.map(({ name }) => name),
-    ["session_shutdown", "session_start", "session_shutdown", "tool_call"],
-    "the first shutdown handler belongs to ScopedPi; the second is product lifecycle cleanup",
+    ["session_shutdown", "session_start", "tool_call", "session_shutdown"],
+    "ScopedPi must install its shutdown guard first; product lifecycle cleanup is a distinct later registration",
   );
-  const [scopedShutdown, , productShutdown, toolCallHandler] = registrations;
+  const scopedShutdown = registrations[0];
+  const toolCallHandler = registrations[2];
+  const productShutdown = registrations[3];
   assert.equal(scopedShutdown.handler({}, {}), true);
   assert.equal(productShutdown.handler({}, {}), undefined);
   const toolCall = { toolName: "read", toolCallId: "lifecycle-slice" };
