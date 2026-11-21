@@ -1,7 +1,6 @@
-use std::sync::{
-    Arc,
-    atomic::{AtomicBool, Ordering},
-};
+use std::sync::Arc;
+
+use parking_lot::Mutex;
 
 use napi::bindgen_prelude::{FnArgs, Function, PromiseRaw, Unknown};
 use napi::{Env, JsValue, Result};
@@ -13,29 +12,70 @@ pub trait Callback: Sized + 'static {
     fn register(self, pi: &ScopedPi<'_>) -> Result<()>;
 }
 
+#[derive(Debug, thiserror::Error)]
+enum SessionError {
+    #[error("session state is unavailable")]
+    Unavailable,
+}
+
+#[derive(Default)]
+struct SessionState {
+    closed: bool,
+    cleanup: Vec<Box<dyn FnOnce() + Send>>,
+}
+
 #[derive(Clone, Default)]
-struct SessionToken(Arc<AtomicBool>);
+struct SessionToken(Arc<Mutex<SessionState>>);
 
 impl SessionToken {
     fn ensure_active(&self) -> Result<()> {
-        if self.0.load(Ordering::Acquire) {
-            Err(napi::Error::from_reason("session state is unavailable"))
+        if self.0.lock().closed {
+            Err(napi::Error::from_reason(
+                SessionError::Unavailable.to_string(),
+            ))
         } else {
             Ok(())
         }
     }
 
     fn close(&self) -> bool {
-        !self.0.swap(true, Ordering::AcqRel)
+        let cleanup = {
+            let mut state = self.0.lock();
+            if state.closed {
+                return false;
+            }
+            state.closed = true;
+            std::mem::take(&mut state.cleanup)
+        };
+        for release in cleanup {
+            release();
+        }
+        true
     }
 
     fn guarded_callback<A: 'static, R: 'static>(
         &self,
-        action: impl Fn(A) -> R + Clone + 'static,
+        action: impl Fn(A) -> R + Clone + Send + 'static,
     ) -> impl Fn(A) -> Result<R> + Clone + 'static {
+        let stored = Arc::new(Mutex::new(Some(action)));
+        let cleanup = stored.clone();
+        {
+            let mut state = self.0.lock();
+            if state.closed {
+                cleanup.lock().take();
+            } else {
+                state.cleanup.push(Box::new(move || {
+                    cleanup.lock().take();
+                }));
+            }
+        }
         let token = self.clone();
         move |arg| {
             token.ensure_active()?;
+            let action =
+                stored.lock().as_ref().cloned().ok_or_else(|| {
+                    napi::Error::from_reason(SessionError::Unavailable.to_string())
+                })?;
             Ok(action(arg))
         }
     }
@@ -75,7 +115,7 @@ impl<'a> ScopedPi<'a> {
 
     pub fn guarded_callback<A: 'static, R: 'static>(
         &self,
-        action: impl Fn(A) -> R + Clone + 'static,
+        action: impl Fn(A) -> R + Clone + Send + 'static,
     ) -> impl Fn(A) -> Result<R> + Clone + 'static {
         self.token.guarded_callback(action)
     }
@@ -134,11 +174,16 @@ mod tests {
 
     #[test]
     fn shutdown_releases_callback_state_while_handler_is_retained() {
-        use std::sync::{Arc, atomic::{AtomicUsize, Ordering}};
+        use std::sync::{
+            Arc,
+            atomic::{AtomicUsize, Ordering},
+        };
 
         struct State(Arc<AtomicUsize>);
         impl Drop for State {
-            fn drop(&mut self) { self.0.fetch_add(1, Ordering::SeqCst); }
+            fn drop(&mut self) {
+                self.0.fetch_add(1, Ordering::SeqCst);
+            }
         }
 
         let drops = Arc::new(AtomicUsize::new(0));
@@ -146,12 +191,18 @@ mod tests {
         let token = SessionToken::default();
         let handler = token.guarded_callback({
             let state = state.clone();
-            move |()| { let _ = &state; }
+            move |()| {
+                let _ = &state;
+            }
         });
         drop(state);
         assert_eq!(drops.load(Ordering::SeqCst), 0);
         token.close();
-        assert_eq!(drops.load(Ordering::SeqCst), 1, "shutdown must release callback state");
+        assert_eq!(
+            drops.load(Ordering::SeqCst),
+            1,
+            "shutdown must release callback state"
+        );
         assert!(handler(()).is_err());
     }
 
