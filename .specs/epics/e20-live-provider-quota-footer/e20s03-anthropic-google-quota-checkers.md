@@ -101,3 +101,9 @@ Supported quota providers after this story: `openai-codex`, `openai` (ChatGPT-ac
 ## 9. Definition of done
 
 Anthropic, Google Gemini CLI, and Antigravity quota checkers match multi-pass provider coverage for usage, share credential resolution and result types with e20s01/e20s02, and pass focused tests without a multi-pass dependency.
+
+## 17. Verification Script
+
+1. Run `node --test extensions/usage/`.
+2. Run `npm run check`.
+3. Run fixture-backed checker tests for Anthropic, Gemini CLI, and Antigravity; verify structured windows render without tokens or raw response bodies.

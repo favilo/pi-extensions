@@ -1,6 +1,6 @@
 story_id: e20s02
 title: Persistent opt-in current-provider quota footer
-status: planned
+status: failing
 bcps: 2
 delta: ADDED
 spec: e20s02-quota-footer.md
@@ -11,7 +11,7 @@ tasks:
       of 5h and 7d for the current provider, refresh/backoff, and preservation
       of footerData extension statuses.
     verify: node --test extensions/usage/
-    status: planned
+    status: failing
     risk: P1
     allure:
       severity: high
@@ -24,7 +24,7 @@ tasks:
       Implement setFooter-based current-provider quota bar with persisted
       preference and shared checker consumption from e20s01.
     verify: node --test extensions/usage/
-    status: planned
+    status: failing
     risk: P1
     allure:
       severity: high
@@ -35,7 +35,7 @@ tasks:
   - id: 3
     description: Run package typecheck/tests after footer integration.
     verify: npm run check
-    status: planned
+    status: failing
     risk: P1
     allure:
       severity: high

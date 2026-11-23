@@ -1,6 +1,6 @@
 story_id: e21s03
 title: Propose-permission-rule tool and companion skill
-status: planned
+status: failing
 bcps: 3
 delta: ADDED
 spec: e21s03-propose-permission-rule-tool.md
@@ -11,15 +11,15 @@ tasks:
       Add contracts that the propose-permission-rule tool always prompts, never
       matches an allow rule for itself, and persists only after explicit approval.
     verify: node --test extensions/tool-permissions/
-    status: planned
+    status: failing
     risk: P0
   - id: 2
     description: Implement the propose-permission-rule tool and scoped persistence path.
     verify: node --test extensions/tool-permissions/
-    status: planned
+    status: failing
     risk: P0
   - id: 3
     description: Ship a companion skill in the pi-extensions plugin that drives the tool.
     verify: node --test extensions/tool-permissions/
-    status: planned
+    status: failing
     risk: P2

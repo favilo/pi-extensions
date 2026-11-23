@@ -1,6 +1,6 @@
 story_id: e21s01
 title: Allow and edit forever for known non-MCP tools
-status: planned
+status: failing
 bcps: 4
 delta: ADDED
 spec: e21s01-allow-and-edit-non-mcp-forever.md
@@ -12,7 +12,7 @@ tasks:
       forever-save and Ctrl+E / Ctrl+Shift+E parameter-prefilled edit-save into
       project vs user permissions.toml.
     verify: node --test extensions/tool-permissions/
-    status: planned
+    status: failing
     risk: P1
   - id: 2
     description: >-
@@ -20,17 +20,17 @@ tasks:
       the editor from current parameters and persisting only after a successful
       scoped save.
     verify: node --test extensions/tool-permissions/
-    status: planned
+    status: failing
     risk: P1
   - id: 3
     description: >-
       Add shared permission-rule example comments to the allow-pattern temp
       buffer and the other permissions edit templates.
     verify: node --test extensions/tool-permissions/
-    status: planned
+    status: failing
     risk: P2
   - id: 4
     description: Run package checks for the permission authoring changes.
     verify: npm run check
-    status: planned
+    status: failing
     risk: P1

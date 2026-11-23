@@ -111,3 +111,9 @@ The footer consumes the same quota/usage adapters introduced in e20s01 (and late
 ## 9. Definition of done
 
 A persistent opt-in `/usage-footer` (or equivalent) command controls a current-provider quota footer that shows both 5h and 7d when available, preserves other extension statuses, never leaks credentials, and restores correctly across sessions.
+
+## 17. Verification Script
+
+1. Run `node --test extensions/usage/`.
+2. Run `npm run check`.
+3. In a test session, toggle the footer on and off; verify the preference survives reload and other extension status text remains visible.

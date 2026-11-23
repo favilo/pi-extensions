@@ -34,3 +34,9 @@ Extension tools that perform exact-text edits should opt into the same diff-base
 - An unlisted extension edit tool does not use that path.
 - Invalid resolver output or failed edit preconditions never reach the approval prompt.
 - Approved calls still execute through the original tool path.
+
+## 17. Verification Script
+
+1. Run focused extension edit-tool registration tests.
+2. Run `npm run check`.
+3. Register a fixture tool, request an edit, and verify preflight plus diff approval; verify an unregistered tool bypasses this path.

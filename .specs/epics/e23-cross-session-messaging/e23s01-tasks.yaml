@@ -1,6 +1,6 @@
 story_id: e23s01
 title: Message another running Pi session
-status: planned
+status: failing
 bcps: 5
 delta: ADDED
 spec: e23s01-message-running-pi-session.md
@@ -11,15 +11,15 @@ tasks:
       Define session identity, steer-vs-queue semantics, approval visibility, and
       accept/unavailable result contracts without foreign transcript writes.
     verify: node --test extensions/
-    status: planned
+    status: failing
     risk: P1
   - id: 2
     description: Implement the cross-session messaging tool behind the permission boundary.
     verify: node --test extensions/
-    status: planned
+    status: failing
     risk: P1
   - id: 3
     description: Verify unavailable and denied paths leave the target session unchanged.
     verify: node --test extensions/
-    status: planned
+    status: failing
     risk: P1

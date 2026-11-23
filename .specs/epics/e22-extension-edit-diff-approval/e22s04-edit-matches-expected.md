@@ -48,3 +48,9 @@ should be able to apply all replacements in one call.
 - Given `matches_expected` omitted, multi-match still fails as today.
 - Permission/diff UI for an approved multi-match edit shows the complete
   contextual diff covering every replaced occurrence.
+
+## 17. Verification Script
+
+1. Run `node --test extensions/tool-permissions/edit-preflight.test.ts`.
+2. Run `npm run check`.
+3. Edit a fixture containing exactly two occurrences with `matches_expected: 2`; verify both changes apply. Repeat with an incorrect count and verify failure before any prompt.

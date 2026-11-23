@@ -35,3 +35,9 @@ When a permission prompt asks the user to approve an `edit` or `write`, the diff
 
 - `node --test extensions/tool-permissions/diff-review.test.ts`
 - `npm run check`
+
+## 17. Verification Script
+
+1. Run focused built-in edit/write permission rendering tests.
+2. Run `npm run check`.
+3. Request an edit and write that each modify multiple lines; verify the approval prompt shows the full contextual diff.

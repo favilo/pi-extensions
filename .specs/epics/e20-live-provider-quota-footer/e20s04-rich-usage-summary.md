@@ -89,3 +89,10 @@ No credential leakage. No `/accounts:*` behavior changes.
 ## 8. Definition of done
 
 `/usage` renders rich shared quota results (including 5h and 7d for Codex/Anthropic), stays aligned with the footer, keeps e05 safety rules, updates documentation tests, and passes package checks.
+
+## 17. Verification Script
+
+1. Run `node --test extensions/usage/`.
+2. Run `node --test extensions/usage/documentation.test.ts`.
+3. Run `npm run check`.
+4. Exercise fixture-backed Codex, Anthropic, and Google summaries; verify each window matches the shared quota result and contains no credentials.

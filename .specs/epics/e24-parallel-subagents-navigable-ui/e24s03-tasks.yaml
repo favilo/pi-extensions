@@ -1,6 +1,6 @@
 story_id: e24s03
 title: Parent approval serialization and result routing
-status: planned
+status: failing
 bcps: 3
 delta: ADDED
 spec: e24s03-approval-routing.md
@@ -11,10 +11,10 @@ tasks:
       Add contracts that concurrent child prompts stay uniquely identified and
       each decision routes only to the requesting child.
     verify: node --test extensions/subagent/
-    status: planned
+    status: failing
     risk: P0
   - id: 2
     description: Implement parent approval serialization and result routing.
     verify: node --test extensions/subagent/
-    status: planned
+    status: failing
     risk: P0

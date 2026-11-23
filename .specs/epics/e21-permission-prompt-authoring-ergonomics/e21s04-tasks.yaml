@@ -1,6 +1,6 @@
 story_id: e21s04
 title: Skip redundant activate_skill when skill is unchanged
-status: planned
+status: failing
 bcps: 3
 delta: ADDED
 spec: e21s04-skip-redundant-activate-skill.md
@@ -12,17 +12,17 @@ tasks:
       calls with the fixed skip message, including after /skill loads, while
       still requiring permission prompts.
     verify: node --test extensions/
-    status: planned
+    status: failing
     risk: P1
   - id: 2
     description: >-
       Implement session skill fingerprinting and the pre-tool-permissions
       redundant-load filter without bypassing activate_skill authorization.
     verify: node --test extensions/
-    status: planned
+    status: failing
     risk: P1
   - id: 3
     description: Verify reload still occurs when skill files change after the last load.
     verify: node --test extensions/
-    status: planned
+    status: failing
     risk: P1

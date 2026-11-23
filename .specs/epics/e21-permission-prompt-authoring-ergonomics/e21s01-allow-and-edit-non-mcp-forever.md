@@ -59,3 +59,9 @@ Temp-file and permissions-editor buffers carry a shared comment explaining rule 
 - e03s02 scoped Ctrl+A / Ctrl+Shift+A save
 - `editPatternInExternalEditor` / `editPermissionsInExternalEditor` in `extensions/tool-permissions/index.ts`
 - Known MCP empty `suggestedRule` forever allow path
+
+## 17. Verification Script
+
+1. Run focused tool-permissions tests for permission prompt shortcuts.
+2. Run `npm run check`.
+3. In an interactive prompt for a known non-MCP tool, verify the four save/edit shortcuts and both project/user scopes.

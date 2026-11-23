@@ -32,3 +32,9 @@ Some good allow rules are hard to invent by hand (for example `jj diff ...`). Th
 - Denying leaves permissions files unchanged.
 - An allow rule targeting the propose tool never short-circuits the prompt.
 - The bundled skill documents how to drive the tool.
+
+## 17. Verification Script
+
+1. Run focused tool-permissions tests for proposed-rule approval and denial.
+2. Run `npm run check`.
+3. Propose a rule in a temporary project, approve it, and verify exactly that rule persists; deny another proposal and verify no file change.

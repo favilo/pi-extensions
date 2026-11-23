@@ -29,3 +29,9 @@ Register `obsidian_edit` in the `~/.pi/agent/` JSON settings (or ship a document
 - An `obsidian_edit` permission prompt shows the complete contextual diff for the target note.
 - Bad vault/note resolution fails closed before the prompt.
 - Other unregistered tools are unaffected.
+
+## 17. Verification Script
+
+1. Run focused Obsidian edit consumer tests.
+2. Run `npm run check`.
+3. Edit a fixture vault note through `obsidian_edit`; verify the approval prompt renders the resolved note diff and invalid resolution fails before prompting.

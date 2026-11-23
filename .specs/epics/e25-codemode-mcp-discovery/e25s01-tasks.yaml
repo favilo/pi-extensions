@@ -1,6 +1,6 @@
 story_id: e25s01
 title: Replace MCP tool injection with codemode discovery
-status: planned
+status: failing
 bcps: 5
 delta: ADDED
 spec: e25s01-prefer-codemode-over-mcp-injection.md
@@ -11,18 +11,18 @@ tasks:
       Map existing MCP tool catalog injection and define a codemode discovery
       contract that retains tool identity, permission evaluation, and audit.
     verify: node --test extensions/
-    status: planned
+    status: failing
     risk: P1
   - id: 2
     description: >-
       Remove wholesale MCP tool injection and expose configured MCP discovery and
       invocation through codemode.
     verify: node --test extensions/
-    status: planned
+    status: failing
     risk: P1
   - id: 3
     description: >-
       Verify discovered MCP calls retain authorization prompts and audit evidence.
     verify: node --test extensions/
-    status: planned
+    status: failing
     risk: P0

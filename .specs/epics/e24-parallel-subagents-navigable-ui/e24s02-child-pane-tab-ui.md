@@ -28,3 +28,9 @@ Replace the current child display with that navigable UI. Permission prompts app
 - Each child has a durable tab/pane with live status and output.
 - Keyboard navigation switches children.
 - A waiting-for-permission child shows a title-bar badge and hosts its prompt in-pane.
+
+## 17. Verification Script
+
+1. Run focused child panel rendering tests.
+2. Run `npm run check`.
+3. Launch multiple children and use the UI navigation controls to switch among each child and the main pane.

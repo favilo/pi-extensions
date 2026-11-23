@@ -97,3 +97,9 @@ No access/refresh tokens, raw response bodies, or secret-bearing headers in user
 ## 9. Definition of done
 
 Codex/OpenAI OAuth usage uses `wham/usage`, resolves credentials through account-switcher then `auth.json`, exposes structured 5h/7d windows, keeps e05 safety rules, and passes focused tests without depending on `pi-multi-pass`.
+
+## 17. Verification Script
+
+1. Run `node --test extensions/usage/`.
+2. Run `npm run check`.
+3. With a non-secret fixture for a ChatGPT OAuth account, run `/usage` and verify it renders 5h and 7d windows without credential material.

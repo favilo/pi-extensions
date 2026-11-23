@@ -33,3 +33,9 @@ An agent working in one project directory needs a safe way to message another in
 - Unavailable targets return a clear unavailable result without partial writes.
 - Denial leaves the target session unchanged.
 - No direct foreign-transcript mutation.
+
+## 17. Verification Script
+
+1. Run focused cross-session messaging tests.
+2. Run `npm run check`.
+3. Start two isolated sessions; send an approved message to the target and verify it steers an active turn or starts an idle turn without leaking other session state.

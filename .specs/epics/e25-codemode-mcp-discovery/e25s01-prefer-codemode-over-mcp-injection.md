@@ -30,3 +30,9 @@ Replace the current MCP tool injection path with a model where agents discover a
 - MCP tools are not injected wholesale into the session tool catalog.
 - Agents can still discover and call configured MCP tools through codemode.
 - Permission prompts and audits still cover those calls.
+
+## 17. Verification Script
+
+1. Run focused codemode MCP discovery tests.
+2. Run `npm run check`.
+3. Discover and invoke an MCP tool through codemode; verify it remains permission-enforced and no wholesale tool injection occurs.

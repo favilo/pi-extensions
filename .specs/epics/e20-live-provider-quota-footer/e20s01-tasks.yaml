@@ -1,6 +1,6 @@
 story_id: e20s01
 title: Real Codex and OpenAI OAuth usage adapter
-status: planned
+status: failing
 bcps: 2
 delta: ADDED
 spec: e20s01-codex-openai-usage-adapter.md
@@ -11,7 +11,7 @@ tasks:
       Codex wham/usage parsing (5h/7d), chatgpt_account_id gating, and safe
       failure kinds.
     verify: node --test extensions/usage/
-    status: planned
+    status: failing
     risk: P1
     allure:
       severity: high
@@ -25,7 +25,7 @@ tasks:
       and replace the broken OpenAI/Codex OAuth /usage path with the wham/usage
       checker.
     verify: node --test extensions/usage/
-    status: planned
+    status: failing
     risk: P1
     allure:
       severity: high
@@ -36,7 +36,7 @@ tasks:
   - id: 3
     description: Run package typecheck/tests for the usage extension changes.
     verify: npm run check
-    status: planned
+    status: failing
     risk: P1
     allure:
       severity: high

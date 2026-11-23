@@ -29,3 +29,9 @@ Compress the prompt layout and drop redundant fields so more of the decision and
 - Redundant chrome/fields are removed or collapsed.
 - Primary decision controls and the request subject remain visible in a typical terminal height without scrolling past the decision line.
 - Existing keyboard shortcuts continue to work.
+
+## 17. Verification Script
+
+1. Run focused permission-prompt rendering and keyboard tests.
+2. Run `npm run check`.
+3. Open a representative prompt in a typical terminal and verify decision controls stay visible without changing shortcut behavior.

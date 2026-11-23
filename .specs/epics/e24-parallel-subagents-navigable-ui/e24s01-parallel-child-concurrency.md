@@ -29,3 +29,9 @@ Remove the single-active-child constraint and define concurrency semantics for s
 - Two independent children can be active concurrently.
 - Cancellation and cleanup are well-defined per child.
 - Child tool actions still require separate approval.
+
+## 17. Verification Script
+
+1. Run focused subagent concurrency tests.
+2. Run `npm run check`.
+3. Launch independent child tasks and verify they remain isolated while their lifecycle results stay attributable.

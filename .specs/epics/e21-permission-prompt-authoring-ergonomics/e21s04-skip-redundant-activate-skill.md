@@ -43,3 +43,9 @@ Before the expensive reload, detect unchanged already-loaded skills and return t
 - After a skill file change, `activate_skill` reloads.
 - `/skill:<name>` followed by `activate_skill` for the same unchanged skill skips.
 - Permission prompts for `activate_skill` are not skipped by this filter.
+
+## 17. Verification Script
+
+1. Run focused activate_skill tests.
+2. Run `npm run check`.
+3. Load a skill twice without changes, then modify its fixture and load again; verify skip then reload behavior while permissions remain enforced.

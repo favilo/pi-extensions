@@ -1,6 +1,6 @@
 story_id: e20s03
 title: Anthropic and Google quota checkers
-status: planned
+status: failing
 bcps: 3
 delta: ADDED
 spec: e20s03-anthropic-google-quota-checkers.md
@@ -10,7 +10,7 @@ tasks:
       Add Anthropic OAuth usage/profile checker tests and implementation for
       5h, 7d, and weekly scoped windows using shared credential resolution.
     verify: node --test extensions/usage/
-    status: planned
+    status: failing
     risk: P1
     allure:
       severity: high
@@ -22,7 +22,7 @@ tasks:
       Add Google Gemini CLI retrieveUserQuota and Antigravity
       fetchAvailableModels checkers with structured windows and safe failures.
     verify: node --test extensions/usage/
-    status: planned
+    status: failing
     risk: P1
     allure:
       severity: high
@@ -35,7 +35,7 @@ tasks:
       Wire Anthropic and Google checkers into /usage and the footer for the
       current provider; prove multi-pass provider coverage parity in tests.
     verify: node --test extensions/usage/
-    status: planned
+    status: failing
     risk: P1
     allure:
       severity: high
@@ -45,7 +45,7 @@ tasks:
   - id: 4
     description: Run package typecheck/tests after Anthropic/Google checkers.
     verify: npm run check
-    status: planned
+    status: failing
     risk: P1
     allure:
       severity: high

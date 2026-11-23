@@ -24,3 +24,9 @@ Define and implement parent-side approval coordination so simultaneous child pro
 - Concurrent child permission asks never share an ambiguous prompt identity.
 - Each allow/deny/steer result routes to the correct child only.
 - Parent coordination preserves per-child approval requirements from e24s01.
+
+## 17. Verification Script
+
+1. Run focused approval-routing tests.
+2. Run `npm run check`.
+3. Create simultaneous child approval requests and verify each approval resolves only its intended request.
