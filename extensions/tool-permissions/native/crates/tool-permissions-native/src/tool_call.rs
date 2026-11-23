@@ -44,6 +44,15 @@ mod tests {
     use super::{ResultState, ToolCallId};
 
     #[test]
+    fn shutdown_prevents_late_steering_from_being_recorded() {
+        let id = ToolCallId::parse("call").unwrap();
+        let mut state = ResultState::default();
+        state.clear_on_session_shutdown();
+        state.record_steering(id.clone(), "late".into());
+        assert_eq!(state.take_steering(&id), None);
+    }
+
+    #[test]
     fn closing_one_session_does_not_clear_another_sessions_steering() {
         let id = ToolCallId::parse("same-call").unwrap();
         let mut first = ResultState::default();
