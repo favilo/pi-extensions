@@ -20,22 +20,33 @@ impl ToolCallId {
     }
 }
 
-#[derive(Default)]
-pub(crate) struct ResultState {
-    steering: HashMap<ToolCallId, String>,
+pub(crate) enum ResultState {
+    Active(HashMap<ToolCallId, String>),
+    Closed,
+}
+
+impl Default for ResultState {
+    fn default() -> Self {
+        Self::Active(HashMap::new())
+    }
 }
 
 impl ResultState {
     pub(crate) fn record_steering(&mut self, call_id: ToolCallId, steering: String) {
-        self.steering.insert(call_id, steering);
+        if let Self::Active(pending) = self {
+            pending.insert(call_id, steering);
+        }
     }
 
     pub(crate) fn take_steering(&mut self, call_id: &ToolCallId) -> Option<String> {
-        self.steering.remove(call_id)
+        match self {
+            Self::Active(pending) => pending.remove(call_id),
+            Self::Closed => None,
+        }
     }
 
     pub(crate) fn clear_on_session_shutdown(&mut self) {
-        self.steering.clear();
+        *self = Self::Closed;
     }
 }
 
