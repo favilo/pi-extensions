@@ -34,7 +34,9 @@ impl ResultState {
         self.steering.remove(call_id)
     }
 
-    pub(crate) fn close(&mut self) {}
+    pub(crate) fn clear_on_session_shutdown(&mut self) {
+        self.steering.clear();
+    }
 }
 
 #[cfg(test)]
@@ -48,7 +50,7 @@ mod tests {
         let mut second = ResultState::default();
         first.record_steering(id.clone(), "first".into());
         second.record_steering(id.clone(), "second".into());
-        first.close();
+        first.clear_on_session_shutdown();
         assert_eq!(first.take_steering(&id), None);
         assert_eq!(second.take_steering(&id), Some("second".into()));
     }
