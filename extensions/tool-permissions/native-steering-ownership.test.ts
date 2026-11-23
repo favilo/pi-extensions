@@ -52,7 +52,13 @@ test("Rust annotates the matching result with session steering once", async () =
   );
   assert.equal(bridge.recordSteering("cancelled", "do not deliver"), true);
   assert.equal(bridge.discardSteering("cancelled"), true);
-  assert.equal(await handlers.get("tool_result")!({ toolCallId: "cancelled", content: [] }, {}), undefined);
+  assert.equal(
+    await handlers.get("tool_result")!(
+      { toolCallId: "cancelled", content: [] },
+      {},
+    ),
+    undefined,
+  );
   assert.equal(bridge.recordSteering("pending", "never deliver"), true);
   await handlers.get("session_shutdown")!({}, {});
   assert.equal(bridge.recordSteering("late", "ignore"), false);

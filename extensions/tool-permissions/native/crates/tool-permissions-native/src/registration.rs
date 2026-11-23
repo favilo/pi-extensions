@@ -119,6 +119,18 @@ impl<'env> RegistrationBridge<'env> {
                 Ok(true)
             })?;
         source.set_named_property("recordSteering", record)?;
+        // TODO: Remove this cancellation capability when prompt ownership moves to Rust.
+        let discard_state = state.clone();
+        let discard: Function<String, bool> =
+            self.bridge
+                .env()
+                .create_function_from_closure("discardSteering", move |ctx| {
+                    let id: String = ctx.get(0)?;
+                    let id = ToolCallId::parse(&id)
+                        .map_err(|error| Error::from_reason(error.to_string()))?;
+                    Ok(discard_state.lock().take_steering(&id).is_some())
+                })?;
+        source.set_named_property("discardSteering", discard)?;
         let handler = self.bridge.env().create_function_from_closure("toolPermissionsResult", move |ctx| {
             if !is_active() { state.lock().clear_on_session_shutdown(); return Ok(Either::B(())); }
             let event: Object = ctx.get(0)?;
