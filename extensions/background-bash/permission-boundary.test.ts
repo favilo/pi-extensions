@@ -237,6 +237,50 @@ test("active sessions receive monitor messages as steering without triggering a 
   }
 });
 
+test("completion delivery always triggers a turn even when originating context reports busy", async () => {
+  let exit:
+    | ((outcome: {
+        code: number | null;
+        signal: NodeJS.Signals | null;
+      }) => void)
+    | undefined;
+  const { tools, messages, cleanup } = harness(({ onExit }) => {
+    exit = onExit;
+    return { terminate() {} };
+  }, false);
+  try {
+    const bash = tools.get("bash")!;
+    const result = await bash.execute(
+      "call-busy",
+      { command: "echo done", background: true },
+      new AbortController().signal,
+      undefined,
+      { cwd: "/workspace", isIdle: () => false },
+    );
+    const taskId = (result.details as { id: string }).id;
+    exit?.({ code: 0, signal: null });
+    exit?.({ code: 0, signal: null });
+    assert.deepEqual(messages, [
+      {
+        message: {
+          customType: "background_bash_complete",
+          content: `task ${taskId} completed with status completed`,
+          display: true,
+          details: {
+            taskId,
+            status: "completed",
+            exitCode: 0,
+            signal: null,
+          },
+        },
+        options: { deliverAs: "steer", triggerTurn: true },
+      },
+    ]);
+  } finally {
+    cleanup();
+  }
+});
+
 test("monitored task sends one completion message without a monitor terminal summary", async () => {
   let emit: ((stream: "stdout" | "stderr", chunk: string) => void) | undefined;
   let exit:
