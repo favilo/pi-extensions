@@ -20,7 +20,9 @@ type NativeRegistrationHost = Pick<
   "on" | "registerCommand" | "registerEntryRenderer"
 >;
 
-type NativeRegistrationBridge = {
+export type NativeRegistrationBridge = {
+  recordSteering?(toolCallId: string, steering: string): boolean;
+  discardSteering?(toolCallId: string): boolean;
   renderPermissionPreview?(
     entry: unknown,
     options: unknown,

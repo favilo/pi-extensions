@@ -13,7 +13,7 @@ vcs:
   workspace: e18s04-prompt-queue
   last_completed_change: b6512463
   parent_bookmark: favilo/e19s02-async-prompt-lifecycle
-  workspace_change: yppotwnk
+  workspace_change: wnwslmmx
 planning:
   e16:
     status: completed
@@ -101,9 +101,9 @@ planning:
     constraints:
     - Do not modify the e06 repair flow or child-private bridge catalog.
 handoff:
-  last_step_completed: 'e19s04 partial TDD: scoped cleanup ordering test and implementation committed; production TypeScript lifecycle behavior restored temporarily.'
+  last_step_completed: 'e19s04 partial: native steering tracer and guarded shutdown committed; production main-tool wiring is uncommitted.'
   open_decisions:
-  - 'Design scoped shutdown cleanup so it executes once before revocation, still closes on cleanup failure, and cannot authorize work during shutdown.'
+  - 'Prove production native steering ownership and child-session isolation through public behavior before committing the current wiring.'
   required_reading:
   - .specs/IMPACT-e19s04.md
   - .specs/epics/e19-full-rust-pi-event-orchestration/e19s04-rust-lifecycle-and-tool-orchestration.md
@@ -117,44 +117,38 @@ handoff:
   next_skill: develop-tdd
   latest_progress: >-
     Replanned e19s04/e19s05 state ownership before e19s08 lifecycle cleanup.
-    Scoped shutdown guard and late authorization checks were implemented; Rust
-    tool-result registration now has a no-bridge slice in progress. Authorization
-    and steering result behavior still delegate to TypeScript. Story traceability
-    is waived; no push performed.
+    Rust now has session-scoped steering state, result annotation, cancellation
+    and shutdown guards, and temporary recordSteering/discardSteering bridge
+    capabilities. Preview cleanup and legacy result annotations remain delegated.
+    Story traceability is waived; no push performed.
   replanning_update: >-
     e19s04 now covers authorization and result ownership and may interleave with
     e19s05 interactive state migration. New e19s08 owns final lifecycle cleanup
     after both; e19s06 bridge removal follows e19s08. Existing scoped shutdown
     forwarding is temporary and must not be counted as lifecycle parity.
   context: >-
-    Resume e19s04; user approved lifecycle registration through ScopedPi while tool
-    call and result handlers remain on RegistrationBridge. Keep TypeScript startup
-    notices, audit and prompt cleanup until Rust replacements have parity; temporary
-    capabilities need a TODO for removal. ScopedPi currently registers a shutdown
-    guard before its guarded event handlers, so a separate scoped shutdown event is
-    revoked before invocation. Design one guard with registered product cleanup,
-    including failure-safe closure and denial of late confirmations. Do not remove
-    RegistrationBridge. Story tracing is waived. No push performed.
+    Resume e19s04 authorization and result ownership. Keep TypeScript startup,
+    preview and prompt cleanup until Rust replacements have parity; temporary
+    capabilities need TODOs for removal. ScopedPi uses a single shutdown guard;
+    late tool calls and pending approvals fail closed. Do not remove
+    RegistrationBridge prematurely. Story tracing is waived. No push performed.
   session_handoff: >-
-    Working copy tmxkunrl contains unfinished uncommitted lifecycle changes; inspect
-    jj status and diff before edits. Commits 0f628fae and a31ebfa8 contain earlier
-    lifecycle tests, some assumptions now superseded by the single-guard design;
-    a31ebfa8 also includes earlier implementation changes, so do not assume it is
-    strictly test-only. 088d1b8e is RED cleanup-order test; 89f76a17 is GREEN.
-    Review 89f76a17 for safety: it leaves ensure_active true during cleanup, may
-    permit callback dispatch during shutdown, and does not guarantee closure if
-    cleanup panics. The new LifecycleCallbacks module is an unused scaffold; its
-    shutdown does nothing. Production lifecycle forwarding was restored in the
-    working copy and must not be removed until replacement behavior is tested.
-    npm run fmt also changed documentation.test.ts; inspect that incidental diff.
-    Native build succeeded with unused scaffold warning. Focused index and prompt
-    queue tests passed 35/35 after restoration. Earlier npm run check failed on
-    debug notification, late confirmation, and registration test; those results
-    predate restoration and the full suite has not been rerun. Registration tests
-    currently contain stale assumptions and must not be described as passing.
-    Next: reconcile lifecycle tests with approved single-guard design, preserve
-    actual production cleanup, use behavioral RED/GREEN in separate jj changes,
-    then run story verify and full check.
+    Working copy wnwslmmx contains uncommitted production wiring in index.ts and
+    native-registration-loader.ts. Inspect jj status and diff before edits; do not
+    discard it. Main tool-call contexts now use temporary Rust recordSteering and
+    discardSteering functions, with the legacy TypeScript map retained for other
+    contexts. Rust result handling preserves the legacy preview callback and uses
+    session-scoped state; shutdown seals that state. Typecheck, existing steering
+    tests, npm test -- extensions/tool-permissions and npm run check passed on this
+    working copy; the latter emits existing Clippy warnings. One Bevy integration
+    test was skipped in npm test. The production switch lacks a separate behavioral
+    RED test and mechanical isolation; do not claim the TDD gate or story complete.
+    Next: design a public-interface regression proving production uses native
+    ownership while preserving child-session steering, cancellation and preview
+    behavior; establish a valid behavioral RED in a separate jj change, then
+    verify and commit the production wiring. Review concurrency and fail-closed
+    behavior before deleting TypeScript fallback. e19s04 is incomplete; e19s05
+    can interleave; final lifecycle cleanup is e19s08, before e19s06.
   blocker: ''
   implementation_update: 'e19s02 accepted: tests and independent security re-review
     passed; NFR accepted for existing liveness bounds, traceability waived by user.
