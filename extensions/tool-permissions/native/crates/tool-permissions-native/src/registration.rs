@@ -1,10 +1,12 @@
 use crate::contract::{NativeOperation, NativeRegistrationRequest, NativeRegistrationResponse};
+use crate::tool_call::{ResultState, ToolCallId};
 use crate::{CONTRACT_VERSION, validate_nonce};
 use napi::bindgen_prelude::{
     Either, FnArgs, Function, FunctionRef, JsObjectValue, Object, PromiseRaw, Unknown,
 };
 use napi::{Env, Error, JsValue, Result};
 use pi_api::{Bridge, CallbackPresence, OnCallback, ScopedPi};
+use std::{cell::RefCell, rc::Rc};
 
 type NativeRenderer =
     FunctionRef<FnArgs<(Unknown<'static>, Unknown<'static>, Unknown<'static>)>, Unknown<'static>>;
@@ -79,6 +81,63 @@ impl<'env> RegistrationBridge<'env> {
             .pi()
             .on(self.bridge.env(), OnCallback::ToolCall, handler)?;
         self.record(true, "tool_call")
+    }
+
+    fn register_native_steering_result(
+        &mut self,
+        is_active: impl Fn() -> bool + Clone + 'static,
+    ) -> Result<bool> {
+        let Some(mut source) = self.bridge.source() else {
+            return Ok(false);
+        };
+        if source.get_named_property::<Function<FnArgs<(Unknown<'static>, Unknown<'static>)>, Unknown<'static>>>("handleToolResult").is_ok() {
+            return Ok(false);
+        }
+        if source
+            .get_named_property::<Function<FnArgs<(String, String)>, bool>>("recordSteering")
+            .is_err()
+        {
+            return Ok(false);
+        }
+        let state = Rc::new(RefCell::new(ResultState::default()));
+        let record_state = state.clone();
+        let active = is_active.clone();
+        // TODO: Remove this TypeScript capability after the prompt UI moves to Rust.
+        let record: Function<FnArgs<(String, String)>, bool> = self
+            .bridge
+            .env()
+            .create_function_from_closure("recordSteering", move |ctx| {
+                if !active() {
+                    record_state.borrow_mut().clear_on_session_shutdown();
+                    return Ok(false);
+                }
+                let id: String = ctx.get(0)?;
+                let text: String = ctx.get(1)?;
+                let id = ToolCallId::parse(&id).map_err(|e| Error::from_reason(e.to_string()))?;
+                record_state.borrow_mut().record_steering(id, text);
+                Ok(true)
+            })?;
+        source.set_named_property("recordSteering", record)?;
+        let handler = self.bridge.env().create_function_from_closure("toolPermissionsResult", move |ctx| {
+            if !is_active() { state.borrow_mut().clear_on_session_shutdown(); return Ok(Either::B(())); }
+            let event: Object = ctx.get(0)?;
+            let id: String = event.get_named_property("toolCallId")?;
+            let id = ToolCallId::parse(&id).map_err(|e| Error::from_reason(e.to_string()))?;
+            let Some(steering) = state.borrow_mut().take_steering(&id) else { return Ok(Either::B(())); };
+            let mut content: Vec<Unknown> = event.get_named_property("content")?;
+            let mut annotation = Object::new(ctx.env)?;
+            annotation.set_named_property("type", "text")?;
+            annotation.set_named_property("text", format!("\n\n<user-steering source=\"permission-prompt\">\n{steering}\n</user-steering>"))?;
+            content.push(annotation.to_unknown());
+            let mut result = Object::new(ctx.env)?;
+            result.set_named_property("content", content)?;
+            Ok(Either::A(result))
+        })?;
+        self.bridge
+            .pi()
+            .on(self.bridge.env(), OnCallback::ToolResult, handler)?;
+        self.registrations.push("tool_result".to_owned());
+        Ok(true)
     }
 
     pub fn register_tool_result(&mut self) -> Result<()> {
@@ -204,8 +263,10 @@ pub fn register_callbacks(
         )?,
         "session_start",
     )?;
-    bridge.register_tool_call(is_active)?;
-    bridge.register_tool_result()?;
+    bridge.register_tool_call(is_active.clone())?;
+    if !bridge.register_native_steering_result(is_active)? {
+        bridge.register_tool_result()?;
+    }
     bridge.record(shutdown_registered, "session_shutdown")?;
     bridge.register_command()?;
     bridge.register_entry_renderer()?;
