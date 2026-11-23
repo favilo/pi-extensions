@@ -43,7 +43,9 @@ impl SessionToken {
     fn on_close(&self, cleanup: impl FnOnce() + Send + 'static) -> Result<()> {
         let mut state = self.0.lock();
         if state.closed || state.closing {
-            return Err(napi::Error::from_reason(SessionError::Unavailable.to_string()));
+            return Err(napi::Error::from_reason(
+                SessionError::Unavailable.to_string(),
+            ));
         }
         state.cleanup.push(Box::new(cleanup));
         Ok(())
@@ -302,11 +304,16 @@ mod tests {
 
     #[test]
     fn shutdown_runs_registered_session_cleanup() {
-        use std::sync::{Arc, atomic::{AtomicBool, Ordering}};
+        use std::sync::{
+            Arc,
+            atomic::{AtomicBool, Ordering},
+        };
         let token = SessionToken::default();
         let cleared = Arc::new(AtomicBool::new(false));
         let observed = cleared.clone();
-        token.on_close(move || observed.store(true, Ordering::SeqCst)).unwrap();
+        token
+            .on_close(move || observed.store(true, Ordering::SeqCst))
+            .unwrap();
         token.close();
         assert!(cleared.load(Ordering::SeqCst));
     }
