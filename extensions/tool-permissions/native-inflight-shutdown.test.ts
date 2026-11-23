@@ -27,7 +27,7 @@ test("an authorization resolved after shutdown cannot allow a tool call", async 
       registerCommand() {},
       registerEntryRenderer() {},
     },
-    { handleToolCall: () => pending },
+    { authorizeToolCall: () => pending },
   );
   const result = Promise.resolve(
     handlers.get("tool_call")!(

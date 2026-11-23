@@ -12,7 +12,7 @@ test("Rust annotates the matching result with session steering once", async () =
   >();
   const cleaned: string[] = [];
   const bridge = {
-    handleToolCall: () => undefined,
+    authorizeToolCall: () => undefined,
     handleToolResult: (event: unknown) => {
       const id = (event as { toolCallId: string }).toolCallId;
       cleaned.push(id);

@@ -13,7 +13,7 @@ exports.probe = (request) => ({
 });
 exports.registerToolPermissionsCallbacks = (request, pi, bridge) => {
   pi.on("session_start", (event, ctx) => bridge.handleSessionStart(event, ctx));
-  pi.on("tool_call", (event, ctx) => bridge.handleToolCall(event, ctx));
+  pi.on("tool_call", (event, ctx) => bridge.authorizeToolCall?.(event, ctx));
   pi.on("tool_result", (event, ctx) => bridge.handleToolResult?.(event, ctx));
   pi.on("session_shutdown", (event, ctx) =>
     bridge.handleSessionShutdown?.(event, ctx),

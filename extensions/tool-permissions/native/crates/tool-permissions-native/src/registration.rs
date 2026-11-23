@@ -39,12 +39,12 @@ impl<'env> RegistrationBridge<'env> {
         let source = self
             .bridge
             .source()
-            .ok_or_else(|| Error::from_reason("handleToolCall bridge is unavailable"))?;
-        let callback = source.get_named_property::<Function<FnArgs<(Unknown<'static>, Unknown<'static>)>, Unknown<'static>>>("handleToolCall")?.create_ref()?;
+            .ok_or_else(|| Error::from_reason("authorizeToolCall bridge is unavailable"))?;
+        let callback = source.get_named_property::<Function<FnArgs<(Unknown<'static>, Unknown<'static>)>, Unknown<'static>>>("authorizeToolCall")?.create_ref()?;
         let handler =
             self.bridge
                 .env()
-                .create_function_from_closure("toolPermissionsCall", move |ctx| {
+                .create_function_from_closure("rustToolPermissionsCall", move |ctx| {
                     if !is_active() {
                         let mut denied = Object::new(ctx.env)?;
                         denied.set_named_property("block", true)?;

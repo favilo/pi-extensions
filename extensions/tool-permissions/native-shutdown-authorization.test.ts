@@ -25,7 +25,7 @@ test("a tool call after session shutdown is not authorized by the delegated hand
       registerEntryRenderer() {},
     },
     {
-      handleToolCall() {
+      authorizeToolCall() {
         calls++;
         return undefined;
       },

@@ -25,7 +25,7 @@ test("a malformed tool call is blocked before the authorization callback", async
       registerEntryRenderer() {},
     },
     {
-      handleToolCall: () => {
+      authorizeToolCall: () => {
         delegated = true;
       },
     },

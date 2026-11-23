@@ -23,7 +23,7 @@ test("tool results without steering are handled without a TypeScript result call
       registerCommand() {},
       registerEntryRenderer() {},
     },
-    { handleToolCall: () => undefined },
+    { authorizeToolCall: () => undefined },
   );
   assert.ok(
     handlers.has("tool_result"),

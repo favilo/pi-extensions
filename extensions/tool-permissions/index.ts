@@ -2876,7 +2876,7 @@ export default function toolPermissionPolicy(pi: ExtensionAPI) {
         handleRegisteredSessionStart(ctx as PermissionContext, {
           reportNativeProbe: false,
         }),
-      handleToolCall: (event, ctx) =>
+      authorizeToolCall: (event, ctx) =>
         handleRegisteredToolCall(event, ctx, pi, steering),
       handleToolResult: (event) =>
         handleRegisteredToolResult(event as ToolResultEvent),

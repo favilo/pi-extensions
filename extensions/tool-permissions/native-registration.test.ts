@@ -149,7 +149,7 @@ test("bundled Rust registration calls pi.on and registerCommand for delegated ca
       handleSessionStart(event: unknown, ctx: unknown) {
         handledSessionStarts.push({ event, ctx });
       },
-      handleToolCall(event: unknown, ctx: unknown) {
+      authorizeToolCall(event: unknown, ctx: unknown) {
         handledToolCalls.push({ event, ctx });
         return { block: true, reason: "delegated" };
       },
@@ -298,7 +298,7 @@ test("Rust preserves product lifecycle callbacks while tool calls remain bridge-
         shutdowns.push({ event, ctx });
         return cleanupFinished;
       },
-      handleToolCall(event: unknown, ctx: unknown) {
+      authorizeToolCall(event: unknown, ctx: unknown) {
         toolCalls.push({ event, ctx });
         return { block: true, reason: "tool bridge remains delegated" };
       },
@@ -368,7 +368,7 @@ test("production registration exposes a sample command that notifies the user", 
       },
       registerEntryRenderer() {},
     },
-    { handleToolCall() {} },
+    { authorizeToolCall() {} },
   );
   const command = commands.get("registration-sample");
   assert.ok(command);

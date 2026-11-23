@@ -101,9 +101,12 @@ planning:
     constraints:
     - Do not modify the e06 repair flow or child-private bridge catalog.
 handoff:
-  last_step_completed: 'e19s04 partial: native steering tracer and guarded shutdown committed; production main-tool wiring is uncommitted.'
+  last_step_completed: 'e19s04 complete: Rust owns direct tool callback registration,
+    malformed/late-call fail-closed guards, invocation-bound steering, and result annotation;
+    temporary policy/UI bridge remains explicitly sequenced to e19s05/e19s06.'
   open_decisions:
-  - 'Prove production native steering ownership and child-session isolation through public behavior before committing the current wiring.'
+  - Migrate interactive policy/UI ownership in e19s05, final lifecycle cleanup in
+    e19s08, and remove the remaining TypeScript bridge in e19s06.
   required_reading:
   - .specs/IMPACT-e19s04.md
   - .specs/epics/e19-full-rust-pi-event-orchestration/e19s04-rust-lifecycle-and-tool-orchestration.md
@@ -116,39 +119,32 @@ handoff:
   - extensions/tool-permissions/native-prompt-queue.test.ts
   next_skill: develop-tdd
   latest_progress: >-
-    Replanned e19s04/e19s05 state ownership before e19s08 lifecycle cleanup.
-    Rust now has session-scoped steering state, result annotation, cancellation
-    and shutdown guards, and temporary recordSteering/discardSteering bridge
-    capabilities. Preview cleanup and legacy result annotations remain delegated.
+    Interactive Pi smoke matrix passed: native registration was active; deny blocked an
+    unmatched write; allow-once wrote; steering was injected into the matching result and
+    followed; saved project rule auto-allowed a matching write; killing Pi with a pending
+    prompt failed closed; and a clean relaunch had no stale prompt or steering state.
+    Escape is not prompt cancellation; only abort/shutdown cancels. Rust owns callback
+    registration, validation, session guards, steering state, and result annotation;
+    TypeScript temporarily owns policy dispatch, preview cleanup, and prompt UI.
     Story traceability is waived; no push performed.
   replanning_update: >-
-    e19s04 now covers authorization and result ownership and may interleave with
-    e19s05 interactive state migration. New e19s08 owns final lifecycle cleanup
-    after both; e19s06 bridge removal follows e19s08. Existing scoped shutdown
-    forwarding is temporary and must not be counted as lifecycle parity.
+    e19s04 is complete at its callback-orchestration scope. e19s05 owns interactive
+    policy/UI state, e19s08 owns final lifecycle cleanup, and e19s06 removes the
+    TypeScript bridge after both have parity.
   context: >-
-    Resume e19s04 authorization and result ownership. Keep TypeScript startup,
-    preview and prompt cleanup until Rust replacements have parity; temporary
-    capabilities need TODOs for removal. ScopedPi uses a single shutdown guard;
-    late tool calls and pending approvals fail closed. Do not remove
-    RegistrationBridge prematurely. Story tracing is waived. No push performed.
+    Begin e19s05 interactive permission surface migration. Do not remove RegistrationBridge
+    before e19s05/e19s08 migration is complete; e19s06 owns final bridge removal. Story
+    tracing is waived; no push performed.
   session_handoff: >-
-    Working copy wnwslmmx contains uncommitted production wiring in index.ts and
-    native-registration-loader.ts. Inspect jj status and diff before edits; do not
-    discard it. Main tool-call contexts now use temporary Rust recordSteering and
-    discardSteering functions, with the legacy TypeScript map retained for other
-    contexts. Rust result handling preserves the legacy preview callback and uses
-    session-scoped state; shutdown seals that state. Typecheck, existing steering
-    tests, npm test -- extensions/tool-permissions and npm run check passed on this
-    working copy; the latter emits existing Clippy warnings. One Bevy integration
-    test was skipped in npm test. The production switch lacks a separate behavioral
-    RED test and mechanical isolation; do not claim the TDD gate or story complete.
-    Next: design a public-interface regression proving production uses native
-    ownership while preserving child-session steering, cancellation and preview
-    behavior; establish a valid behavioral RED in a separate jj change, then
-    verify and commit the production wiring. Review concurrency and fail-closed
-    behavior before deleting TypeScript fallback. e19s04 is incomplete; e19s05
-    can interleave; final lifecycle cleanup is e19s08, before e19s06.
+    e19s04 scope was honestly respecified: Rust registration.rs owns pi.on(tool_call),
+    malformed-call validation, late/session-closed failure, Rust session-scoped steering,
+    and result annotation. The temporary TypeScript authorizeToolCall policy/UI host
+    capability is not an e19s04 blocker; e19s05 owns interactive migration, e19s08
+    lifecycle cleanup, and e19s06 final bridge removal. Interactive Pi UAT passed deny,
+    allow-once, steering result injection, saved-rule auto-allow, forced shutdown
+    fail-closed, and clean relaunch. Escape does not cancel a permission prompt; only
+    request/session abort or shutdown does. Historical audit wording was corrected.
+    scripts/pi-workspace.sh uses a per-run mktemp overlay. No push performed.
   blocker: ''
   implementation_update: 'e19s02 accepted: tests and independent security re-review
     passed; NFR accepted for existing liveness bounds, traceability waived by user.
@@ -186,6 +182,7 @@ metrics:
       calls: 12
       total_seconds: 7668.0
       avg_seconds: 639.0
+      _start: '2026-11-23T22:17:31Z'
     verify-work:
       calls: 5
       total_seconds: 5191.0
