@@ -12,6 +12,7 @@ use crate::contract::{
     NativeOperation, PromptQueueDecision, PromptQueueRequest, PromptQueueResolution,
     PromptQueueResponse,
 };
+use crate::tool_call::ToolCallId;
 
 #[derive(Debug, Error)]
 pub enum PromptQueueError {
@@ -34,7 +35,7 @@ pub fn validate(request: &PromptQueueRequest) -> std::result::Result<(), PromptQ
     if request.nonce.is_empty() || request.nonce.len() > 256 {
         return Err(PromptQueueError::Nonce);
     }
-    ToolCallId::parse(&request.tool_call_id)?;
+    ToolCallId::parse(&request.tool_call_id).map_err(|_| PromptQueueError::ToolCallId)?;
     Ok(())
 }
 
@@ -43,7 +44,8 @@ pub fn complete(
     resolution: PromptQueueResolution,
 ) -> std::result::Result<PromptQueueResponse, PromptQueueError> {
     validate(&request)?;
-    let tool_call_id = ToolCallId::parse(&request.tool_call_id)?;
+    let tool_call_id =
+        ToolCallId::parse(&request.tool_call_id).map_err(|_| PromptQueueError::ToolCallId)?;
     Ok(PromptQueueResponse {
         version: CONTRACT_VERSION,
         operation: NativeOperation::PromptQueue,
@@ -348,22 +350,6 @@ fn failed_response(request: &PromptQueueRequest) -> PromptQueueResponse {
         tool_call_id: request.tool_call_id.clone(),
         decision: PromptQueueDecision::Deny,
         steering: None,
-    }
-}
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-struct ToolCallId(String);
-
-impl ToolCallId {
-    fn parse(value: &str) -> std::result::Result<Self, PromptQueueError> {
-        if value.is_empty() {
-            return Err(PromptQueueError::ToolCallId);
-        }
-        Ok(Self(value.to_owned()))
-    }
-
-    fn into_string(self) -> String {
-        self.0
     }
 }
 

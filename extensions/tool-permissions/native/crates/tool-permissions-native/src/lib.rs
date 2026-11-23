@@ -7,9 +7,9 @@ mod path_trust;
 mod policy;
 mod prompt_queue;
 mod registration;
-mod result_state;
 mod rule_save;
 mod sample_callback;
+mod tool_call;
 
 pub use contract::{
     AuditWriteRequest, AuditWriteResponse, EvaluateRequest, EvaluateResponse, NativeOperation,
