@@ -40,8 +40,13 @@ impl SessionToken {
         }
     }
 
-    fn on_close(&self, _cleanup: impl FnOnce() + Send + 'static) -> Result<()> {
-        self.ensure_active()
+    fn on_close(&self, cleanup: impl FnOnce() + Send + 'static) -> Result<()> {
+        let mut state = self.0.lock();
+        if state.closed || state.closing {
+            return Err(napi::Error::from_reason(SessionError::Unavailable.to_string()));
+        }
+        state.cleanup.push(Box::new(cleanup));
+        Ok(())
     }
 
     fn close(&self) -> bool {
@@ -149,6 +154,14 @@ impl<'a> ScopedPi<'a> {
             return Err(error);
         }
         self.token.ensure_active()
+    }
+
+    /// Register cleanup to run once when this session closes.
+    ///
+    /// # Errors
+    /// Returns an error if shutdown has already started.
+    pub fn on_close(&self, cleanup: impl FnOnce() + Send + 'static) -> Result<()> {
+        self.token.on_close(cleanup)
     }
 
     /// Return a check tied to the session lifetime for host-bound authorization.
