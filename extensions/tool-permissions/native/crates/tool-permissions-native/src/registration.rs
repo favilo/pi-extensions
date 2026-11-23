@@ -3,7 +3,7 @@ use crate::{CONTRACT_VERSION, validate_nonce};
 use napi::bindgen_prelude::{
     Either, FnArgs, Function, FunctionRef, JsObjectValue, Object, PromiseRaw, Unknown,
 };
-use napi::{Env, Error, Result};
+use napi::{Env, Error, JsValue, Result};
 use pi_api::{Bridge, CallbackPresence, OnCallback, ScopedPi};
 
 type NativeRenderer =
@@ -48,11 +48,20 @@ impl<'env> RegistrationBridge<'env> {
                         denied.set_named_property("reason", "Permission session is closed.")?;
                         return PromiseRaw::resolve(ctx.env, Either::<Object, Unknown>::A(denied));
                     }
-                    let event: Unknown = ctx.get(0)?;
+                    let event: Object = ctx.get(0)?;
+                    let valid_name = event
+                        .get_named_property::<String>("toolName")
+                        .is_ok_and(|name| !name.is_empty());
+                    if !valid_name {
+                        let mut denied = Object::new(ctx.env)?;
+                        denied.set_named_property("block", true)?;
+                        denied.set_named_property("reason", "Invalid tool call.")?;
+                        return PromiseRaw::resolve(ctx.env, Either::<Object, Unknown>::A(denied));
+                    }
                     let context: Unknown = ctx.get(1)?;
                     let result = callback
                         .borrow_back(ctx.env)?
-                        .call(FnArgs::from((event, context)))?;
+                        .call(FnArgs::from((event.to_unknown(), context)))?;
                     let active = is_active.clone();
                     let promise = PromiseRaw::resolve(ctx.env, result)?.then(move |settled| {
                         if active() {
