@@ -77,6 +77,12 @@ function monitorDeliveryOptions(ctx: unknown): {
   };
 }
 
+/** Completion must wake an idle parent; Pi steers/queues safely while busy. */
+const completionDeliveryOptions = {
+  deliverAs: "steer" as const,
+  triggerTurn: true,
+};
+
 /** Registers background-mode Bash launch plus task lookup/cancel tooling. */
 export function registerBackgroundBash(
   pi: ExtensionAPI,
@@ -185,7 +191,7 @@ export function registerBackgroundBash(
                 signal: completed.signal ?? null,
               },
             },
-            monitorDeliveryOptions(ctx),
+            completionDeliveryOptions,
           );
         },
         ...(typeof input.timeout === "number"
