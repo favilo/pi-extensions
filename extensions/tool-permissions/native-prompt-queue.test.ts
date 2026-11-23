@@ -1,8 +1,9 @@
 import "../test-support/forbid-fetch.ts";
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import test from "node:test";
 import { NATIVE_CONTRACT_VERSION } from "./native-contract.ts";
-import { promptToolPermissionRequest } from "./index.ts";
+import toolPermissionPolicy, { promptToolPermissionRequest } from "./index.ts";
 import {
   NATIVE_PROMPT_QUEUE_NONCE,
   PromptQueueDecision,
@@ -27,6 +28,64 @@ function deferred<T>() {
   });
   return { promise, resolve, reject };
 }
+
+test(
+  "disposing a WASM host prevents a late prompt from authorizing a new host",
+  { timeout: 15000 },
+  () => {
+    const script = `
+    const assert = require('node:assert/strict');
+    const path = require('node:path');
+    const loader = path.resolve('extensions/tool-permissions/native/generated/index.wasi.cjs');
+    const request = { version: 1, operation: 'prompt_queue', nonce: 'test', toolCallId: 'reused-id' };
+    (async () => {
+      let native = require(loader);
+      let settle;
+      let opened;
+      const presented = new Promise(resolve => { opened = resolve; });
+      let oldResult;
+      let queuedOpened = false;
+      native.decidePrompt(request, () => { opened(); return new Promise(resolve => { settle = resolve; }); }).then(result => { oldResult = result; }, () => {});
+      native.decidePrompt({ ...request, toolCallId: 'queued-old' }, async () => { queuedOpened = true; return { decision: 'allow' }; }).then(result => { if (result.decision === 'allow') oldResult = result; }, () => {});
+      await presented;
+      delete require.cache[require.resolve(loader)];
+      const parallel = require(loader);
+      const independent = await parallel.decidePrompt(request, async () => ({ decision: 'deny' }));
+      assert.equal(independent.decision, 'deny');
+      await parallel[Symbol.for('napi.rs.wasi.dispose')]();
+      await native[Symbol.for('napi.rs.wasi.dispose')]();
+      delete require.cache[require.resolve(loader)];
+      native = require(loader);
+      let finishNew;
+      let openNew;
+      const newPresented = new Promise(resolve => { openNew = resolve; });
+      const pendingNew = native.decidePrompt(request, () => { openNew(); return new Promise(resolve => { finishNew = resolve; }); });
+      await newPresented;
+      settle({ decision: 'allow' });
+      await new Promise(resolve => setImmediate(resolve));
+      assert.equal(queuedOpened, false, 'queued old presenter must not open after disposal');
+      assert.notEqual(oldResult?.decision, 'allow', 'disposed requests must not authorize');
+      finishNew({ decision: 'deny' });
+      const result = await pendingNew;
+      assert.equal(result.toolCallId, 'reused-id');
+      assert.equal(result.decision, 'deny');
+      await native[Symbol.for('napi.rs.wasi.dispose')]();
+      console.log('lifecycle-complete');
+    })().catch(error => { console.error(error); process.exitCode = 1; });
+  `;
+    const result = spawnSync(process.execPath, ["-e", script], {
+      cwd: process.cwd(),
+      encoding: "utf8",
+      timeout: 12000,
+    });
+    assert.equal(result.status, 0, result.stderr || String(result.error));
+    assert.match(
+      result.stdout,
+      /lifecycle-complete/,
+      "the lifecycle must finish, not exit with pending promises",
+    );
+  },
+);
 
 test("the WASM runtime awaits a JavaScript promise without blocking the event loop", async () => {
   const native = requireNativePackage(bundledNativePackagePath()) as {
@@ -206,6 +265,84 @@ test(
 );
 
 test(
+  "a malformed presenter result denies and releases the next prompt",
+  { timeout: 5000 },
+  async () => {
+    const native = requireNativePackage(bundledNativePackagePath()) as {
+      decidePrompt(
+        request: {
+          version: number;
+          operation: string;
+          nonce: string;
+          toolCallId: string;
+        },
+        present: (id: string) => Promise<unknown>,
+      ): Promise<{ ok: boolean; decision: string; toolCallId: string }>;
+    };
+    const request = (toolCallId: string) => ({
+      version: NATIVE_CONTRACT_VERSION,
+      operation: "prompt_queue",
+      nonce: NATIVE_PROMPT_QUEUE_NONCE,
+      toolCallId,
+    });
+    const first = native.decidePrompt(request("malformed-first"), async () => ({
+      decision: "unexpected",
+    }));
+    const second = native.decidePrompt(request("malformed-next"), async () => ({
+      decision: PromptQueueDecision.Allow,
+    }));
+    assert.deepEqual(await first, {
+      version: NATIVE_CONTRACT_VERSION,
+      operation: "prompt_queue",
+      ok: false,
+      nonce: NATIVE_PROMPT_QUEUE_NONCE,
+      toolCallId: "malformed-first",
+      decision: PromptQueueDecision.Deny,
+    });
+    assert.equal((await second).decision, PromptQueueDecision.Allow);
+  },
+);
+
+test(
+  "a synchronous presenter throw denies and releases the next prompt",
+  { timeout: 5000 },
+  async () => {
+    const native = requireNativePackage(bundledNativePackagePath()) as {
+      decidePrompt(
+        request: {
+          version: number;
+          operation: string;
+          nonce: string;
+          toolCallId: string;
+        },
+        present: (id: string) => Promise<{ decision: PromptQueueDecision }>,
+      ): Promise<{ ok: boolean; decision: string; toolCallId: string }>;
+    };
+    const request = (toolCallId: string) => ({
+      version: NATIVE_CONTRACT_VERSION,
+      operation: "prompt_queue",
+      nonce: NATIVE_PROMPT_QUEUE_NONCE,
+      toolCallId,
+    });
+    const first = native.decidePrompt(request("throw-first"), () => {
+      throw new Error("presenter failed");
+    });
+    const second = native.decidePrompt(request("throw-next"), async () => ({
+      decision: PromptQueueDecision.Allow,
+    }));
+    assert.deepEqual(await first, {
+      version: NATIVE_CONTRACT_VERSION,
+      operation: "prompt_queue",
+      ok: false,
+      nonce: NATIVE_PROMPT_QUEUE_NONCE,
+      toolCallId: "throw-first",
+      decision: PromptQueueDecision.Deny,
+    });
+    assert.equal((await second).decision, PromptQueueDecision.Allow);
+  },
+);
+
+test(
   "the native boundary queues a later prompt until the active UI settles",
   { timeout: 5000 },
   async () => {
@@ -315,6 +452,237 @@ test("steering stays bound to the prompt that submitted it", async () => {
     steering: "use the project policy instead",
   });
 });
+
+test(
+  "an aborted permission request cannot allow after a late UI confirmation",
+  { timeout: 5000 },
+  async () => {
+    const controller = new AbortController();
+    const confirmation = deferred<boolean>();
+    const opened = deferred<void>();
+    const pending = promptToolPermissionRequest(
+      { sendUserMessage() {} },
+      {
+        cwd: "/workspace/project",
+        hasUI: true,
+        mode: "rpc",
+        sessionId: "late-confirmation",
+        signal: controller.signal,
+        ui: {
+          confirm: async () => {
+            opened.resolve();
+            return confirmation.promise;
+          },
+        },
+      },
+      {
+        actor: { kind: "main" },
+        toolName: "read",
+        input: { path: "notes.md" },
+        cwd: "/workspace/project",
+        toolCallId: "late-confirmation-call",
+      },
+    );
+    await opened.promise;
+    controller.abort();
+    confirmation.resolve(true);
+    assert.notEqual(await pending, "allow");
+  },
+);
+
+test(
+  "a cancelled queued request never opens its permission UI",
+  { timeout: 5000 },
+  async () => {
+    const firstConfirmation = deferred<boolean>();
+    const opened = deferred<void>();
+    const controller = new AbortController();
+    let secondOpened = false;
+    const request = (toolCallId: string) => ({
+      actor: { kind: "main" as const },
+      toolName: "read",
+      input: { path: "notes.md" },
+      cwd: "/workspace/project",
+      toolCallId,
+    });
+    const first = promptToolPermissionRequest(
+      { sendUserMessage() {} },
+      {
+        cwd: "/workspace/project",
+        hasUI: true,
+        mode: "rpc",
+        sessionId: "queued-cancel-first",
+        ui: {
+          confirm: async () => {
+            opened.resolve();
+            return firstConfirmation.promise;
+          },
+        },
+      },
+      request("queued-cancel-first"),
+    );
+    await opened.promise;
+    const second = promptToolPermissionRequest(
+      { sendUserMessage() {} },
+      {
+        cwd: "/workspace/project",
+        hasUI: true,
+        mode: "rpc",
+        sessionId: "queued-cancel-second",
+        signal: controller.signal,
+        ui: {
+          confirm: async () => {
+            secondOpened = true;
+            return true;
+          },
+        },
+      },
+      request("queued-cancel-second"),
+    );
+    controller.abort();
+    const cancelled = await Promise.race([
+      second,
+      new Promise<"still-pending">((resolve) =>
+        setTimeout(() => resolve("still-pending"), 100),
+      ),
+    ]);
+    firstConfirmation.resolve(false);
+    assert.equal(await first, "deny");
+    assert.notEqual(
+      cancelled,
+      "still-pending",
+      "queued cancellation must settle before the active prompt",
+    );
+    assert.notEqual(await second, "allow");
+    assert.equal(secondOpened, false);
+  },
+);
+
+test(
+  "cancellation settles even when the UI ignores abort",
+  { timeout: 5000 },
+  async () => {
+    const controller = new AbortController();
+    const confirmation = deferred<boolean>();
+    const opened = deferred<void>();
+    const pending = promptToolPermissionRequest(
+      { sendUserMessage() {} },
+      {
+        cwd: "/workspace/project",
+        hasUI: true,
+        mode: "rpc",
+        sessionId: "ignored-abort",
+        signal: controller.signal,
+        ui: {
+          confirm: async () => {
+            opened.resolve();
+            return confirmation.promise;
+          },
+        },
+      },
+      {
+        actor: { kind: "main" },
+        toolName: "read",
+        input: { path: "notes.md" },
+        cwd: "/workspace/project",
+        toolCallId: "ignored-abort-call",
+      },
+    );
+    await opened.promise;
+    const later = promptToolPermissionRequest(
+      { sendUserMessage() {} },
+      {
+        cwd: "/workspace/project",
+        hasUI: true,
+        mode: "rpc",
+        sessionId: "after-ignored-abort",
+        ui: { confirm: async () => true },
+      },
+      {
+        actor: { kind: "main" },
+        toolName: "read",
+        input: { path: "other.md" },
+        cwd: "/workspace/project",
+        toolCallId: "after-ignored-abort-call",
+      },
+    );
+    controller.abort();
+    const result = await Promise.race([
+      pending,
+      new Promise<"still-pending">((resolve) =>
+        setTimeout(() => resolve("still-pending"), 100),
+      ),
+    ]);
+    const laterResult = await Promise.race([
+      later,
+      new Promise<"still-pending">((resolve) =>
+        setTimeout(() => resolve("still-pending"), 100),
+      ),
+    ]);
+    confirmation.resolve(true);
+    await pending;
+    assert.notEqual(
+      result,
+      "still-pending",
+      "cancellation must settle without UI cooperation",
+    );
+    assert.equal(
+      laterResult,
+      "allow",
+      "later prompts must progress before the old UI settles",
+    );
+  },
+);
+
+test(
+  "session shutdown rejects a late permission confirmation",
+  { timeout: 5000 },
+  async () => {
+    const handlers = new Map<
+      string,
+      (event: unknown, ctx: unknown) => unknown
+    >();
+    toolPermissionPolicy({
+      on(name: string, handler: (event: unknown, ctx: unknown) => unknown) {
+        handlers.set(name, handler);
+      },
+      registerCommand() {},
+      registerEntryRenderer() {},
+    } as never);
+    const confirmation = deferred<boolean>();
+    const opened = deferred<void>();
+    const pending = promptToolPermissionRequest(
+      { sendUserMessage() {} },
+      {
+        cwd: "/workspace/project",
+        hasUI: true,
+        mode: "rpc",
+        sessionId: "shutdown-test",
+        ui: {
+          confirm: async () => {
+            opened.resolve();
+            return confirmation.promise;
+          },
+        },
+      },
+      {
+        actor: { kind: "main" },
+        toolName: "read",
+        input: { path: "notes.md" },
+        cwd: "/workspace/project",
+        toolCallId: "shutdown-test-call",
+      },
+    );
+    await opened.promise;
+    assert.ok(handlers.get("session_shutdown"));
+    await handlers.get("session_shutdown")?.(
+      {},
+      { sessionId: "shutdown-test" },
+    );
+    confirmation.resolve(true);
+    assert.notEqual(await pending, "allow");
+  },
+);
 
 test("promptToolPermissionRequest holds the native queue until the visible prompt settles", async () => {
   const components: VisiblePrompt[] = [];

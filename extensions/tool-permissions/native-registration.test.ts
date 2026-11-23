@@ -102,7 +102,10 @@ test("bundled Rust registration calls pi.on and registerCommand for delegated ca
     return;
   }
   assert.ok(register);
-  const handlers = new Map<string, (event: unknown, ctx: any) => unknown>();
+  const handlers = new Map<
+    string,
+    Array<(event: unknown, ctx: any) => unknown>
+  >();
   const commands = new Map<
     string,
     { description?: string; handler: (args: string, ctx: unknown) => unknown }
@@ -124,7 +127,7 @@ test("bundled Rust registration calls pi.on and registerCommand for delegated ca
     },
     {
       on(eventName: string, handler: (event: unknown, ctx: any) => unknown) {
-        handlers.set(eventName, handler);
+        handlers.set(eventName, [...(handlers.get(eventName) ?? []), handler]);
       },
       registerCommand(
         name: string,
@@ -146,7 +149,7 @@ test("bundled Rust registration calls pi.on and registerCommand for delegated ca
       handleSessionStart(event: unknown, ctx: unknown) {
         handledSessionStarts.push({ event, ctx });
       },
-      handleToolCall(event: unknown, ctx: unknown) {
+      authorizeToolCall(event: unknown, ctx: unknown) {
         handledToolCalls.push({ event, ctx });
         return { block: true, reason: "delegated" };
       },
@@ -180,6 +183,11 @@ test("bundled Rust registration calls pi.on and registerCommand for delegated ca
     "command:permissions",
     "entry_renderer:permission-preview",
   ]);
+  assert.deepEqual(
+    [...handlers.keys()],
+    ["session_shutdown", "session_start", "tool_call", "tool_result"],
+    "Rust installs its session lifetime guard before Rust-owned lifecycle callbacks; tool callbacks remain bridge-delegated",
+  );
   assert.equal(
     commands.get("permissions")?.description,
     "Edit user or local tool permissions",
@@ -205,7 +213,10 @@ test("bundled Rust registration calls pi.on and registerCommand for delegated ca
         notices.push({ message, level }),
     },
   };
-  await handlers.get("session_start")?.(sessionStartEvent, sessionStartContext);
+  await handlers.get("session_start")?.[0](
+    sessionStartEvent,
+    sessionStartContext,
+  );
   assert.deepEqual(notices, [
     { message: "Rust native registration active.", level: "info" },
   ]);
@@ -219,7 +230,7 @@ test("bundled Rust registration calls pi.on and registerCommand for delegated ca
   };
   const toolCallContext = { cwd: "/tmp", hasUI: false, ui: {} };
   assert.deepEqual(
-    await handlers.get("tool_call")?.(toolCallEvent, toolCallContext),
+    await handlers.get("tool_call")?.[0](toolCallEvent, toolCallContext),
     { block: true, reason: "delegated" },
   );
   assert.deepEqual(handledToolCalls, [
@@ -228,7 +239,7 @@ test("bundled Rust registration calls pi.on and registerCommand for delegated ca
   const toolResultEvent = { toolCallId: "native-tool-call", content: [] };
   const toolResultContext = { cwd: "/tmp" };
   assert.deepEqual(
-    await handlers.get("tool_result")?.(toolResultEvent, toolResultContext),
+    await handlers.get("tool_result")?.[0](toolResultEvent, toolResultContext),
     { content: [{ type: "text", text: "delegated" }] },
   );
   assert.deepEqual(handledToolResults, [
@@ -236,13 +247,219 @@ test("bundled Rust registration calls pi.on and registerCommand for delegated ca
   ]);
   const shutdownEvent = {};
   const shutdownContext = { sessionId: "native-session" };
-  await handlers.get("session_shutdown")?.(shutdownEvent, shutdownContext);
+  const shutdownHandlers = handlers.get("session_shutdown") ?? [];
+  assert.equal(shutdownHandlers.length, 1);
+  await shutdownHandlers[0](shutdownEvent, shutdownContext);
   assert.deepEqual(handledSessionShutdowns, [
     { event: shutdownEvent, ctx: shutdownContext },
   ]);
   const commandContext = { cwd: "/tmp" };
   await commands.get("permissions")?.handler("local", commandContext);
   assert.deepEqual(handledCommands, [{ args: "local", ctx: commandContext }]);
+});
+
+test("Rust preserves product lifecycle callbacks while tool calls remain bridge-delegated", async () => {
+  const native = createRequire(import.meta.url)(
+    "./native/generated/index.js",
+  ) as {
+    registerToolPermissionsCallbacks(
+      request: unknown,
+      pi: unknown,
+      bridge: unknown,
+    ): { registrations: string[] };
+  };
+  const registrations: Array<{
+    name: string;
+    handler: (event: unknown, ctx: unknown) => unknown;
+  }> = [];
+  const toolCalls: Array<{ event: unknown; ctx: unknown }> = [];
+  const shutdowns: Array<{ event: unknown; ctx: unknown }> = [];
+  let finishShutdown!: () => void;
+  const cleanupFinished = new Promise<void>((resolve) => {
+    finishShutdown = resolve;
+  });
+
+  const response = native.registerToolPermissionsCallbacks(
+    {
+      version: NATIVE_CONTRACT_VERSION,
+      operation: "register_callbacks",
+      nonce: "distinct-lifecycle-shutdowns",
+    },
+    {
+      on(name: string, handler: (event: unknown, ctx: unknown) => unknown) {
+        registrations.push({ name, handler });
+      },
+      registerCommand() {},
+      registerEntryRenderer() {},
+    },
+    {
+      handleSessionStart() {},
+      handleSessionShutdown(event: unknown, ctx: unknown) {
+        shutdowns.push({ event, ctx });
+        return cleanupFinished;
+      },
+      authorizeToolCall(event: unknown, ctx: unknown) {
+        toolCalls.push({ event, ctx });
+        return { block: true, reason: "tool bridge remains delegated" };
+      },
+    },
+  );
+
+  assert.deepEqual(response.registrations, [
+    "session_start",
+    "tool_call",
+    "tool_result",
+    "session_shutdown",
+  ]);
+  assert.deepEqual(
+    registrations.map(({ name }) => name),
+    ["session_shutdown", "session_start", "tool_call", "tool_result"],
+    "one scoped shutdown guard owns product cleanup",
+  );
+  const scopedShutdown = registrations[0];
+  const toolCallHandler = registrations[2];
+  const shutdownEvent = {};
+  const shutdownContext = { sessionId: "test" };
+  const pendingCleanup = scopedShutdown.handler(shutdownEvent, shutdownContext);
+  assert.ok(pendingCleanup instanceof Promise);
+  await scopedShutdown.handler(shutdownEvent, shutdownContext);
+  assert.deepEqual(shutdowns, [{ event: shutdownEvent, ctx: shutdownContext }]);
+  finishShutdown();
+  await pendingCleanup;
+  const toolCall = { toolName: "read", toolCallId: "lifecycle-slice" };
+  const context = { cwd: "/tmp", hasUI: false };
+  assert.deepEqual(await toolCallHandler.handler(toolCall, context), {
+    block: true,
+    reason: "Permission session is closed.",
+  });
+  assert.deepEqual(toolCalls, []);
+});
+
+test("production registration exposes a sample command that notifies the user", async () => {
+  const native = createRequire(import.meta.url)(
+    "./native/generated/index.js",
+  ) as {
+    registerToolPermissionsCallbacks(
+      request: unknown,
+      pi: unknown,
+      bridge: unknown,
+    ): unknown;
+  };
+  const commands = new Map<
+    string,
+    { handler(args: string, ctx: unknown): unknown }
+  >();
+  const shutdownHandlers: Array<() => unknown> = [];
+  native.registerToolPermissionsCallbacks(
+    {
+      version: NATIVE_CONTRACT_VERSION,
+      operation: "register_callbacks",
+      nonce: "sample-live",
+    },
+    {
+      on(name: string, handler: () => unknown) {
+        if (name === "session_shutdown") shutdownHandlers.push(handler);
+      },
+      registerCommand(
+        name: string,
+        options: { handler(args: string, ctx: unknown): unknown },
+      ) {
+        commands.set(name, options);
+      },
+      registerEntryRenderer() {},
+    },
+    { authorizeToolCall() {} },
+  );
+  const command = commands.get("registration-sample");
+  assert.ok(command);
+  const notices: string[] = [];
+  await command.handler("", {
+    hasUI: true,
+    ui: {
+      notify(message: string) {
+        notices.push(message);
+      },
+    },
+  });
+  assert.deepEqual(notices, ["Rust sample command works."]);
+  for (const shutdown of shutdownHandlers) shutdown();
+  assert.throws(() =>
+    command.handler("", { hasUI: true, ui: { notify() {} } }),
+  );
+});
+
+test("direct registration installs a Rust-owned session callback without a bridge", () => {
+  const native = createRequire(import.meta.url)(
+    "./native/generated/index.js",
+  ) as {
+    registerDirectCallbacks: (pi: unknown) => boolean;
+  };
+  const handlers = new Map<string, unknown>();
+  const registered = native.registerDirectCallbacks({
+    on(name: string, handler: unknown) {
+      handlers.set(name, handler);
+    },
+    registerCommand() {},
+    registerEntryRenderer() {},
+  });
+  assert.equal(registered, true);
+  assert.equal(typeof handlers.get("session_info_changed"), "function");
+});
+
+test("direct registration installs a Rust-owned sample command without a bridge", () => {
+  const native = createRequire(import.meta.url)(
+    "./native/generated/index.js",
+  ) as {
+    registerDirectCallbacks: (pi: unknown) => boolean;
+  };
+  const commands = new Map<string, unknown>();
+  native.registerDirectCallbacks({
+    on() {},
+    registerCommand(name: string, options: unknown) {
+      commands.set(name, options);
+    },
+    registerEntryRenderer() {},
+  });
+  assert.ok(commands.has("registration-sample"));
+});
+
+test("one shutdown revokes all direct-registration callbacks", async () => {
+  const native = createRequire(import.meta.url)(
+    "./native/generated/index.js",
+  ) as { registerDirectCallbacks(pi: unknown): boolean };
+  const handlers = new Map<
+    string,
+    Array<(event: unknown, context: unknown) => unknown>
+  >();
+  const commands = new Map<
+    string,
+    { handler(args: string, context: unknown): unknown }
+  >();
+  native.registerDirectCallbacks({
+    on(name: string, handler: (event: unknown, context: unknown) => unknown) {
+      handlers.set(name, [...(handlers.get(name) ?? []), handler]);
+    },
+    registerCommand(
+      name: string,
+      options: { handler(args: string, context: unknown): unknown },
+    ) {
+      commands.set(name, options);
+    },
+    registerEntryRenderer() {},
+  });
+  const shutdown = handlers.get("session_shutdown") ?? [];
+  assert.equal(shutdown.length, 1);
+  const event = handlers.get("session_info_changed")?.[0];
+  const command = commands.get("registration-sample");
+  assert.ok(event);
+  assert.ok(command);
+  shutdown[0]({}, {});
+  await assert.rejects(
+    Promise.resolve(event({ type: "session_info_changed" }, {})),
+  );
+  assert.throws(() =>
+    command.handler("", { hasUI: true, ui: { notify() {} } }),
+  );
 });
 
 test("Rust callback dispatches after tracer initialization returns", async () => {
@@ -352,7 +569,10 @@ test("shutdown during initialization prevents a live scoped registration", () =>
   const registrations: string[] = [];
   assert.throws(() =>
     native.registerCallbackTracer({
-      on(eventName: string, handler: (event: unknown, ctx: unknown) => unknown) {
+      on(
+        eventName: string,
+        handler: (event: unknown, ctx: unknown) => unknown,
+      ) {
         registrations.push(eventName);
         if (eventName === "session_shutdown") handler({}, {});
       },
@@ -436,7 +656,7 @@ test("shutdown cancels Rust tracer work before its asynchronous dispatch", async
     handler({ type: "session_info_changed", name: "pending" }, {}),
   );
   assert.equal(shutdown({}, {}), true);
-  await assert.rejects(pending, /callback tracer state is unavailable/);
+  await assert.rejects(pending, /session state is unavailable/);
 });
 
 test("Rust tracer accepts the Pi session info changed event shape", async () => {

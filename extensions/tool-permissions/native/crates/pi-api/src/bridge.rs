@@ -15,30 +15,22 @@ pub enum CallbackPresence {
 /// `pi` plus the JavaScript object that holds behavior callbacks.
 pub struct Bridge<'scope> {
     env: &'scope Env,
-    pi: Pi<'scope>,
+    pi: Pi,
     source: Option<Object<'scope>>,
 }
 
 type EventCallback = FunctionRef<FnArgs<(Unknown<'static>, Unknown<'static>)>, Unknown<'static>>;
 
 impl<'scope> Bridge<'scope> {
-    pub fn new(
-        env: &'scope Env,
-        pi: Object<'scope>,
-        source: Option<Object<'scope>>,
-    ) -> Result<Self> {
-        Ok(Self {
-            env,
-            pi: Pi::new(env, pi)?,
-            source,
-        })
+    pub fn new(env: &'scope Env, pi: Pi, source: Option<Object<'scope>>) -> Result<Self> {
+        Ok(Self { env, pi, source })
     }
 
     pub fn env(&self) -> &'scope Env {
         self.env
     }
 
-    pub fn pi(&self) -> &Pi<'scope> {
+    pub fn pi(&self) -> &Pi {
         &self.pi
     }
 
@@ -83,7 +75,7 @@ impl<'scope> Bridge<'scope> {
                     let callback = callback.borrow_back(ctx.env)?;
                     callback.call(FnArgs::from((event_value, extension_context)))
                 })?;
-            self.pi.on(event, handler)?;
+            self.pi.on(self.env, event, handler)?;
         } else {
             let handler = self
                 .env
@@ -93,7 +85,7 @@ impl<'scope> Bridge<'scope> {
                     }
                     Ok(())
                 })?;
-            self.pi.on(event, handler)?;
+            self.pi.on(self.env, event, handler)?;
         }
         Ok(true)
     }

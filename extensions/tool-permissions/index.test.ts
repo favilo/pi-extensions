@@ -38,7 +38,7 @@ exports.registerToolPermissionsCallbacks = (request, pi, bridge) => {
     if (ctx.hasUI) ctx.ui.notify("Rust native registration active.", "info");
     return bridge.handleSessionStart(event, ctx);
   });
-  pi.on("tool_call", (event, ctx) => bridge.handleToolCall(event, ctx));
+  pi.on("tool_call", (event, ctx) => bridge.authorizeToolCall(event, ctx));
   pi.on("tool_result", (event, ctx) => bridge.handleToolResult(event, ctx));
   pi.on("session_shutdown", (event, ctx) => bridge.handleSessionShutdown(event, ctx));
   pi.registerCommand("permissions", { description: "Edit user or local tool permissions", handler: (args, ctx) => bridge.handlePermissionsCommand(args, ctx) });
@@ -158,6 +158,68 @@ exports.registerToolPermissionsCallbacks = (request, pi, bridge) => {
   }
 });
 
+test("production registration provides native steering ownership to main calls only", async () => {
+  const directory = mkdtempSync(
+    join(tmpdir(), "pi-permissions-native-steering-production-"),
+  );
+  const packagePath = join(directory, "native.cjs");
+  writeFileSync(
+    packagePath,
+    `
+exports.probe = (request) => ({ version: 1, operation: request.operation, ok: true, nonce: request.nonce });
+exports.registerToolPermissionsCallbacks = (request, pi, bridge) => {
+  if (typeof bridge.recordSteering !== "function" || typeof bridge.discardSteering !== "function") {
+    throw new Error("native steering capabilities are unavailable");
+  }
+  pi.on("tool_call", (event, ctx) => {
+    if (ctx.mode === "child") return undefined;
+    return bridge.authorizeToolCall(event, ctx);
+  });
+  pi.on("tool_result", (event, ctx) => bridge.handleToolResult(event, ctx));
+  return { version: 1, operation: "register_callbacks", ok: true, nonce: request.nonce, registrations: ["tool_call", "tool_result"] };
+};
+`,
+    "utf8",
+  );
+  const previousPackage = process.env.PI_TOOL_PERMISSIONS_NATIVE_PACKAGE;
+  const previousDisable = process.env.PI_TOOL_PERMISSIONS_NATIVE_DISABLE;
+  const restoreNativePackagePath = setNativePackagePathForTests(packagePath);
+  const handlers = new Map<
+    string,
+    Array<(event: unknown, ctx: unknown) => unknown>
+  >();
+  delete process.env.PI_TOOL_PERMISSIONS_NATIVE_PACKAGE;
+  delete process.env.PI_TOOL_PERMISSIONS_NATIVE_DISABLE;
+  try {
+    toolPermissionPolicy({
+      registerCommand() {},
+      registerEntryRenderer() {},
+      on(event: string, handler: (event: unknown, ctx: unknown) => unknown) {
+        handlers.set(event, [...(handlers.get(event) ?? []), handler]);
+      },
+    } as never);
+    assert.equal(handlers.get("tool_call")?.length, 1);
+    assert.equal(handlers.get("tool_result")?.length, 1);
+    assert.equal(
+      await handlers.get("tool_call")?.[0]?.(
+        { toolName: "subagent-tool-request", toolCallId: "child-call", input: {} },
+        { mode: "child", cwd: "/tmp", hasUI: false, ui: {} },
+      ),
+      undefined,
+      "child bridge calls remain isolated from main-session steering",
+    );
+  } finally {
+    restoreNativePackagePath();
+    if (previousPackage === undefined)
+      delete process.env.PI_TOOL_PERMISSIONS_NATIVE_PACKAGE;
+    else process.env.PI_TOOL_PERMISSIONS_NATIVE_PACKAGE = previousPackage;
+    if (previousDisable === undefined)
+      delete process.env.PI_TOOL_PERMISSIONS_NATIVE_DISABLE;
+    else process.env.PI_TOOL_PERMISSIONS_NATIVE_DISABLE = previousDisable;
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
 test("startup uses WASM registration and does not install a TypeScript engine", async () => {
   const directory = mkdtempSync(
     join(tmpdir(), "pi-permissions-native-runtime-"),
@@ -172,7 +234,7 @@ exports.registerToolPermissionsCallbacks = (request, pi, bridge) => {
     if (ctx.hasUI) ctx.ui.notify("WASM tool-permissions active.", "info");
     return bridge.handleSessionStart(event, ctx);
   });
-  pi.on("tool_call", (event, ctx) => bridge.handleToolCall(event, ctx));
+  pi.on("tool_call", (event, ctx) => bridge.authorizeToolCall(event, ctx));
   return {
     version: 1,
     operation: "register_callbacks",

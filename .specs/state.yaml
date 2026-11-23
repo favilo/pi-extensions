@@ -1,17 +1,19 @@
 active_flow: build_epic
-active_epic_id: e15
-active_story_id: e15s03
-active_story: Inject terminal completion into the agent queue
-active_bug_id: null
+active_epic_id: e19
+active_story_id: e19s04
+active_story: e19s04
+active_story_title: Move tool authorization and result orchestration into Rust
+active_bug_id: BUG-2026-11-20T101309
 bug_cycle:
-  current_step: null
-  completed_steps: []
+  current_step: 1
+  completed_steps:
+  - investigate-bug
 vcs:
   kind: jj
-  workspace: background-bash-completion
-  last_completed_change: moynskuoppoq
-  parent_bookmark: favilo/later-epic-outlines
-  feature_bookmark: favilo/background-bash-completion
+  workspace: e18s04-prompt-queue
+  last_completed_change: b6512463
+  parent_bookmark: favilo/e19s02-async-prompt-lifecycle
+  workspace_change: wnwslmmx
 planning:
   e16:
     status: completed
@@ -112,28 +114,54 @@ planning:
     constraints:
     - Do not modify the e06 repair flow or child-private bridge catalog.
 handoff:
-  last_step_completed: 'e15s03 completion wake fix: RED 2381ef48 + GREEN 2fee19bb;
-    live task bash-f02f7fbf completed and started a turn without a user message'
-  open_decisions: []
+  last_step_completed: 'e19s04 complete: Rust owns direct tool callback registration,
+    malformed/late-call fail-closed guards, invocation-bound steering, and result annotation;
+    temporary policy/UI bridge remains explicitly sequenced to e19s05/e19s06.'
+  open_decisions:
+  - Migrate interactive policy/UI ownership in e19s05, final lifecycle cleanup in
+    e19s08, and remove the remaining TypeScript bridge in e19s06.
   required_reading:
-  - .specs/epics/e15-background-bash-monitors/epic.yaml
-  - .specs/epics/e15-background-bash-monitors/e15s03-background-bash-completion-notify.md
-  - .specs/epics/e15-background-bash-monitors/e15s03-tasks.yaml
-  - .specs/epics/e15-background-bash-monitors/e15s02-live-bash-monitors.md
-  - extensions/background-bash/index.ts
-  - extensions/background-bash/lifecycle.ts
-  - extensions/background-bash/lifecycle.test.ts
-  - extensions/background-bash/monitor.test.ts
-  - extensions/background-bash/permission-boundary.test.ts
-  next_skill: verify-work
-  context: 'Bug: completion used monitorDeliveryOptions(ctx) so triggerTurn followed
-    ctx.isIdle(); settle race left triggerTurn false and Pi only appended. Fix: completionDeliveryOptions
-    always {deliverAs:steer, triggerTurn:true}; monitor progress still idle-gated.
-    Cursor bridge kept. Live: session 2026-11-23T20-48-55… custom_message at 21:25:47.696Z
-    then assistant at 21:26:01.192Z. Bookmark favilo/background-bash-completion at
-    2fee19bb. Remaining: update e15s03-tasks.yaml if needed, verify-work, optional
-    pure idle settle test without bash_task poll.'
-  blocker: null
+  - .specs/IMPACT-e19s04.md
+  - .specs/epics/e19-full-rust-pi-event-orchestration/e19s04-rust-lifecycle-and-tool-orchestration.md
+  - .specs/epics/e19-full-rust-pi-event-orchestration/e19s04-tasks.yaml
+  - extensions/tool-permissions/index.ts
+  - extensions/tool-permissions/native/crates/tool-permissions-native/src/registration.rs
+  - extensions/tool-permissions/native/crates/pi-api/src/session_scope.rs
+  - extensions/tool-permissions/native/crates/tool-permissions-native/src/lifecycle_callbacks.rs
+  - extensions/tool-permissions/native-registration.test.ts
+  - extensions/tool-permissions/native-prompt-queue.test.ts
+  next_skill: develop-tdd
+  latest_progress: >-
+    Interactive Pi smoke matrix passed: native registration was active; deny blocked an
+    unmatched write; allow-once wrote; steering was injected into the matching result and
+    followed; saved project rule auto-allowed a matching write; killing Pi with a pending
+    prompt failed closed; and a clean relaunch had no stale prompt or steering state.
+    Escape is not prompt cancellation; only abort/shutdown cancels. Rust owns callback
+    registration, validation, session guards, steering state, and result annotation;
+    TypeScript temporarily owns policy dispatch, preview cleanup, and prompt UI.
+    Story traceability is waived; no push performed.
+  replanning_update: >-
+    e19s04 is complete at its callback-orchestration scope. e19s05 owns interactive
+    policy/UI state, e19s08 owns final lifecycle cleanup, and e19s06 removes the
+    TypeScript bridge after both have parity.
+  context: >-
+    Begin e19s05 interactive permission surface migration. Do not remove RegistrationBridge
+    before e19s05/e19s08 migration is complete; e19s06 owns final bridge removal. Story
+    tracing is waived; no push performed.
+  session_handoff: >-
+    e19s04 scope was honestly respecified: Rust registration.rs owns pi.on(tool_call),
+    malformed-call validation, late/session-closed failure, Rust session-scoped steering,
+    and result annotation. The temporary TypeScript authorizeToolCall policy/UI host
+    capability is not an e19s04 blocker; e19s05 owns interactive migration, e19s08
+    lifecycle cleanup, and e19s06 final bridge removal. Interactive Pi UAT passed deny,
+    allow-once, steering result injection, saved-rule auto-allow, forced shutdown
+    fail-closed, and clean relaunch. Escape does not cancel a permission prompt; only
+    request/session abort or shutdown does. Historical audit wording was corrected.
+    scripts/pi-workspace.sh uses a per-run mktemp overlay. No push performed.
+  blocker: ''
+  implementation_update: 'e19s02 accepted: tests and independent security re-review
+    passed; NFR accepted for existing liveness bounds, traceability waived by user.
+    See .specs/verifications/e19s02-verify.yaml.'
   planning_handoff:
     later_epics_outlined_at: '2026-11-20T14:05:00Z'
     status: outline_created
@@ -197,7 +225,7 @@ metrics:
       calls: 5
       total_seconds: 5191.0
       avg_seconds: 1038.2
-      _start: '2026-09-02T17:43:06Z'
+      _start: '2026-11-20T20:52:26Z'
     audit-code:
       calls: 3
       total_seconds: 3246.0
@@ -218,4 +246,4 @@ metrics:
       calls: 1
       total_seconds: 297.0
       avg_seconds: 297.0
-  story_start: 2026-11-23 11:29:00+00:00
+  story_start: '2026-11-17T21:43:00Z'

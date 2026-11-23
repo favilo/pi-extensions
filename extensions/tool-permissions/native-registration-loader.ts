@@ -20,14 +20,18 @@ type NativeRegistrationHost = Pick<
   "on" | "registerCommand" | "registerEntryRenderer"
 >;
 
-type NativeRegistrationBridge = {
+export type NativeRegistrationBridge = {
+  recordSteering?(toolCallId: string, steering: string): boolean;
+  discardSteering?(toolCallId: string): boolean;
+  /** Temporary host boundary for UI, filesystem, and Pi-specific authorization behavior. */
+  authorizeToolCall?(event: unknown, context: unknown): unknown;
   renderPermissionPreview?(
     entry: unknown,
     options: unknown,
     theme: unknown,
   ): unknown;
   handleSessionStart?(event: unknown, ctx: unknown): unknown;
-  handleToolCall(event: unknown, ctx: unknown): unknown;
+  authorizeToolCall?(event: unknown, context: unknown): unknown;
   handleToolResult?(event: unknown, ctx: unknown): unknown;
   handleSessionShutdown?(event: unknown, ctx: unknown): unknown;
   handlePermissionsCommand?(args: unknown, ctx: unknown): unknown;

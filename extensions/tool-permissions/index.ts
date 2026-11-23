@@ -82,6 +82,7 @@ import {
 import {
   hasNativeRegistration,
   registerNativeToolPermissionsCallbacks,
+  type NativeRegistrationBridge,
 } from "./native-registration-loader.ts";
 import { fatalNativeEngineUnavailable } from "./native-load-fatal.ts";
 import type {
@@ -109,6 +110,9 @@ export type PermissionContext = {
   cwd: string;
   /** The pi tool-call identity for the invocation currently being authorized. */
   toolCallId?: string;
+  // Temporary host capability until prompt ownership moves to Rust.
+  recordNativeSteering?: (toolCallId: string, steering: string) => boolean;
+  discardNativeSteering?: (toolCallId: string) => boolean;
   hasUI: boolean;
   mode: string;
   ui: {
@@ -952,10 +956,25 @@ async function presentScrollablePermission(
 ): Promise<PermissionResult> {
   if (ctx.mode !== "tui" || !ctx.ui.custom) {
     const bodyWithHeader = stickyHeader ? `${stickyHeader}\n\n${body}` : body;
-    const allowed = await ctx.ui.confirm(title, bodyWithHeader, { signal });
-    return allowed
-      ? { allowed: true, decision: "allow_once" }
-      : { allowed: false, decision: "deny" };
+    const confirmation = ctx.ui.confirm(title, bodyWithHeader, { signal });
+    let onAbort: (() => void) | undefined;
+    try {
+      const cancelled = new Promise<PermissionResult>((resolve) => {
+        onAbort = () => resolve({ allowed: false, decision: "cancel" });
+        signal.addEventListener("abort", onAbort, { once: true });
+        if (signal.aborted) onAbort();
+      });
+      return await Promise.race([
+        confirmation.then((allowed): PermissionResult =>
+          allowed
+            ? { allowed: true, decision: "allow_once" }
+            : { allowed: false, decision: "deny" },
+        ),
+        cancelled,
+      ]);
+    } finally {
+      if (onAbort) signal.removeEventListener("abort", onAbort);
+    }
   }
 
   const rawLines = body.split("\n");
@@ -1070,8 +1089,16 @@ async function presentScrollablePermission(
         // Denials carry the steering text inside the invocation-bound block
         // reason (see deniedResult). Allows annotate the invocation-bound tool
         // result (see the tool_result handler) — no floating steer messages.
-        if (result.allowed && toolCallId)
-          pendingSteering.set(toolCallId, steering);
+        if (result.allowed && toolCallId) {
+          if (ctx.recordNativeSteering) {
+            if (!ctx.recordNativeSteering(toolCallId, steering)) {
+              done({ allowed: false, decision: "cancel" });
+              return;
+            }
+          } else {
+            pendingSteering.set(toolCallId, steering);
+          }
+        }
         done({ ...result, steering });
       };
 
@@ -1463,7 +1490,7 @@ async function presentOnNativePromptQueue(
   const release = trackSessionPromptAbort(sessionId, abort);
   let outcome: PermissionResult | undefined;
   try {
-    const bound = await presentBoundPrompt(
+    const prompt = presentBoundPrompt(
       {
         version: NATIVE_CONTRACT_VERSION,
         operation: "prompt_queue",
@@ -1482,9 +1509,26 @@ async function presentOnNativePromptQueue(
         return promptResolution(outcome);
       },
     );
-    const accepted = acceptBoundPermission(bound, outcome, queueId);
-    if (outcome?.allowed && !accepted.allowed && request.toolCallId)
+    let onAbort: (() => void) | undefined;
+    const cancelled = new Promise<undefined>((resolve) => {
+      onAbort = () => resolve(undefined);
+      abort.signal.addEventListener("abort", onAbort, { once: true });
+      if (promptWasCancelled(abort.signal)) onAbort();
+    });
+    let bound: Awaited<typeof prompt> | undefined;
+    try {
+      bound = await Promise.race([prompt, cancelled]);
+    } finally {
+      if (onAbort) abort.signal.removeEventListener("abort", onAbort);
+    }
+    const accepted =
+      !bound || promptWasCancelled(abort.signal)
+        ? { allowed: false as const, decision: "cancel" as const }
+        : acceptBoundPermission(bound, outcome, queueId);
+    if (outcome?.allowed && !accepted.allowed && request.toolCallId) {
+      ctx.discardNativeSteering?.(request.toolCallId);
       pendingSteering.delete(request.toolCallId);
+    }
     return accepted;
   } finally {
     ctx.signal?.removeEventListener("abort", abortFromParent);
@@ -2742,10 +2786,19 @@ async function handleRegisteredToolCall(
   event: any,
   extensionContext: any,
   pi: ExtensionAPI,
+  steering: {
+    recordSteering(id: string, text: string): boolean;
+    discardSteering(id: string): boolean;
+  },
 ): Promise<ToolCallEventResult> {
   // Bind the pi tool-call identity to this invocation so prompts and
   // steering messages can reference the exact call.
-  const ctx = { ...extensionContext, toolCallId: event.toolCallId };
+  const ctx = {
+    ...extensionContext,
+    toolCallId: event.toolCallId,
+    recordNativeSteering: steering.recordSteering,
+    discardNativeSteering: steering.discardSteering,
+  };
   // Child sessions expose this bridge as their only tool. Its payload is
   // authorized by the parent boundary, so the child-side policy must not
   // intercept it as an unknown standalone tool.
@@ -2806,34 +2859,44 @@ async function handleRegisteredToolCall(
 }
 
 export default function toolPermissionPolicy(pi: ExtensionAPI) {
-  const nativeRegistration = registerNativeToolPermissionsCallbacks(pi, {
-    renderPermissionPreview: (entry, options, theme) =>
-      renderRegisteredPermissionPreview(
-        entry as { data?: PermissionPreview },
-        options as { expanded: boolean },
-        theme,
-      ),
-    handleSessionStart: (_event, ctx) =>
-      handleRegisteredSessionStart(ctx as PermissionContext, {
-        reportNativeProbe: false,
-      }),
-    handleToolCall: (event, ctx) => handleRegisteredToolCall(event, ctx, pi),
-    handleToolResult: (event) =>
-      handleRegisteredToolResult(event as ToolResultEvent),
-    handleSessionShutdown: (_event, ctx) =>
-      handleRegisteredSessionShutdown(ctx),
-    handlePermissionsCommand: (args, ctx) =>
-      handleRegisteredPermissionsCommand(
-        String(args),
-        ctx as ExtensionCommandContext,
-      ),
-  });
+  const steering = {
+    recordSteering: (_id: string, _text: string): boolean => false,
+    discardSteering: (_id: string): boolean => false,
+  };
+  const nativeRegistration = registerNativeToolPermissionsCallbacks(
+    pi,
+    Object.assign(steering, {
+      renderPermissionPreview: (entry, options, theme) =>
+        renderRegisteredPermissionPreview(
+          entry as { data?: PermissionPreview },
+          options as { expanded: boolean },
+          theme,
+        ),
+      handleSessionStart: (_event, ctx) =>
+        handleRegisteredSessionStart(ctx as PermissionContext, {
+          reportNativeProbe: false,
+        }),
+      authorizeToolCall: (event, ctx) =>
+        handleRegisteredToolCall(event, ctx, pi, steering),
+      handleToolResult: (event) =>
+        handleRegisteredToolResult(event as ToolResultEvent),
+      handleSessionShutdown: (_event, ctx) =>
+        handleRegisteredSessionShutdown(ctx),
+      handlePermissionsCommand: (args, ctx) =>
+        handleRegisteredPermissionsCommand(
+          String(args),
+          ctx as ExtensionCommandContext,
+        ),
+    } satisfies NativeRegistrationBridge),
+  );
 
   if (nativeRegistration.mode !== "native") {
     fatalNativeEngineUnavailable(nativeRegistration.reason);
   }
 
   if (!hasNativeRegistration(nativeRegistration, "tool_call")) {
-    fatalNativeEngineUnavailable("native registration is incomplete; missing tool_call");
+    fatalNativeEngineUnavailable(
+      "native registration is incomplete; missing tool_call",
+    );
   }
 }

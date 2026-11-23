@@ -1,6 +1,6 @@
 story_id: e19s03
 title: Register Pi callbacks directly from Rust
-status: failing
+status: cancelled
 bcps: 5
 spec: e19s03-rust-direct-pi-registration.md
 tasks:
@@ -9,7 +9,7 @@ tasks:
     verify: npm test -- extensions/tool-permissions/native-registration.test.ts
     risk: P0
     security: high
-    status: failing
+    status: cancelled
     allure:
       severity: critical
       categories:
@@ -17,11 +17,11 @@ tasks:
         - Registration
         - Security Review
   - id: 2
-    description: Replace bridge-forwarded registration callbacks with Rust-created adapters that dispatch to typed Rust handler traits.
+    description: Implement a separate Rust registration harness with adapters that dispatch to typed Rust handlers without a TypeScript bridge.
     verify: npm test -- extensions/tool-permissions/native-registration.test.ts
     risk: P0
     security: high
-    status: failing
+    status: cancelled
     allure:
       severity: critical
       categories:
@@ -29,14 +29,15 @@ tasks:
         - Callback safety
         - Security Review
   - id: 3
-    description: Remove registration-time TypeScript bridge requirements while retaining the Pi API handoff to Rust.
+    description: Verify the production bridge and existing permission behavior remain intact during this story.
     verify: npm run check
     risk: P0
     security: high
-    status: failing
+    status: cancelled
     allure:
       severity: critical
       categories:
         - Typecheck
         - Registration
         - Security Review
+resolution: Superseded by earlier callback work; user waived remaining original acceptance criteria and confirmed registration-sample works in a fresh Pi session. Production migration continues in e19s04-e19s05.

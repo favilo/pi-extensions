@@ -29,6 +29,13 @@ Before running a command, verify that any scripts/*.sh path belongs to the
 project or to Bigpowers. If it belongs to Bigpowers, rewrite it using the
 required absolute-path form.
 
+## Story traceability
+
+- Skip story traceability generation and story-tag coverage checks by default.
+  Do not run trace-stories or require traceability matrices as a story gate unless
+  the user explicitly requests it. Record the skip as a user-directed waiver; do
+  not describe skipped checks as passing.
+
 ## Version control
 
 - `main` is protected: never push directly to it. Land every change through a
