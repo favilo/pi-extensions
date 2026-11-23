@@ -99,10 +99,10 @@ epics:
   - id: e15
     title: Background Bash execution with live agent-flow monitors
     capsule_dir: epics/e15-background-bash-monitors
-    wsjf: 0.0
-    bcps: 8
+    wsjf: 9.0
+    bcps: 11
     note: >-
-      Unscored backlog epic. Let an authorized Bash command run as a parent-session-owned cancellable task and, when explicitly monitored, safely inject its bounded, attributed output lines into the agent flow as steering or an idle-triggered turn.
+      WSJF = (business value 8 + time criticality 5 + risk reduction 5) / job size 2 = 9.0 for e15s03 completion notify. e15s01–s02 remain passing (lifecycle + opt-in line monitors). e15s03 adds always-on terminal `background_bash_complete` injection so agents await completion instead of polling; monitors stay a separate occasional-progress channel.
   - id: e16
     title: Rust/WASM core migration for tool-permissions
     capsule_dir: epics/archive/e16-rust-wasm-tool-permissions-core

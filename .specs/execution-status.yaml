@@ -49,8 +49,9 @@ development_status:
   e10s03: passing
   e13s01: todo
   e14s01: todo
-  e15s01: todo
-  e15s02: todo
+  e15s01: passing
+  e15s02: passing
+  e15s03: todo
   e16s01: passing
   e16s02: todo
   e16s03: todo
