@@ -250,24 +250,6 @@ export function registerBackgroundBash(
                   monitorDeliveryOptions(ctx),
                 );
               },
-              onMonitorComplete: (completed: BackgroundBashTask) => {
-                pi.sendMessage(
-                  {
-                    customType: "background_bash_monitor",
-                    content: `task ${completed.id} completed with status ${completed.status}`,
-                    display: true,
-                    details: {
-                      taskId: completed.id,
-                      terminal: true,
-                      status: completed.status,
-                      exitCode: completed.exitCode,
-                      signal: completed.signal,
-                      omitted: monitorOmitted,
-                    },
-                  },
-                  monitorDeliveryOptions(ctx),
-                );
-              },
             }
           : {}),
       });
