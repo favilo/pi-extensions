@@ -30,7 +30,7 @@ Replace the broken OpenAI/Codex branch in `extensions/usage/` with a multi-pass-
 
 | Candidate | Source | Verdict | Notes |
 |-----------|--------|---------|-------|
-| `hjanuschka/pi-multi-pass` Codex checker | `/Users/kevin.oberlies/git/agents/pi-multi-pass/extensions/multi-sub.ts` (`codexQuotaChecker`, `parseCodexUsageSnapshot`) | extend | Port endpoint, headers, window parse, and `chatgpt_account_id` gate; do not take pools/subs. |
+| `hjanuschka/pi-multi-pass` Codex checker | `~/git/agents/pi-multi-pass/extensions/multi-sub.ts` (`codexQuotaChecker`, `parseCodexUsageSnapshot`) | extend | Port endpoint, headers, window parse, and `chatgpt_account_id` gate; do not take pools/subs. |
 | Existing e05 `/usage` adapter | `extensions/usage/index.ts` | extend | Keep adapter surface; replace OpenAI/Codex OAuth implementation. |
 
 ## 6. Requirements
