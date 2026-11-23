@@ -211,7 +211,7 @@ test("active sessions receive monitor messages as steering without triggering a 
   }
 });
 
-test("monitored task sends one terminal summary after output delivery", async () => {
+test("monitored task sends one completion message without a monitor terminal summary", async () => {
   let emit: ((stream: "stdout" | "stderr", chunk: string) => void) | undefined;
   let exit:
     | ((outcome: {
@@ -226,23 +226,32 @@ test("monitored task sends one terminal summary after output delivery", async ()
   });
   try {
     const bash = tools.get("bash")!;
-    await bash.execute(
+    const result = await bash.execute(
       "c1",
       { command: "echo done", background: true, monitor: true },
       new AbortController().signal,
       undefined,
       { cwd: "/w" },
     );
+    const taskId = (result.details as { id: string }).id;
     emit?.("stdout", "done\n");
     exit?.({ code: 0, signal: null });
     exit?.({ code: 0, signal: null });
     assert.equal(messages.length, 2);
-    assert.match(
-      String(
-        (messages.at(-1) as { message: { content: string } }).message.content,
-      ),
-      /completed/,
-    );
+    assert.deepEqual(messages.at(-1), {
+      message: {
+        customType: "background_bash_complete",
+        content: `task ${taskId} completed with status completed`,
+        display: true,
+        details: {
+          taskId,
+          status: "completed",
+          exitCode: 0,
+          signal: null,
+        },
+      },
+      options: { deliverAs: "steer", triggerTurn: true },
+    });
   } finally {
     cleanup();
   }

@@ -172,6 +172,22 @@ export function registerBackgroundBash(
       const task = controller.launch({
         command: input.command,
         cwd,
+        onComplete: (completed: BackgroundBashTask) => {
+          pi.sendMessage(
+            {
+              customType: "background_bash_complete",
+              content: `task ${completed.id} completed with status ${completed.status}`,
+              display: true,
+              details: {
+                taskId: completed.id,
+                status: completed.status,
+                exitCode: completed.exitCode ?? null,
+                signal: completed.signal ?? null,
+              },
+            },
+            monitorDeliveryOptions(ctx),
+          );
+        },
         ...(typeof input.timeout === "number"
           ? { timeoutSeconds: input.timeout }
           : {}),

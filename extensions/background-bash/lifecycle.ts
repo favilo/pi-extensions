@@ -158,9 +158,14 @@ export function createBackgroundBashController(options: {
     clearTimer(id);
     monitors.get(id)?.close();
     monitors.delete(id);
-    const onComplete = monitorCompletions.get(id);
+    const onMonitorComplete = monitorCompletions.get(id);
     monitorCompletions.delete(id);
-    if (!closed) onComplete?.({ ...task });
+    const onComplete = completions.get(id);
+    completions.delete(id);
+    if (!closed) {
+      onMonitorComplete?.({ ...task });
+      onComplete?.({ ...task });
+    }
     processes.delete(id);
   }
 
