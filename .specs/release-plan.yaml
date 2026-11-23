@@ -101,8 +101,9 @@ epics:
     capsule_dir: epics/e15-background-bash-monitors
     wsjf: 9.0
     bcps: 11
+    status: completed
     note: >-
-      WSJF = (business value 8 + time criticality 5 + risk reduction 5) / job size 2 = 9.0 for e15s03 completion notify. e15s01–s02 remain passing (lifecycle + opt-in line monitors). e15s03 adds always-on terminal `background_bash_complete` injection so agents await completion instead of polling; monitors stay a separate occasional-progress channel.
+      Completed. e15s01–s02 provide lifecycle and opt-in line monitors; e15s03 adds always-on terminal `background_bash_complete` injection so agents await completion instead of polling. Completion always requests a turn safely, while monitor progress stays idle-gated.
   - id: e16
     title: Rust/WASM core migration for tool-permissions
     capsule_dir: epics/archive/e16-rust-wasm-tool-permissions-core
@@ -149,9 +150,9 @@ epics:
     title: Extension edit-tool diff approval
     capsule_dir: epics/e22-extension-edit-diff-approval
     wsjf: 3.2
-    bcps: 9
+    bcps: 12
     note: >-
-      WSJF = (business value 5 + time criticality 3 + risk reduction 8) / job size 5 = 3.2. Absorbs e13 full-diff review and adds ~/.pi/agent settings-registered extension edit tools, beginning with obsidian_edit.
+      WSJF = (business value 5 + time criticality 3 + risk reduction 8) / job size 5 = 3.2 for original e22s01–s03. Absorbs e13 full-diff review, adds settings-registered extension edit tools beginning with obsidian_edit, and adds e22s04 for exact-count multi-match built-in edits via matches_expected.
   - id: e23
     title: Cross-session messaging
     capsule_dir: epics/e23-cross-session-messaging

@@ -1,6 +1,6 @@
 story_id: e15s03
 title: Inject terminal completion into the agent queue
-status: pending
+status: passing
 bcps: 3
 delta: ADDED
 spec: e15s03-background-bash-completion-notify.md
@@ -12,7 +12,7 @@ tasks:
       status, and exit code/signal; no stdout/stderr payload; idle parents get
       a triggered turn; active parents get steer delivery.
     verify: node --test extensions/background-bash/lifecycle.test.ts extensions/background-bash/permission-boundary.test.ts
-    status: pending
+    status: passing
     risk: P0
   - id: 2
     description: |-
@@ -20,7 +20,7 @@ tasks:
       registry and wire delivery through the extension; fold or remove the
       monitor-path terminal summary so `monitor: true` never double-fires.
     verify: node --test extensions/background-bash/lifecycle.test.ts extensions/background-bash/monitor.test.ts extensions/background-bash/permission-boundary.test.ts
-    status: pending
+    status: passing
     risk: P0
   - id: 3
     description: |-
@@ -29,5 +29,5 @@ tasks:
       only after the wake for status/output, treat monitor as occasional
       progress lines under existing caps, and verify the full package suite.
     verify: node --test extensions/background-bash/lifecycle.test.ts extensions/background-bash/monitor.test.ts extensions/background-bash/permission-boundary.test.ts && npm run check
-    status: pending
+    status: passing
     risk: P0

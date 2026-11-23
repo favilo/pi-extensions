@@ -9,7 +9,7 @@ bug_cycle:
 vcs:
   kind: jj
   workspace: background-bash-completion
-  last_completed_change: tpnkloyw
+  last_completed_change: moynskuoppoq
   parent_bookmark: favilo/later-epic-outlines
   feature_bookmark: favilo/background-bash-completion
 planning:
@@ -112,8 +112,8 @@ planning:
     constraints:
     - Do not modify the e06 repair flow or child-private bridge catalog.
 handoff:
-  last_step_completed: Created jj workspace background-bash-completion from favilo/later-epic-outlines
-    with e15s03 story/tasks already in the capsule. Session state retargeted to e15s03.
+  last_step_completed: 'e15s03 completion wake fix: RED 2381ef48 + GREEN 2fee19bb;
+    live task bash-f02f7fbf completed and started a turn without a user message'
   open_decisions: []
   required_reading:
   - .specs/epics/e15-background-bash-monitors/epic.yaml
@@ -125,16 +125,14 @@ handoff:
   - extensions/background-bash/lifecycle.test.ts
   - extensions/background-bash/monitor.test.ts
   - extensions/background-bash/permission-boundary.test.ts
-  next_skill: develop-tdd
-  context: 'Implement e15s03: every background Bash task emits exactly one background_bash_complete
-    message on terminal state (task id, status, exit code/signal; no output lines),
-    independent of monitor. Monitors remain an occasional progress-line channel under
-    existing caps; dedupe any monitor-path terminal summary so monitored tasks do
-    not double-fire. Update bash / monitor / bash_task tool descriptions so agents
-    await completion instead of polling. TDD with behavioral RED and GREEN in separate
-    jj changes. No raw git. Land via favilo/background-bash-completion. Keep cwd at
-    this workspace root; invoke Bigpowers scripts only via $BIGPOWERS_ROOT/scripts/<script>.sh
-    absolute paths.'
+  next_skill: verify-work
+  context: 'Bug: completion used monitorDeliveryOptions(ctx) so triggerTurn followed
+    ctx.isIdle(); settle race left triggerTurn false and Pi only appended. Fix: completionDeliveryOptions
+    always {deliverAs:steer, triggerTurn:true}; monitor progress still idle-gated.
+    Cursor bridge kept. Live: session 2026-11-23T20-48-55… custom_message at 21:25:47.696Z
+    then assistant at 21:26:01.192Z. Bookmark favilo/background-bash-completion at
+    2fee19bb. Remaining: update e15s03-tasks.yaml if needed, verify-work, optional
+    pure idle settle test without bash_task poll.'
   blocker: null
   planning_handoff:
     later_epics_outlined_at: '2026-11-20T14:05:00Z'
@@ -205,10 +203,9 @@ metrics:
       total_seconds: 3246.0
       avg_seconds: 1082.0
     develop-tdd:
-      calls: 10
-      total_seconds: 664248.0
-      avg_seconds: 66424.8
-      _start: '2026-11-23T19:38:58Z'
+      calls: 12
+      total_seconds: 666524.0
+      avg_seconds: 55543.666666666664
     plan-work:
       calls: 3
       total_seconds: 1580.0

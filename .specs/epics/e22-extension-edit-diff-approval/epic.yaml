@@ -1,7 +1,7 @@
 id: e22
 title: Extension edit-tool diff approval
 wsjf: 3.2
-total_bcps: 9
+total_bcps: 12
 status: planned
 stories:
   - id: e22s01
@@ -26,9 +26,27 @@ stories:
     delta: ADDED
     spec: e22s03-obsidian-edit-consumer.md
     tasks: e22s03-tasks.yaml
+  - id: e22s04
+    title: Built-in edit multi-match via matches_expected
+    bcps: 3
+    status: planned
+    delta: ADDED
+    spec: e22s04-edit-matches-expected.md
+    tasks: e22s04-tasks.yaml
+    scoring:
+      business_value: 8
+      time_criticality: 3
+      risk_reduction: 5
+      job_size: 2
+      wsjf: 8.0
+      rationale: >-
+        Agents need intentional N-way identical replacements (BV 8) without
+        unsafe replace-all; reduces failed multi-match edits (RR 5); flexible
+        timing (TC 3); reuses edit preflight (~1 day, JS 2).
 note: >-
-  WSJF = (business value 5 + time criticality 3 + risk reduction 8) / job size 5 = 3.2.
-  Absorbs remaining e13 work (complete built-in edit/write diffs) and extends it with
-  settings-driven registration of extension edit tools under ~/.pi/agent/ JSON settings.
-  Initial consumer is obsidian_edit. Outline from .specs/LATER.md; plan-work later.
-  e13 is superseded by this epic.
+  WSJF = (business value 5 + time criticality 3 + risk reduction 8) / job size 5 = 3.2
+  for the original e22s01–s03 outline. Absorbs remaining e13 work (complete built-in
+  edit/write diffs) and extends it with settings-driven registration of extension
+  edit tools under ~/.pi/agent/ JSON settings. Initial consumer is obsidian_edit.
+  e22s04 adds optional matches_expected on built-in edit pairs (WSJF 8.0). Outline
+  from .specs/LATER.md; plan-work later. e13 is superseded by this epic.

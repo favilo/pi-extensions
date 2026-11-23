@@ -2,7 +2,7 @@ id: e15
 title: Background Bash execution with live agent-flow monitors
 wsjf: 9.0
 total_bcps: 11
-status: planned
+status: completed
 stories:
   - id: e15s01
     title: Run permission-enforced Bash commands in the background
@@ -21,7 +21,7 @@ stories:
   - id: e15s03
     title: Inject terminal completion into the agent queue
     bcps: 3
-    status: pending
+    status: passing
     delta: ADDED
     spec: e15s03-background-bash-completion-notify.md
     tasks: e15s03-tasks.yaml
