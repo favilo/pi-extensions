@@ -28,13 +28,13 @@ export type RegisterBackgroundBashOptions = {
 const backgroundParameterSchema = {
   type: "boolean",
   description:
-    "Run this command in the background and return a task ID immediately instead of waiting for completion.",
+    "Run this command in the background and return a task ID immediately. Await the injected background_bash_complete message, then use bash_task for status or bounded output; do not sleep-loop or repeatedly poll.",
 } as const;
 
 const monitorParameterSchema = {
   type: "boolean",
   description:
-    "Wake the agent when monitored background output changes. Requires background: true.",
+    "Inject occasional progress lines or small batches from a long-running background task. Requires background: true. This is independent of terminal completion notification and remains subject to rate, byte, and message caps; do not use it to stream high-volume output into context.",
 } as const;
 
 /** Admit an optional background flag into the published bash tool's parameter schema. */
@@ -273,7 +273,7 @@ export function registerBackgroundBash(
     name: "bash_task",
     label: "bash_task",
     description:
-      'Manage background Bash tasks. Use action: "list", "status", "output", "stop_monitor", or "cancel". Output supports bounded stream, offset, and limit retrieval.',
+      'Manage background Bash tasks. Await the injected background_bash_complete message before using this tool for final status or bounded output; do not sleep-loop or repeatedly poll running tasks. Use action: "list", "status", "output", "stop_monitor", or "cancel". Output supports bounded stream, offset, and limit retrieval.',
     parameters: Type.Object({
       id: Type.Optional(
         Type.String({

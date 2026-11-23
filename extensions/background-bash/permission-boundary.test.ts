@@ -16,6 +16,8 @@ type ToolResultLike = {
 };
 type CapturedTool = {
   name: string;
+  description?: string;
+  parameters?: { properties?: Record<string, { description?: string }> };
   execute(
     toolCallId: string,
     params: Record<string, unknown>,
@@ -67,6 +69,30 @@ function harness(spawn: BackgroundBashSpawn, idle = true) {
     cleanup: () => unpublishToolDefinition("bash"),
   };
 }
+
+test("published tool descriptions direct agents to await completion and bound monitor use", () => {
+  const { tools, cleanup } = harness(() => ({ terminate() {} }));
+  try {
+    const bash = tools.get("bash")! as CapturedTool & {
+      description?: string;
+      parameters?: { properties?: Record<string, { description?: string }> };
+    };
+    const bashTask = tools.get("bash_task")! as CapturedTool & {
+      description?: string;
+    };
+    assert.match(
+      bash.parameters?.properties?.background?.description ?? "",
+      /await.*background_bash_complete/i,
+    );
+    assert.match(
+      bash.parameters?.properties?.monitor?.description ?? "",
+      /occasional progress.*caps/i,
+    );
+    assert.match(bashTask.description ?? "", /await.*background_bash_complete/i);
+  } finally {
+    cleanup();
+  }
+});
 
 test("an authorized background launch returns its task ID before the command settles", async () => {
   const spawned: Array<{ command: string; cwd: string }> = [];
