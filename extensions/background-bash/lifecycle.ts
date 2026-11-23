@@ -55,6 +55,7 @@ export type BackgroundBashController = {
       taskId: string,
     ) => void;
     onMonitorComplete?: (task: BackgroundBashTask) => void;
+    onComplete?: (task: BackgroundBashTask) => void;
   }): BackgroundBashTask;
   status(id: string): BackgroundBashTask | undefined;
   list(): BackgroundBashTask[];
@@ -117,6 +118,7 @@ export function createBackgroundBashController(options: {
     string,
     (task: BackgroundBashTask) => void
   >();
+  const completions = new Map<string, (task: BackgroundBashTask) => void>();
   let closed = false;
 
   function clearTimer(id: string): void {
@@ -172,6 +174,7 @@ export function createBackgroundBashController(options: {
       monitor,
       onMonitorEvent,
       onMonitorComplete,
+      onComplete,
     }) {
       if (closed) throw new Error("Background Bash registry is closed.");
       if (signal?.aborted)
@@ -194,6 +197,7 @@ export function createBackgroundBashController(options: {
         task.stdoutPath = join(outputDir, `${task.id}-stdout.log`);
         task.stderrPath = join(outputDir, `${task.id}-stderr.log`);
       }
+      if (onComplete) completions.set(task.id, onComplete);
       if (monitor) {
         monitors.set(
           task.id,

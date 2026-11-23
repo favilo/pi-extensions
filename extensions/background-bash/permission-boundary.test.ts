@@ -99,6 +99,54 @@ test("an authorized background launch returns its task ID before the command set
   }
 });
 
+test("unmonitored task injects one minimal completion notification", async () => {
+  let emit: ((stream: "stdout" | "stderr", chunk: string) => void) | undefined;
+  let exit:
+    | ((outcome: {
+        code: number | null;
+        signal: NodeJS.Signals | null;
+      }) => void)
+    | undefined;
+  const { tools, messages, cleanup } = harness(({ onOutput, onExit }) => {
+    emit = onOutput;
+    exit = onExit;
+    return { terminate() {} };
+  });
+  try {
+    const bash = tools.get("bash")!;
+    const result = await bash.execute(
+      "call-1",
+      { command: "echo done", background: true },
+      new AbortController().signal,
+      undefined,
+      { cwd: "/workspace" },
+    );
+    const taskId = (result.details as { id: string }).id;
+    emit?.("stdout", "done\\n");
+    exit?.({ code: 0, signal: null });
+    exit?.({ code: 0, signal: null });
+
+    assert.deepEqual(messages, [
+      {
+        message: {
+          customType: "background_bash_complete",
+          content: `task ${taskId} completed with status completed`,
+          display: true,
+          details: {
+            taskId,
+            status: "completed",
+            exitCode: 0,
+            signal: null,
+          },
+        },
+        options: { deliverAs: "steer", triggerTurn: true },
+      },
+    ]);
+  } finally {
+    cleanup();
+  }
+});
+
 test("monitor true forwards each completed output change as an attributed agent message", async () => {
   let emit: ((stream: "stdout" | "stderr", chunk: string) => void) | undefined;
   const { tools, messages, cleanup } = harness(({ onOutput }) => {
