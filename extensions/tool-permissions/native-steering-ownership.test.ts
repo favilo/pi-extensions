@@ -13,6 +13,7 @@ test("Rust annotates the matching result with session steering once", async () =
   const bridge = {
     handleToolCall: () => undefined,
     recordSteering: (_id: string, _text: string): boolean => false,
+    discardSteering: (_id: string): boolean => false,
   };
   native.registerToolPermissionsCallbacks(
     {
@@ -49,6 +50,9 @@ test("Rust annotates the matching result with session steering once", async () =
     ),
     undefined,
   );
+  assert.equal(bridge.recordSteering("cancelled", "do not deliver"), true);
+  assert.equal(bridge.discardSteering("cancelled"), true);
+  assert.equal(await handlers.get("tool_result")!({ toolCallId: "cancelled", content: [] }, {}), undefined);
   assert.equal(bridge.recordSteering("pending", "never deliver"), true);
   await handlers.get("session_shutdown")!({}, {});
   assert.equal(bridge.recordSteering("late", "ignore"), false);
