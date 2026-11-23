@@ -92,9 +92,12 @@ impl<'env> RegistrationBridge<'env> {
         let Some(mut source) = self.bridge.source() else {
             return Ok(false);
         };
-        if source.get_named_property::<Function<FnArgs<(Unknown<'static>, Unknown<'static>)>, Unknown<'static>>>("handleToolResult").is_ok() {
-            return Ok(false);
-        }
+        // TODO: Remove preview cleanup delegation when interactive state moves to Rust.
+        let preview_cleanup = source
+            .get_named_property::<Function<FnArgs<(Unknown<'static>, Unknown<'static>)>, Unknown<'static>>>("handleToolResult")
+            .ok()
+            .map(|callback| callback.create_ref())
+            .transpose()?;
         if source
             .get_named_property::<Function<FnArgs<(String, String)>, bool>>("recordSteering")
             .is_err()
@@ -134,6 +137,10 @@ impl<'env> RegistrationBridge<'env> {
         let handler = self.bridge.env().create_function_from_closure("toolPermissionsResult", move |ctx| {
             if !is_active() { state.lock().clear_on_session_shutdown(); return Ok(Either::B(())); }
             let event: Object = ctx.get(0)?;
+            if let Some(callback) = &preview_cleanup {
+                let context: Unknown = ctx.get(1)?;
+                callback.borrow_back(ctx.env)?.call(FnArgs::from((event.to_unknown(), context)))?;
+            }
             let id: String = event.get_named_property("toolCallId")?;
             let id = ToolCallId::parse(&id).map_err(|e| Error::from_reason(e.to_string()))?;
             let Some(steering) = state.lock().take_steering(&id) else { return Ok(Either::B(())); };

@@ -13,7 +13,9 @@ test("Rust annotates the matching result with session steering once", async () =
   const cleaned: string[] = [];
   const bridge = {
     handleToolCall: () => undefined,
-    handleToolResult: (event: unknown) => { cleaned.push((event as { toolCallId: string }).toolCallId); },
+    handleToolResult: (event: unknown) => {
+      cleaned.push((event as { toolCallId: string }).toolCallId);
+    },
     recordSteering: (_id: string, _text: string): boolean => false,
     discardSteering: (_id: string): boolean => false,
   };
