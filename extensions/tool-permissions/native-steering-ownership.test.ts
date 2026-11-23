@@ -16,7 +16,9 @@ test("Rust annotates the matching result with session steering once", async () =
     handleToolResult: (event: unknown) => {
       const id = (event as { toolCallId: string }).toolCallId;
       cleaned.push(id);
-      return id === "legacy" ? { content: [{ type: "text", text: "legacy annotation" }] } : undefined;
+      return id === "legacy"
+        ? { content: [{ type: "text", text: "legacy annotation" }] }
+        : undefined;
     },
     recordSteering: (_id: string, _text: string): boolean => false,
     discardSteering: (_id: string): boolean => false,
@@ -36,7 +38,13 @@ test("Rust annotates the matching result with session steering once", async () =
     },
     bridge,
   );
-  assert.deepEqual(await handlers.get("tool_result")!({ toolCallId: "legacy", content: [] }, {}), { content: [{ type: "text", text: "legacy annotation" }] });
+  assert.deepEqual(
+    await handlers.get("tool_result")!(
+      { toolCallId: "legacy", content: [] },
+      {},
+    ),
+    { content: [{ type: "text", text: "legacy annotation" }] },
+  );
   cleaned.length = 0;
   assert.equal(bridge.recordSteering("first", "review this"), true);
   const result = await handlers.get("tool_result")!(

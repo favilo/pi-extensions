@@ -137,13 +137,15 @@ impl<'env> RegistrationBridge<'env> {
         let handler = self.bridge.env().create_function_from_closure("toolPermissionsResult", move |ctx| {
             if !is_active() { state.lock().clear_on_session_shutdown(); return Ok(Either::B(())); }
             let event: Object = ctx.get(0)?;
-            if let Some(callback) = &preview_cleanup {
+            let legacy = if let Some(callback) = &preview_cleanup {
                 let context: Unknown = ctx.get(1)?;
-                callback.borrow_back(ctx.env)?.call(FnArgs::from((event.to_unknown(), context)))?;
-            }
+                Some(callback.borrow_back(ctx.env)?.call(FnArgs::from((event.to_unknown(), context)))?)
+            } else { None };
             let id: String = event.get_named_property("toolCallId")?;
             let id = ToolCallId::parse(&id).map_err(|e| Error::from_reason(e.to_string()))?;
-            let Some(steering) = state.lock().take_steering(&id) else { return Ok(Either::B(())); };
+            let Some(steering) = state.lock().take_steering(&id) else {
+                return Ok(match legacy { Some(value) => Either::A(value), None => Either::B(()) });
+            };
             let mut content: Vec<Unknown> = event.get_named_property("content")?;
             let mut annotation = Object::new(ctx.env)?;
             annotation.set_named_property("type", "text")?;
@@ -151,7 +153,7 @@ impl<'env> RegistrationBridge<'env> {
             content.push(annotation.to_unknown());
             let mut result = Object::new(ctx.env)?;
             result.set_named_property("content", content)?;
-            Ok(Either::A(result))
+            Ok(Either::A(result.to_unknown()))
         })?;
         self.bridge
             .pi()
