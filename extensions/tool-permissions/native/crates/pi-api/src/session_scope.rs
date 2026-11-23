@@ -40,6 +40,10 @@ impl SessionToken {
         }
     }
 
+    fn on_close(&self, _cleanup: impl FnOnce() + Send + 'static) -> Result<()> {
+        self.ensure_active()
+    }
+
     fn close(&self) -> bool {
         let cleanup = {
             let mut state = self.0.lock();
@@ -281,6 +285,17 @@ mod tests {
         let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| token.close()));
         assert!(result.is_err());
         assert!(token.ensure_active().is_err());
+    }
+
+    #[test]
+    fn shutdown_runs_registered_session_cleanup() {
+        use std::sync::{Arc, atomic::{AtomicBool, Ordering}};
+        let token = SessionToken::default();
+        let cleared = Arc::new(AtomicBool::new(false));
+        let observed = cleared.clone();
+        token.on_close(move || observed.store(true, Ordering::SeqCst)).unwrap();
+        token.close();
+        assert!(cleared.load(Ordering::SeqCst));
     }
 
     #[test]
