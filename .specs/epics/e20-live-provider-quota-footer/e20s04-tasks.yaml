@@ -1,0 +1,42 @@
+story_id: e20s04
+title: Shared-result rich /usage summary
+status: failing
+bcps: 2
+delta: ADDED
+spec: e20s04-rich-usage-summary.md
+tasks:
+  - id: 1
+    description: >-
+      Extend formatUsageSummary contracts so structured 5h/7d (and Google)
+      windows, plan/email, and safe failures render from the shared result type.
+    verify: node --test extensions/usage/
+    status: failing
+    risk: P1
+    allure:
+      severity: high
+      categories:
+        - Provider quota footer
+        - usage rendering
+  - id: 2
+    description: >-
+      Prove /usage and footer agree on window percentages for the same checker
+      result; update documentation tests for the rich summary.
+    verify: node --test extensions/usage/documentation.test.ts
+    status: failing
+    risk: P1
+    allure:
+      severity: high
+      categories:
+        - Provider quota footer
+        - documentation
+        - parity
+  - id: 3
+    description: Run package typecheck/tests after rich /usage rendering.
+    verify: npm run check
+    status: failing
+    risk: P1
+    allure:
+      severity: high
+      categories:
+        - Provider quota footer
+        - regression

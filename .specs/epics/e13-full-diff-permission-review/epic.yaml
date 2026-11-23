@@ -2,12 +2,17 @@ id: e13
 title: Complete edit and write diffs in permission review
 wsjf: 0.0
 total_bcps: 3
-status: planned
+status: superseded
+superseded_by: e22s01
 stories:
   - id: e13s01
     title: Review complete edit and write diffs before approval
     bcps: 3
-    status: todo
+    status: superseded
+    superseded_by: e22s01
     delta: MODIFIED
     spec: e13s01-complete-edit-write-diff-review.md
     tasks: e13s01-tasks.yaml
+note: >-
+  Superseded by e22s01. The copied story retains this full built-in edit/write diff
+  work and e22 adds settings-registered extension edit-tool diff approval.

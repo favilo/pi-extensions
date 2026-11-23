@@ -2,7 +2,7 @@ id: e16
 title: Rust/WASM core migration for tool-permissions
 wsjf: 0.0
 total_bcps: 27
-status: passing
+status: completed
 stories:
   - id: e16s01
     title: Spike a supported Rust/WASM boundary for tool-permissions

@@ -1,0 +1,21 @@
+story_id: e24s01
+title: Parallel child concurrency and lifecycle contracts
+status: failing
+bcps: 5
+delta: ADDED
+spec: e24s01-parallel-child-concurrency.md
+plan_detail: outline
+tasks:
+  - id: 1
+    description: >-
+      Define parallel admission, cancellation, completion, cleanup, and result
+      export contracts while preserving per-child isolation and per-action
+      approval.
+    verify: node --test extensions/subagent/
+    status: failing
+    risk: P0
+  - id: 2
+    description: Remove the single-active-child restriction behind those contracts.
+    verify: node --test extensions/subagent/
+    status: failing
+    risk: P0

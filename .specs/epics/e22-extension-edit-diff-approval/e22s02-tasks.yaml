@@ -1,0 +1,30 @@
+story_id: e22s02
+title: Settings-registered extension edit tools with diff approval
+status: failing
+bcps: 4
+delta: ADDED
+spec: e22s02-settings-registered-edit-tools.md
+plan_detail: outline
+tasks:
+  - id: 1
+    description: >-
+      Define the ~/.pi/agent/ JSON settings shape and contracts for resolving
+      path, existing text, and edits[] before a diff approval prompt.
+    verify: node --test extensions/tool-permissions/
+    status: failing
+    risk: P0
+  - id: 2
+    description: >-
+      Implement settings-driven registration and complete contextual diff
+      approval while rejecting invalid resolver or precondition failures before
+      prompting.
+    verify: node --test extensions/tool-permissions/
+    status: failing
+    risk: P0
+  - id: 3
+    description: >-
+      Keep registration/policy semantics native-boundary friendly and host
+      filesystem resolution in the host adapter.
+    verify: node --test extensions/tool-permissions/
+    status: failing
+    risk: P1

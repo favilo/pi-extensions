@@ -1,22 +1,22 @@
 active_flow: build_epic
-active_epic_id: e19
-active_story_id: e19s02
-active_story: Use typed async prompt orchestration
-active_bug_id: BUG-2026-11-20T101309
+active_epic_id: e15
+active_story_id: e15s03
+active_story: Inject terminal completion into the agent queue
+active_bug_id: null
 bug_cycle:
-  current_step: 1
-  completed_steps:
-    - investigate-bug
+  current_step: null
+  completed_steps: []
 vcs:
   kind: jj
-  workspace: e18s04-prompt-queue
-  last_completed_change: ylsmvrqy
-  parent_bookmark: main
+  workspace: background-bash-completion
+  last_completed_change: moynskuoppoq
+  parent_bookmark: favilo/later-epic-outlines
+  feature_bookmark: favilo/background-bash-completion
 planning:
   e16:
     status: completed
     story_id: e16s04
-    capsule: .specs/epics/e16-rust-wasm-tool-permissions-core
+    capsule: .specs/epics/archive/e16-rust-wasm-tool-permissions-core
     wsjf: 0.0
     scoring:
       business_value: 0
@@ -29,7 +29,7 @@ planning:
   e17:
     status: completed
     story_id: e17s02
-    capsule: .specs/epics/e17-environment-protected-yolo-mode
+    capsule: .specs/epics/archive/e17-environment-protected-yolo-mode
     wsjf: 7.0
     scoring:
       business_value: 8
@@ -41,7 +41,7 @@ planning:
   e07:
     status: completed
     story_id: e07s05
-    capsule: .specs/epics/e07-bash-subcommand-permissions
+    capsule: .specs/epics/archive/e07-bash-subcommand-permissions
     wsjf: 5.5
     scoring:
       business_value: 9
@@ -54,7 +54,7 @@ planning:
   e11:
     status: completed
     story_id: e11s04
-    capsule: .specs/epics/e11-truthful-tool-history
+    capsule: .specs/epics/archive/e11-truthful-tool-history
     wsjf: 0.0
     scoring:
       business_value: 8
@@ -65,7 +65,7 @@ planning:
   e05:
     status: completed
     story_id: e05s01
-    capsule: .specs/epics/e05-provider-usage
+    capsule: .specs/epics/archive/e05-provider-usage
     wsjf: 4.0
     scoring:
       business_value: 5
@@ -73,10 +73,23 @@ planning:
       risk_reduction: 3
       job_size: 3
       rationale: Provider-neutral /usage command complete.
+  e20:
+    status: planned
+    story_id: e20s01
+    capsule: .specs/epics/e20-live-provider-quota-footer
+    wsjf: 3.6
+    scoring:
+      business_value: 8
+      time_criticality: 5
+      risk_reduction: 5
+      job_size: 5
+      rationale: Extends e05 with multi-pass-style quota checkers for all supported
+        providers, persistent opt-in current-provider footer (5h+7d), Codex first;
+        all four stories required.
   e10:
     status: completed
     story_id: e10s02
-    capsule: .specs/epics/e10-vim-permission-steering
+    capsule: .specs/epics/archive/e10-vim-permission-steering
     wsjf: 0.0
     scoring:
       business_value: 6
@@ -87,7 +100,7 @@ planning:
   e12:
     status: completed
     story_id: e12s01
-    capsule: .specs/epics/e12-global-context-router
+    capsule: .specs/epics/archive/e12-global-context-router
     wsjf: 5.4
     scoring:
       business_value: 10
@@ -99,113 +112,55 @@ planning:
     constraints:
     - Do not modify the e06 repair flow or child-private bridge catalog.
 handoff:
-  last_step_completed: >-
-    BUG-2026-11-20T101309 investigation completed: an isolated child runtime lacks
-    extension-provided provider catalogs before account-specific authentication is
-    installed. The bug file and README known-issue link are updated. Resume e19s02,
-    which was paused after async presenter dispatch and full check passed.
-  open_decisions:
-  - Determine how session cancellation and shutdown revoke native queued and active prompts without late authorization.
-  - Verify environment cleanup, identity reuse, and lifecycle behavior against the real WASM host before accepting the story.
+  last_step_completed: 'e15s03 completion wake fix: RED 2381ef48 + GREEN 2fee19bb;
+    live task bash-f02f7fbf completed and started a turn without a user message'
+  open_decisions: []
   required_reading:
-  - .specs/bugs/BUG-2026-11-20T101309-child-model-unavailable.md
-  - extensions/subagent/account-runtime.ts
-  - extensions/subagent/account-runtime.test.ts
-  - $HOME/git/agents/pi-account-switcher/src/runtime/child-runtime-api.ts
-  - .specs/product/SCOPE_LATEST.yaml
-  - .specs/IMPACT-e19-e19s02.md
-  - .specs/epics/e19-full-rust-pi-event-orchestration/epic.yaml
-  - .specs/epics/e19-full-rust-pi-event-orchestration/e19s02-miri-prompt-queue.md
-  - .specs/epics/e19-full-rust-pi-event-orchestration/e19s02-tasks.yaml
-  - extensions/tool-permissions/native/crates/tool-permissions-native/src/prompt_queue.rs
-  - extensions/tool-permissions/native/crates/tool-permissions-native/src/lib.rs
-  - extensions/tool-permissions/native-prompt-queue.test.ts
-  - extensions/tool-permissions/native/Cargo.toml
-  - extensions/tool-permissions/native/package.json
-  - node_modules/@napi-rs/cli/src/utils/config.ts
-  next_skill: develop-tdd
-  context: 'User accepted e19s01 and approved the following direction for e19s02,
-    but requested implementation start next session. Use Rust async/await with napi::Promise<PromptQueueResolution>
-    and a single FIFO queue. Investigate napi-async-runtime 0.2.10 (Tokio-free), preferably
-    CurrentThread, with napi''s async-runtime feature and generated WASI loader host
-    bootstrap (napi.wasm.asyncRuntime: true and @napi-rs/async-runtime). Register
-    the runtime through module_init. Declare Rust dependencies under workspace.dependencies
-    and member dependencies with workspace = true. Confirm compatible napi-derive
-    and npm package versions before changing dependencies.
-
-
-    Use a ThreadsafeFunction with call_async_catch to invoke the presenter on its
-    owning JavaScript thread; await the callback invocation and then the returned
-    typed Promise. Do not retain Env or borrowed JavaScript handles across suspension.
-    Do not block_on the Pi JavaScript thread. Preserve single-queue FIFO, identity
-    binding, cancellation, shutdown, and fail-closed behavior. Test synchronous throws,
-    rejected and malformed results, cancellation, teardown, and the real WASM loader.
-    Keep runtime bootstrap separate from production TypeScript permission callback
-    glue. TypeScript currently calls decidePrompt through native-prompt-queue.ts;
-    production migration is later e19 work.
-
-
-    Current committed state: presenter FunctionRef transmute was removed; a typed
-    PromiseRaw<''static, ...> signature marker remains and is narrowed to invocation
-    lifetime. Raw deferred handles and unsafe impl Send were replaced with napi::JsDeferred;
-    the queue remains process-global and uses an environment cleanup hook. Generated
-    TypeScript declares Promise<PromptQueueResponse>. Workspace Clippy all and pedantic
-    are warnings; undocumented_unsafe_blocks is denied and npm run check runs Clippy.
-    e19s02 remains in progress, not complete. Miri passed Rust-owned queue tests only;
-    it does not validate N-API or JavaScript environment lifetimes. The story and
-    task ledger reflect the user''s updated direction; do not claim Miri proves host-lifetime
-    safety.
-
-
-    Prior art: local napi 3.16.2 promise.rs and threadsafe_function.rs; napi-async-runtime
-    0.2.10 src/lib.rs, src/adapter.rs and src/js_callback.rs in the Cargo registry;
-    https://napi.rs/docs/concepts/async-runtime and https://docs.rs/napi-async-runtime/0.2.10/napi_async_runtime/.
-    CurrentThread on WASM needs loader task and timer hosts; the runtime crate does
-    not install itself. The user''s desired approach does not require Tokio.
-
-
-    Follow repository TDD: behavioral RED and GREEN in separate jj changes; run tests
-    and jj commit in separate Bash calls. No raw git commands. No push unless asked.
-    Keep working directory at project root for Bigpowers scripts and invoke them only
-    via $BIGPOWERS_ROOT/scripts absolute path.'
-  blocker: >-
-    The account-switcher subagent model issue is investigated and tracked as
-    BUG-2026-11-20T101309; its fix is separate follow-up work. Resume e19s02.
-    User approved aligning the native package's Node compatibility with the new
-    @napi-rs/async-runtime 0.2.0 dependency: ^20.19.0 || ^22.13.0 || >=23.5.0.
-    The updated Bigpowers RED isolation checker passed for daeca6da using an
-    isolated jj workspace and the project's installed dependencies. npm audit
-    reports three pre-existing high findings in brace-expansion,
-    undici, and zod; none are dependencies of the new host package. cargo audit
-    found no Rust dependency vulnerabilities.
-  async_runtime_progress: >-
-    The plan consistency checker now passes after adding missing spec links to six
-    task ledgers. The behavioral RED commit daeca6da fails against the earlier stub
-    with an assertion that the Rust tracer must return a Promise. The committed
-    GREEN bootstraps napi-async-runtime 0.2.10 with the generated WASI loader and
-    @napi-rs/async-runtime 0.2.0. The focused eight-test suite, full npm run check
-    (374 preflight and 34 Rust tests), and cargo audit pass. Queue migration and
-    lifecycle tests remain; task 1 is passing. No push was performed.
-  current_async_draft: >-
-    RED a5a20081 passed the updated jj-aware isolation checker. Committed change
-    6f8108fa uses a mutex-owning environment registry, unique prompt IDs, and typed
-    ThreadsafeFunction dispatch. Full npm run check now passes (375 TypeScript
-    tests and 35 Rust tests) after replacing synchronous presenter assumptions in
-    existing tests with explicit readiness signals. A temporary
-    /tmp/pi-wasi-prompt-lifecycle.cjs probe observed the same
-    numeric env address across independent WASM instances and tested disposal with
-    a pending prompt and late allow; same-registry reuse was simulated in Rust.
-    The probe is not yet a committed regression test, and the registry test was
-    added alongside implementation rather than independently RED. Shutdown,
-    cancellation, malformed resolutions, cleanup ordering, cross-environment
-    isolation, and a full security review remain before claiming the story done.
-    Resume e19s02 after investigating the child-model bug. Task 2 remains failing until those identity and security contracts are verified;
-    tasks 3 and 4 also remain failing. Next use develop-tdd for the lifecycle cases,
-    then run verify-work and security review. The separate path wording fix is
-    ce5d4810, with RED 1b230149. Its broader original report remains unconfirmed;
-    registry BUG-2026-11-19T165747 stays open pending real reproduction and edit/write
-    parity investigation. No push or PR was made.
+  - .specs/epics/e15-background-bash-monitors/epic.yaml
+  - .specs/epics/e15-background-bash-monitors/e15s03-background-bash-completion-notify.md
+  - .specs/epics/e15-background-bash-monitors/e15s03-tasks.yaml
+  - .specs/epics/e15-background-bash-monitors/e15s02-live-bash-monitors.md
+  - extensions/background-bash/index.ts
+  - extensions/background-bash/lifecycle.ts
+  - extensions/background-bash/lifecycle.test.ts
+  - extensions/background-bash/monitor.test.ts
+  - extensions/background-bash/permission-boundary.test.ts
+  next_skill: verify-work
+  context: 'Bug: completion used monitorDeliveryOptions(ctx) so triggerTurn followed
+    ctx.isIdle(); settle race left triggerTurn false and Pi only appended. Fix: completionDeliveryOptions
+    always {deliverAs:steer, triggerTurn:true}; monitor progress still idle-gated.
+    Cursor bridge kept. Live: session 2026-11-23T20-48-55… custom_message at 21:25:47.696Z
+    then assistant at 21:26:01.192Z. Bookmark favilo/background-bash-completion at
+    2fee19bb. Remaining: update e15s03-tasks.yaml if needed, verify-work, optional
+    pure idle settle test without bash_task poll.'
+  blocker: null
+  planning_handoff:
+    later_epics_outlined_at: '2026-11-20T14:05:00Z'
+    status: outline_created
+    capsules:
+    - .specs/epics/e21-permission-prompt-authoring-ergonomics
+    - .specs/epics/e22-extension-edit-diff-approval
+    - .specs/epics/e23-cross-session-messaging
+    - .specs/epics/e24-parallel-subagents-navigable-ui
+    - .specs/epics/e25-codemode-mcp-discovery
+    decisions:
+    - e21s01 includes Ctrl+A/Ctrl+Shift+A and Ctrl+E/Ctrl+Shift+E for known non-MCP
+      tools, prefilled current parameters, and shared permission-rule template examples.
+    - e21s04 skips unchanged already-in-context activate_skill loads with the user-specified
+      message, including after /skill, before the reload cost but without bypassing
+      permission prompts.
+    - e22 uses a JSON settings file under ~/.pi/agent/ for extension edit-tool registration;
+      e13/e13s01 is superseded by e22s01.
+    - e25 replaces wholesale MCP tool session injection with codemode discovery/invocation
+      while retaining authorization and audit.
+    next_steps:
+    - Run plan-work against the outlined capsules to deepen acceptance criteria, contracts,
+      dependencies, and task verification.
+    - After all story plans are complete, clear or replace the planning-in-progress
+      marker and migrated notes in .specs/LATER.md.
   deferred_work:
+  - Start e20 (live provider quota footer) via plan-work/develop-tdd on e20s01 when
+    ready; capsule at .specs/epics/e20-live-provider-quota-footer
   - Consolidate safeStringify and JSON formatting helpers into a shared utility module
   - Persist completed and active child sessions for later external analysis
   - Add interactive child steering after the read-only transcript slice
@@ -235,9 +190,9 @@ metrics:
       avg_seconds: 1434.0
       _start: '2026-08-26T20:06:32Z'
     survey-context:
-      calls: 12
-      total_seconds: 7668.0
-      avg_seconds: 639.0
+      calls: 13
+      total_seconds: 7741.0
+      avg_seconds: 595.4615384615385
     verify-work:
       calls: 5
       total_seconds: 5191.0
@@ -248,9 +203,9 @@ metrics:
       total_seconds: 3246.0
       avg_seconds: 1082.0
     develop-tdd:
-      calls: 10
-      total_seconds: 664248.0
-      avg_seconds: 66424.8
+      calls: 12
+      total_seconds: 666524.0
+      avg_seconds: 55543.666666666664
     plan-work:
       calls: 3
       total_seconds: 1580.0
@@ -259,4 +214,8 @@ metrics:
       calls: 2
       total_seconds: 2.0
       avg_seconds: 1.0
-  story_start: '2026-11-17T21:43:00Z'
+    change-request:
+      calls: 1
+      total_seconds: 297.0
+      avg_seconds: 297.0
+  story_start: 2026-11-23 11:29:00+00:00

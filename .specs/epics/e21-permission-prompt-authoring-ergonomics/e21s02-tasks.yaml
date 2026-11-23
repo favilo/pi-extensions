@@ -1,0 +1,20 @@
+story_id: e21s02
+title: Compress the permission prompt UI
+status: failing
+bcps: 2
+delta: ADDED
+spec: e21s02-compress-permission-prompt.md
+plan_detail: outline
+tasks:
+  - id: 1
+    description: >-
+      Add layout contracts that the permission prompt keeps the decision and
+      request subject visible after redundant fields are removed.
+    verify: node --test extensions/tool-permissions/
+    status: failing
+    risk: P2
+  - id: 2
+    description: Compress the permission prompt render path without changing shortcuts.
+    verify: node --test extensions/tool-permissions/
+    status: failing
+    risk: P2

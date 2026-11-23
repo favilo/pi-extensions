@@ -1,0 +1,32 @@
+id: e24
+title: Parallel subagents with navigable child UI
+wsjf: 2.1
+total_bcps: 13
+status: planned
+stories:
+  - id: e24s01
+    title: Parallel child concurrency and lifecycle contracts
+    bcps: 5
+    status: planned
+    delta: ADDED
+    spec: e24s01-parallel-child-concurrency.md
+    tasks: e24s01-tasks.yaml
+  - id: e24s02
+    title: Durable child pane and tab UI
+    bcps: 5
+    status: planned
+    delta: ADDED
+    spec: e24s02-child-pane-tab-ui.md
+    tasks: e24s02-tasks.yaml
+  - id: e24s03
+    title: Parent approval serialization and result routing
+    bcps: 3
+    status: planned
+    delta: ADDED
+    spec: e24s03-approval-routing.md
+    tasks: e24s03-tasks.yaml
+note: >-
+  WSJF = (business value 8 + time criticality 5 + risk reduction 8) / job size 10 = 2.1.
+  Major UX/concurrency redesign building on completed e06. Removes the temporary
+  single-active-child constraint and replaces the child display with a navigable
+  pane/tab UI. Outline from .specs/LATER.md; plan-work details deferred.

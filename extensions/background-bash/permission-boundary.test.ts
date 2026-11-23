@@ -16,6 +16,8 @@ type ToolResultLike = {
 };
 type CapturedTool = {
   name: string;
+  description?: string;
+  parameters?: { properties?: Record<string, { description?: string }> };
   execute(
     toolCallId: string,
     params: Record<string, unknown>,
@@ -68,6 +70,30 @@ function harness(spawn: BackgroundBashSpawn, idle = true) {
   };
 }
 
+test("published tool descriptions direct agents to await completion and bound monitor use", () => {
+  const { tools, cleanup } = harness(() => ({ terminate() {} }));
+  try {
+    const bash = tools.get("bash")! as CapturedTool & {
+      description?: string;
+      parameters?: { properties?: Record<string, { description?: string }> };
+    };
+    const bashTask = tools.get("bash_task")! as CapturedTool & {
+      description?: string;
+    };
+    assert.match(
+      bash.parameters?.properties?.background?.description ?? "",
+      /await.*background_bash_complete/i,
+    );
+    assert.match(
+      bash.parameters?.properties?.monitor?.description ?? "",
+      /occasional progress.*caps/i,
+    );
+    assert.match(bashTask.description ?? "", /await.*background_bash_complete/i);
+  } finally {
+    cleanup();
+  }
+});
+
 test("an authorized background launch returns its task ID before the command settles", async () => {
   const spawned: Array<{ command: string; cwd: string }> = [];
   const { tools, foregroundCalls, cleanup } = harness(({ command, cwd }) => {
@@ -94,6 +120,54 @@ test("an authorized background launch returns its task ID before the command set
     assert.match(details.id, /^bash-/);
     assert.equal(details.status, "running");
     assert.match(result.content[0]!.text!, /bash-/);
+  } finally {
+    cleanup();
+  }
+});
+
+test("unmonitored task injects one minimal completion notification", async () => {
+  let emit: ((stream: "stdout" | "stderr", chunk: string) => void) | undefined;
+  let exit:
+    | ((outcome: {
+        code: number | null;
+        signal: NodeJS.Signals | null;
+      }) => void)
+    | undefined;
+  const { tools, messages, cleanup } = harness(({ onOutput, onExit }) => {
+    emit = onOutput;
+    exit = onExit;
+    return { terminate() {} };
+  });
+  try {
+    const bash = tools.get("bash")!;
+    const result = await bash.execute(
+      "call-1",
+      { command: "echo done", background: true },
+      new AbortController().signal,
+      undefined,
+      { cwd: "/workspace" },
+    );
+    const taskId = (result.details as { id: string }).id;
+    emit?.("stdout", "done\\n");
+    exit?.({ code: 0, signal: null });
+    exit?.({ code: 0, signal: null });
+
+    assert.deepEqual(messages, [
+      {
+        message: {
+          customType: "background_bash_complete",
+          content: `task ${taskId} completed with status completed`,
+          display: true,
+          details: {
+            taskId,
+            status: "completed",
+            exitCode: 0,
+            signal: null,
+          },
+        },
+        options: { deliverAs: "steer", triggerTurn: true },
+      },
+    ]);
   } finally {
     cleanup();
   }
@@ -163,7 +237,51 @@ test("active sessions receive monitor messages as steering without triggering a 
   }
 });
 
-test("monitored task sends one terminal summary after output delivery", async () => {
+test("completion delivery always triggers a turn even when originating context reports busy", async () => {
+  let exit:
+    | ((outcome: {
+        code: number | null;
+        signal: NodeJS.Signals | null;
+      }) => void)
+    | undefined;
+  const { tools, messages, cleanup } = harness(({ onExit }) => {
+    exit = onExit;
+    return { terminate() {} };
+  }, false);
+  try {
+    const bash = tools.get("bash")!;
+    const result = await bash.execute(
+      "call-busy",
+      { command: "echo done", background: true },
+      new AbortController().signal,
+      undefined,
+      { cwd: "/workspace", isIdle: () => false },
+    );
+    const taskId = (result.details as { id: string }).id;
+    exit?.({ code: 0, signal: null });
+    exit?.({ code: 0, signal: null });
+    assert.deepEqual(messages, [
+      {
+        message: {
+          customType: "background_bash_complete",
+          content: `task ${taskId} completed with status completed`,
+          display: true,
+          details: {
+            taskId,
+            status: "completed",
+            exitCode: 0,
+            signal: null,
+          },
+        },
+        options: { deliverAs: "steer", triggerTurn: true },
+      },
+    ]);
+  } finally {
+    cleanup();
+  }
+});
+
+test("monitored task sends one completion message without a monitor terminal summary", async () => {
   let emit: ((stream: "stdout" | "stderr", chunk: string) => void) | undefined;
   let exit:
     | ((outcome: {
@@ -178,23 +296,32 @@ test("monitored task sends one terminal summary after output delivery", async ()
   });
   try {
     const bash = tools.get("bash")!;
-    await bash.execute(
+    const result = await bash.execute(
       "c1",
       { command: "echo done", background: true, monitor: true },
       new AbortController().signal,
       undefined,
       { cwd: "/w" },
     );
+    const taskId = (result.details as { id: string }).id;
     emit?.("stdout", "done\n");
     exit?.({ code: 0, signal: null });
     exit?.({ code: 0, signal: null });
     assert.equal(messages.length, 2);
-    assert.match(
-      String(
-        (messages.at(-1) as { message: { content: string } }).message.content,
-      ),
-      /completed/,
-    );
+    assert.deepEqual(messages.at(-1), {
+      message: {
+        customType: "background_bash_complete",
+        content: `task ${taskId} completed with status completed`,
+        display: true,
+        details: {
+          taskId,
+          status: "completed",
+          exitCode: 0,
+          signal: null,
+        },
+      },
+      options: { deliverAs: "steer", triggerTurn: true },
+    });
   } finally {
     cleanup();
   }

@@ -1,0 +1,18 @@
+id: e23
+title: Cross-session messaging
+wsjf: 2.6
+total_bcps: 5
+status: planned
+stories:
+  - id: e23s01
+    title: Message another running Pi session
+    bcps: 5
+    status: planned
+    delta: ADDED
+    spec: e23s01-message-running-pi-session.md
+    tasks: e23s01-tasks.yaml
+note: >-
+  WSJF = (business value 5 + time criticality 3 + risk reduction 5) / job size 5 = 2.6.
+  Outline from .specs/LATER.md. Let one Pi session send an approved message to another
+  independently running session without writing that session's transcript directly.
+  Plan-work details deferred.

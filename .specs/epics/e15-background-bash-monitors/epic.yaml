@@ -1,8 +1,8 @@
 id: e15
 title: Background Bash execution with live agent-flow monitors
-wsjf: 0.0
-total_bcps: 8
-status: passing
+wsjf: 9.0
+total_bcps: 11
+status: completed
 stories:
   - id: e15s01
     title: Run permission-enforced Bash commands in the background
@@ -18,3 +18,20 @@ stories:
     delta: ADDED
     spec: e15s02-live-bash-monitors.md
     tasks: e15s02-tasks.yaml
+  - id: e15s03
+    title: Inject terminal completion into the agent queue
+    bcps: 3
+    status: passing
+    delta: ADDED
+    spec: e15s03-background-bash-completion-notify.md
+    tasks: e15s03-tasks.yaml
+    scoring:
+      business_value: 8
+      time_criticality: 5
+      risk_reduction: 5
+      job_size: 2
+      wsjf: 9.0
+      rationale: >-
+        Removes agent poll/wait loops for background Bash (BV 8), unblocks
+        better long-running workflows (TC 5), cuts missed-completion risk
+        (RR 5), and reuses existing lifecycle/delivery hooks (~1 day, JS 2).

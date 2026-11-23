@@ -1,0 +1,31 @@
+story_id: e22s04
+title: Built-in edit multi-match via matches_expected
+status: failing
+bcps: 3
+delta: ADDED
+spec: e22s04-edit-matches-expected.md
+plan_detail: outline
+tasks:
+  - id: 1
+    description: >-
+      Add behavioral contracts for optional matches_expected on edit pairs:
+      exact count applies all replacements; mismatch fails closed without a
+      prompt; omitted matches_expected keeps single-match-only behavior.
+    verify: node --test extensions/tool-permissions/edit-preflight.test.ts
+    status: failing
+    risk: P0
+  - id: 2
+    description: >-
+      Implement matches_expected in edit preflight and apply path (TS and any
+      Rust/WASM mirror), including clear mismatch errors and multi-occurrence
+      diff input for permission review.
+    verify: node --test extensions/tool-permissions/edit-preflight.test.ts extensions/tool-permissions/edit-denial.test.ts
+    status: failing
+    risk: P0
+  - id: 3
+    description: >-
+      Cover permission/diff display for multi-match edits and run the focused
+      tool-permissions suite.
+    verify: node --test extensions/tool-permissions/
+    status: failing
+    risk: P1

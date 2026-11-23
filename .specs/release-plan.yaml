@@ -18,21 +18,21 @@ epics:
       WSJF = (business value 7 + time criticality 9 + risk reduction 11) / job size 3 = 9.0. Restore a green Windows Git Bash baseline without platform-specific wrappers or elevated link privileges before feature work resumes.
   - id: e11
     title: Truthful built-in tool outcomes and history
-    capsule_dir: epics/e11-truthful-tool-history
+    capsule_dir: epics/archive/e11-truthful-tool-history
     wsjf: 0.0
     bcps: 12
     note: >-
       Unscored backlog epic migrated from .plans/issues-discovered.md. Make edit failures and denials canonical agent-facing outcomes, then render those same outcomes faithfully; also expose complete Bash commands and retained output in expanded history, and surface agent-supplied tool-call reasons in permission prompts and history.
   - id: e09
     title: Invocation-bound permission steering
-    capsule_dir: epics/e09-invocation-bound-steering
+    capsule_dir: epics/archive/e09-invocation-bound-steering
     wsjf: 0.0
     bcps: 4
     note: >-
       Unscored backlog epic migrated from .plans/issues-discovered.md. Bind steering feedback to the exact tool call and safe invocation summary so parallel requests cannot consume ambiguous guidance.
   - id: e10
     title: Vim-capable permission steering editor
-    capsule_dir: epics/e10-vim-permission-steering
+    capsule_dir: epics/archive/e10-vim-permission-steering
     wsjf: 0.0
     bcps: 6
     note: >-
@@ -53,14 +53,14 @@ epics:
       Original provisional WSJF = 6.0. E06 extends the completed permission-enforced runtime with observable background execution, switchable live transcripts, and explicit full-context export. The e06s08 increment scores 5.0 = (business value 7 + time criticality 5 + risk reduction 8) / job size 4; explicit user priority places its planning before the blocking e06s05 security repair and its implementation after that repair.
   - id: e07
     title: Bash subcommand permission evaluation
-    capsule_dir: epics/e07-bash-subcommand-permissions
+    capsule_dir: epics/archive/e07-bash-subcommand-permissions
     wsjf: 5.5
     bcps: 9
     note: >-
       Provisional WSJF = 5.5. Parse compound Bash safely, allowlist individual commands, deny the complete invocation when one component is denied, and preserve complete audit evidence.
   - id: e05
     title: Provider usage visibility
-    capsule_dir: epics/e05-provider-usage
+    capsule_dir: epics/archive/e05-provider-usage
     wsjf: 4.0
     bcps: 5
     note: >-
@@ -74,7 +74,7 @@ epics:
       WSJF = (business value 6 + time criticality 4 + risk reduction 7) / job size 10 = 1.7. The epic extends the existing permission boundary with trusted project hierarchy, explicit save scope, and scoped policy editor commands.
   - id: e12
     title: Global context router
-    capsule_dir: epics/e12-global-context-router
+    capsule_dir: epics/archive/e12-global-context-router
     wsjf: 5.4
     bcps: 8
     note: >-
@@ -84,8 +84,11 @@ epics:
     capsule_dir: epics/e13-full-diff-permission-review
     wsjf: 0.0
     bcps: 3
+    status: superseded
+    superseded_by: e22s01
     note: >-
-      Unscored backlog epic migrated from .plans/issues-discovered.md. Present the complete pending change in edit/write permission prompts so approval decisions are based on the whole diff, not a cropped preview.
+      Superseded by e22s01, which retains this built-in edit/write full-diff work
+      and groups it with settings-registered extension edit-tool diff approval.
   - id: e14
     title: ast-grep structural search tool
     capsule_dir: epics/e14-ast-grep-search-tool
@@ -96,27 +99,28 @@ epics:
   - id: e15
     title: Background Bash execution with live agent-flow monitors
     capsule_dir: epics/e15-background-bash-monitors
-    wsjf: 0.0
-    bcps: 8
+    wsjf: 9.0
+    bcps: 11
+    status: completed
     note: >-
-      Unscored backlog epic. Let an authorized Bash command run as a parent-session-owned cancellable task and, when explicitly monitored, safely inject its bounded, attributed output lines into the agent flow as steering or an idle-triggered turn.
+      Completed. e15s01–s02 provide lifecycle and opt-in line monitors; e15s03 adds always-on terminal `background_bash_complete` injection so agents await completion instead of polling. Completion always requests a turn safely, while monitor progress stays idle-gated.
   - id: e16
     title: Rust/WASM core migration for tool-permissions
-    capsule_dir: epics/e16-rust-wasm-tool-permissions-core
+    capsule_dir: epics/archive/e16-rust-wasm-tool-permissions-core
     wsjf: 0.0
     bcps: 27
     note: >-
       Unscored backlog epic. Pilot a hybrid Rust/WASM migration in the security-sensitive, pure-compute portions of `tool-permissions`, starting with a supported package/runtime boundary and using `pi-oxidized` if it proves compatible with the required Pi extension shape. BCP total matches the passing capsule, which records 27.
   - id: e17
     title: Environment-protected YOLO permission mode
-    capsule_dir: epics/e17-environment-protected-yolo-mode
+    capsule_dir: epics/archive/e17-environment-protected-yolo-mode
     wsjf: 7.0
     bcps: 6
     note: >-
       WSJF = (business value 8 + time criticality 7 + risk reduction 6) / job size 3 = 7.0. Gate YOLO mode behind an environment variable (PI_YOLO_MODE=1) to bypass permission prompts for single-session Docker/automation workflows while preserving audit evidence.
   - id: e18
     title: WASM-only tool-permissions runtime
-    capsule_dir: epics/e18-wasm-only-tool-permissions
+    capsule_dir: epics/archive/e18-wasm-only-tool-permissions
     wsjf: 2.1
     bcps: 38
     note: >-
@@ -128,6 +132,48 @@ epics:
     bcps: 39
     note: >-
       Provisional WSJF = (business value 10 + time criticality 10 + risk reduction 10) / job size 4 = 7.5. Build on e18's completed WASM framework to make Rust own Pi callback registration and all permission orchestration. Start with safe callback-lifetime proof and typed Tokio-free async prompt orchestration, with Miri limited to optional Rust-only checks. Deferred e19s07 adds 5 BCP for WASM panic characterization and fail-closed recovery after the authorization boundary is available; priority and epic WSJF remain unchanged.
+  - id: e20
+    title: Live provider quota footer
+    capsule_dir: epics/e20-live-provider-quota-footer
+    wsjf: 3.6
+    bcps: 9
+    note: >-
+      WSJF = (business value 8 + time criticality 5 + risk reduction 5) / job size 5 = 3.6. Extends completed e05 by replacing broken OAuth Codex usage with multi-pass-style checkers for openai-codex, openai, anthropic, google-gemini-cli, and google-antigravity; adds a persistent opt-in current-provider footer showing 5h and 7d where applicable. Codex first; all four stories required.
+  - id: e21
+    title: Permission prompt authoring and ergonomics
+    capsule_dir: epics/e21-permission-prompt-authoring-ergonomics
+    wsjf: 3.6
+    bcps: 12
+    note: >-
+      WSJF = (business value 8 + time criticality 5 + risk reduction 5) / job size 5 = 3.6. Adds known non-MCP forever-save/edit shortcuts, prompt compaction, an always-explicit rule proposal tool, and unchanged-skill activate_skill dedupe without bypassing permissions.
+  - id: e22
+    title: Extension edit-tool diff approval
+    capsule_dir: epics/e22-extension-edit-diff-approval
+    wsjf: 3.2
+    bcps: 12
+    note: >-
+      WSJF = (business value 5 + time criticality 3 + risk reduction 8) / job size 5 = 3.2 for original e22s01–s03. Absorbs e13 full-diff review, adds settings-registered extension edit tools beginning with obsidian_edit, and adds e22s04 for exact-count multi-match built-in edits via matches_expected.
+  - id: e23
+    title: Cross-session messaging
+    capsule_dir: epics/e23-cross-session-messaging
+    wsjf: 2.6
+    bcps: 5
+    note: >-
+      WSJF = (business value 5 + time criticality 3 + risk reduction 5) / job size 5 = 2.6. Adds approved, isolated steer-or-queue messaging between running Pi sessions.
+  - id: e24
+    title: Parallel subagents with navigable child UI
+    capsule_dir: epics/e24-parallel-subagents-navigable-ui
+    wsjf: 2.1
+    bcps: 13
+    note: >-
+      WSJF = (business value 8 + time criticality 5 + risk reduction 8) / job size 10 = 2.1. Replaces the temporary single-active-child limit with defined parallel lifecycle semantics, child tabs/panes, and unambiguous approval routing.
+  - id: e25
+    title: Prefer codemode MCP discovery over session injection
+    capsule_dir: epics/e25-codemode-mcp-discovery
+    wsjf: 3.2
+    bcps: 5
+    note: >-
+      WSJF = (business value 8 + time criticality 3 + risk reduction 5) / job size 5 = 3.2. Removes wholesale MCP tool session injection in favor of codemode discovery and invocation while retaining authorization and audit.
 bugs:
   total: 1
   fixed: 0

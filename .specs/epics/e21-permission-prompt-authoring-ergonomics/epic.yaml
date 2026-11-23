@@ -1,0 +1,41 @@
+id: e21
+title: Permission prompt authoring and ergonomics
+wsjf: 3.6
+total_bcps: 12
+status: planned
+stories:
+  - id: e21s01
+    title: Allow and edit forever for known non-MCP tools
+    bcps: 4
+    status: planned
+    delta: ADDED
+    spec: e21s01-allow-and-edit-non-mcp-forever.md
+    tasks: e21s01-tasks.yaml
+  - id: e21s02
+    title: Compress the permission prompt UI
+    bcps: 2
+    status: planned
+    delta: ADDED
+    spec: e21s02-compress-permission-prompt.md
+    tasks: e21s02-tasks.yaml
+  - id: e21s03
+    title: Propose-permission-rule tool and companion skill
+    bcps: 3
+    status: planned
+    delta: ADDED
+    spec: e21s03-propose-permission-rule-tool.md
+    tasks: e21s03-tasks.yaml
+  - id: e21s04
+    title: Skip redundant activate_skill when skill is unchanged
+    bcps: 3
+    status: planned
+    delta: ADDED
+    spec: e21s04-skip-redundant-activate-skill.md
+    tasks: e21s04-tasks.yaml
+note: >-
+  WSJF = (business value 8 + time criticality 5 + risk reduction 5) / job size 5 = 3.6.
+  Outline migrated from .specs/LATER.md. Extends e03 scoped save so known non-MCP tools
+  get the same allow/edit forever shortcuts as known MCP tools, compresses the prompt,
+  adds a never-allow-listed rule proposal tool, and short-circuits repeated activate_skill
+  loads before tool-permissions without bypassing permission prompts. Story plan details
+  remain outline-level for a later plan-work session.
