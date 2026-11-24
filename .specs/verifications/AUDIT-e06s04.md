@@ -16,7 +16,7 @@
 ## Provenance and metadata
 
 - ✓ Story tasks, security evidence, and verification evidence identify e06s04.
-- ✓ Behavioral RED and GREEN changes are separate for unavailable UI, boundary cancellation, TUI Escape cancellation, and real adapter omission.
+- ✓ Behavioral RED and GREEN changes are separate for unavailable UI, boundary cancellation, non-cancelling TUI Escape handling, and real adapter omission.
 - ✓ No ADR-level decision or new plan artifact requiring additional metadata was introduced.
 
 ## Correctness
@@ -24,7 +24,7 @@
 - ✓ Missing parent UI omits the prompt callback, so default asks reach the shared unavailable-UI denial path.
 - ✓ The unavailable result preserves `status: denied`, uses `reason: unavailable_ui`, and includes only safe actor, tool, cwd, summary, and optional steering fields.
 - ✓ Raw tool input is absent from the child result.
-- ✓ Escape resolves the custom TUI prompt as `cancel`; the boundary maps it to `status: cancelled` without execution.
+- ✓ Escape does not settle the custom TUI prompt. Request/session abort or shutdown resolves it as `cancel`, which the boundary maps to `status: cancelled` without execution.
 - ✓ Explicit allow and deny decisions remain authoritative before prompt handling.
 - ✓ Refusal paths do not execute tools or persist allow rules.
 
@@ -54,7 +54,7 @@
 
 ## Test coverage and F.I.R.S.T
 
-- ✓ Public behavior covers unavailable UI, available UI Escape cancellation, structured cancellation, explicit allow, explicit deny, no execution, and safe result fields.
+- ✓ Public behavior covers unavailable UI, available UI non-cancelling Escape handling, structured cancellation, explicit allow, explicit deny, no execution, and safe result fields.
 - ✓ The real parent prompt adapter is tested, preventing a boundary-only false positive.
 - ✓ Tests are fast, independent, deterministic, self-validating, and written before each behavior change.
 - ✓ Focused verification passes: 16 permission and subagent tests.

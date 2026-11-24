@@ -12,6 +12,7 @@ use crate::contract::{
     NativeOperation, PromptQueueDecision, PromptQueueRequest, PromptQueueResolution,
     PromptQueueResponse,
 };
+use crate::tool_call::ToolCallId;
 
 #[derive(Debug, Error)]
 pub enum PromptQueueError {
@@ -34,7 +35,7 @@ pub fn validate(request: &PromptQueueRequest) -> std::result::Result<(), PromptQ
     if request.nonce.is_empty() || request.nonce.len() > 256 {
         return Err(PromptQueueError::Nonce);
     }
-    ToolCallId::parse(&request.tool_call_id)?;
+    ToolCallId::parse(&request.tool_call_id).map_err(|_| PromptQueueError::ToolCallId)?;
     Ok(())
 }
 
@@ -43,7 +44,8 @@ pub fn complete(
     resolution: PromptQueueResolution,
 ) -> std::result::Result<PromptQueueResponse, PromptQueueError> {
     validate(&request)?;
-    let tool_call_id = ToolCallId::parse(&request.tool_call_id)?;
+    let tool_call_id =
+        ToolCallId::parse(&request.tool_call_id).map_err(|_| PromptQueueError::ToolCallId)?;
     Ok(PromptQueueResponse {
         version: CONTRACT_VERSION,
         operation: NativeOperation::PromptQueue,
@@ -188,7 +190,6 @@ impl<T> PromptQueue<T> {
             return Some(prompt);
         }
         self.active = Some(prompt);
-        self.opening = false;
         None
     }
 
@@ -197,6 +198,7 @@ impl<T> PromptQueue<T> {
             return None;
         }
         let completed = self.active.take();
+        self.opening = false;
         self.active = self.pending.pop_front();
         if self.active.is_none() {
             self.environment = None;
@@ -266,11 +268,16 @@ fn persistent_present(
 }
 
 fn open_next(env: &Env) -> NapiResult<()> {
-    let Some(active) = NATIVE_PROMPT_QUEUE
-        .lock()
-        .expect("native prompt queue lock poisoned")
-        .take_active_for_opening()
-    else {
+    let current_environment = environment_id(env)?;
+    let Some(active) = ({
+        let mut queue = NATIVE_PROMPT_QUEUE
+            .lock()
+            .expect("native prompt queue lock poisoned");
+        if queue.environment != Some(current_environment) {
+            return Ok(());
+        }
+        queue.take_active_for_opening()
+    }) else {
         return Ok(());
     };
     let tool_call_id = active.request.tool_call_id.clone();
@@ -346,22 +353,6 @@ fn failed_response(request: &PromptQueueRequest) -> PromptQueueResponse {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
-struct ToolCallId(String);
-
-impl ToolCallId {
-    fn parse(value: &str) -> std::result::Result<Self, PromptQueueError> {
-        if value.is_empty() {
-            return Err(PromptQueueError::ToolCallId);
-        }
-        Ok(Self(value.to_owned()))
-    }
-
-    fn into_string(self) -> String {
-        self.0
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::complete;
@@ -410,6 +401,22 @@ mod tests {
         assert_eq!(
             queue.active,
             Some(super::ToolCallId::parse("call-second").unwrap())
+        );
+    }
+
+    #[test]
+    fn an_active_presenter_cannot_be_opened_twice() {
+        let mut queue = super::PromptQueue::default();
+        queue.submit(super::EnvironmentId(1), "prompt").unwrap();
+        let prompt = queue.take_active_for_opening().unwrap();
+        assert!(
+            queue
+                .restore_active(super::EnvironmentId(1), prompt)
+                .is_none()
+        );
+        assert!(
+            queue.take_active_for_opening().is_none(),
+            "an already dispatched prompt must not open twice"
         );
     }
 

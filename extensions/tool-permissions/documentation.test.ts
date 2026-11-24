@@ -41,7 +41,13 @@ test("documents native tool-permissions runtime build, packaging, and fallback b
     /npm pack --dry-run \.\/extensions\/tool-permissions\/native/,
   );
   assert.match(rootPackage, /"build:native"/);
-  assert.match(rootPackage, /wasm32-wasip1-threads/);
+  assert.match(
+    readFileSync(
+      new URL("../../scripts/build-native.sh", import.meta.url),
+      "utf8",
+    ),
+    /wasm32-wasip1-threads/,
+  );
   assert.match(readme, /wasm32-wasip1-threads/);
   assert.match(readme, /does not load a platform `\.node` library/);
   assert.match(nativePackage, /"files"\s*:/);

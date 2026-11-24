@@ -76,6 +76,25 @@ test("resolves the current directory policy path only under persisted trust", ()
   );
 });
 
+test("scoped policy resolution delegates matching rules to the Rust orchestrator", () => {
+  const root = mkdtempSync(join(tmpdir(), "pi-permission-scope-"));
+  const user = join(root, "user.toml");
+  writeFileSync(
+    user,
+    policy({ bash: { allow: [{ command: "^pwd$" }], deny: [] } }),
+  );
+  assert.deepEqual(
+    resolveScopedPermissionDecision({
+      cwd: root,
+      toolName: "bash",
+      input: { command: "pwd" },
+      userPermissionsPath: user,
+      trustResolver: () => null,
+    }),
+    { decision: "allow", source: "user", path: user },
+  );
+});
+
 test("nearest matching trusted project policy overrides parent and user policy", () => {
   const root = mkdtempSync(join(tmpdir(), "pi-permission-scope-"));
   const repo = join(root, "project");

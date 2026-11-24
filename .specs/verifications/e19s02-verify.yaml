@@ -1,0 +1,24 @@
+story_id: e19s02
+verifier: verify-work
+status: accepted
+mechanical:
+  focused:
+    command: npm run build:native && npx tsx --test extensions/tool-permissions/native-prompt-queue.test.ts
+    result: passed
+    note: 16 tests passed after native redispatch fix
+  full:
+    command: npm run check
+    result: passed
+    note: Single run after native redispatch fix; 384 preflight tests passed; output /tmp/e19s02-final-check.log
+manual:
+  status: accepted
+  note: User accepted the proposed verification script and automated evidence; user did not state that they personally ran the commands.
+security:
+  status: reviewed
+  note: Independent re-review found no concrete remaining native lifecycle issue. An uncooperative UI may remain visible after cancellation; user chose queue progress.
+open_gates:
+  - Blind-spot scan had 0 HIGH findings before its generated traceability artifacts were removed at the user's request.
+  - Story traceability checks waived by user; no traceability matrix is required.
+  - NFR evidence accepted within the existing liveness scope; no product latency or production observability SLO is asserted. See .specs/verifications/NFR-e19s02.json.
+limitations:
+  - Disposed host promises are not asserted to settle; tests check that no late allow is observed and queued old presenters do not open.

@@ -1,225 +1,330 @@
-use std::sync::{Arc, Mutex};
+use std::{cell::RefCell, rc::Rc, sync::Arc};
 
-use napi::{Env, Result};
+use parking_lot::Mutex;
+
+use napi::bindgen_prelude::{Either, FnArgs, Function, FunctionRef, PromiseRaw, Unknown};
+use napi::{Env, JsValue, Result};
 
 use crate::{OnCallback, Pi};
 
-/// An object that can register its Pi callbacks.
-pub trait SessionCallbacks {
-    fn register_callbacks(self, env: &Env, pi: &Pi) -> Result<()>;
-}
-
-/// Defines the callbacks installed for one revocable session object.
-pub trait ScopedCallbacks: Sized + 'static {
-    fn register_scoped(scope: &SessionScoped<Self>, env: &Env, pi: &Pi) -> Result<()>;
+/// A Rust callback that registers its handlers through a session facade.
+pub trait Callback: Sized + 'static {
+    fn register(self, pi: &ScopedPi<'_>) -> Result<()>;
 }
 
 #[derive(Debug, thiserror::Error)]
-pub enum SessionScopeError {
+enum SessionError {
     #[error("session state is unavailable")]
     Unavailable,
-    #[error("session state is busy")]
-    Busy,
 }
 
-/// Shares an owned session object across callbacks and revokes it on shutdown.
-///
-/// Calls never run while the lifecycle mutex is held. Concurrent or reentrant
-/// access returns `Busy`; shutdown revokes access and drops an in-flight object
-/// when its current synchronous operation returns.
-pub struct SessionScoped<T> {
-    state: Arc<Mutex<Lifecycle<T>>>,
+#[derive(Default)]
+struct SessionState {
+    closing: bool,
+    closed: bool,
+    cleanup: Vec<Box<dyn FnOnce() + Send>>,
 }
 
-enum Lifecycle<T> {
-    Active(T),
-    Busy,
-    Closed,
-}
+#[derive(Clone, Default)]
+struct SessionToken(Arc<Mutex<SessionState>>);
 
-impl<T> Clone for SessionScoped<T> {
-    fn clone(&self) -> Self {
-        Self {
-            state: Arc::clone(&self.state),
-        }
-    }
-}
-
-impl<T: 'static> SessionScoped<T> {
-    pub fn new(state: T) -> Self {
-        Self {
-            state: Arc::new(Mutex::new(Lifecycle::Active(state))),
+impl SessionToken {
+    fn ensure_active(&self) -> Result<()> {
+        let state = self.0.lock();
+        if state.closed || state.closing {
+            Err(napi::Error::from_reason(
+                SessionError::Unavailable.to_string(),
+            ))
+        } else {
+            Ok(())
         }
     }
 
-    pub fn with<R>(
+    fn on_close(&self, cleanup: impl FnOnce() + Send + 'static) -> Result<()> {
+        let mut state = self.0.lock();
+        if state.closed || state.closing {
+            return Err(napi::Error::from_reason(
+                SessionError::Unavailable.to_string(),
+            ));
+        }
+        state.cleanup.push(Box::new(cleanup));
+        Ok(())
+    }
+
+    fn close(&self) -> bool {
+        let cleanup = {
+            let mut state = self.0.lock();
+            if state.closed || state.closing {
+                return false;
+            }
+            state.closing = true;
+            std::mem::take(&mut state.cleanup)
+        };
+        for release in cleanup {
+            release();
+        }
+        let mut state = self.0.lock();
+        state.closed = true;
+        state.closing = false;
+        true
+    }
+
+    fn guarded_callback<A: 'static, R: 'static>(
         &self,
-        action: impl FnOnce(&mut T) -> R,
-    ) -> std::result::Result<R, SessionScopeError> {
-        let mut state = self
-            .state
-            .lock()
-            .map_err(|_| SessionScopeError::Unavailable)?;
-        let object = match std::mem::replace(&mut *state, Lifecycle::Busy) {
-            Lifecycle::Active(object) => object,
-            Lifecycle::Busy => return Err(SessionScopeError::Busy),
-            Lifecycle::Closed => {
-                *state = Lifecycle::Closed;
-                return Err(SessionScopeError::Unavailable);
+        action: impl Fn(A) -> R + Clone + Send + 'static,
+    ) -> impl Fn(A) -> Result<R> + Clone + 'static {
+        let stored = Arc::new(Mutex::new(Some(action)));
+        let cleanup = stored.clone();
+        {
+            let mut state = self.0.lock();
+            if state.closed || state.closing {
+                cleanup.lock().take();
+            } else {
+                state.cleanup.push(Box::new(move || {
+                    cleanup.lock().take();
+                }));
             }
-        };
-        drop(state);
-        let mut lease = SessionLease {
-            scope: self,
-            object: Some(object),
-        };
-        Ok(action(
-            lease.object.as_mut().expect("session lease owns object"),
-        ))
-    }
-
-    pub fn close(&self) -> std::result::Result<bool, SessionScopeError> {
-        let mut state = self
-            .state
-            .lock()
-            .map_err(|_| SessionScopeError::Unavailable)?;
-        let removed = std::mem::replace(&mut *state, Lifecycle::Closed);
-        drop(state);
-        let was_active = !matches!(removed, Lifecycle::Closed);
-        drop(removed);
-        Ok(was_active)
-    }
-}
-
-struct SessionLease<'a, T: 'static> {
-    scope: &'a SessionScoped<T>,
-    object: Option<T>,
-}
-
-impl<T> Drop for SessionLease<'_, T> {
-    fn drop(&mut self) {
-        if let Ok(mut state) = self.scope.state.lock() {
-            if matches!(*state, Lifecycle::Busy) {
-                *state = Lifecycle::Active(self.object.take().expect("session lease owns object"));
-            }
+        }
+        let token = self.clone();
+        move |arg| {
+            token.ensure_active()?;
+            let action =
+                stored.lock().as_ref().cloned().ok_or_else(|| {
+                    napi::Error::from_reason(SessionError::Unavailable.to_string())
+                })?;
+            Ok(action(arg))
         }
     }
 }
 
-impl<T: ScopedCallbacks> SessionCallbacks for SessionScoped<T> {
-    fn register_callbacks(self, env: &Env, pi: &Pi) -> Result<()> {
-        let shutdown_scope = self.clone();
-        let handler = env.create_function_from_closure("piSessionShutdown", move |_| {
-            shutdown_scope
-                .close()
-                .map_err(|error| napi::Error::from_reason(error.to_string()))
+type ShutdownCallback = FunctionRef<FnArgs<(Unknown<'static>, Unknown<'static>)>, Unknown<'static>>;
+type ShutdownSlot = Rc<RefCell<Option<ShutdownCallback>>>;
+
+/// Rust-only registration facade; all its callbacks share one shutdown lifetime.
+pub struct ScopedPi<'a> {
+    env: &'a Env,
+    pi: &'a Pi,
+    token: SessionToken,
+    shutdown: ShutdownSlot,
+}
+
+impl<'a> ScopedPi<'a> {
+    pub fn new(env: &'a Env, pi: &'a Pi) -> Result<Self> {
+        let token = SessionToken::default();
+        let shutdown_token = token.clone();
+        let shutdown: ShutdownSlot = Rc::default();
+        let cleanup = shutdown.clone();
+        let handler = env.create_function_from_closure("piSessionShutdown", move |ctx| {
+            let closed = shutdown_token.close();
+            if closed && let Some(callback) = cleanup.borrow_mut().take() {
+                let event: Unknown = ctx.get(0)?;
+                let context: Unknown = ctx.get(1)?;
+                return callback
+                    .borrow_back(ctx.env)?
+                    .call(FnArgs::from((event, context)))
+                    .map(Either::B);
+            }
+            Ok(Either::A(closed))
         })?;
-        let ensure_active = || {
-            self.with(|_| ())
-                .map_err(|error| napi::Error::from_reason(error.to_string()))
-        };
-        let result = pi
-            .on(OnCallback::SessionShutdown, handler)
-            .and_then(|()| ensure_active())
-            .and_then(|()| T::register_scoped(&self, env, pi))
-            .and_then(|()| ensure_active());
-        if let Err(error) = result {
-            let _ = self.close();
+        pi.on(env, OnCallback::SessionShutdown, handler)?;
+        token.ensure_active()?;
+        Ok(Self {
+            env,
+            pi,
+            token,
+            shutdown,
+        })
+    }
+
+    /// Register temporary host cleanup to run once when the scope closes.
+    ///
+    /// # Errors
+    /// Returns an error if the scope is closed or the handler cannot be retained.
+    pub fn on_shutdown(
+        &self,
+        handler: &Function<'a, FnArgs<(Unknown<'static>, Unknown<'static>)>, Unknown<'static>>,
+    ) -> Result<()> {
+        self.token.ensure_active()?;
+        *self.shutdown.borrow_mut() = Some(handler.create_ref()?);
+        Ok(())
+    }
+
+    pub fn register_callback<T: Callback>(&self, callback: T) -> Result<()> {
+        self.token.ensure_active()?;
+        if let Err(error) = callback.register(self) {
+            self.token.close();
             return Err(error);
         }
-        Ok(())
+        self.token.ensure_active()
+    }
+
+    /// Register cleanup to run once when this session closes.
+    ///
+    /// # Errors
+    /// Returns an error if shutdown has already started.
+    pub fn on_close(&self, cleanup: impl FnOnce() + Send + 'static) -> Result<()> {
+        self.token.on_close(cleanup)
+    }
+
+    /// Return a check tied to the session lifetime for host-bound authorization.
+    pub fn is_active_check(&self) -> impl Fn() -> bool + Clone + 'static {
+        let token = self.token.clone();
+        move || token.ensure_active().is_ok()
+    }
+
+    pub fn env(&self) -> &'a Env {
+        self.env
+    }
+
+    pub fn guarded_callback<A: 'static, R: 'static>(
+        &self,
+        action: impl Fn(A) -> R + Clone + Send + 'static,
+    ) -> impl Fn(A) -> Result<R> + Clone + 'static {
+        self.token.guarded_callback(action)
+    }
+
+    pub fn on(
+        &self,
+        event: OnCallback,
+        handler: Function<'a, FnArgs<(Unknown<'static>, Unknown<'static>)>, Unknown<'static>>,
+    ) -> Result<()> {
+        let handler = handler.create_ref()?;
+        let token = self.token.clone();
+        let guarded = self
+            .env
+            .create_function_from_closure("scopedEvent", move |ctx| {
+                if token.ensure_active().is_err() {
+                    return Ok(
+                        PromiseRaw::<()>::reject(ctx.env, "session state is unavailable")?
+                            .to_unknown(),
+                    );
+                }
+                let event: Unknown = ctx.get(0)?;
+                let context: Unknown = ctx.get(1)?;
+                handler
+                    .borrow_back(ctx.env)?
+                    .call(FnArgs::from((event, context)))
+            })?;
+        self.pi.on(self.env, event, guarded)
+    }
+
+    pub fn register_command(
+        &self,
+        name: &str,
+        description: &str,
+        handler: Function<'a, FnArgs<(Unknown<'static>, Unknown<'static>)>, Unknown<'static>>,
+    ) -> Result<()> {
+        let handler = handler.create_ref()?;
+        let token = self.token.clone();
+        let guarded = self
+            .env
+            .create_function_from_closure("scopedCommand", move |ctx| {
+                token.ensure_active()?;
+                let args: Unknown = ctx.get(0)?;
+                let context: Unknown = ctx.get(1)?;
+                handler
+                    .borrow_back(ctx.env)?
+                    .call(FnArgs::from((args, context)))
+            })?;
+        self.pi
+            .register_command(self.env, name, description, guarded)
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::SessionScoped;
-    use std::sync::{
-        Arc,
-        atomic::{AtomicUsize, Ordering},
-    };
+    use super::SessionToken;
 
-    struct State {
-        drops: Arc<AtomicUsize>,
-        count: u32,
-    }
+    #[test]
+    fn shutdown_releases_callback_state_while_handler_is_retained() {
+        use std::sync::{
+            Arc,
+            atomic::{AtomicUsize, Ordering},
+        };
 
-    impl Drop for State {
-        fn drop(&mut self) {
-            self.drops.fetch_add(1, Ordering::SeqCst);
+        struct State(Arc<AtomicUsize>);
+        impl Drop for State {
+            fn drop(&mut self) {
+                self.0.fetch_add(1, Ordering::SeqCst);
+            }
         }
-    }
 
-    #[test]
-    fn callbacks_run_without_holding_the_lifecycle_lock() {
-        let scope = SessionScoped::new(1_u32);
-        let observed = scope
-            .with(|_| scope.state.try_lock().is_ok())
-            .expect("active session");
-        assert!(observed, "callback must not hold the lifecycle mutex");
-    }
-
-    #[test]
-    fn reentrant_access_is_busy_and_shutdown_drops_the_active_object_after_return() {
         let drops = Arc::new(AtomicUsize::new(0));
-        let scope = SessionScoped::new(State {
-            drops: Arc::clone(&drops),
-            count: 0,
+        let state = Arc::new(State(drops.clone()));
+        let token = SessionToken::default();
+        let handler = token.guarded_callback({
+            let state = state.clone();
+            move |()| {
+                let _ = &state;
+            }
         });
-        let nested = scope.clone();
-        scope
-            .with(|state| {
-                assert!(matches!(
-                    nested.with(|_| ()),
-                    Err(super::SessionScopeError::Busy)
-                ));
-                assert!(nested.close().unwrap());
-                assert!(matches!(
-                    nested.with(|_| ()),
-                    Err(super::SessionScopeError::Unavailable)
-                ));
-                assert_eq!(drops.load(Ordering::SeqCst), 0);
-                state.count += 1;
-            })
-            .unwrap();
-        assert_eq!(drops.load(Ordering::SeqCst), 1);
-        assert!(!scope.close().unwrap());
-    }
-
-    #[test]
-    fn panicking_callback_returns_the_object_to_the_active_scope() {
-        let scope = SessionScoped::new(0_u32);
-        let outcome = std::panic::catch_unwind(|| {
-            let _ = scope.with(|state| {
-                *state = 7;
-                panic!("test panic");
-            });
-        });
-        assert!(outcome.is_err());
-        assert_eq!(scope.with(|state| *state).unwrap(), 7);
-    }
-
-    #[test]
-    fn closing_one_scope_revokes_all_handles_and_drops_state_once() {
-        let drops = Arc::new(AtomicUsize::new(0));
-        let scope = SessionScoped::new(State {
-            drops: Arc::clone(&drops),
-            count: 0,
-        });
-        let callback = scope.clone();
+        drop(state);
+        assert_eq!(drops.load(Ordering::SeqCst), 0);
+        token.close();
         assert_eq!(
-            callback
-                .with(|state| {
-                    state.count += 1;
-                    state.count
-                })
-                .unwrap(),
-            1
+            drops.load(Ordering::SeqCst),
+            1,
+            "shutdown must release callback state"
         );
-        assert!(scope.close().unwrap());
-        assert_eq!(drops.load(Ordering::SeqCst), 1);
-        assert!(callback.with(|state| state.count).is_err());
-        assert!(!scope.close().unwrap());
-        assert_eq!(drops.load(Ordering::SeqCst), 1);
+        assert!(handler(()).is_err());
+    }
+
+    #[test]
+    fn shutdown_denies_new_work_during_cleanup() {
+        use std::sync::{
+            Arc,
+            atomic::{AtomicBool, Ordering},
+        };
+
+        let token = SessionToken::default();
+        let active_during_cleanup = Arc::new(AtomicBool::new(false));
+        let observed = active_during_cleanup.clone();
+        let cleanup_token = token.clone();
+        token.0.lock().cleanup.push(Box::new(move || {
+            observed.store(cleanup_token.ensure_active().is_ok(), Ordering::SeqCst);
+        }));
+
+        assert!(token.close());
+        assert!(!active_during_cleanup.load(Ordering::SeqCst));
+        assert!(token.ensure_active().is_err());
+    }
+
+    #[test]
+    fn shutdown_closes_scope_when_cleanup_panics() {
+        let token = SessionToken::default();
+        token
+            .0
+            .lock()
+            .cleanup
+            .push(Box::new(|| panic!("cleanup failed")));
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| token.close()));
+        assert!(result.is_err());
+        assert!(token.ensure_active().is_err());
+    }
+
+    #[test]
+    fn shutdown_runs_registered_session_cleanup() {
+        use std::sync::{
+            Arc,
+            atomic::{AtomicBool, Ordering},
+        };
+        let token = SessionToken::default();
+        let cleared = Arc::new(AtomicBool::new(false));
+        let observed = cleared.clone();
+        token
+            .on_close(move || observed.store(true, Ordering::SeqCst))
+            .unwrap();
+        token.close();
+        assert!(cleared.load(Ordering::SeqCst));
+    }
+
+    #[test]
+    fn shutdown_revokes_all_token_clones_once() {
+        let token = SessionToken::default();
+        let clone = token.clone();
+        assert!(clone.ensure_active().is_ok());
+        assert!(token.close());
+        assert!(!clone.close());
+        assert!(clone.ensure_active().is_err());
     }
 }

@@ -24,34 +24,28 @@ if [[ "$workspace_name" != "pi-extensions" ]]; then
   exit 1
 fi
 
-# The overlay sits beside the real agent directory. Relative package paths in
-# settings.json, such as ../../git/agents/bigpowers, then resolve the same way.
-overlay_parent=$(dirname "$agent_dir")
-slug=$(printf '%s' "$workspace" | shasum -a 256 | awk '{print substr($1, 1, 12)}')
-overlay="$overlay_parent/agent-pi-extensions-$slug"
-mkdir -p "$overlay"
+# Per-run overlay: rewrite only settings.json, and symlink all normal agent
+# state so Pi behaves exactly as it does outside this workspace.
+overlay=$(mktemp -d "${TMPDIR:-/tmp}/agent-pi-extensions.XXXXXX")
+cleanup() {
+  rm -rf "$overlay"
+}
+trap cleanup EXIT
 
-shopt -s nullglob
-for entry in "$overlay"/*; do
-  base=$(basename "$entry")
-  if [[ "$base" == "settings.json" ]]; then
-    continue
-  fi
-  if [[ ! -e "$agent_dir/$base" ]]; then
-    rm -rf "$entry"
-  fi
-done
+shopt -s nullglob dotglob
 for entry in "$agent_dir"/*; do
   base=$(basename "$entry")
   if [[ "$base" == "settings.json" ]]; then
     continue
   fi
-  ln -sfn "$entry" "$overlay/$base"
+  ln -s "$entry" "$overlay/$base"
 done
-shopt -u nullglob
+shopt -u nullglob dotglob
 
-if [[ -L "$overlay/settings.json" ]]; then
-  rm "$overlay/settings.json"
+# settings.json is the only overlay-local file.
+# It is written after the package list is updated below.
+if [[ -e "$overlay/settings.json" || -L "$overlay/settings.json" ]]; then
+  rm -f "$overlay/settings.json"
 fi
 
 resolve_local() {

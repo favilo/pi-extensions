@@ -1,15 +1,15 @@
 story_id: e19s04
-title: Move lifecycle and tool authorization orchestration into Rust
-status: failing
-bcps: 8
+title: Move tool callback orchestration and result annotation into Rust
+status: passing
+bcps: 5
 spec: e19s04-rust-lifecycle-and-tool-orchestration.md
 tasks:
   - id: 1
-    description: Add parity contracts for Rust-owned session start, tool-call authorization, tool-result annotation, and session shutdown behavior.
+    description: Add parity contracts for Rust-owned tool-call registration, invocation validation, late-call rejection, and tool-result annotation, including cancellation and late confirmation.
     verify: npm test -- extensions/tool-permissions
     risk: P0
     security: high
-    status: failing
+    status: passing
     allure:
       severity: critical
       categories:
@@ -17,11 +17,11 @@ tasks:
         - Authorization
         - Security Review
   - id: 2
-    description: Implement typed Rust lifecycle and tool-call orchestration using the safe callback mechanism proven by e19s01 and e19s02.
+    description: Implement typed Rust tool-call and result orchestration using the safe callback mechanism proven by e19s01 and e19s02; retain temporary policy/UI capabilities until e19s05/e19s06 and lifecycle cleanup until e19s08.
     verify: npm test -- extensions/tool-permissions
     risk: P0
     security: high
-    status: failing
+    status: passing
     allure:
       severity: critical
       categories:
@@ -29,11 +29,11 @@ tasks:
         - Native integration
         - Security Review
   - id: 3
-    description: Remove migrated lifecycle and tool authorization implementations from TypeScript while preserving observable permission outcomes.
+    description: Retain explicit temporary TypeScript policy/UI capabilities while Rust owns callback registration, validation, session guards, steering state, and result annotation; final bridge removal is e19s06 after e19s05/e19s08 parity.
     verify: npm run check
     risk: P0
     security: high
-    status: failing
+    status: passing
     allure:
       severity: critical
       categories:

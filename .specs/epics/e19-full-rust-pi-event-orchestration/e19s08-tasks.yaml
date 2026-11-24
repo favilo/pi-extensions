@@ -1,0 +1,27 @@
+story_id: e19s08
+title: Move lifecycle behavior and shutdown cleanup into Rust
+status: failing
+bcps: 3
+spec: e19s08-rust-lifecycle-cleanup.md
+depends_on:
+  - e19s04
+  - e19s05
+tasks:
+  - id: 1
+    description: Add parity contracts for startup notices and audit, shutdown cleanup, failure and late confirmation across migrated session state.
+    verify: npm test -- extensions/tool-permissions
+    risk: P0
+    security: high
+    status: failing
+  - id: 2
+    description: Implement Rust-owned startup and final shutdown behavior after authorization and interactive state owners have migrated.
+    verify: npm test -- extensions/tool-permissions
+    risk: P0
+    security: high
+    status: failing
+  - id: 3
+    description: Remove the temporary TypeScript lifecycle capabilities after parity is proven.
+    verify: npm run check
+    risk: P0
+    security: high
+    status: failing

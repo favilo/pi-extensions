@@ -13,7 +13,7 @@ exports.probe = (request) => ({
 });
 exports.registerToolPermissionsCallbacks = (request, pi, bridge) => {
   pi.on("session_start", (event, ctx) => bridge.handleSessionStart(event, ctx));
-  pi.on("tool_call", (event, ctx) => bridge.handleToolCall(event, ctx));
+  pi.on("tool_call", (event, ctx) => bridge.authorizeToolCall?.(event, ctx));
   pi.on("tool_result", (event, ctx) => bridge.handleToolResult?.(event, ctx));
   pi.on("session_shutdown", (event, ctx) =>
     bridge.handleSessionShutdown?.(event, ctx),
@@ -53,7 +53,9 @@ export function withNativeHostPackage(
 ): Promise<void> | void {
   const previousPackage = process.env.PI_TOOL_PERMISSIONS_NATIVE_PACKAGE;
   const previousDisable = process.env.PI_TOOL_PERMISSIONS_NATIVE_DISABLE;
-  const directory = mkdtempSync(join(tmpdir(), "tool-permissions-native-host-"));
+  const directory = mkdtempSync(
+    join(tmpdir(), "tool-permissions-native-host-"),
+  );
   const packagePath = join(directory, "index.cjs");
   writeFileSync(packagePath, `${NATIVE_REGISTRATION_STUB}\n${extraSource}\n`);
   process.env.PI_TOOL_PERMISSIONS_NATIVE_PACKAGE = "1";

@@ -3,7 +3,7 @@ stories:
     status: done
     completed_at: '2026-11-19T21:43:54Z'
   e19s02:
-    status: in_progress
+    status: done
     started_at: '2026-11-19T21:43:54Z'
   e06s05:
     status: todo
@@ -11,6 +11,9 @@ stories:
   e07s01:
     status: todo
     started_at: '2026-08-11T16:43:59-07:00'
+  e19s03:
+    status: done
+    resolution: superseded; user confirmed sample command live
 development_status:
   e01s01: passing
   e01s02: passing
@@ -68,12 +71,13 @@ development_status:
   e18s06: cancelled
   e18s07: cancelled
   e19s01: passing
-  e19s02: todo
-  e19s03: todo
-  e19s04: todo
+  e19s02: passing
+  e19s03: cancelled
+  e19s04: passing
   e19s05: todo
   e19s06: todo
   e19s07: todo
+  e19s08: todo
   e20s01: todo
   e20s02: todo
   e20s03: todo
